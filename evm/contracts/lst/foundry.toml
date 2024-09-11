@@ -1,8 +1,6 @@
 [profile.default]
-src = "contracts/src"
-script = "script"
+src = "src"
 out = "out"
-test = "test"
-libs = ["contracts/lib"]
+libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
