@@ -1,10 +1,18 @@
+use crate::contract::execute;
 use crate::contract::instantiate;
-use crate::msg::{InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::query::query;
-use crate::state::Config;
+use crate::state::ValidatorsRegistry;
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
-use cosmwasm_std::{coins, from_json, Addr, DepsMut, Env, Response};
+use cosmwasm_std::{
+    coins, from_json, Addr, Coin, Decimal, DepsMut, Empty, Env, MemoryStorage, Response, Uint128,
+    Validator,
+};
+use cw_multi_test::{
+    App, AppBuilder, BankKeeper, Contract, ContractWrapper, Executor, FailingModule, StakingInfo,
+    WasmKeeper,
+};
 
 fn set_up(deps: DepsMut, env: Env, validators: Vec<Addr>) -> Result<Response, ContractError> {
     let denom_name: String = "muno".to_string();
@@ -17,6 +25,82 @@ fn set_up(deps: DepsMut, env: Env, validators: Vec<Addr>) -> Result<Response, Co
     let info = message_info(&creator, &coins(2, denom_name.as_str()));
     let res = instantiate(deps, env, info, msg).unwrap();
     Ok(res)
+}
+
+pub type StakingApp = App<
+    BankKeeper,
+    MockApi,
+    MemoryStorage,
+    FailingModule<Empty, cosmwasm_std::Empty, cosmwasm_std::Empty>,
+    WasmKeeper<Empty, cosmwasm_std::Empty>,
+>;
+
+const VALIDATOR_ONE_ADDRESS: &str = "validator_one";
+const STAKING_DENOM: &str = "TOKEN";
+const SUPPLY: u128 = 500_000_000u128;
+
+pub fn liquid_staking_contract() -> Box<dyn Contract<Empty>> {
+    let contract = ContractWrapper::new(execute, instantiate, query);
+    Box::new(contract)
+}
+
+fn setup_contract() -> (Addr, StakingApp, Addr, u64) {
+    let owner: Addr = Addr::unchecked("owner");
+    let validator_addr: Addr = Addr::unchecked(VALIDATOR_ONE_ADDRESS);
+
+    let mut app: StakingApp = AppBuilder::new_custom().build(|router, api, storage| {
+        let env = mock_env();
+        // Set the initial balances for USER
+        router
+            .bank
+            .init_balance(
+                storage,
+                &owner,
+                vec![Coin {
+                    denom: STAKING_DENOM.to_string(),
+                    amount: Uint128::from(SUPPLY),
+                }],
+            )
+            .unwrap();
+
+        // Setup staking module for the correct mock data.
+        router
+            .staking
+            .setup(
+                storage,
+                StakingInfo {
+                    bonded_denom: STAKING_DENOM.to_string(),
+                    unbonding_time: 1, // in seconds
+                    apr: Decimal::percent(10),
+                },
+            )
+            .unwrap();
+
+        let validator = Validator::create(
+            validator_addr.to_string(),
+            Decimal::zero(),
+            Decimal::one(),
+            Decimal::one(),
+        );
+        // Add mock validator
+        router
+            .staking
+            .add_validator(api, storage, &env.block, validator)
+            .unwrap();
+    });
+
+    let ls_code_id = app.store_code(liquid_staking_contract());
+
+    let init_msg = InstantiateMsg {
+        underlying_coin_denom: STAKING_DENOM.to_string(),
+        validators: vec![validator_addr],
+    };
+    // Instantiate the multisig contract using its newly stored code id
+    let ls_address = app
+        .instantiate_contract(ls_code_id, owner.clone(), &init_msg, &[], "ls-test", None)
+        .unwrap();
+
+    (owner, app, ls_address, ls_code_id)
 }
 
 #[test]
@@ -36,7 +120,33 @@ fn initial_query() {
     let env = mock_env();
     let _ = set_up(deps.as_mut(), env.clone(), vec![validator.clone()]);
 
-    let msg = QueryMsg::Config {};
-    let config: Config = from_json(query(deps.as_ref(), env, msg).unwrap()).unwrap();
-    assert_eq!(config.validators.first().unwrap(), validator);
+    let msg = QueryMsg::Validators {};
+    let config: ValidatorsRegistry = from_json(query(deps.as_ref(), env, msg).unwrap()).unwrap();
+    assert_eq!(config.validators.first().unwrap().address, validator.to_string());
+}
+
+#[test]
+fn execute_bond() {
+    let (owner, mut app, ls_contract_addr, _ls_code_id) = setup_contract();
+
+    let bond_msg = ExecuteMsg::Bond {};
+    let res1 = app.execute_contract(owner.clone(), ls_contract_addr.clone(), &bond_msg, &[]);
+
+    //println!("{:?}", res1);
+    assert_eq!(res1.is_err(), true);
+
+    let fund = Coin {
+        amount: Uint128::new(10),
+        denom: STAKING_DENOM.to_string(),
+    };
+
+    let res2 = app
+        .execute_contract(
+            owner.clone(),
+            ls_contract_addr.clone(),
+            &bond_msg,
+            &vec![fund],
+        )
+        .unwrap();
+    println!("{:?}", res2);
 }

@@ -1,4 +1,4 @@
-use crate::state::{Config, Parameters, State};
+use crate::state::{Config, Parameters, State, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
 
@@ -40,4 +40,6 @@ pub enum QueryMsg {
     State {},
     #[returns(Parameters)]
     Parameters {},
+    #[returns(ValidatorsRegistry)]
+    Validators {},
 }
