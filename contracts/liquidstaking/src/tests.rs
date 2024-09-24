@@ -2,23 +2,31 @@ use crate::contract::execute;
 use crate::contract::instantiate;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::query::query;
-use crate::state::ValidatorsRegistry;
+use crate::state::{State, ValidatorsRegistry};
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
 use cosmwasm_std::{
-    coins, from_json, Addr, Coin, Decimal, DepsMut, Empty, Env, MemoryStorage, Response, Uint128,
-    Validator,
+    coins, from_json, Addr, Coin, Decimal, DepsMut, Env, MemoryStorage, Response, StdError,
+    Uint128, Validator,
 };
 use cw_multi_test::{
     App, AppBuilder, BankKeeper, Contract, ContractWrapper, Executor, FailingModule, StakingInfo,
     WasmKeeper,
 };
+use token_factory_api::TokenFactoryMsg;
 
-fn set_up(deps: DepsMut, env: Env, validators: Vec<Addr>) -> Result<Response, ContractError> {
+fn set_up(
+    deps: DepsMut,
+    env: Env,
+    validators: Vec<Addr>,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let denom_name: String = "muno".to_string();
+    let staked_token_denom_address = Addr::unchecked("lst_denom");
     let msg = InstantiateMsg {
         underlying_coin_denom: denom_name.clone(),
         validators,
+        staked_token_denom: denom_name.clone(),
+        staked_token_denom_address,
     };
 
     let creator = MockApi::default().addr_make("owner");
@@ -31,20 +39,20 @@ pub type StakingApp = App<
     BankKeeper,
     MockApi,
     MemoryStorage,
-    FailingModule<Empty, cosmwasm_std::Empty, cosmwasm_std::Empty>,
-    WasmKeeper<Empty, cosmwasm_std::Empty>,
+    FailingModule<TokenFactoryMsg, cosmwasm_std::Empty, cosmwasm_std::Empty>,
+    WasmKeeper<TokenFactoryMsg, cosmwasm_std::Empty>,
 >;
 
 const VALIDATOR_ONE_ADDRESS: &str = "validator_one";
 const STAKING_DENOM: &str = "TOKEN";
 const SUPPLY: u128 = 500_000_000u128;
 
-pub fn liquid_staking_contract() -> Box<dyn Contract<Empty>> {
+pub fn liquid_staking_contract() -> Box<dyn Contract<TokenFactoryMsg>> {
     let contract = ContractWrapper::new(execute, instantiate, query);
     Box::new(contract)
 }
 
-fn setup_contract() -> (Addr, StakingApp, Addr, u64) {
+fn setup_contract() -> (Addr, StakingApp, Addr) {
     let owner: Addr = Addr::unchecked("owner");
     let validator_addr: Addr = Addr::unchecked(VALIDATOR_ONE_ADDRESS);
 
@@ -91,16 +99,20 @@ fn setup_contract() -> (Addr, StakingApp, Addr, u64) {
 
     let ls_code_id = app.store_code(liquid_staking_contract());
 
-    let init_msg = InstantiateMsg {
-        underlying_coin_denom: STAKING_DENOM.to_string(),
-        validators: vec![validator_addr],
+    let denom_name: String = STAKING_DENOM.to_string();
+    let validators: Vec<Addr> = vec![validator_addr];
+    let msg = InstantiateMsg {
+        underlying_coin_denom: denom_name.clone(),
+        validators,
+        staked_token_denom: denom_name,
+        staked_token_denom_address: owner.clone(),
     };
     // Instantiate the multisig contract using its newly stored code id
     let ls_address = app
-        .instantiate_contract(ls_code_id, owner.clone(), &init_msg, &[], "ls-test", None)
+        .instantiate_contract(ls_code_id, owner.clone(), &msg, &[], "ls-test", None)
         .unwrap();
 
-    (owner, app, ls_address, ls_code_id)
+    (owner, app, ls_address)
 }
 
 #[test]
@@ -122,12 +134,15 @@ fn initial_query() {
 
     let msg = QueryMsg::Validators {};
     let config: ValidatorsRegistry = from_json(query(deps.as_ref(), env, msg).unwrap()).unwrap();
-    assert_eq!(config.validators.first().unwrap().address, validator.to_string());
+    assert_eq!(
+        config.validators.first().unwrap().address,
+        validator.to_string()
+    );
 }
 
 #[test]
 fn execute_bond() {
-    let (owner, mut app, ls_contract_addr, _ls_code_id) = setup_contract();
+    let (owner, mut app, ls_contract_addr) = setup_contract();
 
     let bond_msg = ExecuteMsg::Bond {};
     let res1 = app.execute_contract(owner.clone(), ls_contract_addr.clone(), &bond_msg, &[]);
@@ -136,7 +151,7 @@ fn execute_bond() {
     assert_eq!(res1.is_err(), true);
 
     let fund = Coin {
-        amount: Uint128::new(10),
+        amount: Uint128::new(2000),
         denom: STAKING_DENOM.to_string(),
     };
 
@@ -148,5 +163,29 @@ fn execute_bond() {
             &vec![fund],
         )
         .unwrap();
-    println!("{:?}", res2);
+    //println!("{:?}", res2);
+
+    let msg = QueryMsg::State {};
+    let res: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr.clone(), &msg);
+    //let bin: State = from_json(bin).unwrap();
+    println!("{:?}", res);
+
+    let fund2 = Coin {
+        amount: Uint128::new(8000),
+        denom: STAKING_DENOM.to_string(),
+    };
+
+    let res3 = app
+        .execute_contract(
+            owner.clone(),
+            ls_contract_addr.clone(),
+            &bond_msg,
+            &vec![fund2],
+        )
+        .unwrap();
+    println!("{:?}", res3);
+
+    let state2: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr, &msg);
+    //let bin: State = from_json(bin).unwrap();
+    println!("{:?}", state2);
 }

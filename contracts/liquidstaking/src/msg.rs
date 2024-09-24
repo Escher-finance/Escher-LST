@@ -1,4 +1,4 @@
-use crate::state::{Config, Parameters, State, ValidatorsRegistry};
+use crate::state::{Parameters, State, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
 
@@ -6,6 +6,8 @@ use cosmwasm_std::Addr;
 pub struct InstantiateMsg {
     pub underlying_coin_denom: String,
     pub validators: Vec<Addr>,
+    pub staked_token_denom: String,
+    pub staked_token_denom_address: Addr,
 }
 
 #[cw_serde]
@@ -34,8 +36,6 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(Config)]
-    Config {},
     #[returns(State)]
     State {},
     #[returns(Parameters)]

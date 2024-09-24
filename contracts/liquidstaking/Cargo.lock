@@ -572,6 +572,7 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
+ "token-factory-api",
 ]
 
 [[package]]
@@ -1058,6 +1059,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.77",
+]
+
+[[package]]
+name = "token-factory-api"
+version = "0.1.0"
+source = "git+https://github.com/unionlabs/union?tag=v0.24.0#4d3bf1c9ca1e7b210206ab20c32fe0300ea23291"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
 ]
 
 [[package]]
