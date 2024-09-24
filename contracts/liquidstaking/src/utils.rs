@@ -70,3 +70,13 @@ pub fn get_actual_total_reward(
 
     return total_rewards;
 }
+
+
+pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
+    let bond_decimal = Decimal::new(total_bond_amount);
+    let ratio = Decimal::from_ratio(Uint128::new(1005), Uint128::new(1000));
+    let fract = Decimal::new(Uint128::new(DECIMAL_FRACTIONAL)) * ratio;
+
+    let total = bond_decimal * fract;
+    return total.to_uint_ceil();
+}

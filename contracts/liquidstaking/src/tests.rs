@@ -14,6 +14,7 @@ use cw_multi_test::{
     WasmKeeper,
 };
 use token_factory_api::TokenFactoryMsg;
+use crate::utils::get_mock_total_reward;
 
 fn set_up(
     deps: DepsMut,
@@ -151,11 +152,11 @@ fn execute_bond() {
     assert_eq!(res1.is_err(), true);
 
     let fund = Coin {
-        amount: Uint128::new(2000),
+        amount: Uint128::new(1000),
         denom: STAKING_DENOM.to_string(),
     };
 
-    let res2 = app
+    let _res2 = app
         .execute_contract(
             owner.clone(),
             ls_contract_addr.clone(),
@@ -166,16 +167,16 @@ fn execute_bond() {
     //println!("{:?}", res2);
 
     let msg = QueryMsg::State {};
-    let res: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr.clone(), &msg);
+    let _res: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr.clone(), &msg);
     //let bin: State = from_json(bin).unwrap();
-    println!("{:?}", res);
+    //println!("{:?}", res);
 
     let fund2 = Coin {
-        amount: Uint128::new(8000),
+        amount: Uint128::new(1000),
         denom: STAKING_DENOM.to_string(),
     };
 
-    let res3 = app
+    let _res3 = app
         .execute_contract(
             owner.clone(),
             ls_contract_addr.clone(),
@@ -183,9 +184,20 @@ fn execute_bond() {
             &vec![fund2],
         )
         .unwrap();
-    println!("{:?}", res3);
+    //println!("{:?}", res3);
 
-    let state2: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr, &msg);
+    let _state2: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr, &msg);
     //let bin: State = from_json(bin).unwrap();
-    println!("{:?}", state2);
+    //println!("{:?}", state2);
+}
+
+#[test]
+fn mock_total_reward() {
+    let total_bond = Uint128::new(1000);
+    let total_bond_with_reward = get_mock_total_reward(total_bond);
+    println!("total_bond: {:?}", total_bond);
+    println!("total_bond_with_reward: {:?}", total_bond_with_reward);
+
+    let bond_decimal = Decimal::new(total_bond);
+    println!("bond_decimal: {:?}", bond_decimal);
 }

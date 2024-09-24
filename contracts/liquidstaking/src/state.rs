@@ -18,7 +18,10 @@ pub struct State {
     pub total_bond_amount: Uint128,
     // total liquid staking token that is issued
     pub total_lst_supply: Uint128,
-    pub last_unbonded_time: u64,
+    // bond_counter how many times bond is called
+    pub bond_counter: u64,
+    // last_bond_time
+    pub last_bond_time: u64,
 }
 
 // Config is configuration that still possible to change

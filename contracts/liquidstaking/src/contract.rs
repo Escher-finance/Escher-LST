@@ -11,7 +11,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{
     Parameters, State, Validator, ValidatorsRegistry, PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
-use crate::utils::{decimal_division, get_actual_total_bonded, get_actual_total_reward};
+use crate::utils::{decimal_division, get_actual_total_bonded, get_actual_total_reward, get_mock_total_reward};
 
 /*
 // version info for migration info
@@ -48,8 +48,9 @@ pub fn instantiate(
     let state = State {
         exchange_rate: Decimal::one(),
         total_bond_amount: Uint128::new(0),
-        last_unbonded_time: 0,
         total_lst_supply: Uint128::new(0),
+        bond_counter: 0,
+        last_bond_time: 0,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -121,24 +122,31 @@ pub fn execute(
         .iter()
         .map(|v| v.address.clone())
         .collect();
-    state.total_bond_amount = get_actual_total_bonded(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list.clone(),
-    ) + get_actual_total_reward(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list,
-    );
+
+
+    if !cfg!(test) {
+        state.total_bond_amount = get_actual_total_bonded(
+            deps.querier,
+            delegator.to_string(),
+            coin_denom.clone(),
+            validators_list.clone(),
+        ) + get_actual_total_reward(
+            deps.querier,
+            delegator.to_string(),
+            coin_denom.clone(),
+            validators_list,
+        );
+    } else {
+        state.total_bond_amount = get_mock_total_reward(state.total_bond_amount);
+    }
 
     let total_lst_supply = state.total_lst_supply;
 
+    // after update exchange rate we update the state
+    state.bond_counter = state.bond_counter + 1;
+    state.total_bond_amount += payment.amount;
     state.update_exchange_rate(total_lst_supply, mint_amount);
 
-    // after update exchange rate we update the state
-    state.total_bond_amount += payment.amount;
     state.total_lst_supply = total_lst_supply + mint_amount;
     STATE.save(deps.storage, &state)?;
 
