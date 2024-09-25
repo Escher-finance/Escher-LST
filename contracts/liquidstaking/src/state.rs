@@ -14,8 +14,10 @@ pub struct Validator {
 #[cw_serde]
 pub struct State {
     pub exchange_rate: Decimal,
-    // total native token value that is delegated
+    // total native token plus staking rewards
     pub total_bond_amount: Uint128,
+    // total native token that is delegated, include rewards
+    pub total_delegated_amount: Uint128,
     // total liquid staking token that is issued
     pub total_lst_supply: Uint128,
     // bond_counter how many times bond is called

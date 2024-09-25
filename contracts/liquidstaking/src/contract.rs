@@ -50,6 +50,7 @@ pub fn instantiate(
 
     let state = State {
         exchange_rate: Decimal::one(),
+        total_delegated_amount: Uint128::new(0),
         total_bond_amount: Uint128::new(0),
         total_lst_supply: Uint128::new(0),
         bond_counter: 0,
@@ -126,12 +127,14 @@ pub fn execute(
     let total_bond_amount: Uint128;
 
     if !cfg!(test) {
-        total_bond_amount = get_actual_total_bonded(
+        let delegated_amount = get_actual_total_bonded(
             deps.querier,
             delegator.to_string(),
             coin_denom.clone(),
             validators_list.clone(),
-        ) + get_actual_total_reward(
+        );
+        state.total_delegated_amount = delegated_amount;
+        total_bond_amount =  delegated_amount + get_actual_total_reward(
             deps.querier,
             delegator.to_string(),
             coin_denom.clone(),
@@ -155,7 +158,7 @@ pub fn execute(
     state.bond_counter = state.bond_counter + 1;
     state.total_bond_amount = total_bond_amount + payment.amount;
     state.total_lst_supply = total_lst_supply + mint_amount;
-
+    state.total_delegated_amount += payment.amount;
     state.update_exchange_rate();
     
     STATE.save(deps.storage, &state)?;
