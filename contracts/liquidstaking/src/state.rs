@@ -39,12 +39,7 @@ pub struct Parameters {
 }
 
 impl State {
-    pub fn update_exchange_rate(&mut self, total_issued: Uint128, requested: Uint128) {
-        let actual_supply = total_issued + requested;
-        if self.total_bond_amount.is_zero() || actual_supply.is_zero() {
-            self.exchange_rate = Decimal::one()
-        } else {
-            self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, actual_supply);
-        }
+    pub fn update_exchange_rate(&mut self) {
+        self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_lst_supply);
     }
 }

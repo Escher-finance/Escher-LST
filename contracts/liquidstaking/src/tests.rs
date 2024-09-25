@@ -3,6 +3,7 @@ use crate::contract::instantiate;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::query::query;
 use crate::state::{State, ValidatorsRegistry};
+use crate::utils::{calculate_token_from_rate, get_mock_total_reward};
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
 use cosmwasm_std::{
@@ -14,7 +15,6 @@ use cw_multi_test::{
     WasmKeeper,
 };
 use token_factory_api::TokenFactoryMsg;
-use crate::utils::get_mock_total_reward;
 
 fn set_up(
     deps: DepsMut,
@@ -147,7 +147,6 @@ fn execute_bond() {
 
     let bond_msg = ExecuteMsg::Bond {};
     let res1 = app.execute_contract(owner.clone(), ls_contract_addr.clone(), &bond_msg, &[]);
-
     //println!("{:?}", res1);
     assert_eq!(res1.is_err(), true);
 
@@ -156,7 +155,7 @@ fn execute_bond() {
         denom: STAKING_DENOM.to_string(),
     };
 
-    let _res2 = app
+    let res2 = app
         .execute_contract(
             owner.clone(),
             ls_contract_addr.clone(),
@@ -164,19 +163,19 @@ fn execute_bond() {
             &vec![fund],
         )
         .unwrap();
-    //println!("{:?}", res2);
+    println!("{:?}", res2);
 
     let msg = QueryMsg::State {};
-    let _res: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr.clone(), &msg);
-    //let bin: State = from_json(bin).unwrap();
-    //println!("{:?}", res);
+    let res: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr.clone(), &msg);
+    let state: State = res.unwrap();
+    println!("{:?}", state);
 
     let fund2 = Coin {
         amount: Uint128::new(1000),
         denom: STAKING_DENOM.to_string(),
     };
 
-    let _res3 = app
+    let res3 = app
         .execute_contract(
             owner.clone(),
             ls_contract_addr.clone(),
@@ -184,20 +183,46 @@ fn execute_bond() {
             &vec![fund2],
         )
         .unwrap();
-    //println!("{:?}", res3);
+    println!("{:?}", res3);
 
-    let _state2: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr, &msg);
-    //let bin: State = from_json(bin).unwrap();
-    //println!("{:?}", state2);
+    let res2: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr, &msg);
+    let state2: State = res2.unwrap();
+    println!("{:?}", state2);
 }
+
+
+#[test]
+fn exchange_rate_calculation() {
+    let total_bond = Uint128::new(100);
+
+    let a = Uint128::new(10);
+    let b = Uint128::new(50);
+    let exchange_rate = Decimal::from_ratio(a, b);
+    //println!("{:?} / {:?}", total_bond, exchange_rate);
+
+    let token = calculate_token_from_rate(total_bond, exchange_rate);
+    assert_eq!(token, Uint128::new(500));
+
+    // - Rewards for 4 days: 1000 Union * 0.0274% * 4 = 1.096 Union
+    // - Total staked Union + rewards (U + R): 1001.096 Union
+    // - Total LUnion (L): 1000 LUnion
+
+    // - New exchange rate: 1001.096 / 1000 = 1.001096 Union per LUnion
+    // - Bob receives: 500 / 1.001096 = 499.45 LUnion
+
+    let a = Uint128::new(1001096);
+    let b = Uint128::new(1000000);
+    let new_exchange_rate = Decimal::from_ratio(a, b);
+
+    let bond_amount = Uint128::new(500000000);
+    let mint_amount = calculate_token_from_rate(bond_amount, new_exchange_rate);
+    assert_eq!(mint_amount, Uint128::new(499452599));
+}
+
 
 #[test]
 fn mock_total_reward() {
     let total_bond = Uint128::new(1000);
-    let total_bond_with_reward = get_mock_total_reward(total_bond);
-    println!("total_bond: {:?}", total_bond);
-    println!("total_bond_with_reward: {:?}", total_bond_with_reward);
-
-    let bond_decimal = Decimal::new(total_bond);
-    println!("bond_decimal: {:?}", bond_decimal);
+    let bond_with_reward = get_mock_total_reward(total_bond);
+    assert_eq!(bond_with_reward, Uint128::new(1005));
 }
