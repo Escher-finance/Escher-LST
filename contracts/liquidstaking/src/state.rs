@@ -38,6 +38,8 @@ pub struct Parameters {
     pub underlying_coin_denom: String,
     pub staked_token_denom: String,
     pub staked_token_denom_address: String,
+    pub ucs01_channel: String,
+    pub ucs01_relay_contract: String,
 }
 
 impl State {

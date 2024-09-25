@@ -5,6 +5,7 @@ pub mod msg;
 pub mod query;
 pub mod state;
 pub mod utils;
+pub mod relay;
 
 #[cfg(test)]
 mod tests;

@@ -8,6 +8,8 @@ pub struct InstantiateMsg {
     pub validators: Vec<Addr>,
     pub staked_token_denom: String,
     pub staked_token_denom_address: Addr,
+    pub ucs01_channel: String,
+    pub ucs01_relay_contract: String,
 }
 
 #[cw_serde]
@@ -43,3 +45,26 @@ pub enum QueryMsg {
     #[returns(ValidatorsRegistry)]
     Validators {},
 }
+
+/// This is the message we accept via Receive
+#[cw_serde]
+pub struct TransferMsg {
+    /// The local channel to send the packets on
+    pub channel: String,
+    /// The remote address to send to.
+    pub receiver: String,
+    /// How long the packet lives in seconds. If not specified, use default_timeout
+    pub timeout: Option<u64>,
+    /// The memo
+    pub memo: String,
+    // Fee associated with the transfer, denominated in transferred coins
+    // pub fees: Option<Fees>,
+}
+
+
+#[cw_serde]
+pub enum Ucs01RelayExecuteMsg {
+    /// This allows us to transfer native tokens
+    Transfer(TransferMsg),
+}
+

@@ -45,6 +45,9 @@ pub fn instantiate(
         underlying_coin_denom: msg.underlying_coin_denom,
         staked_token_denom: msg.staked_token_denom,
         staked_token_denom_address: msg.staked_token_denom_address.to_string(),
+        ucs01_channel: msg.ucs01_channel,
+        ucs01_relay_contract: msg.ucs01_relay_contract,
+
     };
     PARAMETERS.save(deps.storage, &params)?;
 
