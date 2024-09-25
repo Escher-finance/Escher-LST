@@ -14,11 +14,16 @@ pub struct Validator {
 #[cw_serde]
 pub struct State {
     pub exchange_rate: Decimal,
-    // total native token value that is delegated
+    // total native token plus staking rewards
     pub total_bond_amount: Uint128,
+    // total native token that is delegated, include rewards
+    pub total_delegated_amount: Uint128,
     // total liquid staking token that is issued
     pub total_lst_supply: Uint128,
-    pub last_unbonded_time: u64,
+    // bond_counter how many times bond is called
+    pub bond_counter: u64,
+    // last_bond_time
+    pub last_bond_time: u64,
 }
 
 // Config is configuration that still possible to change
@@ -36,12 +41,7 @@ pub struct Parameters {
 }
 
 impl State {
-    pub fn update_exchange_rate(&mut self, total_issued: Uint128, requested: Uint128) {
-        let actual_supply = total_issued + requested;
-        if self.total_bond_amount.is_zero() || actual_supply.is_zero() {
-            self.exchange_rate = Decimal::one()
-        } else {
-            self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, actual_supply);
-        }
+    pub fn update_exchange_rate(&mut self) {
+        self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_lst_supply);
     }
 }

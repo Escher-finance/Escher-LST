@@ -6,12 +6,10 @@ use std::str::FromStr;
 const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
 
 /// return a / b
-pub fn decimal_division(a: Uint128, b: Decimal) -> Uint128 {
-    let fract = Decimal::new(Uint128::new(DECIMAL_FRACTIONAL)) * b;
-    let total = Uint128::new(fract.to_uint_ceil().into());
-    let mut decimal = Decimal::from_ratio(a, total);
-    decimal = decimal * (Decimal::new(Uint128::from(DECIMAL_FRACTIONAL)));
-    return decimal.to_uint_ceil();
+pub fn calculate_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
+    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
+    let fract = (exchange_rate * decimal_fract).to_uint_ceil();
+    Decimal::from_ratio(Uint128::from(DECIMAL_FRACTIONAL) * stake_amount, fract).to_uint_floor()
 }
 
 /// get total delegated token value from validators in native token
@@ -69,4 +67,9 @@ pub fn get_actual_total_reward(
     }
 
     return total_rewards;
+}
+
+pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
+    let ratio = Decimal::from_ratio(Uint128::new(1000), Uint128::new(1005));
+    return calculate_token_from_rate(total_bond_amount, ratio);
 }

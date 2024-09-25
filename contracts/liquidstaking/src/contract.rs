@@ -11,7 +11,10 @@ use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{
     Parameters, State, Validator, ValidatorsRegistry, PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
-use crate::utils::{decimal_division, get_actual_total_bonded, get_actual_total_reward};
+use crate::utils::{
+    calculate_token_from_rate, get_actual_total_bonded, get_actual_total_reward,
+    get_mock_total_reward,
+};
 
 /*
 // version info for migration info
@@ -47,9 +50,11 @@ pub fn instantiate(
 
     let state = State {
         exchange_rate: Decimal::one(),
+        total_delegated_amount: Uint128::new(0),
         total_bond_amount: Uint128::new(0),
-        last_unbonded_time: 0,
         total_lst_supply: Uint128::new(0),
+        bond_counter: 0,
+        last_bond_time: 0,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -110,36 +115,52 @@ pub fn execute(
         msgs.push(staking_msg.into());
     }
 
-    // logic to mint token and update the supply and total_bond_amount
-    let mut state = STATE.load(deps.storage)?;
-
-    let mint_amount = decimal_division(payment.amount, state.exchange_rate);
-
     let delegator = env.contract.address;
     let validators_list: Vec<String> = validators_reg
         .validators
         .iter()
         .map(|v| v.address.clone())
         .collect();
-    state.total_bond_amount = get_actual_total_bonded(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list.clone(),
-    ) + get_actual_total_reward(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list,
-    );
+
+    // logic to mint token and update the supply and total_bond_amount
+    let mut state = STATE.load(deps.storage)?;
+    let total_bond_amount: Uint128;
+
+    if !cfg!(test) {
+        let delegated_amount = get_actual_total_bonded(
+            deps.querier,
+            delegator.to_string(),
+            coin_denom.clone(),
+            validators_list.clone(),
+        );
+        state.total_delegated_amount = delegated_amount;
+        total_bond_amount =  delegated_amount + get_actual_total_reward(
+            deps.querier,
+            delegator.to_string(),
+            coin_denom.clone(),
+            validators_list,
+        );
+    } else {
+        total_bond_amount = get_mock_total_reward(state.total_bond_amount);
+    }
+
+    let mut current_exchange_rate = state.exchange_rate;
+    
+    if !total_bond_amount.is_zero() && !state.total_lst_supply.is_zero() {
+        current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
+    }
+
+    let mint_amount = calculate_token_from_rate(payment.amount, current_exchange_rate);
 
     let total_lst_supply = state.total_lst_supply;
 
-    state.update_exchange_rate(total_lst_supply, mint_amount);
-
     // after update exchange rate we update the state
-    state.total_bond_amount += payment.amount;
+    state.bond_counter = state.bond_counter + 1;
+    state.total_bond_amount = total_bond_amount + payment.amount;
     state.total_lst_supply = total_lst_supply + mint_amount;
+    state.total_delegated_amount += payment.amount;
+    state.update_exchange_rate();
+    
     STATE.save(deps.storage, &state)?;
 
     // Start to mint according to staked token
@@ -156,7 +177,8 @@ pub fn execute(
     let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "mint"),
         attr("from", sender),
-        attr("bonded", mint_amount),
+        attr("minted", mint_amount),
+        attr("exchange_rate", state.exchange_rate.to_string())
     ]);
 
     Ok(res)
