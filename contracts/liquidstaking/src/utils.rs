@@ -2,6 +2,7 @@ use cosmwasm_std::{
     Decimal, DelegationTotalRewardsResponse, QuerierWrapper, StdError, StdResult, Uint128,
 };
 use std::str::FromStr;
+// to_json_binary, GrpcQuery, QueryRequest,
 
 const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
 
@@ -73,3 +74,18 @@ pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
     let ratio = Decimal::from_ratio(Uint128::new(1000), Uint128::new(1005));
     return calculate_token_from_rate(total_bond_amount, ratio);
 }
+
+// pub fn get_account_owner(querier: QuerierWrapper, account_address: String) -> StdResult<InterchainAccount>{
+//     let query_request = protos::cosmos::auth::v1beta1::QueryAccountRequest {
+//         address: account_address,
+//     };
+//     let query = GrpcQuery{
+//         path: "/cosmos.auth.v1beta1.Query/Account".to_string(),
+//         data: to_json_binary(query_request)?,
+//     };
+//     let query_msg = QueryRequest::Grpc(query);
+
+//     let acc: InterchainAccount = querier.query(&query_msg)?;
+
+//     Ok(acc);
+// }

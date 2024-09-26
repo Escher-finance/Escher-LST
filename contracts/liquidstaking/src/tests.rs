@@ -22,12 +22,12 @@ fn set_up(
     validators: Vec<Addr>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let denom_name: String = "muno".to_string();
-    let staked_token_denom_address = Addr::unchecked("lst_denom");
+    let liquidstaking_denom_address = Addr::unchecked("lst_denom");
     let msg = InstantiateMsg {
         underlying_coin_denom: denom_name.clone(),
         validators,
-        staked_token_denom: denom_name.clone(),
-        staked_token_denom_address,
+        liquidstaking_denom: denom_name.clone(),
+        liquidstaking_denom_address,
     };
 
     let creator = MockApi::default().addr_make("owner");
@@ -105,8 +105,8 @@ fn setup_contract() -> (Addr, StakingApp, Addr) {
     let msg = InstantiateMsg {
         underlying_coin_denom: denom_name.clone(),
         validators,
-        staked_token_denom: denom_name,
-        staked_token_denom_address: owner.clone(),
+        liquidstaking_denom: denom_name,
+        liquidstaking_denom_address: owner.clone(),
     };
     // Instantiate the multisig contract using its newly stored code id
     let ls_address = app
@@ -190,7 +190,6 @@ fn execute_bond() {
     println!("{:?}", state2);
 }
 
-
 #[test]
 fn exchange_rate_calculation() {
     let total_bond = Uint128::new(100);
@@ -218,7 +217,6 @@ fn exchange_rate_calculation() {
     let mint_amount = calculate_token_from_rate(bond_amount, new_exchange_rate);
     assert_eq!(mint_amount, Uint128::new(499452599));
 }
-
 
 #[test]
 fn mock_total_reward() {

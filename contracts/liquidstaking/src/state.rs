@@ -36,8 +36,8 @@ pub struct ValidatorsRegistry {
 #[cw_serde]
 pub struct Parameters {
     pub underlying_coin_denom: String,
-    pub staked_token_denom: String,
-    pub staked_token_denom_address: String,
+    pub liquidstaking_denom: String,
+    pub liquidstaking_denom_address: String,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,
 }

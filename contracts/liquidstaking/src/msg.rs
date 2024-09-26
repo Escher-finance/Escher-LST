@@ -1,13 +1,13 @@
 use crate::state::{Parameters, State, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Coin, Uint128};
 
 #[cw_serde]
 pub struct InstantiateMsg {
     pub underlying_coin_denom: String,
     pub validators: Vec<Addr>,
-    pub staked_token_denom: String,
-    pub staked_token_denom_address: Addr,
+    pub liquidstaking_denom: String,
+    pub liquidstaking_denom_address: Addr,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,
 }
@@ -17,10 +17,10 @@ pub enum ExecuteMsg {
     ////////////////////
     /// Owner's operations
     ////////////////////
-    UpdateConfig {
-        owner: Option<String>,
-        validators: Option<String>,
-    },
+    // UpdateConfig {
+    //     owner: Option<String>,
+    //     validators: Option<String>,
+    // },
 
     ////////////////////
     /// User's operations
@@ -33,6 +33,10 @@ pub enum ExecuteMsg {
     // BondRewards {},
     // Send back unbonded coin to the user
     // WithdrawUnbonded {},
+    Transfer {
+        amount: Coin,
+        receiver: Addr,
+    },
 }
 
 #[cw_serde]
@@ -44,6 +48,12 @@ pub enum QueryMsg {
     Parameters {},
     #[returns(ValidatorsRegistry)]
     Validators {},
+    #[returns(TotalBond)]
+    TotalBondAmount {
+        delegator: String,
+        denom: String,
+        validators: Vec<String>,
+    },
 }
 
 /// This is the message we accept via Receive
@@ -61,10 +71,16 @@ pub struct TransferMsg {
     // pub fees: Option<Fees>,
 }
 
-
 #[cw_serde]
 pub enum Ucs01RelayExecuteMsg {
     /// This allows us to transfer native tokens
     Transfer(TransferMsg),
 }
 
+#[cw_serde]
+pub struct MigrateMsg {}
+
+#[cw_serde]
+pub struct TotalBond {
+    pub amount: Uint128,
+}
