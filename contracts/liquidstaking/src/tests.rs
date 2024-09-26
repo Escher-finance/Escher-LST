@@ -23,11 +23,16 @@ fn set_up(
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let denom_name: String = "muno".to_string();
     let liquidstaking_denom_address = Addr::unchecked("lst_denom");
+
+    let ucs01_relay_contract = Addr::unchecked("relay_contract");
+
     let msg = InstantiateMsg {
         underlying_coin_denom: denom_name.clone(),
         validators,
         liquidstaking_denom: denom_name.clone(),
         liquidstaking_denom_address,
+        ucs01_channel: "channel-01".to_string(),
+        ucs01_relay_contract: ucs01_relay_contract.to_string(),
     };
 
     let creator = MockApi::default().addr_make("owner");
@@ -102,11 +107,15 @@ fn setup_contract() -> (Addr, StakingApp, Addr) {
 
     let denom_name: String = STAKING_DENOM.to_string();
     let validators: Vec<Addr> = vec![validator_addr];
+
+    let ucs01_relay_contract = Addr::unchecked("relay_contract");
     let msg = InstantiateMsg {
         underlying_coin_denom: denom_name.clone(),
         validators,
         liquidstaking_denom: denom_name,
         liquidstaking_denom_address: owner.clone(),
+        ucs01_channel: "channel-01".to_string(),
+        ucs01_relay_contract: ucs01_relay_contract.to_string(),
     };
     // Instantiate the multisig contract using its newly stored code id
     let ls_address = app
