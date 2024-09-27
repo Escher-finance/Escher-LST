@@ -1,7 +1,7 @@
 use crate::error::ContractError;
 use crate::relay::send_to_evm;
 use crate::reply::MINT_TOKENS_REPLY_ID;
-use crate::state::{PARAMETERS, STATE, VALIDATORS_REGISTRY};
+use crate::state::{Config, CONFIG, PARAMETERS, STATE, VALIDATORS_REGISTRY};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     calculate_token_from_rate, get_actual_total_bonded, get_actual_total_reward,
@@ -164,5 +164,48 @@ pub fn transfer(
         .add_attribute("receiver", receiver.to_string())
         .add_attribute("amount", amount.amount.to_string())
         .add_attribute("denom", amount.denom);
+    Ok(res)
+}
+
+pub fn set_owner(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_owner: Addr,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let mut config: Config = CONFIG.load(deps.storage)?;
+    if config.owner != info.sender.to_string() {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    config.owner = new_owner.to_string();
+    CONFIG.save(deps.storage, &config)?;
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_attribute("action", "set_owner")
+        .add_attribute("owner", new_owner.to_string());
+    Ok(res)
+}
+
+pub fn set_token_admin(
+    deps: DepsMut,
+    info: MessageInfo,
+    denom: String,
+    new_admin: Addr,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let config: Config = CONFIG.load(deps.storage)?;
+    if config.owner != info.sender.to_string() {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let msg = TokenFactoryMsg::ChangeAdmin {
+        denom: denom.clone(),
+        new_admin_address: new_admin.to_string(),
+    };
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "set_token_admin")
+        .add_attribute("denom", denom)
+        .add_attribute("admin", new_admin.to_string());
     Ok(res)
 }

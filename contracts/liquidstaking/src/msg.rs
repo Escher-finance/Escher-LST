@@ -38,9 +38,13 @@ pub enum ExecuteMsg {
         amount: Coin,
         receiver: Addr,
     },
-    // ChangeTokenOwner {
-    //     new_owner: Addr,
-    // }
+    SetOwner {
+        new_owner: Addr,
+    },
+    SetTokenAdmin {
+        denom: String,
+        new_admin: Addr,
+    },
 }
 
 #[cw_serde]

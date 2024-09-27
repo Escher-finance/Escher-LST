@@ -5,12 +5,17 @@ use cw_storage_plus::Item;
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
-
+pub const CONFIG: Item<Config> = Item::new("config");
 pub const BALANCE: Item<Uint128> = Item::new("balance");
 
 #[cw_serde]
 pub struct Validator {
     pub address: String,
+}
+
+#[cw_serde]
+pub struct Config {
+    pub owner: String,
 }
 
 #[cw_serde]

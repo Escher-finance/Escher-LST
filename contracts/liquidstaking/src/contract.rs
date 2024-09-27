@@ -7,7 +7,7 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Parameters, State, Validator, ValidatorsRegistry, BALANCE, PARAMETERS, STATE,
+    Config, Parameters, State, Validator, ValidatorsRegistry, BALANCE, CONFIG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
 
@@ -19,11 +19,14 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
+    let config = Config {
+        owner: info.sender.to_string(),
+    };
+    CONFIG.save(deps.storage, &config)?;
     BALANCE.save(deps.storage, &Uint128::new(0))?;
 
     let mut validators: Vec<Validator> = vec![];
@@ -70,6 +73,10 @@ pub fn execute(
         ExecuteMsg::Bond {} => execute::bond(deps, env, info),
         ExecuteMsg::Transfer { amount, receiver } => {
             execute::transfer(deps, env, info, amount, receiver)
+        }
+        ExecuteMsg::SetOwner { new_owner } => execute::set_owner(deps, info, new_owner),
+        ExecuteMsg::SetTokenAdmin { denom, new_admin } => {
+            execute::set_token_admin(deps, info, denom, new_admin)
         }
     }
 }
