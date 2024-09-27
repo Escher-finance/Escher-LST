@@ -1,6 +1,6 @@
 use crate::msg::{TransferMsg, Ucs01RelayExecuteMsg};
+use crate::token_factory_api::TokenFactoryMsg;
 use cosmwasm_std::{to_json_binary, Coin, CosmosMsg, StdError, WasmMsg};
-use token_factory_api::TokenFactoryMsg;
 
 pub fn send_to_evm(
     contract_addr: String,
@@ -13,6 +13,7 @@ pub fn send_to_evm(
         receiver,
         memo: "Send back to EVM".to_string(),
         timeout: None,
+        fees: None,
     });
     let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
 

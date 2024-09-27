@@ -6,6 +6,8 @@ pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
 
+pub const BALANCE: Item<Uint128> = Item::new("balance");
+
 #[cw_serde]
 pub struct Validator {
     pub address: String,
@@ -37,7 +39,6 @@ pub struct ValidatorsRegistry {
 pub struct Parameters {
     pub underlying_coin_denom: String,
     pub liquidstaking_denom: String,
-    pub liquidstaking_denom_address: String,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,
 }

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::state::{Parameters, State, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Uint128};
@@ -7,7 +9,6 @@ pub struct InstantiateMsg {
     pub underlying_coin_denom: String,
     pub validators: Vec<Addr>,
     pub liquidstaking_denom: String,
-    pub liquidstaking_denom_address: Addr,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,
 }
@@ -37,6 +38,9 @@ pub enum ExecuteMsg {
         amount: Coin,
         receiver: Addr,
     },
+    // ChangeTokenOwner {
+    //     new_owner: Addr,
+    // }
 }
 
 #[cw_serde]
@@ -54,7 +58,11 @@ pub enum QueryMsg {
         denom: String,
         validators: Vec<String>,
     },
+    #[returns(BalanceResponse)]
+    Balance {},
 }
+
+pub type Fees = BTreeMap<String, Coin>;
 
 /// This is the message we accept via Receive
 #[cw_serde]
@@ -68,7 +76,7 @@ pub struct TransferMsg {
     /// The memo
     pub memo: String,
     // Fee associated with the transfer, denominated in transferred coins
-    // pub fees: Option<Fees>,
+    pub fees: Option<Fees>,
 }
 
 #[cw_serde]
@@ -82,5 +90,10 @@ pub struct MigrateMsg {}
 
 #[cw_serde]
 pub struct TotalBond {
+    pub amount: Uint128,
+}
+
+#[cw_serde]
+pub struct BalanceResponse {
     pub amount: Uint128,
 }

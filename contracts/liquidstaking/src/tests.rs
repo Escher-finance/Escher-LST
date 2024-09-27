@@ -3,6 +3,7 @@ use crate::contract::instantiate;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::query::query;
 use crate::state::{State, ValidatorsRegistry};
+use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{calculate_token_from_rate, get_mock_total_reward};
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
@@ -14,7 +15,6 @@ use cw_multi_test::{
     App, AppBuilder, BankKeeper, Contract, ContractWrapper, Executor, FailingModule, StakingInfo,
     WasmKeeper,
 };
-use token_factory_api::TokenFactoryMsg;
 
 fn set_up(
     deps: DepsMut,
@@ -22,7 +22,6 @@ fn set_up(
     validators: Vec<Addr>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let denom_name: String = "muno".to_string();
-    let liquidstaking_denom_address = Addr::unchecked("lst_denom");
 
     let ucs01_relay_contract = Addr::unchecked("relay_contract");
 
@@ -30,7 +29,6 @@ fn set_up(
         underlying_coin_denom: denom_name.clone(),
         validators,
         liquidstaking_denom: denom_name.clone(),
-        liquidstaking_denom_address,
         ucs01_channel: "channel-01".to_string(),
         ucs01_relay_contract: ucs01_relay_contract.to_string(),
     };
@@ -113,7 +111,6 @@ fn setup_contract() -> (Addr, StakingApp, Addr) {
         underlying_coin_denom: denom_name.clone(),
         validators,
         liquidstaking_denom: denom_name,
-        liquidstaking_denom_address: owner.clone(),
         ucs01_channel: "channel-01".to_string(),
         ucs01_relay_contract: ucs01_relay_contract.to_string(),
     };

@@ -17,6 +17,9 @@ pub enum ContractError {
     #[error("NoAsset")]
     NoAsset {},
 
+    #[error("ReplyError")]
+    ReplyError { message: String },
+
     #[error("InvalidContractName")]
     InvalidContractName {},
 

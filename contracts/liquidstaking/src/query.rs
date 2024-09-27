@@ -1,5 +1,7 @@
-use crate::msg::{QueryMsg, TotalBond};
-use crate::state::{Parameters, State, ValidatorsRegistry, PARAMETERS, STATE, VALIDATORS_REGISTRY};
+use crate::msg::{BalanceResponse, QueryMsg, TotalBond};
+use crate::state::{
+    Parameters, State, ValidatorsRegistry, BALANCE, PARAMETERS, STATE, VALIDATORS_REGISTRY,
+};
 use crate::utils::{get_actual_total_bonded, get_actual_total_reward};
 use cosmwasm_std::{entry_point, to_json_binary};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
@@ -17,6 +19,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         } => to_json_binary(&query_total_staked_amount(
             deps, delegator, denom, validators,
         )?),
+        QueryMsg::Balance {} => to_json_binary(&(query_balance(deps.storage)?)),
     }
 }
 
@@ -36,6 +39,12 @@ pub fn query_validators(storage: &dyn Storage) -> StdResult<ValidatorsRegistry> 
     let validators = VALIDATORS_REGISTRY.load(storage)?;
 
     Ok(validators)
+}
+
+pub fn query_balance(storage: &dyn Storage) -> StdResult<BalanceResponse> {
+    let balance = BALANCE.load(storage)?;
+
+    Ok(BalanceResponse { amount: balance })
 }
 
 pub fn query_total_staked_amount(
