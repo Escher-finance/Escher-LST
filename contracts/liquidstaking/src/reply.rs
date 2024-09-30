@@ -1,5 +1,5 @@
 use crate::error::ContractError;
-use crate::state::{Parameters, BALANCE, PARAMETERS};
+use crate::state::{Balance, Parameters, BALANCE, PARAMETERS};
 use cosmwasm_std::{entry_point, DepsMut, Env, Reply, Response};
 
 pub const MINT_TOKENS_REPLY_ID: u64 = 123;
@@ -24,7 +24,12 @@ fn on_mint_tokens(deps: DepsMut, env: Env, _msg: Reply) -> Result<Response, Cont
     let lst_balance = deps
         .querier
         .query_balance(env.contract.address.to_string(), params.liquidstaking_denom)?;
-    BALANCE.save(deps.storage, &lst_balance.amount)?;
+
+    let balance = Balance {
+        amount: lst_balance.amount,
+        last_updated: env.block.time.nanos(),
+    };
+    BALANCE.save(deps.storage, &balance)?;
 
     Ok(Response::new())
 }

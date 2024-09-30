@@ -6,7 +6,13 @@ pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
 pub const CONFIG: Item<Config> = Item::new("config");
-pub const BALANCE: Item<Uint128> = Item::new("balance");
+pub const BALANCE: Item<Balance> = Item::new("balance");
+
+#[cw_serde]
+pub struct Balance {
+    pub amount: Uint128,
+    pub last_updated: u64,
+}
 
 #[cw_serde]
 pub struct Validator {

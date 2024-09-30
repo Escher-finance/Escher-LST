@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::state::{Parameters, State, ValidatorsRegistry};
+use crate::state::{Balance, Parameters, State, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Uint128};
 
@@ -62,7 +62,7 @@ pub enum QueryMsg {
         denom: String,
         validators: Vec<String>,
     },
-    #[returns(BalanceResponse)]
+    #[returns(Balance)]
     Balance {},
 }
 
@@ -94,10 +94,5 @@ pub struct MigrateMsg {}
 
 #[cw_serde]
 pub struct TotalBond {
-    pub amount: Uint128,
-}
-
-#[cw_serde]
-pub struct BalanceResponse {
     pub amount: Uint128,
 }

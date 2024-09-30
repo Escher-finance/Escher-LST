@@ -7,8 +7,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, Parameters, State, Validator, ValidatorsRegistry, BALANCE, CONFIG, PARAMETERS, STATE,
-    VALIDATORS_REGISTRY,
+    Balance, Config, Parameters, State, Validator, ValidatorsRegistry, BALANCE, CONFIG, PARAMETERS,
+    STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -27,7 +27,12 @@ pub fn instantiate(
         owner: info.sender.to_string(),
     };
     CONFIG.save(deps.storage, &config)?;
-    BALANCE.save(deps.storage, &Uint128::new(0))?;
+
+    let balance = Balance {
+        amount: Uint128::new(0),
+        last_updated: 0,
+    };
+    BALANCE.save(deps.storage, &balance)?;
 
     let mut validators: Vec<Validator> = vec![];
     for validator_addr in msg.validators {

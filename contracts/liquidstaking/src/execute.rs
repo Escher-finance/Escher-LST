@@ -133,6 +133,9 @@ pub fn bond(
         .add_attributes(vec![
             attr("action", "mint"),
             attr("from", sender),
+            attr("delegate_amount", delegate_amount.to_string()),
+            attr("remaining_amount", remaining_amount.to_string()),
+            attr("denom", coin_denom.to_string()),
             attr("minted", mint_amount),
             attr("exchange_rate", state.exchange_rate.to_string()),
         ]);
@@ -160,7 +163,7 @@ pub fn transfer(
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_message(msg)
-        .add_attribute("action", "trnasfer")
+        .add_attribute("action", "transfer")
         .add_attribute("receiver", receiver.to_string())
         .add_attribute("amount", amount.amount.to_string())
         .add_attribute("denom", amount.denom);

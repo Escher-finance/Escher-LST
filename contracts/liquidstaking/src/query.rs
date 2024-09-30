@@ -1,6 +1,6 @@
-use crate::msg::{BalanceResponse, QueryMsg, TotalBond};
+use crate::msg::{QueryMsg, TotalBond};
 use crate::state::{
-    Parameters, State, ValidatorsRegistry, BALANCE, PARAMETERS, STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, State, ValidatorsRegistry, BALANCE, PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::{get_actual_total_bonded, get_actual_total_reward};
 use cosmwasm_std::{entry_point, to_json_binary};
@@ -41,10 +41,10 @@ pub fn query_validators(storage: &dyn Storage) -> StdResult<ValidatorsRegistry> 
     Ok(validators)
 }
 
-pub fn query_balance(storage: &dyn Storage) -> StdResult<BalanceResponse> {
+pub fn query_balance(storage: &dyn Storage) -> StdResult<Balance> {
     let balance = BALANCE.load(storage)?;
 
-    Ok(BalanceResponse { amount: balance })
+    Ok(balance)
 }
 
 pub fn query_total_staked_amount(
