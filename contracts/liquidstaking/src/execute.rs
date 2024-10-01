@@ -1,4 +1,5 @@
 use crate::error::ContractError;
+use crate::msg::MintTokensPayload;
 use crate::relay::send_to_evm;
 use crate::reply::MINT_TOKENS_REPLY_ID;
 use crate::state::{Config, CONFIG, PARAMETERS, STATE, VALIDATORS_REGISTRY};
@@ -8,14 +9,15 @@ use crate::utils::{
     get_mock_total_reward,
 };
 use cosmwasm_std::{
-    attr, Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, StakingMsg, SubMsg,
-    Uint128,
+    attr, to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
+    StakingMsg, SubMsg, Uint128,
 };
 
 pub fn bond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    source: String,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -122,8 +124,15 @@ pub fn bond(
 
     let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
     if !cfg!(test) {
-        let sub_msg: SubMsg<TokenFactoryMsg> =
-            SubMsg::reply_always(mint_msg, MINT_TOKENS_REPLY_ID).into();
+        let payload = MintTokensPayload {
+            source,
+            amount: mint_amount,
+        };
+        let payload_bin = to_json_binary(&payload)?;
+
+        let sub_msg: SubMsg<TokenFactoryMsg> = SubMsg::reply_always(mint_msg, MINT_TOKENS_REPLY_ID)
+            .with_payload(payload_bin)
+            .into();
         sub_msgs.push(sub_msg);
     }
 

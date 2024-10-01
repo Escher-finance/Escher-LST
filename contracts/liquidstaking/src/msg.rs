@@ -30,7 +30,9 @@ pub enum ExecuteMsg {
     /// Receives `amount` in underlying coin denom from sender.
     /// Delegate `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
-    Bond {},
+    Bond {
+        source: String,
+    },
     // BondRewards {},
     // Send back unbonded coin to the user
     // WithdrawUnbonded {},
@@ -64,6 +66,8 @@ pub enum QueryMsg {
     },
     #[returns(Balance)]
     Balance {},
+    #[returns(Log)]
+    Log {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;
@@ -79,8 +83,6 @@ pub struct TransferMsg {
     pub timeout: Option<u64>,
     /// The memo
     pub memo: String,
-    // Fee associated with the transfer, denominated in transferred coins
-    pub fees: Option<Fees>,
 }
 
 #[cw_serde]
@@ -94,5 +96,16 @@ pub struct MigrateMsg {}
 
 #[cw_serde]
 pub struct TotalBond {
+    pub amount: Uint128,
+}
+
+#[cw_serde]
+pub struct Log {
+    pub message: String,
+}
+
+#[cw_serde]
+pub struct MintTokensPayload {
+    pub source: String,
     pub amount: Uint128,
 }

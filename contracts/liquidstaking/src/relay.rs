@@ -13,7 +13,6 @@ pub fn send_to_evm(
         receiver,
         memo: "Send back to EVM".to_string(),
         timeout: None,
-        fees: None,
     });
     let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
 

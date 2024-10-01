@@ -7,6 +7,7 @@ pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const BALANCE: Item<Balance> = Item::new("balance");
+pub const LOG: Item<String> = Item::new("log");
 
 #[cw_serde]
 pub struct Balance {
