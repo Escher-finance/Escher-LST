@@ -85,13 +85,14 @@ pub fn bond(
             validators_list.clone(),
         );
         state.total_delegated_amount = delegated_amount;
-        total_bond_amount = delegated_amount
-            + get_actual_total_reward(
-                deps.querier,
-                delegator.to_string(),
-                coin_denom.clone(),
-                validators_list,
-            );
+        let reward = get_actual_total_reward(
+            deps.querier,
+            delegator.to_string(),
+            coin_denom.clone(),
+            validators_list,
+        )?;
+
+        total_bond_amount = delegated_amount + reward;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
     }

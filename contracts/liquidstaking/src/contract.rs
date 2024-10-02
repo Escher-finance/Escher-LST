@@ -7,8 +7,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Config, Parameters, State, Validator, ValidatorsRegistry, BALANCE, CONFIG, PARAMETERS,
-    STATE, VALIDATORS_REGISTRY,
+    Balance, Config, Parameters, State, Validator, ValidatorsRegistry, BALANCE, CONFIG, LOG,
+    PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -23,6 +23,9 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    LOG.save(deps.storage, &"".into())?;
+
     let config = Config {
         owner: info.sender.to_string(),
     };

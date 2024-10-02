@@ -97,6 +97,8 @@ pub struct MigrateMsg {}
 #[cw_serde]
 pub struct TotalBond {
     pub amount: Uint128,
+    pub delegated: Uint128,
+    pub reward: Uint128,
 }
 
 #[cw_serde]

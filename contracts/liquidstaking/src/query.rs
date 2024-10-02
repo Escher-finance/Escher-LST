@@ -28,25 +28,21 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn query_state(storage: &dyn Storage) -> StdResult<State> {
     let state = STATE.load(storage)?;
-
     Ok(state)
 }
 
 pub fn query_params(storage: &dyn Storage) -> StdResult<Parameters> {
     let params = PARAMETERS.load(storage)?;
-
     Ok(params)
 }
 
 pub fn query_validators(storage: &dyn Storage) -> StdResult<ValidatorsRegistry> {
     let validators = VALIDATORS_REGISTRY.load(storage)?;
-
     Ok(validators)
 }
 
 pub fn query_balance(storage: &dyn Storage) -> StdResult<Balance> {
     let balance = BALANCE.load(storage)?;
-
     Ok(balance)
 }
 
@@ -68,15 +64,16 @@ pub fn query_total_staked_amount(
         delegator.to_string(),
         coin_denom.clone(),
         validators_list,
-    );
+    )?;
 
     Ok(TotalBond {
         amount: delegated_amount + total_reward,
+        delegated: delegated_amount,
+        reward: total_reward,
     })
 }
 
 pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
     let log = LOG.load(storage)?;
-
     Ok(Log { message: log })
 }

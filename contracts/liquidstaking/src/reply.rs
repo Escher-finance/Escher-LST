@@ -37,7 +37,7 @@ fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, Contr
     BALANCE.save(deps.storage, &balance)?;
 
     let responses = msg.result.unwrap().msg_responses;
-    let mut log = "".to_string();
+    let mut log = format!("responses_count: {} ", responses.len());
     for response in responses {
         log += format!("{} ", &response.type_url).as_str();
     }
