@@ -5,10 +5,24 @@ use cw_storage_plus::Item;
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
+pub const CONFIG: Item<Config> = Item::new("config");
+pub const BALANCE: Item<Balance> = Item::new("balance");
+pub const LOG: Item<String> = Item::new("log");
+
+#[cw_serde]
+pub struct Balance {
+    pub amount: Uint128,
+    pub last_updated: u64,
+}
 
 #[cw_serde]
 pub struct Validator {
     pub address: String,
+}
+
+#[cw_serde]
+pub struct Config {
+    pub owner: String,
 }
 
 #[cw_serde]
@@ -36,8 +50,9 @@ pub struct ValidatorsRegistry {
 #[cw_serde]
 pub struct Parameters {
     pub underlying_coin_denom: String,
-    pub staked_token_denom: String,
-    pub staked_token_denom_address: String,
+    pub liquidstaking_denom: String,
+    pub ucs01_channel: String,
+    pub ucs01_relay_contract: String,
 }
 
 impl State {

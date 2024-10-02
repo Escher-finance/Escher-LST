@@ -1,7 +1,8 @@
 use cosmwasm_std::{
-    Decimal, DelegationTotalRewardsResponse, QuerierWrapper, StdError, StdResult, Uint128,
+    Decimal, DelegationTotalRewardsResponse, QuerierWrapper, StdResult, Uint128, Uint256,
 };
 use std::str::FromStr;
+// to_json_binary, GrpcQuery, QueryRequest,
 
 const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
 
@@ -44,7 +45,7 @@ pub fn get_actual_total_reward(
     delegator: String,
     denom: String,
     validators: Vec<String>,
-) -> Uint128 {
+) -> StdResult<Uint128> {
     let mut total_rewards = Uint128::new(0);
     let result: StdResult<DelegationTotalRewardsResponse> =
         querier.query_delegation_total_rewards(delegator);
@@ -54,19 +55,19 @@ pub fn get_actual_total_reward(
             if validators.contains(&delegator_reward.validator_address) {
                 for reward in delegator_reward.reward {
                     if reward.denom == denom {
-                        let reward_val: Result<Uint128, StdError> =
-                            Uint128::from_str(reward.amount.to_string().as_str());
-
-                        if reward_val.is_ok() {
-                            total_rewards += reward_val.unwrap();
-                        }
+                        let reward_val = to_uint128(reward.amount.to_uint_floor())?;
+                        total_rewards += reward_val;
                     }
                 }
             }
         }
     }
 
-    return total_rewards;
+    Ok(total_rewards)
+}
+
+pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
+    Ok(Uint128::from_str(&v.to_string())?)
 }
 
 pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {

@@ -3,6 +3,7 @@ use crate::contract::instantiate;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::query::query;
 use crate::state::{State, ValidatorsRegistry};
+use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{calculate_token_from_rate, get_mock_total_reward};
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
@@ -14,7 +15,6 @@ use cw_multi_test::{
     App, AppBuilder, BankKeeper, Contract, ContractWrapper, Executor, FailingModule, StakingInfo,
     WasmKeeper,
 };
-use token_factory_api::TokenFactoryMsg;
 
 fn set_up(
     deps: DepsMut,
@@ -22,12 +22,15 @@ fn set_up(
     validators: Vec<Addr>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let denom_name: String = "muno".to_string();
-    let staked_token_denom_address = Addr::unchecked("lst_denom");
+
+    let ucs01_relay_contract = Addr::unchecked("relay_contract");
+
     let msg = InstantiateMsg {
         underlying_coin_denom: denom_name.clone(),
         validators,
-        staked_token_denom: denom_name.clone(),
-        staked_token_denom_address,
+        liquidstaking_denom: denom_name.clone(),
+        ucs01_channel: "channel-01".to_string(),
+        ucs01_relay_contract: ucs01_relay_contract.to_string(),
     };
 
     let creator = MockApi::default().addr_make("owner");
@@ -102,11 +105,14 @@ fn setup_contract() -> (Addr, StakingApp, Addr) {
 
     let denom_name: String = STAKING_DENOM.to_string();
     let validators: Vec<Addr> = vec![validator_addr];
+
+    let ucs01_relay_contract = Addr::unchecked("relay_contract");
     let msg = InstantiateMsg {
         underlying_coin_denom: denom_name.clone(),
         validators,
-        staked_token_denom: denom_name,
-        staked_token_denom_address: owner.clone(),
+        liquidstaking_denom: denom_name,
+        ucs01_channel: "channel-01".to_string(),
+        ucs01_relay_contract: ucs01_relay_contract.to_string(),
     };
     // Instantiate the multisig contract using its newly stored code id
     let ls_address = app
@@ -190,7 +196,6 @@ fn execute_bond() {
     println!("{:?}", state2);
 }
 
-
 #[test]
 fn exchange_rate_calculation() {
     let total_bond = Uint128::new(100);
@@ -218,7 +223,6 @@ fn exchange_rate_calculation() {
     let mint_amount = calculate_token_from_rate(bond_amount, new_exchange_rate);
     assert_eq!(mint_amount, Uint128::new(499452599));
 }
-
 
 #[test]
 fn mock_total_reward() {
