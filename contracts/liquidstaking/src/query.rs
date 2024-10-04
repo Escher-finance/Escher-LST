@@ -1,11 +1,11 @@
 use crate::msg::{Log, QueryMsg, TotalBond};
+use crate::state::unbond_history;
 use crate::state::{
-    Balance, Parameters, State, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
+    Balance, Parameters, State, ValidatorsRegistry, UnbondHistory, BALANCE, LOG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
 use crate::utils::{get_actual_total_bonded, get_actual_total_reward};
-use cosmwasm_std::{entry_point, to_json_binary};
-
+use cosmwasm_std::{entry_point, to_json_binary, Order};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -23,6 +23,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         )?),
         QueryMsg::Balance {} => to_json_binary(&(query_balance(deps.storage)?)),
         QueryMsg::Log {} => to_json_binary(&(query_log(deps.storage)?)),
+        QueryMsg::UnbondHistory {
+            source,
+            sender,
+            released,
+        } => to_json_binary(&(query_unbond_history(deps.storage, source, sender, released)?)),
     }
 }
 
@@ -76,4 +81,65 @@ pub fn query_total_staked_amount(
 pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
     let log = LOG.load(storage)?;
     Ok(Log { message: log })
+}
+
+pub fn query_unbond_history(
+    storage: &dyn Storage,
+    source: Option<String>,
+    sender: Option<String>,
+    released: Option<bool>,
+) -> StdResult<Vec<UnbondHistory>> {
+    if source.is_some() && released.is_none() {
+        let unbonded_list = unbond_history()
+            .idx
+            .source
+            .prefix(source.unwrap())
+            .range(storage, None, None, Order::Ascending)
+            .map(|n| n.unwrap().1)
+            .collect::<Vec<_>>();
+
+        return Ok(unbonded_list);
+    }
+
+    if source.is_some() && released.is_some() {
+        let unbonded_list = unbond_history()
+            .idx
+            .source_released
+            .prefix(format!(
+                "{}-{}",
+                source.unwrap(),
+                released.unwrap().to_string()
+            ))
+            .range(storage, None, None, Order::Ascending)
+            .map(|n| n.unwrap().1)
+            .collect::<Vec<_>>();
+
+        return Ok(unbonded_list);
+    }
+
+    if source.is_none() && sender.is_some() {
+        let unbonded_list = unbond_history()
+            .idx
+            .sender
+            .prefix(sender.unwrap())
+            .range(storage, None, None, Order::Ascending)
+            .map(|n| n.unwrap().1)
+            .collect::<Vec<_>>();
+
+            return Ok(unbonded_list);
+    }
+
+    if source.is_none() && released.is_some() {
+        let unbonded_list = unbond_history()
+            .idx
+            .released
+            .prefix(released.unwrap().to_string())
+            .range(storage, None, None, Order::Ascending)
+            .map(|n| n.unwrap().1)
+            .collect::<Vec<_>>();
+
+        return Ok(unbonded_list);
+    }
+
+    Ok(vec![])
 }

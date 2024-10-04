@@ -77,6 +77,7 @@ pub fn num_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
 pub struct UnbondHistory {
     pub id: u64,
     pub sender: String,
+    pub source: String,
     pub amount: Coin,
     pub exchange_rate: Decimal,
     pub unbond_time: Timestamp,
@@ -85,13 +86,15 @@ pub struct UnbondHistory {
 }
 
 pub struct UnbondHistoryIndexes<'a> {
+    pub source: MultiIndex<'a, String, UnbondHistory, u64>,
     pub sender: MultiIndex<'a, String, UnbondHistory, u64>,
     pub released: MultiIndex<'a, String, UnbondHistory, u64>,
+    pub source_released: MultiIndex<'a, String, UnbondHistory, u64>,
 }
 
 impl<'a> IndexList<UnbondHistory> for UnbondHistoryIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondHistory>> + '_> {
-        let v: Vec<&dyn Index<UnbondHistory>> = vec![&self.sender, &self.released];
+        let v: Vec<&dyn Index<UnbondHistory>> = vec![&self.source, &self.sender, &self.released];
         Box::new(v.into_iter())
     }
 }
@@ -100,6 +103,11 @@ const UNBOND_HISTORY_NAMESPACE: &str = "unbond_history";
 
 pub fn unbond_history<'a>() -> IndexedMap<u64, UnbondHistory, UnbondHistoryIndexes<'a>> {
     let indexes = UnbondHistoryIndexes {
+        source: MultiIndex::new(
+            |_pk, d: &UnbondHistory| d.source.clone(),
+            UNBOND_HISTORY_NAMESPACE,
+            "unbond_history__source",
+        ),
         sender: MultiIndex::new(
             |_pk, d: &UnbondHistory| d.sender.clone(),
             UNBOND_HISTORY_NAMESPACE,
@@ -109,6 +117,11 @@ pub fn unbond_history<'a>() -> IndexedMap<u64, UnbondHistory, UnbondHistoryIndex
             |_pk, d: &UnbondHistory| format!("{}", d.released.to_string()),
             UNBOND_HISTORY_NAMESPACE,
             "unbond_history__released",
+        ),
+        source_released: MultiIndex::new(
+            |_pk, d: &UnbondHistory| format!("{}-{}", d.source.to_string(), d.released.to_string()),
+            UNBOND_HISTORY_NAMESPACE,
+            "unbond_history__source_released",
         ),
     };
     IndexedMap::new(UNBOND_HISTORY_NAMESPACE, indexes)

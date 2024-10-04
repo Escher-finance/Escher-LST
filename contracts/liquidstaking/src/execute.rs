@@ -165,7 +165,7 @@ pub fn unbond(
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.liquidstaking_denom;
-    let sender = info.sender;
+    let sender = info.sender.to_string();
 
     // coin must have be sent along with transaction and it should be in underlying coin denom
     if info.funds.len() > 1usize {
@@ -253,7 +253,8 @@ pub fn unbond(
     };
     let history = UnbondHistory {
         id,
-        sender: source,
+        sender: sender.clone(),
+        source: source.clone(),
         amount: unbond_amount,
         exchange_rate: state.exchange_rate,
         unbond_time: env.block.time,
@@ -270,7 +271,8 @@ pub fn unbond(
 
     let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "undelegate"),
-        attr("from", sender),
+        attr("sender", sender),
+        attr("source", source),
         attr("undelegate_amount", undelegate_amount.to_string()),
         attr("remaining_amount", remaining_amount.to_string()),
         attr("denom", coin_denom.to_string()),

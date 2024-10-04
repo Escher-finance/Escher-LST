@@ -71,6 +71,12 @@ pub enum QueryMsg {
     Balance {},
     #[returns(Log)]
     Log {},
+    #[returns(Vec<UnbondHistory>)]
+    UnbondHistory {
+        source: Option<String>,
+        sender: Option<String>,
+        released: Option<bool>,
+    },
 }
 
 pub type Fees = BTreeMap<String, Coin>;
