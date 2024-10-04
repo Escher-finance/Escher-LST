@@ -79,6 +79,7 @@ pub fn execute(
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     match msg {
         ExecuteMsg::Bond { source } => execute::bond(deps, env, info, source),
+        ExecuteMsg::Unbond { source } => execute::unbond(deps, env, info, source),
         ExecuteMsg::Transfer { amount, receiver } => {
             execute::transfer(deps, env, info, amount, receiver)
         }

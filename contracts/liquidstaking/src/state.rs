@@ -1,6 +1,6 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Decimal, Uint128};
-use cw_storage_plus::Item;
+use cosmwasm_std::{Coin, Decimal, StdResult, Storage, Timestamp, Uint128};
+use cw_storage_plus::{Index, Item, MultiIndex, IndexList, IndexedMap};
 
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
@@ -59,4 +59,62 @@ impl State {
     pub fn update_exchange_rate(&mut self) {
         self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_lst_supply);
     }
+}
+
+pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
+
+pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
+    let val = num_tokens(storage)? + 1;
+    TOKEN_COUNT.save(storage, &val)?;
+    Ok(val)
+}
+
+pub fn num_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
+    Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
+}
+
+#[cw_serde]
+pub struct UnbondHistory {
+    pub id: u64,
+    pub sender: String,
+    pub amount: Coin,
+    pub exchange_rate: Decimal,
+    pub unbond_time: Timestamp, 
+    pub released: bool,
+    pub released_time: Timestamp,
+}
+
+pub struct UnbondHistoryIndexes<'a> {
+    pub sender: MultiIndex<'a, String, UnbondHistory, u64>,
+    pub released: MultiIndex<'a, String, UnbondHistory, u64>,
+}
+
+impl<'a> IndexList<UnbondHistory> for UnbondHistoryIndexes<'a> {
+    fn get_indexes(
+        &'_ self,
+    ) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondHistory>> + '_> {
+        let v: Vec<&dyn Index<UnbondHistory>> =
+            vec![&self.sender, &self.released];
+        Box::new(v.into_iter())
+    }
+}
+
+const UNBOND_HISTORY_NAMESPACE: &str = "unbond_history";
+
+pub fn unbond_history<'a>() -> IndexedMap<u64, UnbondHistory, UnbondHistoryIndexes<'a>> {
+    let indexes = UnbondHistoryIndexes {
+        sender: MultiIndex::new(
+            |_pk, d: &UnbondHistory| d.sender.clone(),
+            UNBOND_HISTORY_NAMESPACE,
+            "unbond_history__sender",
+        ),
+        released: MultiIndex::new(
+            |_pk, d: &UnbondHistory| {
+                format!("{}", d.released.to_string())
+            },
+            UNBOND_HISTORY_NAMESPACE,
+            "unbond_history__released",
+        ),
+    };
+    IndexedMap::new(UNBOND_HISTORY_NAMESPACE, indexes)
 }

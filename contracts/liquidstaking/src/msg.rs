@@ -33,6 +33,9 @@ pub enum ExecuteMsg {
     Bond {
         source: String,
     },
+    Unbond {
+        source: String,
+    },
     // BondRewards {},
     // Send back unbonded coin to the user
     // WithdrawUnbonded {},
