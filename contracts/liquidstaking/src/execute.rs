@@ -2,15 +2,18 @@ use crate::error::ContractError;
 use crate::msg::MintTokensPayload;
 use crate::relay::send_to_evm;
 use crate::reply::MINT_TOKENS_REPLY_ID;
-use crate::state::{increment_tokens, unbond_history, UnbondHistory, Config, CONFIG, PARAMETERS, STATE, VALIDATORS_REGISTRY};
+use crate::state::{
+    increment_tokens, unbond_history, Config, UnbondHistory, CONFIG, PARAMETERS, STATE,
+    VALIDATORS_REGISTRY,
+};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
-    calculate_native_token_from_staking_token, calculate_staking_token_from_rate, get_actual_total_bonded, get_actual_total_reward,
-    get_mock_total_reward,
+    calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
+    get_actual_total_bonded, get_actual_total_reward, get_mock_total_reward,
 };
 use cosmwasm_std::{
     attr, to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
-    StakingMsg, SubMsg, Uint128, Timestamp
+    StakingMsg, SubMsg, Timestamp, Uint128,
 };
 
 pub fn bond(
@@ -178,10 +181,10 @@ pub fn unbond(
 
     let total_validators = Uint128::from(validators_reg.validators.len() as u32);
     let validators_list: Vec<String> = validators_reg
-    .validators
-    .iter()
-    .map(|v| v.address.clone())
-    .collect();
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
 
     let mut state = STATE.load(deps.storage)?;
 
@@ -203,8 +206,9 @@ pub fn unbond(
     let total_bond_amount = delegated_amount + reward;
     state.exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
 
-    // calculate native token undelegated amount from liquid staking payment amount 
-    let native_token_undelegated_amount = calculate_native_token_from_staking_token(payment.amount.clone(), state.exchange_rate);
+    // calculate native token undelegated amount from liquid staking payment amount
+    let native_token_undelegated_amount =
+        calculate_native_token_from_staking_token(payment.amount.clone(), state.exchange_rate);
 
     let undelegate_amount = native_token_undelegated_amount / total_validators;
     let remaining_amount = native_token_undelegated_amount % total_validators;
@@ -241,7 +245,7 @@ pub fn unbond(
     };
 
     msgs.push(burn_msg.into());
-    
+
     let id = increment_tokens(deps.storage).unwrap();
     let unbond_amount = Coin {
         amount: native_token_undelegated_amount.clone(),
@@ -252,21 +256,19 @@ pub fn unbond(
         sender: source,
         amount: unbond_amount,
         exchange_rate: state.exchange_rate,
-        unbond_time: env.block.time, 
+        unbond_time: env.block.time,
         released: false,
         released_time: Timestamp::from_nanos(000_000_000),
     };
     unbond_history().save(deps.storage, id, &history)?;
-    
+
     // update total bond, supply and exchange rate here
     state.total_bond_amount = state.total_bond_amount - native_token_undelegated_amount;
     state.total_lst_supply = state.total_lst_supply - payment.amount;
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new()
-    .add_messages(msgs)
-    .add_attributes(vec![
+    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "undelegate"),
         attr("from", sender),
         attr("undelegate_amount", undelegate_amount.to_string()),

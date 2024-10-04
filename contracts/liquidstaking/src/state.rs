@@ -1,6 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Coin, Decimal, StdResult, Storage, Timestamp, Uint128};
-use cw_storage_plus::{Index, Item, MultiIndex, IndexList, IndexedMap};
+use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
@@ -79,7 +79,7 @@ pub struct UnbondHistory {
     pub sender: String,
     pub amount: Coin,
     pub exchange_rate: Decimal,
-    pub unbond_time: Timestamp, 
+    pub unbond_time: Timestamp,
     pub released: bool,
     pub released_time: Timestamp,
 }
@@ -90,11 +90,8 @@ pub struct UnbondHistoryIndexes<'a> {
 }
 
 impl<'a> IndexList<UnbondHistory> for UnbondHistoryIndexes<'a> {
-    fn get_indexes(
-        &'_ self,
-    ) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondHistory>> + '_> {
-        let v: Vec<&dyn Index<UnbondHistory>> =
-            vec![&self.sender, &self.released];
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondHistory>> + '_> {
+        let v: Vec<&dyn Index<UnbondHistory>> = vec![&self.sender, &self.released];
         Box::new(v.into_iter())
     }
 }
@@ -109,9 +106,7 @@ pub fn unbond_history<'a>() -> IndexedMap<u64, UnbondHistory, UnbondHistoryIndex
             "unbond_history__sender",
         ),
         released: MultiIndex::new(
-            |_pk, d: &UnbondHistory| {
-                format!("{}", d.released.to_string())
-            },
+            |_pk, d: &UnbondHistory| format!("{}", d.released.to_string()),
             UNBOND_HISTORY_NAMESPACE,
             "unbond_history__released",
         ),

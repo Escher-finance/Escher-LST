@@ -2,14 +2,17 @@ use crate::contract::execute;
 use crate::contract::instantiate;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::query::query;
-use crate::state::{unbond_history, increment_tokens, State, UnbondHistory, ValidatorsRegistry};
+use crate::state::{increment_tokens, unbond_history, State, UnbondHistory, ValidatorsRegistry};
 use crate::token_factory_api::TokenFactoryMsg;
-use crate::utils::{calculate_staking_token_from_rate, calculate_native_token_from_staking_token, get_mock_total_reward};
+use crate::utils::{
+    calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
+    get_mock_total_reward,
+};
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
 use cosmwasm_std::{
-    coins, from_json, Addr, Coin, Decimal, DepsMut, Env, MemoryStorage, Response, StdError,
-    Order, Uint128, Validator, Timestamp,
+    coins, from_json, Addr, Coin, Decimal, DepsMut, Env, MemoryStorage, Order, Response, StdError,
+    Timestamp, Uint128, Validator,
 };
 use cw_multi_test::{
     App, AppBuilder, BankKeeper, Contract, ContractWrapper, Executor, FailingModule, StakingInfo,
@@ -152,7 +155,7 @@ fn execute_bond() {
     let (owner, mut app, ls_contract_addr) = setup_contract();
 
     let bond_msg = ExecuteMsg::Bond {
-        source: "abc".to_string()
+        source: "abc".to_string(),
     };
     let res1 = app.execute_contract(owner.clone(), ls_contract_addr.clone(), &bond_msg, &[]);
     //println!("{:?}", res1);
@@ -233,7 +236,6 @@ fn mock_total_reward() {
     assert_eq!(bond_with_reward, Uint128::new(1005));
 }
 
-
 #[test]
 fn exchange_unbond_rate_calculation() {
     let staking_token = Uint128::new(100);
@@ -257,7 +259,6 @@ fn test_unbond_history() {
     let mut id = increment_tokens(&mut deps.storage).unwrap();
     println!("{}", id);
 
-
     let sender1 = deps.api.addr_make("sender1");
     let sender2 = deps.api.addr_make("sender2");
 
@@ -274,7 +275,7 @@ fn test_unbond_history() {
         sender: sender1.to_string(),
         amount: amount.clone(),
         exchange_rate: exchange_rate,
-        unbond_time: ts, 
+        unbond_time: ts,
         released: false,
         released_time: ts,
     };
@@ -286,7 +287,7 @@ fn test_unbond_history() {
         sender: sender2.to_string(),
         amount,
         exchange_rate: exchange_rate,
-        unbond_time: ts, 
+        unbond_time: ts,
         released: true,
         released_time: ts,
     };
@@ -301,12 +302,12 @@ fn test_unbond_history() {
         .collect::<Vec<_>>();
 
     let unbonded_list2 = unbond_history()
-    .idx
-    .released
-    .prefix("false".to_string())
-    .range(&deps.storage, None, None, Order::Ascending)
-    .map(|n| n.unwrap().1)
-    .collect::<Vec<_>>();
+        .idx
+        .released
+        .prefix("false".to_string())
+        .range(&deps.storage, None, None, Order::Ascending)
+        .map(|n| n.unwrap().1)
+        .collect::<Vec<_>>();
 
     println!("{:?}", unbonded_list2);
 }
