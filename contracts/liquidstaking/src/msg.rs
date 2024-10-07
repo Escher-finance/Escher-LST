@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::state::{Balance, Parameters, State, ValidatorsRegistry};
+use crate::state::{Balance, Parameters, State, UnbondHistory, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Uint128};
 

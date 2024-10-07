@@ -84,3 +84,20 @@ pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
     let ratio = Decimal::from_ratio(Uint128::new(1000), Uint128::new(1005));
     return calculate_staking_token_from_rate(total_bond_amount, ratio);
 }
+
+/// return how much to undelegate native token from ratio of total delegated amount divide with total bond amount (with reward)
+pub fn calculate_undelegate_amount(
+    native_token_amount: Uint128,
+    delegated_amount: Uint128,
+    total_bonded_amount: Uint128,
+) -> Uint128 {
+    let native_token_undelegate_decimal =
+        Decimal::new(native_token_amount * Uint128::from(DECIMAL_FRACTIONAL));
+    let ratio = Decimal::from_ratio(delegated_amount, total_bonded_amount);
+
+    println!("native_token_undelegate_decimal: {:?}", native_token_undelegate_decimal);
+    println!("ratio: {:?}", ratio);
+
+    let undelegate_native_decimal = native_token_undelegate_decimal * ratio;
+    undelegate_native_decimal.to_uint_floor()
+}

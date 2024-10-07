@@ -1,7 +1,7 @@
 use crate::msg::{Log, QueryMsg, TotalBond};
 use crate::state::unbond_history;
 use crate::state::{
-    Balance, Parameters, State, ValidatorsRegistry, UnbondHistory, BALANCE, LOG, PARAMETERS, STATE,
+    Balance, Parameters, State, UnbondHistory, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
 use crate::utils::{get_actual_total_bonded, get_actual_total_reward};
@@ -126,7 +126,7 @@ pub fn query_unbond_history(
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();
 
-            return Ok(unbonded_list);
+        return Ok(unbonded_list);
     }
 
     if source.is_none() && released.is_some() {

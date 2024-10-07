@@ -6,7 +6,7 @@ use crate::state::{increment_tokens, unbond_history, State, UnbondHistory, Valid
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
-    get_mock_total_reward,
+    get_mock_total_reward, calculate_undelegate_amount
 };
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
@@ -254,11 +254,12 @@ fn test_unbond_history() {
 
     let validator = deps.api.addr_make("validator");
     let env = mock_env();
-    let res = set_up(deps.as_mut(), env, vec![validator]);
+    let _res = set_up(deps.as_mut(), env, vec![validator]);
 
     let mut id = increment_tokens(&mut deps.storage).unwrap();
     println!("{}", id);
 
+    let source = deps.api.addr_make("source");
     let sender1 = deps.api.addr_make("sender1");
     let sender2 = deps.api.addr_make("sender2");
 
@@ -272,6 +273,7 @@ fn test_unbond_history() {
 
     let mut history = UnbondHistory {
         id,
+        source: source.to_string(),
         sender: sender1.to_string(),
         amount: amount.clone(),
         exchange_rate: exchange_rate,
@@ -284,6 +286,7 @@ fn test_unbond_history() {
     id = increment_tokens(&mut deps.storage).unwrap();
     history = UnbondHistory {
         id,
+        source: source.to_string(),
         sender: sender2.to_string(),
         amount,
         exchange_rate: exchange_rate,
@@ -310,4 +313,15 @@ fn test_unbond_history() {
         .collect::<Vec<_>>();
 
     println!("{:?}", unbonded_list2);
+}
+
+
+#[test]
+fn undelegate_amount_calculation() {
+    let native_token_amount = Uint128::new(1100);
+    let delegated_amount = Uint128::new(1000);
+    let total_bonded_amount = Uint128::new(1100);
+ 
+    let token = calculate_undelegate_amount(native_token_amount, delegated_amount, total_bonded_amount);
+    println!("calculate_undelegate_amount: {:?}", token);
 }
