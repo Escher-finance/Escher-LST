@@ -14,7 +14,7 @@ use crate::utils::{
 };
 use cosmwasm_std::{
     attr, to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
-    StakingMsg, SubMsg, Timestamp, Uint128,
+    StakingMsg, SubMsg, Timestamp, Uint128, DistributionMsg,
 };
 
 pub fn bond(
@@ -68,6 +68,13 @@ pub fn bond(
             });
         }
         msgs.push(staking_msg.into());
+
+        let withdraw_reward_msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
+                validator: validator.address.to_string(),
+            });
+
+        msgs.push(withdraw_reward_msg.into());
     }
 
     let delegator = env.contract.address;
@@ -279,7 +286,7 @@ pub fn unbond(
     // // update total bond, supply and exchange rate here
     state.total_bond_amount = total_bond_amount - native_token_unbond_amount;
     state.total_lst_supply = state.total_lst_supply - payment.amount;
-    state.total_delegated_amount = delegated_amount;
+    state.total_delegated_amount = delegated_amount - undelegate_amount;
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
@@ -295,8 +302,8 @@ pub fn unbond(
             native_token_unbond_amount.to_string(),
         ),
         attr("undelegate_amount", undelegate_amount.to_string()),
-        attr("delegated_amount", delegated_amount.to_string()),
-        attr("total_bond_amount", total_bond_amount.to_string()),
+        attr("delegated_amount", state.total_delegated_amount.to_string()),
+        attr("total_bond_amount", state.total_bond_amount.to_string()),
         attr("total_lst_supply", state.total_lst_supply.to_string()),
         attr("remaining_amount", remaining_amount.to_string()),
         attr("denom", coin_denom.to_string()),
