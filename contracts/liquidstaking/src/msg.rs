@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::state::{Balance, Parameters, State, ValidatorsRegistry};
+use crate::state::{Balance, Parameters, State, UnbondHistory, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Uint128};
 
@@ -33,9 +33,10 @@ pub enum ExecuteMsg {
     Bond {
         source: String,
     },
-    // BondRewards {},
-    // Send back unbonded coin to the user
-    // WithdrawUnbonded {},
+    Unbond {
+        source: String,
+    },
+    BondRewards {},
     Transfer {
         amount: Coin,
         receiver: Addr,
@@ -68,6 +69,12 @@ pub enum QueryMsg {
     Balance {},
     #[returns(Log)]
     Log {},
+    #[returns(Vec<UnbondHistory>)]
+    UnbondHistory {
+        source: Option<String>,
+        sender: Option<String>,
+        released: Option<bool>,
+    },
 }
 
 pub type Fees = BTreeMap<String, Coin>;
@@ -110,4 +117,10 @@ pub struct Log {
 pub struct MintTokensPayload {
     pub source: String,
     pub amount: Uint128,
+}
+
+#[cw_serde]
+pub struct BondRewardsPayload {
+    pub amount: Uint128,
+    pub validator: String,
 }

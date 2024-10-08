@@ -25,4 +25,7 @@ pub enum ContractError {
 
     #[error("InvalidContract")]
     InvalidContractVersion { message: String },
+
+    #[error("ZeroSupplyOrDelegatedAmount")]
+    ZeroSupplyOrDelegatedAmount {},
 }

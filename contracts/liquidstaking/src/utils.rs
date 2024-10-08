@@ -6,11 +6,21 @@ use std::str::FromStr;
 
 const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
 
-/// return a / b
-pub fn calculate_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
+/// return how much staking token from underlying native coin denom
+pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
     let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
     let fract = (exchange_rate * decimal_fract).to_uint_ceil();
     Decimal::from_ratio(Uint128::from(DECIMAL_FRACTIONAL) * stake_amount, fract).to_uint_floor()
+}
+
+/// return how much underlying native coin denom from staking token base on exchange rate
+pub fn calculate_native_token_from_staking_token(
+    staking_token: Uint128,
+    exchange_rate: Decimal,
+) -> Uint128 {
+    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
+    let fract = (exchange_rate * decimal_fract).to_uint_ceil();
+    Decimal::from_ratio(fract * staking_token, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor()
 }
 
 /// get total delegated token value from validators in native token
@@ -72,5 +82,25 @@ pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
 
 pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
     let ratio = Decimal::from_ratio(Uint128::new(1000), Uint128::new(1005));
-    return calculate_token_from_rate(total_bond_amount, ratio);
+    return calculate_staking_token_from_rate(total_bond_amount, ratio);
+}
+
+/// return how much to undelegate native token from ratio of total delegated amount divide with total bond amount (with reward)
+pub fn calculate_undelegate_amount(
+    native_token_amount: Uint128,
+    delegated_amount: Uint128,
+    total_bonded_amount: Uint128,
+) -> Uint128 {
+    let native_token_undelegate_decimal =
+        Decimal::new(native_token_amount * Uint128::from(DECIMAL_FRACTIONAL));
+    let ratio = Decimal::from_ratio(delegated_amount, total_bonded_amount);
+
+    println!(
+        "native_token_undelegate_decimal: {:?}",
+        native_token_undelegate_decimal
+    );
+    println!("ratio: {:?}", ratio);
+
+    let undelegate_native_decimal = native_token_undelegate_decimal * ratio;
+    undelegate_native_decimal.to_uint_floor()
 }

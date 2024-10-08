@@ -79,6 +79,7 @@ pub fn execute(
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     match msg {
         ExecuteMsg::Bond { source } => execute::bond(deps, env, info, source),
+        ExecuteMsg::Unbond { source } => execute::unbond(deps, env, info, source),
         ExecuteMsg::Transfer { amount, receiver } => {
             execute::transfer(deps, env, info, amount, receiver)
         }
@@ -86,6 +87,7 @@ pub fn execute(
         ExecuteMsg::SetTokenAdmin { denom, new_admin } => {
             execute::set_token_admin(deps, info, denom, new_admin)
         }
+        ExecuteMsg::BondRewards {} => execute::bond_rewards(deps, env, info),
     }
 }
 

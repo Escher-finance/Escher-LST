@@ -2,14 +2,17 @@ use crate::contract::execute;
 use crate::contract::instantiate;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::query::query;
-use crate::state::{State, ValidatorsRegistry};
+use crate::state::{increment_tokens, unbond_history, State, UnbondHistory, ValidatorsRegistry};
 use crate::token_factory_api::TokenFactoryMsg;
-use crate::utils::{calculate_token_from_rate, get_mock_total_reward};
+use crate::utils::{
+    calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
+    calculate_undelegate_amount, get_mock_total_reward,
+};
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
 use cosmwasm_std::{
-    coins, from_json, Addr, Coin, Decimal, DepsMut, Env, MemoryStorage, Response, StdError,
-    Uint128, Validator,
+    coins, from_json, Addr, Coin, Decimal, DepsMut, Env, MemoryStorage, Order, Response, StdError,
+    Timestamp, Uint128, Validator,
 };
 use cw_multi_test::{
     App, AppBuilder, BankKeeper, Contract, ContractWrapper, Executor, FailingModule, StakingInfo,
@@ -151,7 +154,9 @@ fn initial_query() {
 fn execute_bond() {
     let (owner, mut app, ls_contract_addr) = setup_contract();
 
-    let bond_msg = ExecuteMsg::Bond {};
+    let bond_msg = ExecuteMsg::Bond {
+        source: "abc".to_string(),
+    };
     let res1 = app.execute_contract(owner.clone(), ls_contract_addr.clone(), &bond_msg, &[]);
     //println!("{:?}", res1);
     assert_eq!(res1.is_err(), true);
@@ -205,7 +210,7 @@ fn exchange_rate_calculation() {
     let exchange_rate = Decimal::from_ratio(a, b);
     //println!("{:?} / {:?}", total_bond, exchange_rate);
 
-    let token = calculate_token_from_rate(total_bond, exchange_rate);
+    let token = calculate_staking_token_from_rate(total_bond, exchange_rate);
     assert_eq!(token, Uint128::new(500));
 
     // - Rewards for 4 days: 1000 Union * 0.0274% * 4 = 1.096 Union
@@ -220,7 +225,7 @@ fn exchange_rate_calculation() {
     let new_exchange_rate = Decimal::from_ratio(a, b);
 
     let bond_amount = Uint128::new(500000000);
-    let mint_amount = calculate_token_from_rate(bond_amount, new_exchange_rate);
+    let mint_amount = calculate_staking_token_from_rate(bond_amount, new_exchange_rate);
     assert_eq!(mint_amount, Uint128::new(499452599));
 }
 
@@ -229,4 +234,94 @@ fn mock_total_reward() {
     let total_bond = Uint128::new(1000);
     let bond_with_reward = get_mock_total_reward(total_bond);
     assert_eq!(bond_with_reward, Uint128::new(1005));
+}
+
+#[test]
+fn exchange_unbond_rate_calculation() {
+    let staking_token = Uint128::new(100);
+
+    let a = Uint128::new(110);
+    let b = Uint128::new(100);
+    let exchange_rate = Decimal::from_ratio(a, b);
+
+    let token = calculate_native_token_from_staking_token(staking_token, exchange_rate);
+    assert_eq!(token, Uint128::new(110));
+}
+
+#[test]
+fn test_unbond_history() {
+    let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+
+    let validator = deps.api.addr_make("validator");
+    let env = mock_env();
+    let _res = set_up(deps.as_mut(), env, vec![validator]);
+
+    let mut id = increment_tokens(&mut deps.storage).unwrap();
+    println!("{}", id);
+
+    let source = deps.api.addr_make("source");
+    let sender1 = deps.api.addr_make("sender1");
+    let sender2 = deps.api.addr_make("sender2");
+
+    let amount = Coin {
+        amount: Uint128::new(10),
+        denom: "TOKEN".to_string(),
+    };
+
+    let exchange_rate = Decimal::from_ratio(Uint128::new(110), Uint128::new(100));
+    let ts = Timestamp::from_nanos(1_000_000_000);
+
+    let mut history = UnbondHistory {
+        id,
+        source: source.to_string(),
+        sender: sender1.to_string(),
+        amount: amount.clone(),
+        exchange_rate: exchange_rate,
+        unbond_time: ts,
+        released: false,
+        released_time: ts,
+    };
+
+    let _res = unbond_history().save(&mut deps.storage, id, &history);
+    id = increment_tokens(&mut deps.storage).unwrap();
+    history = UnbondHistory {
+        id,
+        source: source.to_string(),
+        sender: sender2.to_string(),
+        amount,
+        exchange_rate: exchange_rate,
+        unbond_time: ts,
+        released: true,
+        released_time: ts,
+    };
+    let _res2 = unbond_history().save(&mut deps.storage, id, &history);
+
+    let unbonded_list1 = unbond_history()
+        .idx
+        .released
+        .prefix("true".to_string())
+        .range(&deps.storage, None, None, Order::Ascending)
+        .map(|n| n.unwrap().1)
+        .collect::<Vec<_>>();
+
+    let unbonded_list2 = unbond_history()
+        .idx
+        .released
+        .prefix("false".to_string())
+        .range(&deps.storage, None, None, Order::Ascending)
+        .map(|n| n.unwrap().1)
+        .collect::<Vec<_>>();
+
+    println!("{:?}", unbonded_list2);
+}
+
+#[test]
+fn undelegate_amount_calculation() {
+    let native_token_amount = Uint128::new(1100);
+    let delegated_amount = Uint128::new(1000);
+    let total_bonded_amount = Uint128::new(1100);
+
+    let token =
+        calculate_undelegate_amount(native_token_amount, delegated_amount, total_bonded_amount);
+    println!("calculate_undelegate_amount: {:?}", token);
 }
