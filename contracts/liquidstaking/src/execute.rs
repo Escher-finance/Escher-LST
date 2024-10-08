@@ -1,7 +1,7 @@
 use crate::error::ContractError;
-use crate::msg::MintTokensPayload;
+use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
-use crate::reply::MINT_TOKENS_REPLY_ID;
+use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::state::{
     increment_tokens, unbond_history, Config, UnbondHistory, CONFIG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
@@ -10,11 +10,11 @@ use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
     calculate_undelegate_amount, get_actual_total_bonded, get_actual_total_reward,
-    get_mock_total_reward,
+    get_mock_total_reward, to_uint128,
 };
 use cosmwasm_std::{
-    attr, to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
-    StakingMsg, SubMsg, Timestamp, Uint128, DistributionMsg,
+    attr, to_json_binary, Addr, Coin, CosmosMsg, DecCoin, Decimal, DepsMut, DistributionMsg, Env,
+    MessageInfo, Response, StakingMsg, StdResult, SubMsg, Timestamp, Uint128,
 };
 
 pub fn bond(
@@ -290,9 +290,7 @@ pub fn unbond(
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new()
-        .add_messages(msgs)
-        .add_attributes(vec![
+    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "undelegate"),
         attr("sender", sender),
         attr("source", source),
@@ -379,5 +377,60 @@ pub fn set_token_admin(
         .add_attribute("action", "set_token_admin")
         .add_attribute("denom", denom)
         .add_attribute("admin", new_admin.to_string());
+    Ok(res)
+}
+
+pub fn bond_rewards(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let coin_denom = params.underlying_coin_denom;
+    let sender = info.sender;
+    let delegator = env.contract.address;
+    let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
+
+    let mut attrs = vec![attr("action", "bond_rewards"), attr("from", sender)];
+
+    for validator in validators_reg.validators {
+        let result: StdResult<Vec<DecCoin>> = deps
+            .querier
+            .query_delegation_rewards(delegator.clone(), validator.address.to_string());
+
+        let mut payload = BondRewardsPayload {
+            validator: validator.address.clone(),
+            amount: Uint128::new(0),
+        };
+
+        if result.is_ok() {
+            for reward in result.unwrap() {
+                if reward.denom == coin_denom {
+                    payload.amount = to_uint128(reward.amount.to_uint_floor())?;
+                }
+            }
+        }
+
+        let withdraw_reward_msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
+                validator: validator.address.to_string(),
+            });
+
+        let payload_bin = to_json_binary(&payload)?;
+
+        let sub_msg: SubMsg<TokenFactoryMsg> =
+            SubMsg::reply_always(withdraw_reward_msg, BOND_WITHDRAW_REWARD_REPLY_ID)
+                .with_payload(payload_bin)
+                .into();
+        sub_msgs.push(sub_msg);
+
+        attrs.push(attr("amount", payload.amount.to_string()));
+    }
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_submessages(sub_msgs)
+        .add_attributes(attrs);
+
     Ok(res)
 }

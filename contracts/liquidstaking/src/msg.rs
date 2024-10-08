@@ -36,9 +36,7 @@ pub enum ExecuteMsg {
     Unbond {
         source: String,
     },
-    // BondRewards {},
-    // Send back unbonded coin to the user
-    // WithdrawUnbonded {},
+    BondRewards {},
     Transfer {
         amount: Coin,
         receiver: Addr,
@@ -119,4 +117,10 @@ pub struct Log {
 pub struct MintTokensPayload {
     pub source: String,
     pub amount: Uint128,
+}
+
+#[cw_serde]
+pub struct BondRewardsPayload {
+    pub amount: Uint128,
+    pub validator: String,
 }

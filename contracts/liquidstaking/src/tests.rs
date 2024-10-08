@@ -6,7 +6,7 @@ use crate::state::{increment_tokens, unbond_history, State, UnbondHistory, Valid
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
-    get_mock_total_reward, calculate_undelegate_amount
+    calculate_undelegate_amount, get_mock_total_reward,
 };
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
@@ -315,13 +315,13 @@ fn test_unbond_history() {
     println!("{:?}", unbonded_list2);
 }
 
-
 #[test]
 fn undelegate_amount_calculation() {
     let native_token_amount = Uint128::new(1100);
     let delegated_amount = Uint128::new(1000);
     let total_bonded_amount = Uint128::new(1100);
- 
-    let token = calculate_undelegate_amount(native_token_amount, delegated_amount, total_bonded_amount);
+
+    let token =
+        calculate_undelegate_amount(native_token_amount, delegated_amount, total_bonded_amount);
     println!("calculate_undelegate_amount: {:?}", token);
 }

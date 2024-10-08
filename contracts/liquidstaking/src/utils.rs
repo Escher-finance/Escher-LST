@@ -95,7 +95,10 @@ pub fn calculate_undelegate_amount(
         Decimal::new(native_token_amount * Uint128::from(DECIMAL_FRACTIONAL));
     let ratio = Decimal::from_ratio(delegated_amount, total_bonded_amount);
 
-    println!("native_token_undelegate_decimal: {:?}", native_token_undelegate_decimal);
+    println!(
+        "native_token_undelegate_decimal: {:?}",
+        native_token_undelegate_decimal
+    );
     println!("ratio: {:?}", ratio);
 
     let undelegate_native_decimal = native_token_undelegate_decimal * ratio;

@@ -1,12 +1,13 @@
 use crate::error::ContractError;
-use crate::msg::{MintTokensPayload, TransferMsg, Ucs01RelayExecuteMsg};
+use crate::msg::{BondRewardsPayload, MintTokensPayload, TransferMsg, Ucs01RelayExecuteMsg};
 use crate::state::{Balance, Parameters, BALANCE, LOG, PARAMETERS};
 use cosmwasm_std::{
     entry_point, from_json, to_json_binary, Coin, CosmosMsg, DepsMut, Env, Reply, Response,
-    StdError, Uint128, WasmMsg,
+    StakingMsg, StdError, Uint128, WasmMsg,
 };
 
 pub const MINT_TOKENS_REPLY_ID: u64 = 123;
+pub const BOND_WITHDRAW_REWARD_REPLY_ID: u64 = 124;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
@@ -19,6 +20,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
 
     match msg.id {
         MINT_TOKENS_REPLY_ID => return on_mint_tokens(deps, env, msg),
+        BOND_WITHDRAW_REWARD_REPLY_ID => return on_bond_rewards(deps, env, msg),
         _ => return Ok(Response::new()),
     };
 }
@@ -100,4 +102,26 @@ pub fn send_to_evm(
     .into();
 
     Ok(msg)
+}
+
+fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let coin_denom = params.underlying_coin_denom;
+    let payload: BondRewardsPayload = from_json(msg.payload)?;
+    let amount = Coin {
+        amount: payload.amount.clone(),
+        denom: coin_denom.to_string(),
+    };
+
+    let staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Delegate {
+        validator: payload.validator.to_string(),
+        amount,
+    });
+
+    let res: Response = Response::new()
+        .add_message(staking_msg)
+        .add_attribute("action", "stake_rewards")
+        .add_attribute("validator", payload.validator.to_string())
+        .add_attribute("amount", payload.amount.to_string());
+    Ok(res)
 }

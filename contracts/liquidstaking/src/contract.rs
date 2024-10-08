@@ -87,6 +87,7 @@ pub fn execute(
         ExecuteMsg::SetTokenAdmin { denom, new_admin } => {
             execute::set_token_admin(deps, info, denom, new_admin)
         }
+        ExecuteMsg::BondRewards {} => execute::bond_rewards(deps, env, info),
     }
 }
 
