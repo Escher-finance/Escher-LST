@@ -24,10 +24,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Balance {} => to_json_binary(&(query_balance(deps.storage)?)),
         QueryMsg::Log {} => to_json_binary(&(query_log(deps.storage)?)),
         QueryMsg::UnbondHistory {
-            source,
+            staker,
             sender,
             released,
-        } => to_json_binary(&(query_unbond_history(deps.storage, source, sender, released)?)),
+        } => to_json_binary(&(query_unbond_history(deps.storage, staker, sender, released)?)),
     }
 }
 
@@ -85,15 +85,15 @@ pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
 
 pub fn query_unbond_history(
     storage: &dyn Storage,
-    source: Option<String>,
+    staker: Option<String>,
     sender: Option<String>,
     released: Option<bool>,
 ) -> StdResult<Vec<UnbondHistory>> {
-    if source.is_some() && released.is_none() {
+    if staker.is_some() && released.is_none() {
         let unbonded_list = unbond_history()
             .idx
-            .source
-            .prefix(source.unwrap())
+            .staker
+            .prefix(staker.unwrap())
             .range(storage, None, None, Order::Ascending)
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();
@@ -101,13 +101,13 @@ pub fn query_unbond_history(
         return Ok(unbonded_list);
     }
 
-    if source.is_some() && released.is_some() {
+    if staker.is_some() && released.is_some() {
         let unbonded_list = unbond_history()
             .idx
-            .source_released
+            .staker_released
             .prefix(format!(
                 "{}-{}",
-                source.unwrap(),
+                staker.unwrap(),
                 released.unwrap().to_string()
             ))
             .range(storage, None, None, Order::Ascending)
@@ -117,7 +117,7 @@ pub fn query_unbond_history(
         return Ok(unbonded_list);
     }
 
-    if source.is_none() && sender.is_some() {
+    if staker.is_none() && sender.is_some() {
         let unbonded_list = unbond_history()
             .idx
             .sender
@@ -129,7 +129,7 @@ pub fn query_unbond_history(
         return Ok(unbonded_list);
     }
 
-    if source.is_none() && released.is_some() {
+    if staker.is_none() && released.is_some() {
         let unbonded_list = unbond_history()
             .idx
             .released

@@ -21,7 +21,7 @@ pub fn bond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    source: String,
+    staker: String,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -74,7 +74,9 @@ pub fn bond(
                 validator: validator.address.to_string(),
             });
 
-        msgs.push(withdraw_reward_msg.into());
+        if !cfg!(test) {
+            msgs.push(withdraw_reward_msg.into());
+        }
     }
 
     let delegator = env.contract.address;
@@ -138,7 +140,7 @@ pub fn bond(
     let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
     if !cfg!(test) {
         let payload = MintTokensPayload {
-            source,
+            staker,
             amount: mint_amount,
         };
         let payload_bin = to_json_binary(&payload)?;
@@ -155,6 +157,7 @@ pub fn bond(
         .add_attributes(vec![
             attr("action", "mint"),
             attr("from", sender),
+            attr("payment_amount", payment.amount.to_string()),
             attr("delegate_amount", delegate_amount.to_string()),
             attr("remaining_amount", remaining_amount.to_string()),
             attr("denom", coin_denom.to_string()),
@@ -169,7 +172,7 @@ pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    source: String,
+    staker: String,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -274,7 +277,7 @@ pub fn unbond(
     let history = UnbondHistory {
         id,
         sender: sender.clone(),
-        source: source.clone(),
+        staker: staker.clone(),
         amount: unbond_amount,
         exchange_rate: current_exchange_rate,
         unbond_time: env.block.time,
@@ -293,7 +296,7 @@ pub fn unbond(
     let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "undelegate"),
         attr("sender", sender),
-        attr("source", source),
+        attr("staker", staker),
         attr("current_exchange_rate", current_exchange_rate.to_string()),
         attr(
             "native_token_unbond_amount",
