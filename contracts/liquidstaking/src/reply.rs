@@ -45,9 +45,9 @@ fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, Contr
     }
 
     let payload: MintTokensPayload = from_json(msg.payload)?;
-    log += format!("transfer to: {} amount: {}", payload.source, payload.amount).as_str();
+    log += format!("transfer to: {} amount: {}", payload.staker, payload.amount).as_str();
     LOG.save(deps.storage, &log)?;
-    return transfer(deps, payload.amount, payload.source);
+    return transfer(deps, payload.amount, payload.staker);
 }
 
 pub fn transfer(

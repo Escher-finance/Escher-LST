@@ -31,10 +31,10 @@ pub enum ExecuteMsg {
     /// Delegate `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
     Bond {
-        source: String,
+        staker: String,
     },
     Unbond {
-        source: String,
+        staker: String,
     },
     BondRewards {},
     Transfer {
@@ -71,7 +71,7 @@ pub enum QueryMsg {
     Log {},
     #[returns(Vec<UnbondHistory>)]
     UnbondHistory {
-        source: Option<String>,
+        staker: Option<String>,
         sender: Option<String>,
         released: Option<bool>,
     },
@@ -115,7 +115,7 @@ pub struct Log {
 
 #[cw_serde]
 pub struct MintTokensPayload {
-    pub source: String,
+    pub staker: String,
     pub amount: Uint128,
 }
 

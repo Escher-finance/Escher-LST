@@ -155,7 +155,7 @@ fn execute_bond() {
     let (owner, mut app, ls_contract_addr) = setup_contract();
 
     let bond_msg = ExecuteMsg::Bond {
-        source: "abc".to_string(),
+        staker: "abc".to_string(),
     };
     let res1 = app.execute_contract(owner.clone(), ls_contract_addr.clone(), &bond_msg, &[]);
     //println!("{:?}", res1);
@@ -259,7 +259,7 @@ fn test_unbond_history() {
     let mut id = increment_tokens(&mut deps.storage).unwrap();
     println!("{}", id);
 
-    let source = deps.api.addr_make("source");
+    let staker = deps.api.addr_make("staker");
     let sender1 = deps.api.addr_make("sender1");
     let sender2 = deps.api.addr_make("sender2");
 
@@ -273,7 +273,7 @@ fn test_unbond_history() {
 
     let mut history = UnbondHistory {
         id,
-        source: source.to_string(),
+        staker: staker.to_string(),
         sender: sender1.to_string(),
         amount: amount.clone(),
         exchange_rate: exchange_rate,
@@ -286,7 +286,7 @@ fn test_unbond_history() {
     id = increment_tokens(&mut deps.storage).unwrap();
     history = UnbondHistory {
         id,
-        source: source.to_string(),
+        staker: staker.to_string(),
         sender: sender2.to_string(),
         amount,
         exchange_rate: exchange_rate,
