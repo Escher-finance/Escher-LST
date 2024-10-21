@@ -68,15 +68,6 @@ pub fn bond(
             });
         }
         msgs.push(staking_msg.into());
-
-        let withdraw_reward_msg: CosmosMsg<TokenFactoryMsg> =
-            CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
-                validator: validator.address.to_string(),
-            });
-
-        if !cfg!(test) {
-            msgs.push(withdraw_reward_msg.into());
-        }
     }
 
     let delegator = env.contract.address;
