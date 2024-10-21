@@ -3,15 +3,15 @@ use cosmwasm_std::{Decimal, Event, Uint128};
 pub const BOND_EVENT: &str = "bond";
 
 #[allow(non_snake_case)]
-pub fn BondEvent(sender: String, 
-    staker: String, 
-    bond_amount: Uint128, 
-    delegated_amount: Uint128, 
+pub fn BondEvent(
+    sender: String,
+    staker: String,
+    bond_amount: Uint128,
+    delegated_amount: Uint128,
     total_bond_amount: Uint128,
-    total_supply: Uint128, 
-    exchange_rate: Decimal, 
+    total_supply: Uint128,
+    exchange_rate: Decimal,
 ) -> Event {
- 
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", staker)
@@ -25,15 +25,15 @@ pub fn BondEvent(sender: String,
 pub const UNBOND_EVENT: &str = "unbond";
 
 #[allow(non_snake_case)]
-pub fn UnbondEvent(sender: String, 
-    staker: String, 
-    unbond_amount: Uint128, 
-    delegated_amount: Uint128, 
+pub fn UnbondEvent(
+    sender: String,
+    staker: String,
+    unbond_amount: Uint128,
+    delegated_amount: Uint128,
     total_bond_amount: Uint128,
-    total_supply: Uint128, 
-    exchange_rate: Decimal, 
+    total_supply: Uint128,
+    exchange_rate: Decimal,
 ) -> Event {
-
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", staker)

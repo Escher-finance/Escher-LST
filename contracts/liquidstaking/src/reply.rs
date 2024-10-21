@@ -47,7 +47,13 @@ fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, Contr
     let payload: MintTokensPayload = from_json(msg.payload)?;
     log += format!("transfer to: {} amount: {}", payload.staker, payload.amount).as_str();
     LOG.save(deps.storage, &log)?;
-    transfer(deps, payload.amount, payload.staker)
+
+    // if the sender is not equal as the staker, means it is from other chain
+    if payload.sender != payload.staker {
+        return transfer(deps, payload.amount, payload.staker);
+    }
+
+    Ok(Response::default())
 }
 
 pub fn transfer(

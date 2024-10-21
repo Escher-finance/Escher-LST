@@ -1,12 +1,11 @@
 use crate::error::ContractError;
+use crate::event::{BondEvent, UnbondEvent};
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::state::{
-    increment_tokens, unbond_history, UnbondHistory, PARAMETERS, STATE,
-    VALIDATORS_REGISTRY,
+    increment_tokens, unbond_history, UnbondHistory, PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
-use crate::event::{BondEvent, UnbondEvent};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
@@ -22,12 +21,13 @@ pub fn bond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    staker: String,
+    staker: Option<String>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom;
     let sender = info.sender;
+    let the_staker: String = staker.unwrap_or_else(|| "".to_string());
 
     // coin must have be sent along with transaction and it should be in underlying coin denom
     if info.funds.len() > 1usize {
@@ -115,12 +115,12 @@ pub fn bond(
     // create bond event here
     let bond_event = BondEvent(
         sender.to_string(),
-        staker.clone(),
+        the_staker.clone(),
         payment.amount.clone(),
-        delegated_amount.clone(), 
+        delegated_amount.clone(),
         total_bond_amount.clone(),
-        total_lst_supply, 
-        current_exchange_rate
+        total_lst_supply,
+        current_exchange_rate,
     );
 
     // after update exchange rate we update the state
@@ -143,7 +143,8 @@ pub fn bond(
     let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
     if !cfg!(test) {
         let payload = MintTokensPayload {
-            staker,
+            sender: sender.to_string(),
+            staker: the_staker.clone(),
             amount: mint_amount,
         };
         let payload_bin = to_json_binary(&payload)?;
@@ -176,18 +177,14 @@ pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    staker: option<String>,
+    staker: Option<String>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom;
     let liquidstaking_denom = params.liquidstaking_denom;
     let sender = info.sender.to_string();
-
-    let mut the_staker = "".to_string();
-    if staker.is_some() {
-        the_staker = staker.unwrap();
-    }
+    let the_staker: String = staker.unwrap_or_else(|| "".to_string());
 
     // coin must have be sent along with transaction and it should be in liquid staking coin denom
     if info.funds.len() > 1usize {
@@ -274,12 +271,11 @@ pub fn unbond(
         sender.clone(),
         the_staker.clone(),
         payment.amount.clone(),
-        delegated_amount.clone(), 
+        delegated_amount.clone(),
         total_bond_amount.clone(),
-        state.total_lst_supply.clone(), 
-        current_exchange_rate
+        state.total_lst_supply.clone(),
+        current_exchange_rate,
     );
-
 
     let burn_msg = TokenFactoryMsg::BurnTokens {
         denom: liquidstaking_denom.clone(),
@@ -318,21 +314,21 @@ pub fn unbond(
         .add_messages(msgs)
         .add_event(unbond_event)
         .add_attributes(vec![
-        attr("action", "undelegate"),
-        attr("sender", sender),
-        attr("staker", the_staker),
-        attr("current_exchange_rate", current_exchange_rate.to_string()),
-        attr(
-            "native_token_unbond_amount",
-            native_token_unbond_amount.to_string(),
-        ),
-        attr("undelegate_amount", undelegate_amount.to_string()),
-        attr("delegated_amount", state.total_delegated_amount.to_string()),
-        attr("total_bond_amount", state.total_bond_amount.to_string()),
-        attr("total_lst_supply", state.total_lst_supply.to_string()),
-        attr("remaining_amount", remaining_amount.to_string()),
-        attr("denom", coin_denom.to_string()),
-    ]);
+            attr("action", "undelegate"),
+            attr("sender", sender),
+            attr("staker", the_staker),
+            attr("current_exchange_rate", current_exchange_rate.to_string()),
+            attr(
+                "native_token_unbond_amount",
+                native_token_unbond_amount.to_string(),
+            ),
+            attr("undelegate_amount", undelegate_amount.to_string()),
+            attr("delegated_amount", state.total_delegated_amount.to_string()),
+            attr("total_bond_amount", state.total_bond_amount.to_string()),
+            attr("total_lst_supply", state.total_lst_supply.to_string()),
+            attr("remaining_amount", remaining_amount.to_string()),
+            attr("denom", coin_denom.to_string()),
+        ]);
 
     Ok(res)
 }

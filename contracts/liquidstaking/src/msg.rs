@@ -124,6 +124,7 @@ pub struct Log {
 
 #[cw_serde]
 pub struct MintTokensPayload {
+    pub sender: String,
     pub staker: String,
     pub amount: Uint128,
 }
