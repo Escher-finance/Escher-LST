@@ -46,7 +46,7 @@ pub fn get_actual_total_bonded(
             .sum();
     }
 
-    return total;
+    total
 }
 
 /// get total delegated token value from validators in native token
@@ -77,12 +77,12 @@ pub fn get_actual_total_reward(
 }
 
 pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
-    Ok(Uint128::from_str(&v.to_string())?)
+    Uint128::from_str(&v.to_string())
 }
 
 pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
     let ratio = Decimal::from_ratio(Uint128::new(1000), Uint128::new(1005));
-    return calculate_staking_token_from_rate(total_bond_amount, ratio);
+    calculate_staking_token_from_rate(total_bond_amount, ratio)
 }
 
 /// return how much to undelegate native token from ratio of total delegated amount divide with total bond amount (with reward)

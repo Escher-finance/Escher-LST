@@ -1,6 +1,9 @@
 pub mod contract;
 mod error;
 pub mod execute;
+
+pub mod event;
+#[allow(unused_imports)]
 pub mod msg;
 pub mod query;
 pub mod relay;

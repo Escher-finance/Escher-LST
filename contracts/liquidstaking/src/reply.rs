@@ -19,10 +19,10 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     }
 
     match msg.id {
-        MINT_TOKENS_REPLY_ID => return on_mint_tokens(deps, env, msg),
-        BOND_WITHDRAW_REWARD_REPLY_ID => return on_bond_rewards(deps, env, msg),
-        _ => return Ok(Response::new()),
-    };
+        MINT_TOKENS_REPLY_ID => on_mint_tokens(deps, env, msg),
+        BOND_WITHDRAW_REWARD_REPLY_ID => on_bond_rewards(deps, env, msg),
+        _ => Ok(Response::new()),
+    }
 }
 
 fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
@@ -47,7 +47,13 @@ fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, Contr
     let payload: MintTokensPayload = from_json(msg.payload)?;
     log += format!("transfer to: {} amount: {}", payload.staker, payload.amount).as_str();
     LOG.save(deps.storage, &log)?;
-    return transfer(deps, payload.amount, payload.staker);
+
+    // if the sender is not equal as the staker, means it is from other chain
+    if payload.sender != payload.staker {
+        return transfer(deps, payload.amount, payload.staker);
+    }
+
+    Ok(Response::default())
 }
 
 pub fn transfer(
@@ -68,8 +74,7 @@ pub fn transfer(
         params.ucs01_channel,
         receiver.to_string(),
         funds,
-    )?
-    .into();
+    )?;
 
     let res: Response = Response::new()
         .add_message(msg)
@@ -98,8 +103,7 @@ pub fn send_to_evm(
         contract_addr,
         msg: transfer_relay_msg,
         funds,
-    })
-    .into();
+    });
 
     Ok(msg)
 }
@@ -109,7 +113,7 @@ fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Con
     let coin_denom = params.underlying_coin_denom;
     let payload: BondRewardsPayload = from_json(msg.payload)?;
     let amount = Coin {
-        amount: payload.amount.clone(),
+        amount: payload.amount,
         denom: coin_denom.to_string(),
     };
 

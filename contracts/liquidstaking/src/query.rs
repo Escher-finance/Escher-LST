@@ -7,6 +7,7 @@ use crate::state::{
 use crate::utils::{get_actual_total_bonded, get_actual_total_reward};
 use cosmwasm_std::{entry_point, to_json_binary, Order};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
+use cw_ownable::get_ownership;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
@@ -28,6 +29,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             sender,
             released,
         } => to_json_binary(&(query_unbond_history(deps.storage, staker, sender, released)?)),
+        QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
     }
 }
 

@@ -1,10 +1,10 @@
 use crate::error::ContractError;
+use crate::event::{BondEvent, UnbondEvent};
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::state::{
-    increment_tokens, unbond_history, Config, UnbondHistory, CONFIG, PARAMETERS, STATE,
-    VALIDATORS_REGISTRY,
+    increment_tokens, unbond_history, UnbondHistory, PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
@@ -21,12 +21,13 @@ pub fn bond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    staker: String,
+    staker: Option<String>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom;
     let sender = info.sender;
+    let the_staker: String = staker.unwrap_or_else(|| "".to_string());
 
     // coin must have be sent along with transaction and it should be in underlying coin denom
     if info.funds.len() > 1usize {
@@ -80,14 +81,14 @@ pub fn bond(
     // logic to mint token and update the supply and total_bond_amount
     let mut state = STATE.load(deps.storage)?;
     let total_bond_amount: Uint128;
+    let delegated_amount = get_actual_total_bonded(
+        deps.querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    );
 
     if !cfg!(test) {
-        let delegated_amount = get_actual_total_bonded(
-            deps.querier,
-            delegator.to_string(),
-            coin_denom.clone(),
-            validators_list.clone(),
-        );
         state.total_delegated_amount = delegated_amount;
         let reward = get_actual_total_reward(
             deps.querier,
@@ -111,6 +112,17 @@ pub fn bond(
 
     let total_lst_supply = state.total_lst_supply;
 
+    // create bond event here
+    let bond_event = BondEvent(
+        sender.to_string(),
+        the_staker.clone(),
+        payment.amount.clone(),
+        delegated_amount.clone(),
+        total_bond_amount.clone(),
+        total_lst_supply,
+        current_exchange_rate,
+    );
+
     // after update exchange rate we update the state
     state.bond_counter = state.bond_counter + 1;
     state.total_bond_amount = total_bond_amount + payment.amount;
@@ -131,7 +143,8 @@ pub fn bond(
     let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
     if !cfg!(test) {
         let payload = MintTokensPayload {
-            staker,
+            sender: sender.to_string(),
+            staker: the_staker.clone(),
             amount: mint_amount,
         };
         let payload_bin = to_json_binary(&payload)?;
@@ -145,6 +158,7 @@ pub fn bond(
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
         .add_submessages(sub_msgs)
+        .add_event(bond_event)
         .add_attributes(vec![
             attr("action", "mint"),
             attr("from", sender),
@@ -163,13 +177,14 @@ pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    staker: String,
+    staker: Option<String>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom;
     let liquidstaking_denom = params.liquidstaking_denom;
     let sender = info.sender.to_string();
+    let the_staker: String = staker.unwrap_or_else(|| "".to_string());
 
     // coin must have be sent along with transaction and it should be in liquid staking coin denom
     if info.funds.len() > 1usize {
@@ -252,6 +267,16 @@ pub fn unbond(
         msgs.push(undelegate_staking_msg.into());
     }
 
+    let unbond_event = UnbondEvent(
+        sender.clone(),
+        the_staker.clone(),
+        payment.amount.clone(),
+        delegated_amount.clone(),
+        total_bond_amount.clone(),
+        state.total_lst_supply.clone(),
+        current_exchange_rate,
+    );
+
     let burn_msg = TokenFactoryMsg::BurnTokens {
         denom: liquidstaking_denom.clone(),
         amount: payment.amount,
@@ -265,10 +290,11 @@ pub fn unbond(
         amount: payment.amount.clone(),
         denom: liquidstaking_denom.clone(),
     };
+
     let history = UnbondHistory {
         id,
         sender: sender.clone(),
-        staker: staker.clone(),
+        staker: the_staker.clone(),
         amount: unbond_amount,
         exchange_rate: current_exchange_rate,
         unbond_time: env.block.time,
@@ -284,22 +310,25 @@ pub fn unbond(
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(vec![
-        attr("action", "undelegate"),
-        attr("sender", sender),
-        attr("staker", staker),
-        attr("current_exchange_rate", current_exchange_rate.to_string()),
-        attr(
-            "native_token_unbond_amount",
-            native_token_unbond_amount.to_string(),
-        ),
-        attr("undelegate_amount", undelegate_amount.to_string()),
-        attr("delegated_amount", state.total_delegated_amount.to_string()),
-        attr("total_bond_amount", state.total_bond_amount.to_string()),
-        attr("total_lst_supply", state.total_lst_supply.to_string()),
-        attr("remaining_amount", remaining_amount.to_string()),
-        attr("denom", coin_denom.to_string()),
-    ]);
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_messages(msgs)
+        .add_event(unbond_event)
+        .add_attributes(vec![
+            attr("action", "undelegate"),
+            attr("sender", sender),
+            attr("staker", the_staker),
+            attr("current_exchange_rate", current_exchange_rate.to_string()),
+            attr(
+                "native_token_unbond_amount",
+                native_token_unbond_amount.to_string(),
+            ),
+            attr("undelegate_amount", undelegate_amount.to_string()),
+            attr("delegated_amount", state.total_delegated_amount.to_string()),
+            attr("total_bond_amount", state.total_bond_amount.to_string()),
+            attr("total_lst_supply", state.total_lst_supply.to_string()),
+            attr("remaining_amount", remaining_amount.to_string()),
+            attr("denom", coin_denom.to_string()),
+        ]);
 
     Ok(res)
 }
@@ -331,35 +360,13 @@ pub fn transfer(
     Ok(res)
 }
 
-pub fn set_owner(
-    deps: DepsMut,
-    info: MessageInfo,
-    new_owner: Addr,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
-    let mut config: Config = CONFIG.load(deps.storage)?;
-    if config.owner != info.sender.to_string() {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    config.owner = new_owner.to_string();
-    CONFIG.save(deps.storage, &config)?;
-
-    let res: Response<TokenFactoryMsg> = Response::new()
-        .add_attribute("action", "set_owner")
-        .add_attribute("owner", new_owner.to_string());
-    Ok(res)
-}
-
 pub fn set_token_admin(
     deps: DepsMut,
     info: MessageInfo,
     denom: String,
     new_admin: Addr,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
-    let config: Config = CONFIG.load(deps.storage)?;
-    if config.owner != info.sender.to_string() {
-        return Err(ContractError::Unauthorized {});
-    }
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let msg = TokenFactoryMsg::ChangeAdmin {
         denom: denom.clone(),
@@ -426,5 +433,78 @@ pub fn bond_rewards(
         .add_submessages(sub_msgs)
         .add_attributes(attrs);
 
+    Ok(res)
+}
+
+pub fn reset(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let mut state = STATE.load(deps.storage)?;
+    state.bond_counter = 0;
+    state.total_bond_amount = Uint128::new(0);
+    state.total_lst_supply = Uint128::new(0);
+    state.total_delegated_amount = Uint128::new(0);
+    state.last_bond_time = 0;
+    state.exchange_rate = Decimal::one();
+    STATE.save(deps.storage, &state)?;
+
+    unbond_history().clear(deps.storage);
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_attribute("action", "reset");
+
+    Ok(res)
+}
+
+/// Update the ownership of the contract.
+#[allow(clippy::needless_pass_by_value)]
+pub fn update_ownership(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    action: cw_ownable::Action,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    if action == cw_ownable::Action::RenounceOwnership {
+        return Err(ContractError::OwnershipCannotBeRenounced);
+    };
+
+    cw_ownable::update_ownership(deps, &env.block, &info.sender, action)?;
+
+    let res: Response<TokenFactoryMsg> =
+        Response::new().add_attribute("action", "update_ownership");
+
+    Ok(res)
+}
+
+pub fn set_parameters(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    underlying_coin_denom: Option<String>,
+    liquidstaking_denom: Option<String>,
+    ucs01_channel: Option<String>,
+    ucs01_relay_contract: Option<String>,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let mut params = PARAMETERS.load(deps.storage)?;
+
+    if underlying_coin_denom.is_some() {
+        params.underlying_coin_denom = underlying_coin_denom.unwrap();
+    }
+    if liquidstaking_denom.is_some() {
+        params.liquidstaking_denom = liquidstaking_denom.unwrap();
+    }
+    if ucs01_channel.is_some() {
+        params.ucs01_channel = ucs01_channel.unwrap();
+    }
+    if ucs01_relay_contract.is_some() {
+        params.ucs01_relay_contract = ucs01_relay_contract.unwrap();
+    }
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_attribute("action", "set_parameters");
     Ok(res)
 }

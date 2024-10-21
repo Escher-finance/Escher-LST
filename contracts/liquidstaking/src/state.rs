@@ -46,7 +46,7 @@ pub struct ValidatorsRegistry {
     pub validators: Vec<Validator>,
 }
 
-// Parameter is not changeable configuration
+// Parameter is required data to instantiate and run contract
 #[cw_serde]
 pub struct Parameters {
     pub underlying_coin_denom: String,
@@ -114,12 +114,12 @@ pub fn unbond_history<'a>() -> IndexedMap<u64, UnbondHistory, UnbondHistoryIndex
             "unbond_history__sender",
         ),
         released: MultiIndex::new(
-            |_pk, d: &UnbondHistory| format!("{}", d.released.to_string()),
+            |_pk, d: &UnbondHistory| d.released.to_string(),
             UNBOND_HISTORY_NAMESPACE,
             "unbond_history__released",
         ),
         staker_released: MultiIndex::new(
-            |_pk, d: &UnbondHistory| format!("{}-{}", d.staker.to_string(), d.released.to_string()),
+            |_pk, d: &UnbondHistory| format!("{}-{}", d.staker, d.released),
             UNBOND_HISTORY_NAMESPACE,
             "unbond_history__staker_released",
         ),
