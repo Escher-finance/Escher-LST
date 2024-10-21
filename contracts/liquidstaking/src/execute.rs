@@ -505,6 +505,8 @@ pub fn set_parameters(
         params.ucs01_relay_contract = ucs01_relay_contract.unwrap();
     }
 
+    PARAMETERS.save(deps.storage, &params)?;
+
     let res: Response<TokenFactoryMsg> = Response::new().add_attribute("action", "set_parameters");
     Ok(res)
 }
