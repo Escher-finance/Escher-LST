@@ -6,6 +6,7 @@ use crate::state::{
     increment_tokens, unbond_history, UnbondHistory, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
+use crate::event::{BondEvent, UnbondEvent};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
@@ -80,14 +81,14 @@ pub fn bond(
     // logic to mint token and update the supply and total_bond_amount
     let mut state = STATE.load(deps.storage)?;
     let total_bond_amount: Uint128;
+    let delegated_amount = get_actual_total_bonded(
+        deps.querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    );
 
     if !cfg!(test) {
-        let delegated_amount = get_actual_total_bonded(
-            deps.querier,
-            delegator.to_string(),
-            coin_denom.clone(),
-            validators_list.clone(),
-        );
         state.total_delegated_amount = delegated_amount;
         let reward = get_actual_total_reward(
             deps.querier,
@@ -110,6 +111,17 @@ pub fn bond(
     let mint_amount = calculate_staking_token_from_rate(payment.amount, current_exchange_rate);
 
     let total_lst_supply = state.total_lst_supply;
+
+    // create bond event here
+    let bond_event = BondEvent(
+        sender.to_string(),
+        staker.clone(),
+        payment.amount.clone(),
+        delegated_amount.clone(), 
+        total_bond_amount.clone(),
+        total_lst_supply, 
+        current_exchange_rate
+    );
 
     // after update exchange rate we update the state
     state.bond_counter = state.bond_counter + 1;
@@ -145,6 +157,7 @@ pub fn bond(
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
         .add_submessages(sub_msgs)
+        .add_event(bond_event)
         .add_attributes(vec![
             attr("action", "mint"),
             attr("from", sender),
@@ -163,13 +176,18 @@ pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    staker: String,
+    staker: option<String>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom;
     let liquidstaking_denom = params.liquidstaking_denom;
     let sender = info.sender.to_string();
+
+    let mut the_staker = "".to_string();
+    if staker.is_some() {
+        the_staker = staker.unwrap();
+    }
 
     // coin must have be sent along with transaction and it should be in liquid staking coin denom
     if info.funds.len() > 1usize {
@@ -252,6 +270,17 @@ pub fn unbond(
         msgs.push(undelegate_staking_msg.into());
     }
 
+    let unbond_event = UnbondEvent(
+        sender.clone(),
+        the_staker.clone(),
+        payment.amount.clone(),
+        delegated_amount.clone(), 
+        total_bond_amount.clone(),
+        state.total_lst_supply.clone(), 
+        current_exchange_rate
+    );
+
+
     let burn_msg = TokenFactoryMsg::BurnTokens {
         denom: liquidstaking_denom.clone(),
         amount: payment.amount,
@@ -265,10 +294,11 @@ pub fn unbond(
         amount: payment.amount.clone(),
         denom: liquidstaking_denom.clone(),
     };
+
     let history = UnbondHistory {
         id,
         sender: sender.clone(),
-        staker: staker.clone(),
+        staker: the_staker.clone(),
         amount: unbond_amount,
         exchange_rate: current_exchange_rate,
         unbond_time: env.block.time,
@@ -284,10 +314,13 @@ pub fn unbond(
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(vec![
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_messages(msgs)
+        .add_event(unbond_event)
+        .add_attributes(vec![
         attr("action", "undelegate"),
         attr("sender", sender),
-        attr("staker", staker),
+        attr("staker", the_staker),
         attr("current_exchange_rate", current_exchange_rate.to_string()),
         attr(
             "native_token_unbond_amount",

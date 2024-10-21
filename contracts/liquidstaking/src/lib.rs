@@ -10,6 +10,7 @@ pub mod reply;
 pub mod state;
 pub mod token_factory_api;
 pub mod utils;
+pub mod event;
 
 #[cfg(test)]
 mod tests;

@@ -33,10 +33,10 @@ pub enum ExecuteMsg {
     /// Delegate `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
     Bond {
-        staker: String,
+        staker: Option<String>,
     },
     Unbond {
-        staker: String,
+        staker: Option<String>,
     },
     BondRewards {},
     Transfer {
