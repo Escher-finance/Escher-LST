@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use crate::state::{Balance, Parameters, State, UnbondHistory, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Uint128};
+use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -13,6 +14,7 @@ pub struct InstantiateMsg {
     pub ucs01_relay_contract: String,
 }
 
+#[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
     ////////////////////
@@ -41,15 +43,22 @@ pub enum ExecuteMsg {
         amount: Coin,
         receiver: Addr,
     },
-    SetOwner {
-        new_owner: Addr,
-    },
     SetTokenAdmin {
         denom: String,
         new_admin: Addr,
     },
+    SetParameters {
+        underlying_coin_denom: Option<String>,
+        liquidstaking_denom: Option<String>,
+        ucs01_channel: Option<String>,
+        ucs01_relay_contract: Option<String>,
+    },
+    /// Reset will set state to initial state
+    Reset {},
 }
 
+#[cw_ownable_query]
+#[non_exhaustive]
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {

@@ -20,8 +20,7 @@ pub fn send_to_evm(
         contract_addr,
         msg: transfer_relay_msg,
         funds,
-    })
-    .into();
+    });
 
     Ok(msg)
 }

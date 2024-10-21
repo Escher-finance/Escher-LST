@@ -3,7 +3,7 @@ use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::state::{
-    increment_tokens, unbond_history, Config, UnbondHistory, CONFIG, PARAMETERS, STATE,
+    increment_tokens, unbond_history, UnbondHistory, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
@@ -331,35 +331,13 @@ pub fn transfer(
     Ok(res)
 }
 
-pub fn set_owner(
-    deps: DepsMut,
-    info: MessageInfo,
-    new_owner: Addr,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
-    let mut config: Config = CONFIG.load(deps.storage)?;
-    if config.owner != info.sender.to_string() {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    config.owner = new_owner.to_string();
-    CONFIG.save(deps.storage, &config)?;
-
-    let res: Response<TokenFactoryMsg> = Response::new()
-        .add_attribute("action", "set_owner")
-        .add_attribute("owner", new_owner.to_string());
-    Ok(res)
-}
-
 pub fn set_token_admin(
     deps: DepsMut,
     info: MessageInfo,
     denom: String,
     new_admin: Addr,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
-    let config: Config = CONFIG.load(deps.storage)?;
-    if config.owner != info.sender.to_string() {
-        return Err(ContractError::Unauthorized {});
-    }
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let msg = TokenFactoryMsg::ChangeAdmin {
         denom: denom.clone(),
@@ -426,5 +404,78 @@ pub fn bond_rewards(
         .add_submessages(sub_msgs)
         .add_attributes(attrs);
 
+    Ok(res)
+}
+
+pub fn reset(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let mut state = STATE.load(deps.storage)?;
+    state.bond_counter = 0;
+    state.total_bond_amount = Uint128::new(0);
+    state.total_lst_supply = Uint128::new(0);
+    state.total_delegated_amount = Uint128::new(0);
+    state.last_bond_time = 0;
+    state.exchange_rate = Decimal::one();
+    STATE.save(deps.storage, &state)?;
+
+    unbond_history().clear(deps.storage);
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_attribute("action", "reset");
+
+    Ok(res)
+}
+
+/// Update the ownership of the contract.
+#[allow(clippy::needless_pass_by_value)]
+pub fn update_ownership(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    action: cw_ownable::Action,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    if action == cw_ownable::Action::RenounceOwnership {
+        return Err(ContractError::OwnershipCannotBeRenounced);
+    };
+
+    cw_ownable::update_ownership(deps, &env.block, &info.sender, action)?;
+
+    let res: Response<TokenFactoryMsg> =
+        Response::new().add_attribute("action", "update_ownership");
+
+    Ok(res)
+}
+
+pub fn set_parameters(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    underlying_coin_denom: Option<String>,
+    liquidstaking_denom: Option<String>,
+    ucs01_channel: Option<String>,
+    ucs01_relay_contract: Option<String>,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let mut params = PARAMETERS.load(deps.storage)?;
+
+    if underlying_coin_denom.is_some() {
+        params.underlying_coin_denom = underlying_coin_denom.unwrap();
+    }
+    if liquidstaking_denom.is_some() {
+        params.liquidstaking_denom = liquidstaking_denom.unwrap();
+    }
+    if ucs01_channel.is_some() {
+        params.ucs01_channel = ucs01_channel.unwrap();
+    }
+    if ucs01_relay_contract.is_some() {
+        params.ucs01_relay_contract = ucs01_relay_contract.unwrap();
+    }
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_attribute("action", "set_parameters");
     Ok(res)
 }

@@ -159,7 +159,7 @@ fn execute_bond() {
     };
     let res1 = app.execute_contract(owner.clone(), ls_contract_addr.clone(), &bond_msg, &[]);
     //println!("{:?}", res1);
-    assert_eq!(res1.is_err(), true);
+    assert!(res1.is_err());
 
     let fund = Coin {
         amount: Uint128::new(1000),
