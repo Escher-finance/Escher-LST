@@ -314,7 +314,7 @@ pub fn unbond(
         .add_messages(msgs)
         .add_event(unbond_event)
         .add_attributes(vec![
-            attr("action", "undelegate"),
+            attr("action", "unbond"),
             attr("sender", sender),
             attr("staker", the_staker),
             attr("current_exchange_rate", current_exchange_rate.to_string()),
@@ -322,8 +322,14 @@ pub fn unbond(
                 "native_token_unbond_amount",
                 native_token_unbond_amount.to_string(),
             ),
-            attr("undelegate_amount", undelegate_amount.to_string()),
-            attr("delegated_amount", state.total_delegated_amount.to_string()),
+            attr(
+                "undelegate_amount_per_validator",
+                undelegate_amount.to_string(),
+            ),
+            attr(
+                "total_delegated_amount",
+                state.total_delegated_amount.to_string(),
+            ),
             attr("total_bond_amount", state.total_bond_amount.to_string()),
             attr("total_lst_supply", state.total_lst_supply.to_string()),
             attr("remaining_amount", remaining_amount.to_string()),

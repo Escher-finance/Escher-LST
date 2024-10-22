@@ -112,12 +112,14 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     if ver.contract != CONTRACT_NAME {
         return Err(ContractError::InvalidContractName {});
     }
-    // note: it's better to do a proper semver comparison, but a string comparison *usually* works    #[allow(clippy::cmp_owned)]
-    if ver.version >= CONTRACT_VERSION.to_string() {
-        return Err(ContractError::InvalidContractVersion {
-            message: "Current version is equal or newer than the new contract code".to_string(),
+    let version: semver::Version = CONTRACT_VERSION.parse()?;
+    let prev_version: semver::Version = ver.version.parse()?;
+    if prev_version >= version {
+        return Err(ContractError::InvalidMigrationVersion {
+            expected: format!("> {prev_version}"),
+            actual: CONTRACT_VERSION.to_string(),
         });
-    } // set the new version
+    }
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     Ok(Response::default())
