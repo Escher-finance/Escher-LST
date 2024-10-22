@@ -51,7 +51,7 @@
         "released",
         "released_time",
         "sender",
-        "source",
+        "staker",
         "unbond_time"
       ],
       "properties": {
@@ -75,7 +75,7 @@
         "sender": {
           "type": "string"
         },
-        "source": {
+        "staker": {
           "type": "string"
         },
         "unbond_time": {
