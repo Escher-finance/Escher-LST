@@ -17,19 +17,6 @@ pub struct InstantiateMsg {
 #[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
-    ////////////////////
-    /// Owner's operations
-    ////////////////////
-    // UpdateConfig {
-    //     owner: Option<String>,
-    //     validators: Option<String>,
-    // },
-
-    ////////////////////
-    /// User's operations
-    ////////////////////
-
-    /// Receives `amount` in underlying coin denom from sender.
     /// Delegate `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
     Bond {
