@@ -492,19 +492,39 @@ pub fn set_parameters(
 
     let mut params = PARAMETERS.load(deps.storage)?;
 
-    if underlying_coin_denom.is_some() {
-        params.underlying_coin_denom = underlying_coin_denom.unwrap();
-    }
-    if liquidstaking_denom.is_some() {
-        params.liquidstaking_denom = liquidstaking_denom.unwrap();
-    }
-    if ucs01_channel.is_some() {
-        params.ucs01_channel = ucs01_channel.unwrap();
-    }
-    if ucs01_relay_contract.is_some() {
-        params.ucs01_relay_contract = ucs01_relay_contract.unwrap();
-    }
+    params.underlying_coin_denom = underlying_coin_denom
+        .clone()
+        .unwrap_or_else(|| params.underlying_coin_denom);
+    params.liquidstaking_denom = liquidstaking_denom
+        .clone()
+        .unwrap_or_else(|| params.liquidstaking_denom);
+    params.ucs01_channel = ucs01_channel
+        .clone()
+        .unwrap_or_else(|| params.ucs01_channel);
+    params.ucs01_relay_contract = ucs01_relay_contract
+        .clone()
+        .unwrap_or_else(|| params.ucs01_relay_contract);
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_attribute("action", "set_parameters");
+    PARAMETERS.save(deps.storage, &params)?;
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_attribute("action", "set_parameters")
+        .add_attribute(
+            "liquidstaking_denom",
+            liquidstaking_denom.unwrap_or_else(|| "".to_string()),
+        )
+        .add_attribute(
+            "underlying_coin_denom",
+            underlying_coin_denom.unwrap_or_else(|| "".to_string()),
+        )
+        .add_attribute(
+            "ucs01_channel",
+            ucs01_channel.unwrap_or_else(|| "".to_string()),
+        )
+        .add_attribute(
+            "ucs01_relay_contract",
+            ucs01_relay_contract.unwrap_or_else(|| "".to_string()),
+        );
+
     Ok(res)
 }

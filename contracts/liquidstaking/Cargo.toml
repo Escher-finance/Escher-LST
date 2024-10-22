@@ -1,6 +1,6 @@
 [package]
 name = "evm-union-liquid-staking"
-version = "0.1.3"
+version = "0.1.6"
 authors = ["isakfm <isak.rickyanto@gmail.com>"]
 edition = "2021"
 
