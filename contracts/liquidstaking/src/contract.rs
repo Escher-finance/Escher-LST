@@ -82,7 +82,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     match msg {
-        ExecuteMsg::Bond { staker } => execute::bond(deps, env, info, staker),
+        ExecuteMsg::Bond { staker, amount } => execute::bond(deps, env, info, staker, amount),
         ExecuteMsg::Unbond { staker } => execute::unbond(deps, env, info, staker),
         ExecuteMsg::Transfer { amount, receiver } => {
             execute::transfer(deps, env, info, amount, receiver)

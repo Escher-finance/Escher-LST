@@ -34,6 +34,7 @@ pub enum ExecuteMsg {
     /// Issue `amount` / exchange_rate for the user.
     Bond {
         staker: Option<String>,
+        amount: Option<Coin>,
     },
     Unbond {
         staker: Option<String>,
