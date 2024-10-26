@@ -7,8 +7,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Config, Parameters, State, Validator, ValidatorsRegistry, BALANCE, CONFIG, LOG,
-    PARAMETERS, STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
+    VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -29,11 +29,6 @@ pub fn instantiate(
     cw_ownable::initialize_owner(deps.storage, deps.api, owner)?;
 
     LOG.save(deps.storage, &"".into())?;
-
-    let config = Config {
-        owner: info.sender.to_string(),
-    };
-    CONFIG.save(deps.storage, &config)?;
 
     let balance = Balance {
         amount: Uint128::new(0),
@@ -117,20 +112,15 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     if ver.contract != CONTRACT_NAME {
         return Err(ContractError::InvalidContractName {});
     }
-    // note: it's better to do a proper semver comparison, but a string comparison *usually* works    #[allow(clippy::cmp_owned)]
-    if ver.version >= CONTRACT_VERSION.to_string() {
-        return Err(ContractError::InvalidContractVersion {
-            message: "Current version is equal or newer than the new contract code".to_string(),
+    let version: semver::Version = CONTRACT_VERSION.parse()?;
+    let prev_version: semver::Version = ver.version.parse()?;
+    if prev_version >= version {
+        return Err(ContractError::InvalidMigrationVersion {
+            expected: format!("> {prev_version}"),
+            actual: CONTRACT_VERSION.to_string(),
         });
-    } // set the new version
-    cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    if cw_ownable::get_ownership(deps.storage).is_err() {
-        let config = CONFIG.load(deps.storage)?;
-        let owner = Some(config.owner.as_ref());
-        cw_ownable::initialize_owner(deps.storage, deps.api, owner)?;
     }
-    CONFIG.remove(deps.storage);
+    cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     Ok(Response::default())
 }

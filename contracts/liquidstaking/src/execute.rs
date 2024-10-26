@@ -339,7 +339,7 @@ pub fn unbond(
         .add_messages(msgs)
         .add_event(unbond_event)
         .add_attributes(vec![
-            attr("action", "undelegate"),
+            attr("action", "unbond"),
             attr("sender", sender),
             attr("staker", the_staker),
             attr("current_exchange_rate", current_exchange_rate.to_string()),
@@ -347,8 +347,14 @@ pub fn unbond(
                 "native_token_unbond_amount",
                 native_token_unbond_amount.to_string(),
             ),
-            attr("undelegate_amount", undelegate_amount.to_string()),
-            attr("delegated_amount", state.total_delegated_amount.to_string()),
+            attr(
+                "undelegate_amount_per_validator",
+                undelegate_amount.to_string(),
+            ),
+            attr(
+                "total_delegated_amount",
+                state.total_delegated_amount.to_string(),
+            ),
             attr("total_bond_amount", state.total_bond_amount.to_string()),
             attr("total_lst_supply", state.total_lst_supply.to_string()),
             attr("remaining_amount", remaining_amount.to_string()),
@@ -463,7 +469,7 @@ pub fn bond_rewards(
 
 pub fn reset(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
@@ -478,10 +484,52 @@ pub fn reset(
     STATE.save(deps.storage, &state)?;
 
     unbond_history().clear(deps.storage);
+    let msgs = get_unbond_all_messages(deps, env.contract.address)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_attribute("action", "reset");
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_messages(msgs)
+        .add_attribute("action", "reset");
 
     Ok(res)
+}
+
+pub fn get_unbond_all_messages(
+    deps: DepsMut,
+    delegator: Addr,
+) -> Result<Vec<CosmosMsg<TokenFactoryMsg>>, ContractError> {
+    let delegations_resp = deps.querier.query_all_delegations(delegator);
+    let params = PARAMETERS.load(deps.storage)?;
+    let denom = params.underlying_coin_denom;
+
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+    for (_pos, validator) in validators_reg.validators.iter().enumerate() {
+        let undelegate_amount: Uint128 = delegations_resp
+            .as_ref()
+            .unwrap()
+            .into_iter()
+            .filter(|d| {
+                d.amount.denom == denom
+                    && !d.amount.amount.is_zero()
+                    && d.validator == validator.address
+            })
+            .map(|d| d.amount.amount)
+            .sum();
+
+        let amount = Coin {
+            amount: undelegate_amount.clone(),
+            denom: denom.to_string(),
+        };
+        let undelegate_staking_msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Staking(StakingMsg::Undelegate {
+                validator: validator.address.to_string(),
+                amount,
+            });
+
+        msgs.push(undelegate_staking_msg.into());
+    }
+
+    Ok(msgs)
 }
 
 /// Update the ownership of the contract.

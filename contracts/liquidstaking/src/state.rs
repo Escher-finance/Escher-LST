@@ -5,7 +5,6 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
-pub const CONFIG: Item<Config> = Item::new("config");
 pub const BALANCE: Item<Balance> = Item::new("balance");
 pub const LOG: Item<String> = Item::new("log");
 
@@ -18,11 +17,6 @@ pub struct Balance {
 #[cw_serde]
 pub struct Validator {
     pub address: String,
-}
-
-#[cw_serde]
-pub struct Config {
-    pub owner: String,
 }
 
 #[cw_serde]
@@ -40,7 +34,6 @@ pub struct State {
     pub last_bond_time: u64,
 }
 
-// Config is configuration that still possible to change
 #[cw_serde]
 pub struct ValidatorsRegistry {
     pub validators: Vec<Validator>,
@@ -57,7 +50,9 @@ pub struct Parameters {
 
 impl State {
     pub fn update_exchange_rate(&mut self) {
-        self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_lst_supply);
+        if self.total_bond_amount != Uint128::new(0) && self.total_lst_supply != Uint128::new(0) {
+            self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_lst_supply);
+        }
     }
 }
 
