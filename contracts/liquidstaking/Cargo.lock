@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "evm-union-liquid-staking"
-version = "0.1.6"
+version = "0.1.11"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -606,6 +606,7 @@ dependencies = [
  "cw-storage-plus",
  "cw2",
  "schemars",
+ "semver",
  "serde",
  "thiserror",
 ]

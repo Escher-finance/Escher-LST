@@ -10,6 +10,9 @@ pub enum ContractError {
     #[error("{0}")]
     Ownership(#[from] OwnershipError),
 
+    #[error("semver parse error: {0}")]
+    SemverError(#[from] semver::Error),
+
     #[error("Unauthorized")]
     Unauthorized {},
 
@@ -21,14 +24,17 @@ pub enum ContractError {
     #[error("NoAsset")]
     NoAsset {},
 
+    #[error("NotEnoughFund")]
+    NotEnoughFund {},
+
     #[error("ReplyError")]
     ReplyError { message: String },
 
     #[error("InvalidContractName")]
     InvalidContractName {},
 
-    #[error("InvalidContract")]
-    InvalidContractVersion { message: String },
+    #[error("invalid migration version: expected {expected}, got {actual}")]
+    InvalidMigrationVersion { expected: String, actual: String },
 
     #[error("ZeroSupplyOrDelegatedAmount")]
     ZeroSupplyOrDelegatedAmount {},

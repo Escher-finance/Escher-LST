@@ -17,24 +17,13 @@ pub struct InstantiateMsg {
 #[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
-    ////////////////////
-    /// Owner's operations
-    ////////////////////
-    // UpdateConfig {
-    //     owner: Option<String>,
-    //     validators: Option<String>,
-    // },
-
-    ////////////////////
-    /// User's operations
-    ////////////////////
-
-    /// Receives `amount` in underlying coin denom from sender.
-    /// Delegate `amount` to validator
+    /// Delegate native denom `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
     Bond {
         staker: Option<String>,
+        amount: Option<Coin>,
     },
+    /// Send liquid staking denom then undelegate native denom according exchange rate from validator
     Unbond {
         staker: Option<String>,
     },
@@ -43,17 +32,19 @@ pub enum ExecuteMsg {
         amount: Coin,
         receiver: Addr,
     },
+    /// Set new token factory denom admin
     SetTokenAdmin {
         denom: String,
         new_admin: Addr,
     },
+    /// Change parameters, only owner can do this
     SetParameters {
         underlying_coin_denom: Option<String>,
         liquidstaking_denom: Option<String>,
         ucs01_channel: Option<String>,
         ucs01_relay_contract: Option<String>,
     },
-    /// Reset will set state to initial state
+    /// Reset will set state to initial state and unbond all delegations
     Reset {},
 }
 

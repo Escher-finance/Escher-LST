@@ -1,6 +1,6 @@
 {
   "contract_name": "evm-union-liquid-staking",
-  "contract_version": "0.1.6",
+  "contract_version": "0.1.7",
   "idl_version": "1.0.0",
   "instantiate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -46,7 +46,7 @@
     "title": "ExecuteMsg",
     "oneOf": [
       {
-        "description": "Owner's operations User's operations Receives `amount` in underlying coin denom from sender. Delegate `amount` to validator Issue `amount` / exchange_rate for the user.",
+        "description": "Delegate `amount` to validator Issue `amount` / exchange_rate for the user.",
         "type": "object",
         "required": [
           "bond"

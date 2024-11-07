@@ -143,9 +143,9 @@ fn initial_query() {
     let _ = set_up(deps.as_mut(), env.clone(), vec![validator.clone()]);
 
     let msg = QueryMsg::Validators {};
-    let config: ValidatorsRegistry = from_json(query(deps.as_ref(), env, msg).unwrap()).unwrap();
+    let reg: ValidatorsRegistry = from_json(query(deps.as_ref(), env, msg).unwrap()).unwrap();
     assert_eq!(
-        config.validators.first().unwrap().address,
+        reg.validators.first().unwrap().address,
         validator.to_string()
     );
 }

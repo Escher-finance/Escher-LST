@@ -1,6 +1,6 @@
 [package]
 name = "evm-union-liquid-staking"
-version = "0.1.6"
+version = "0.1.11"
 authors = ["isakfm <isak.rickyanto@gmail.com>"]
 edition = "2021"
 
@@ -45,6 +45,7 @@ schemars = "0.8.16"
 serde = { version = "1.0.197", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.58" }
 cw-ownable = "2.1.0"
+semver = "1.0"
 
 [dev-dependencies]
 cw-multi-test = { version = "2.0.0", features = ["staking" ] }
