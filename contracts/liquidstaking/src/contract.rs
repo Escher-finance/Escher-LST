@@ -53,6 +53,8 @@ pub fn instantiate(
         liquidstaking_denom: msg.liquidstaking_denom,
         ucs01_channel: msg.ucs01_channel,
         ucs01_relay_contract: msg.ucs01_relay_contract,
+        fee_rate: msg.fee_rate,
+        revenue_receiver: msg.revenue_receiver,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -85,7 +87,7 @@ pub fn execute(
         ExecuteMsg::SetTokenAdmin { denom, new_admin } => {
             execute::set_token_admin(deps, info, denom, new_admin)
         }
-        ExecuteMsg::BondRewards {} => execute::bond_rewards(deps, env, info),
+        ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
         ExecuteMsg::Reset {} => execute::reset(deps, env, info),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::SetParameters {
