@@ -8,7 +8,7 @@ use crate::state::{
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
-    calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
+    self, calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
     calculate_undelegate_amount, get_actual_total_bonded, get_actual_total_reward,
     get_mock_total_reward, to_uint128,
 };
@@ -38,7 +38,6 @@ pub fn bond(
             return Err(ContractError::InvalidAsset {});
         }
 
-        // coin must have be sent along with transaction and it should be in underlying coin denom
         payment = Coin {
             amount: info
                 .funds
@@ -66,35 +65,52 @@ pub fn bond(
         };
     }
 
-    let total_validators = Uint128::from(validators_reg.validators.len() as u32);
+    let total_weight = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.weight)
+        .reduce(|a, b| (a + b))
+        .unwrap_or(1);
 
-    let delegate_amount = payment.amount / total_validators;
-    let remaining_amount = payment.amount % total_validators;
+    let mut total_delegated: Uint128 = Uint128::from(0u32);
 
     let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
-    for (pos, validator) in validators_reg.validators.iter().enumerate() {
+    let mut first_validator: String = "".to_string();
+
+    for (pos, validator) in validators_reg.clone().validators.into_iter().enumerate() {
+        let ratio =
+            Decimal::from_ratio(Uint128::from(validator.weight), Uint128::from(total_weight));
+
+        let delegate_amount = utils::calculate_delegated_amount(payment.amount, ratio);
+        total_delegated += delegate_amount;
         let amount = Coin {
             amount: delegate_amount.clone(),
             denom: coin_denom.to_string(),
         };
-        let mut staking_msg: CosmosMsg<TokenFactoryMsg> =
-            CosmosMsg::Staking(StakingMsg::Delegate {
-                validator: validator.address.to_string(),
-                amount,
-            });
+        let staking_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: validator.address.to_string(),
+            amount,
+        });
+
+        msgs.push(staking_msg.into());
 
         if pos == 0 {
-            let amount = Coin {
-                amount: delegate_amount + remaining_amount,
-                denom: coin_denom.to_string(),
-            };
-            staking_msg = CosmosMsg::Staking(StakingMsg::Delegate {
-                validator: validator.address.to_string(),
-                amount,
-            });
+            first_validator = validator.address.to_string();
         }
-        msgs.push(staking_msg.into());
     }
+
+    // calculate remaining
+    let remaining_amount = payment.amount - total_delegated;
+    let remaining_staking_msg: CosmosMsg<TokenFactoryMsg> =
+        CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: first_validator,
+            amount: Coin {
+                denom: coin_denom.clone(),
+                amount: remaining_amount,
+            },
+        });
+
+    msgs.push(remaining_staking_msg.into());
 
     let delegator = env.contract.address;
     let validators_list: Vec<String> = validators_reg
@@ -188,8 +204,6 @@ pub fn bond(
             attr("action", "mint"),
             attr("from", sender),
             attr("payment_amount", payment.amount.to_string()),
-            attr("delegate_amount", delegate_amount.to_string()),
-            attr("remaining_amount", remaining_amount.to_string()),
             attr("denom", coin_denom.to_string()),
             attr("minted", mint_amount),
             attr("exchange_rate", state.exchange_rate.to_string()),

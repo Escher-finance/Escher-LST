@@ -17,6 +17,7 @@ pub struct Balance {
 #[cw_serde]
 pub struct Validator {
     pub address: String,
+    pub weight: u64,
 }
 
 #[cw_serde]
