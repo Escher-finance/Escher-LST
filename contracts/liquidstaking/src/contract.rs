@@ -37,10 +37,11 @@ pub fn instantiate(
     BALANCE.save(deps.storage, &balance)?;
 
     let mut validators: Vec<Validator> = vec![];
-    for validator_addr in msg.validators {
+    for validator in msg.validators {
         validators.push({
             Validator {
-                address: validator_addr.to_string(),
+                address: validator.addr.to_string(),
+                weight: validator.weight,
             }
         })
     }

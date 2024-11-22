@@ -6,9 +6,15 @@ use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
+pub struct Validator {
+    pub addr: Addr,
+    pub weight: u64,
+}
+
+#[cw_serde]
 pub struct InstantiateMsg {
     pub underlying_coin_denom: String,
-    pub validators: Vec<Addr>,
+    pub validators: Vec<Validator>,
     pub liquidstaking_denom: String,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,

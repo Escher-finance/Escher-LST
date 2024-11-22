@@ -113,3 +113,11 @@ pub fn split_revenue(amount: Uint128, fee_rate: Decimal) -> (Uint128, Uint128) {
     let restake_amount = amount - fee_amount;
     (restake_amount, fee_amount)
 }
+
+pub fn calculate_delegated_amount(amount: Uint128, fee_rate: Decimal) -> Uint128 {
+    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
+    let fract = (fee_rate * decimal_fract).to_uint_ceil();
+    let fee_amount =
+        Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
+    fee_amount
+}
