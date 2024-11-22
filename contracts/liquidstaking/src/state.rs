@@ -46,6 +46,8 @@ pub struct Parameters {
     pub liquidstaking_denom: String,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,
+    pub fee_rate: Decimal,
+    pub revenue_receiver: String,
 }
 
 impl State {
@@ -71,11 +73,12 @@ pub fn num_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
 #[cw_serde]
 pub struct UnbondHistory {
     pub id: u64,
+    pub height: u64,
     pub sender: String,
     pub staker: String,
     pub amount: Coin,
     pub exchange_rate: Decimal,
-    pub unbond_time: Timestamp,
+    pub created: Timestamp,
     pub released: bool,
     pub released_time: Timestamp,
 }

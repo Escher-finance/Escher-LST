@@ -318,11 +318,12 @@ pub fn unbond(
 
     let history = UnbondHistory {
         id,
+        height: env.block.height,
         sender: sender.clone(),
         staker: the_staker.clone(),
         amount: unbond_amount,
         exchange_rate: current_exchange_rate,
-        unbond_time: env.block.time,
+        created: env.block.time,
         released: false,
         released_time: Timestamp::from_nanos(000_000_000),
     };
@@ -412,7 +413,7 @@ pub fn set_token_admin(
     Ok(res)
 }
 
-pub fn bond_rewards(
+pub fn process_rewards(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -424,7 +425,7 @@ pub fn bond_rewards(
     let delegator = env.contract.address;
     let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
 
-    let mut attrs = vec![attr("action", "bond_rewards"), attr("from", sender)];
+    let mut attrs = vec![attr("action", "process_rewards"), attr("from", sender)];
 
     for validator in validators_reg.validators {
         let result: StdResult<Vec<DecCoin>> = deps
