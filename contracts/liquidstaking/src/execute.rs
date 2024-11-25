@@ -1,20 +1,19 @@
 use crate::error::ContractError;
-use crate::event::{BondEvent, UnbondEvent};
+use crate::event::BondEvent;
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::state::{
-    increment_tokens, unbond_history, UnbondHistory, PARAMETERS, STATE, VALIDATORS_REGISTRY,
+    increment_tokens, unbond_history, UnbondRecord, PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     self, calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
-    calculate_undelegate_amount, get_actual_total_bonded, get_actual_total_reward,
-    get_mock_total_reward, to_uint128,
+    get_actual_total_bonded, get_actual_total_reward, get_mock_total_reward, to_uint128,
 };
 use cosmwasm_std::{
-    attr, to_json_binary, Addr, Coin, CosmosMsg, DecCoin, Decimal, DepsMut, DistributionMsg, Env,
-    MessageInfo, Response, StakingMsg, StdResult, SubMsg, Timestamp, Uint128,
+    attr, to_json_binary, Addr, Attribute, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,
+    DistributionMsg, Env, MessageInfo, Response, StakingMsg, StdResult, SubMsg, Timestamp, Uint128,
 };
 
 pub fn bond(
@@ -237,7 +236,8 @@ pub fn unbond(
         .find(|x| x.denom == liquidstaking_denom && x.amount > Uint128::zero())
         .ok_or_else(|| ContractError::NoAsset {})?;
 
-    let total_validators = Uint128::from(validators_reg.validators.len() as u32);
+    let unbond_amount = payment.amount;
+
     let validators_list: Vec<String> = validators_reg
         .validators
         .iter()
@@ -268,75 +268,47 @@ pub fn unbond(
     }
     let current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
 
-    // calculate native token undelegated amount from liquid staking payment amount
-    let native_token_unbond_amount =
+    // calculate how much native token undelegated amount from staked token amount base on current exchange rate
+    let undelegate_amount: Uint128 =
         calculate_native_token_from_staking_token(payment.amount.clone(), current_exchange_rate);
 
-    let mut undelegate_amount = calculate_undelegate_amount(
-        native_token_unbond_amount,
-        delegated_amount,
-        total_bond_amount,
-    );
-    undelegate_amount = undelegate_amount / total_validators;
-
-    let remaining_amount = undelegate_amount % total_validators;
-
     let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
-    for (pos, validator) in validators_reg.validators.iter().enumerate() {
-        let amount = Coin {
-            amount: undelegate_amount.clone(),
-            denom: coin_denom.to_string(),
-        };
-        let mut undelegate_staking_msg: CosmosMsg<TokenFactoryMsg> =
-            CosmosMsg::Staking(StakingMsg::Undelegate {
-                validator: validator.address.to_string(),
-                amount,
-            });
 
-        if pos == 0 {
-            let amount = Coin {
-                amount: undelegate_amount + remaining_amount,
-                denom: coin_denom.to_string(),
-            };
-            undelegate_staking_msg = CosmosMsg::Staking(StakingMsg::Undelegate {
-                validator: validator.address.to_string(),
-                amount,
-            });
-        }
-        msgs.push(undelegate_staking_msg.into());
+    if delegated_amount < undelegate_amount {
+        // throw error
+        return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker
     }
-
-    let unbond_event = UnbondEvent(
-        sender.clone(),
-        the_staker.clone(),
-        payment.amount.clone(),
-        delegated_amount.clone(),
-        total_bond_amount.clone(),
-        state.total_lst_supply.clone(),
-        current_exchange_rate,
+    let (undelegate_msgs, undelegations) = utils::get_undelegate_from_validator_msgs(
+        undelegate_amount,
+        coin_denom.clone(),
+        validators_reg.validators,
     );
+    msgs.extend(undelegate_msgs);
 
-    let burn_msg = TokenFactoryMsg::BurnTokens {
-        denom: liquidstaking_denom.clone(),
-        amount: payment.amount,
-        burn_from_address: delegator.to_string(),
-    };
-
+    let burn_msg = utils::get_burn_msg(
+        liquidstaking_denom.clone(),
+        unbond_amount,
+        delegator.to_string(),
+    );
     msgs.push(burn_msg.into());
 
-    let id = increment_tokens(deps.storage).unwrap();
-    let unbond_amount = Coin {
-        amount: payment.amount.clone(),
+    let unbond_coin = Coin {
+        amount: unbond_amount.clone(),
         denom: liquidstaking_denom.clone(),
     };
-
-    let history = UnbondHistory {
+    let id = increment_tokens(deps.storage).unwrap();
+    let history = UnbondRecord {
         id,
         height: env.block.height,
         sender: sender.clone(),
         staker: the_staker.clone(),
-        amount: unbond_amount,
+        amount: unbond_coin,
         exchange_rate: current_exchange_rate,
+        undelegate_amount: Coin {
+            denom: coin_denom.clone(),
+            amount: undelegate_amount,
+        },
+        undelegations,
         created: env.block.time,
         released: false,
         released_time: Timestamp::from_nanos(000_000_000),
@@ -344,39 +316,52 @@ pub fn unbond(
     unbond_history().save(deps.storage, id, &history)?;
 
     // // update total bond, supply and exchange rate here
-    state.total_bond_amount = total_bond_amount - native_token_unbond_amount;
-    state.total_lst_supply = state.total_lst_supply - payment.amount;
+    state.total_bond_amount = total_bond_amount - undelegate_amount;
+    state.total_lst_supply = state.total_lst_supply - unbond_amount;
     state.total_delegated_amount = delegated_amount - undelegate_amount;
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new()
-        .add_messages(msgs)
-        .add_event(unbond_event)
-        .add_attributes(vec![
-            attr("action", "unbond"),
-            attr("sender", sender),
-            attr("staker", the_staker),
-            attr("current_exchange_rate", current_exchange_rate.to_string()),
-            attr(
-                "native_token_unbond_amount",
-                native_token_unbond_amount.to_string(),
-            ),
-            attr(
-                "undelegate_amount_per_validator",
-                undelegate_amount.to_string(),
-            ),
-            attr(
-                "total_delegated_amount",
-                state.total_delegated_amount.to_string(),
-            ),
-            attr("total_bond_amount", state.total_bond_amount.to_string()),
-            attr("total_lst_supply", state.total_lst_supply.to_string()),
-            attr("remaining_amount", remaining_amount.to_string()),
-            attr("denom", coin_denom.to_string()),
-        ]);
+    let attrs = get_unbond_attrs(
+        sender,
+        the_staker,
+        current_exchange_rate.to_string(),
+        undelegate_amount.to_string(),
+        undelegate_amount.to_string(),
+        state.total_delegated_amount.to_string(),
+        state.total_bond_amount.to_string(),
+        state.total_lst_supply.to_string(),
+        coin_denom.clone(),
+    );
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(attrs);
 
     Ok(res)
+}
+
+fn get_unbond_attrs(
+    sender: String,
+    the_staker: String,
+    current_exchange_rate: String,
+    native_token_unbond_amount: String,
+    undelegate_amount: String,
+    total_delegated_amount: String,
+    total_bond_amount: String,
+    total_lst_supply: String,
+    coin_denom: String,
+) -> Vec<Attribute> {
+    return vec![
+        attr("action", "unbond"),
+        attr("sender", sender),
+        attr("staker", the_staker),
+        attr("current_exchange_rate", current_exchange_rate),
+        attr("native_token_unbond_amount", native_token_unbond_amount),
+        attr("undelegate_amount_per_validator", undelegate_amount),
+        attr("total_delegated_amount", total_delegated_amount),
+        attr("total_bond_amount", total_bond_amount),
+        attr("total_lst_supply", total_lst_supply),
+        attr("denom", coin_denom),
+    ];
 }
 
 pub fn transfer(

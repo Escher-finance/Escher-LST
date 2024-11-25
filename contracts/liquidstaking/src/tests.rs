@@ -2,7 +2,7 @@ use crate::contract::execute;
 use crate::contract::instantiate;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::query::query;
-use crate::state::{increment_tokens, unbond_history, State, UnbondHistory, ValidatorsRegistry};
+use crate::state::{increment_tokens, unbond_history, State, UnbondRecord, ValidatorsRegistry};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
@@ -271,7 +271,7 @@ fn test_unbond_history() {
     let exchange_rate = Decimal::from_ratio(Uint128::new(110), Uint128::new(100));
     let ts = Timestamp::from_nanos(1_000_000_000);
 
-    let mut history = UnbondHistory {
+    let mut history = UnbondRecord {
         id,
         staker: staker.to_string(),
         sender: sender1.to_string(),
@@ -284,7 +284,7 @@ fn test_unbond_history() {
 
     let _res = unbond_history().save(&mut deps.storage, id, &history);
     id = increment_tokens(&mut deps.storage).unwrap();
-    history = UnbondHistory {
+    history = UnbondRecord {
         id,
         staker: staker.to_string(),
         sender: sender2.to_string(),

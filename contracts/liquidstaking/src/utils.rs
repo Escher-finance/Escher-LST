@@ -1,5 +1,8 @@
+use crate::token_factory_api::TokenFactoryMsg;
+use crate::{msg::UndelegationRecord, state::Validator};
 use cosmwasm_std::{
-    Decimal, DelegationTotalRewardsResponse, QuerierWrapper, StdResult, Uint128, Uint256,
+    Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, QuerierWrapper, StakingMsg,
+    StdResult, Uint128, Uint256,
 };
 use std::str::FromStr;
 // to_json_binary, GrpcQuery, QueryRequest,
@@ -85,7 +88,7 @@ pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
     calculate_staking_token_from_rate(total_bond_amount, ratio)
 }
 
-/// return how much to undelegate native token from ratio of total delegated amount divide with total bond amount (with reward)
+/// return how much to undelegate native token from ratio of total delegated amount divide with total bond with reward value amount
 pub fn calculate_undelegate_amount(
     native_token_amount: Uint128,
     delegated_amount: Uint128,
@@ -120,4 +123,66 @@ pub fn calculate_delegated_amount(amount: Uint128, fee_rate: Decimal) -> Uint128
     let fee_amount =
         Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
     fee_amount
+}
+
+pub fn get_burn_msg(denom: String, burn_amount: Uint128, delegator: String) -> TokenFactoryMsg {
+    let burn_msg = TokenFactoryMsg::BurnTokens {
+        denom: denom.clone(),
+        amount: burn_amount,
+        burn_from_address: delegator,
+    };
+
+    burn_msg
+}
+
+pub fn get_undelegate_from_validator_msgs(
+    undelegate_amount: Uint128,
+    coin_denom: String,
+    validators: Vec<Validator>,
+) -> (Vec<CosmosMsg<TokenFactoryMsg>>, Vec<UndelegationRecord>) {
+    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+    let mut undelegations: Vec<UndelegationRecord> = vec![];
+
+    let total_weight = Uint128::from(
+        validators
+            .iter()
+            .map(|v| v.weight)
+            .reduce(|a, b| (a + b))
+            .unwrap_or(0),
+    );
+
+    let total_validators = validators.len();
+    let mut total_undelegated: Uint128 = Uint128::from(0u32);
+
+    for (pos, validator) in validators.into_iter().enumerate() {
+        let ratio = Decimal::from_ratio(Uint128::from(validator.weight), total_weight);
+
+        let undelegate_amount_dec =
+            Decimal::new(undelegate_amount * Uint128::from(DECIMAL_FRACTIONAL));
+        let mut undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
+        total_undelegated += undelegate_amount_for_validator;
+
+        if pos == (total_validators - 1) {
+            let remaining = undelegate_amount - total_undelegated;
+            undelegate_amount_for_validator += remaining;
+        }
+
+        let amount = Coin {
+            amount: undelegate_amount_for_validator.clone(),
+            denom: coin_denom.to_string(),
+        };
+        let undelegate_staking_msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Staking(StakingMsg::Undelegate {
+                validator: validator.address.to_string(),
+                amount,
+            });
+        msgs.push(undelegate_staking_msg);
+
+        undelegations.push(UndelegationRecord {
+            amount: undelegate_amount_for_validator,
+            validator,
+        })
+    }
+
+    (msgs, undelegations)
 }

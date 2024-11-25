@@ -27,6 +27,9 @@ pub enum ContractError {
     #[error("NotEnoughFund")]
     NotEnoughFund {},
 
+    #[error("NotEnoughAvailableFund")]
+    NotEnoughAvailableFund {},
+
     #[error("ReplyError")]
     ReplyError { message: String },
 

@@ -2,6 +2,8 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Coin, Decimal, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 
+use crate::msg::UndelegationRecord;
+
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
@@ -12,12 +14,6 @@ pub const LOG: Item<String> = Item::new("log");
 pub struct Balance {
     pub amount: Uint128,
     pub last_updated: u64,
-}
-
-#[cw_serde]
-pub struct Validator {
-    pub address: String,
-    pub weight: u64,
 }
 
 #[cw_serde]
@@ -33,6 +29,12 @@ pub struct State {
     pub bond_counter: u64,
     // last_bond_time
     pub last_bond_time: u64,
+}
+
+#[cw_serde]
+pub struct Validator {
+    pub address: String,
+    pub weight: u64,
 }
 
 #[cw_serde]
@@ -72,53 +74,55 @@ pub fn num_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
 }
 
 #[cw_serde]
-pub struct UnbondHistory {
+pub struct UnbondRecord {
     pub id: u64,
     pub height: u64,
     pub sender: String,
     pub staker: String,
     pub amount: Coin,
+    pub undelegate_amount: Coin,
     pub exchange_rate: Decimal,
+    pub undelegations: Vec<UndelegationRecord>,
     pub created: Timestamp,
     pub released: bool,
     pub released_time: Timestamp,
 }
 
-pub struct UnbondHistoryIndexes<'a> {
-    pub staker: MultiIndex<'a, String, UnbondHistory, u64>,
-    pub sender: MultiIndex<'a, String, UnbondHistory, u64>,
-    pub released: MultiIndex<'a, String, UnbondHistory, u64>,
-    pub staker_released: MultiIndex<'a, String, UnbondHistory, u64>,
+pub struct UnbondRecordIndexes<'a> {
+    pub staker: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub sender: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub released: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub staker_released: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
-impl<'a> IndexList<UnbondHistory> for UnbondHistoryIndexes<'a> {
-    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondHistory>> + '_> {
-        let v: Vec<&dyn Index<UnbondHistory>> = vec![&self.staker, &self.sender, &self.released];
+impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
+        let v: Vec<&dyn Index<UnbondRecord>> = vec![&self.staker, &self.sender, &self.released];
         Box::new(v.into_iter())
     }
 }
 
 const UNBOND_HISTORY_NAMESPACE: &str = "unbond_history";
 
-pub fn unbond_history<'a>() -> IndexedMap<u64, UnbondHistory, UnbondHistoryIndexes<'a>> {
-    let indexes = UnbondHistoryIndexes {
+pub fn unbond_history<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<'a>> {
+    let indexes = UnbondRecordIndexes {
         staker: MultiIndex::new(
-            |_pk, d: &UnbondHistory| d.staker.clone(),
+            |_pk, d: &UnbondRecord| d.staker.clone(),
             UNBOND_HISTORY_NAMESPACE,
             "unbond_history__staker",
         ),
         sender: MultiIndex::new(
-            |_pk, d: &UnbondHistory| d.sender.clone(),
+            |_pk, d: &UnbondRecord| d.sender.clone(),
             UNBOND_HISTORY_NAMESPACE,
             "unbond_history__sender",
         ),
         released: MultiIndex::new(
-            |_pk, d: &UnbondHistory| d.released.to_string(),
+            |_pk, d: &UnbondRecord| d.released.to_string(),
             UNBOND_HISTORY_NAMESPACE,
             "unbond_history__released",
         ),
         staker_released: MultiIndex::new(
-            |_pk, d: &UnbondHistory| format!("{}-{}", d.staker, d.released),
+            |_pk, d: &UnbondRecord| format!("{}-{}", d.staker, d.released),
             UNBOND_HISTORY_NAMESPACE,
             "unbond_history__staker_released",
         ),

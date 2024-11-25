@@ -40,7 +40,7 @@ pub fn instantiate(
     for validator in msg.validators {
         validators.push({
             Validator {
-                address: validator.addr.to_string(),
+                address: validator.address,
                 weight: validator.weight,
             }
         })
