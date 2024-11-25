@@ -1,15 +1,9 @@
 use std::collections::BTreeMap;
 
-use crate::state::{Balance, Parameters, State, UnbondHistory, ValidatorsRegistry};
+use crate::state::{Balance, Parameters, State, UnbondHistory, Validator, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
-
-#[cw_serde]
-pub struct Validator {
-    pub addr: Addr,
-    pub weight: u64,
-}
 
 #[cw_serde]
 pub struct InstantiateMsg {

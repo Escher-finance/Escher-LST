@@ -15,12 +15,6 @@ pub struct Balance {
 }
 
 #[cw_serde]
-pub struct Validator {
-    pub address: String,
-    pub weight: u64,
-}
-
-#[cw_serde]
 pub struct State {
     pub exchange_rate: Decimal,
     // total native token plus staking rewards
@@ -33,6 +27,12 @@ pub struct State {
     pub bond_counter: u64,
     // last_bond_time
     pub last_bond_time: u64,
+}
+
+#[cw_serde]
+pub struct Validator {
+    pub address: String,
+    pub weight: u64,
 }
 
 #[cw_serde]
