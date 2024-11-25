@@ -34,6 +34,9 @@ pub enum ExecuteMsg {
         amount: Coin,
         receiver: Addr,
     },
+    ProcessUnbonding {
+        id: u64,
+    },
     /// Set new token factory denom admin
     SetTokenAdmin {
         denom: String,

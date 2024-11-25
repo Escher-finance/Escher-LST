@@ -89,6 +89,7 @@ pub fn execute(
             execute::set_token_admin(deps, info, denom, new_admin)
         }
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
+        ExecuteMsg::ProcessUnbonding { id } => execute::process_unbonding(deps, env, info, id),
         ExecuteMsg::Reset {} => execute::reset(deps, env, info),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::SetParameters {

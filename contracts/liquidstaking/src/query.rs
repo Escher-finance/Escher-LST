@@ -1,5 +1,5 @@
 use crate::msg::{Log, QueryMsg, TotalBond};
-use crate::state::unbond_history;
+use crate::state::unbond_record;
 use crate::state::{
     Balance, Parameters, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
@@ -92,7 +92,7 @@ pub fn query_unbond_record(
     released: Option<bool>,
 ) -> StdResult<Vec<UnbondRecord>> {
     if staker.is_some() && released.is_none() {
-        let unbonded_list = unbond_history()
+        let unbonded_list = unbond_record()
             .idx
             .staker
             .prefix(staker.unwrap())
@@ -104,7 +104,7 @@ pub fn query_unbond_record(
     }
 
     if staker.is_some() && released.is_some() {
-        let unbonded_list = unbond_history()
+        let unbonded_list = unbond_record()
             .idx
             .staker_released
             .prefix(format!(
@@ -120,7 +120,7 @@ pub fn query_unbond_record(
     }
 
     if staker.is_none() && sender.is_some() {
-        let unbonded_list = unbond_history()
+        let unbonded_list = unbond_record()
             .idx
             .sender
             .prefix(sender.unwrap())
@@ -132,7 +132,7 @@ pub fn query_unbond_record(
     }
 
     if staker.is_none() && released.is_some() {
-        let unbonded_list = unbond_history()
+        let unbonded_list = unbond_record()
             .idx
             .released
             .prefix(released.unwrap().to_string())

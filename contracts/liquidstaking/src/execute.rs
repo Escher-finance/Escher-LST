@@ -4,7 +4,7 @@ use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::state::{
-    increment_tokens, unbond_history, UnbondRecord, PARAMETERS, STATE, VALIDATORS_REGISTRY,
+    increment_tokens, unbond_record, UnbondRecord, PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
@@ -296,7 +296,7 @@ pub fn unbond(
         amount: unbond_amount.clone(),
         denom: liquidstaking_denom.clone(),
     };
-    let id = increment_tokens(deps.storage).unwrap();
+    let id: u64 = increment_tokens(deps.storage).unwrap();
     let history = UnbondRecord {
         id,
         height: env.block.height,
@@ -313,7 +313,7 @@ pub fn unbond(
         released: false,
         released_time: Timestamp::from_nanos(000_000_000),
     };
-    unbond_history().save(deps.storage, id, &history)?;
+    unbond_record().save(deps.storage, id, &history)?;
 
     // // update total bond, supply and exchange rate here
     state.total_bond_amount = total_bond_amount - undelegate_amount;
@@ -483,7 +483,7 @@ pub fn reset(
     state.exchange_rate = Decimal::one();
     STATE.save(deps.storage, &state)?;
 
-    unbond_history().clear(deps.storage);
+    unbond_record().clear(deps.storage);
     let msgs = get_unbond_all_messages(deps, env.contract.address)?;
 
     let res: Response<TokenFactoryMsg> = Response::new()
@@ -598,6 +598,21 @@ pub fn set_parameters(
             "ucs01_relay_contract",
             ucs01_relay_contract.unwrap_or_else(|| "".to_string()),
         );
+
+    Ok(res)
+}
+
+pub fn process_unbonding(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    id: u64,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let _unbond_record: crate::state::UnbondRecord = unbond_record().load(deps.storage, id)?;
+
+    let res: Response<TokenFactoryMsg> = Response::new();
 
     Ok(res)
 }
