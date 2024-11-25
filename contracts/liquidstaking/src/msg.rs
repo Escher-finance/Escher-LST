@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::state::{Balance, Parameters, State, UnbondHistory, Validator, ValidatorsRegistry};
+use crate::state::{Balance, Parameters, State, UnbondRecord, Validator, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
@@ -71,8 +71,8 @@ pub enum QueryMsg {
     Balance {},
     #[returns(Log)]
     Log {},
-    #[returns(Vec<UnbondHistory>)]
-    UnbondHistory {
+    #[returns(Vec<UnbondRecord>)]
+    UnbondRecord {
         staker: Option<String>,
         sender: Option<String>,
         released: Option<bool>,
@@ -126,4 +126,9 @@ pub struct MintTokensPayload {
 pub struct BondRewardsPayload {
     pub amount: Uint128,
     pub validator: String,
+}
+#[cw_serde]
+pub struct UndelegationRecord {
+    pub amount: Uint128,
+    pub validator: Validator,
 }

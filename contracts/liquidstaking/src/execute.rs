@@ -4,13 +4,12 @@ use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::state::{
-    increment_tokens, unbond_history, UnbondHistory, PARAMETERS, STATE, VALIDATORS_REGISTRY,
+    increment_tokens, unbond_history, UnbondRecord, PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     self, calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
-    calculate_undelegate_amount, get_actual_total_bonded, get_actual_total_reward,
-    get_mock_total_reward, to_uint128,
+    get_actual_total_bonded, get_actual_total_reward, get_mock_total_reward, to_uint128,
 };
 use cosmwasm_std::{
     attr, to_json_binary, Addr, Attribute, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,
@@ -270,36 +269,21 @@ pub fn unbond(
     let current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
-    let native_token_unbond_amount: Uint128 =
+    let undelegate_amount: Uint128 =
         calculate_native_token_from_staking_token(payment.amount.clone(), current_exchange_rate);
-
-    let mut undelegate_amount = native_token_unbond_amount.clone();
 
     let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
 
     if delegated_amount < undelegate_amount {
-        // calculate how much to undelegate and how much to withdraw reward
-        // as there is "very small" possiblity the delegated token amount is smaller than unbond amount
-        undelegate_amount = calculate_undelegate_amount(
-            native_token_unbond_amount,
-            delegated_amount,
-            total_bond_amount,
-        );
-
-        let undelegate_msgs = utils::get_undelegate_from_validator_msgs(
-            undelegate_amount,
-            coin_denom.clone(),
-            validators_reg.validators,
-        );
-        msgs.extend(undelegate_msgs);
-    } else {
-        let undelegate_msgs = utils::get_undelegate_from_validator_msgs(
-            undelegate_amount,
-            coin_denom.clone(),
-            validators_reg.validators,
-        );
-        msgs.extend(undelegate_msgs);
+        // throw error
+        return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker
     }
+    let (undelegate_msgs, undelegations) = utils::get_undelegate_from_validator_msgs(
+        undelegate_amount,
+        coin_denom.clone(),
+        validators_reg.validators,
+    );
+    msgs.extend(undelegate_msgs);
 
     let burn_msg = utils::get_burn_msg(
         liquidstaking_denom.clone(),
@@ -308,19 +292,23 @@ pub fn unbond(
     );
     msgs.push(burn_msg.into());
 
-    let id = increment_tokens(deps.storage).unwrap();
     let unbond_coin = Coin {
-        amount: payment.amount.clone(),
+        amount: unbond_amount.clone(),
         denom: liquidstaking_denom.clone(),
     };
-
-    let history = UnbondHistory {
+    let id = increment_tokens(deps.storage).unwrap();
+    let history = UnbondRecord {
         id,
         height: env.block.height,
         sender: sender.clone(),
         staker: the_staker.clone(),
         amount: unbond_coin,
         exchange_rate: current_exchange_rate,
+        undelegate_amount: Coin {
+            denom: coin_denom.clone(),
+            amount: undelegate_amount,
+        },
+        undelegations,
         created: env.block.time,
         released: false,
         released_time: Timestamp::from_nanos(000_000_000),
@@ -328,7 +316,7 @@ pub fn unbond(
     unbond_history().save(deps.storage, id, &history)?;
 
     // // update total bond, supply and exchange rate here
-    state.total_bond_amount = total_bond_amount - native_token_unbond_amount;
+    state.total_bond_amount = total_bond_amount - undelegate_amount;
     state.total_lst_supply = state.total_lst_supply - unbond_amount;
     state.total_delegated_amount = delegated_amount - undelegate_amount;
     state.update_exchange_rate();
@@ -338,7 +326,7 @@ pub fn unbond(
         sender,
         the_staker,
         current_exchange_rate.to_string(),
-        native_token_unbond_amount.to_string(),
+        undelegate_amount.to_string(),
         undelegate_amount.to_string(),
         state.total_delegated_amount.to_string(),
         state.total_bond_amount.to_string(),

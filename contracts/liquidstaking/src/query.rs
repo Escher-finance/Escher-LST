@@ -1,7 +1,7 @@
 use crate::msg::{Log, QueryMsg, TotalBond};
 use crate::state::unbond_history;
 use crate::state::{
-    Balance, Parameters, State, UnbondHistory, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
+    Balance, Parameters, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
 use crate::utils::{get_actual_total_bonded, get_actual_total_reward};
@@ -24,11 +24,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         )?),
         QueryMsg::Balance {} => to_json_binary(&(query_balance(deps.storage)?)),
         QueryMsg::Log {} => to_json_binary(&(query_log(deps.storage)?)),
-        QueryMsg::UnbondHistory {
+        QueryMsg::UnbondRecord {
             staker,
             sender,
             released,
-        } => to_json_binary(&(query_unbond_history(deps.storage, staker, sender, released)?)),
+        } => to_json_binary(&(query_unbond_record(deps.storage, staker, sender, released)?)),
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
     }
 }
@@ -85,12 +85,12 @@ pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
     Ok(Log { message: log })
 }
 
-pub fn query_unbond_history(
+pub fn query_unbond_record(
     storage: &dyn Storage,
     staker: Option<String>,
     sender: Option<String>,
     released: Option<bool>,
-) -> StdResult<Vec<UnbondHistory>> {
+) -> StdResult<Vec<UnbondRecord>> {
     if staker.is_some() && released.is_none() {
         let unbonded_list = unbond_history()
             .idx

@@ -1,5 +1,5 @@
-use crate::state::Validator;
 use crate::token_factory_api::TokenFactoryMsg;
+use crate::{msg::UndelegationRecord, state::Validator};
 use cosmwasm_std::{
     Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, QuerierWrapper, StakingMsg,
     StdResult, Uint128, Uint256,
@@ -139,8 +139,9 @@ pub fn get_undelegate_from_validator_msgs(
     undelegate_amount: Uint128,
     coin_denom: String,
     validators: Vec<Validator>,
-) -> Vec<CosmosMsg<TokenFactoryMsg>> {
+) -> (Vec<CosmosMsg<TokenFactoryMsg>>, Vec<UndelegationRecord>) {
     let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+    let mut undelegations: Vec<UndelegationRecord> = vec![];
 
     let total_weight = Uint128::from(
         validators
@@ -150,12 +151,21 @@ pub fn get_undelegate_from_validator_msgs(
             .unwrap_or(0),
     );
 
-    for validator in validators.into_iter() {
+    let total_validators = validators.len();
+    let mut total_undelegated: Uint128 = Uint128::from(0u32);
+
+    for (pos, validator) in validators.into_iter().enumerate() {
         let ratio = Decimal::from_ratio(Uint128::from(validator.weight), total_weight);
 
         let undelegate_amount_dec =
             Decimal::new(undelegate_amount * Uint128::from(DECIMAL_FRACTIONAL));
-        let undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
+        let mut undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
+        total_undelegated += undelegate_amount_for_validator;
+
+        if pos == (total_validators - 1) {
+            let remaining = undelegate_amount - total_undelegated;
+            undelegate_amount_for_validator += remaining;
+        }
 
         let amount = Coin {
             amount: undelegate_amount_for_validator.clone(),
@@ -167,7 +177,12 @@ pub fn get_undelegate_from_validator_msgs(
                 amount,
             });
         msgs.push(undelegate_staking_msg);
+
+        undelegations.push(UndelegationRecord {
+            amount: undelegate_amount_for_validator,
+            validator,
+        })
     }
 
-    msgs
+    (msgs, undelegations)
 }
