@@ -1,8 +1,10 @@
+use crate::msg::{TransferMsg, Ucs01RelayExecuteMsg};
 use crate::token_factory_api::TokenFactoryMsg;
+use crate::ContractError;
 use crate::{msg::UndelegationRecord, state::Validator};
 use cosmwasm_std::{
-    Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, QuerierWrapper, StakingMsg,
-    StdResult, Uint128, Uint256,
+    to_json_binary, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, QuerierWrapper,
+    StakingMsg, StdResult, Uint128, Uint256, WasmMsg,
 };
 use std::str::FromStr;
 // to_json_binary, GrpcQuery, QueryRequest,
@@ -185,4 +187,25 @@ pub fn get_undelegate_from_validator_msgs(
     }
 
     (msgs, undelegations)
+}
+
+pub fn send_to_evm(
+    contract_addr: String,
+    channel: String,
+    receiver: String,
+    funds: Vec<Coin>,
+) -> Result<WasmMsg, ContractError> {
+    let relay_transfer_msg: Ucs01RelayExecuteMsg = Ucs01RelayExecuteMsg::Transfer(TransferMsg {
+        channel,
+        receiver,
+        memo: "Send back to EVM".to_string(),
+        timeout: None,
+    });
+    let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
+
+    return Ok(WasmMsg::Execute {
+        contract_addr,
+        msg: transfer_relay_msg,
+        funds,
+    });
 }
