@@ -51,6 +51,7 @@ pub struct Parameters {
     pub ucs01_relay_contract: String,
     pub fee_rate: Decimal,
     pub revenue_receiver: String,
+    pub unbonding_time: u64,
 }
 
 impl State {
@@ -84,6 +85,7 @@ pub struct UnbondRecord {
     pub exchange_rate: Decimal,
     pub undelegations: Vec<UndelegationRecord>,
     pub created: Timestamp,
+    pub completion: Timestamp,
     pub released: bool,
     pub released_time: Timestamp,
 }
@@ -93,11 +95,13 @@ pub struct UnbondRecordIndexes<'a> {
     pub sender: MultiIndex<'a, String, UnbondRecord, u64>,
     pub released: MultiIndex<'a, String, UnbondRecord, u64>,
     pub staker_released: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub height: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
-        let v: Vec<&dyn Index<UnbondRecord>> = vec![&self.staker, &self.sender, &self.released];
+        let v: Vec<&dyn Index<UnbondRecord>> =
+            vec![&self.staker, &self.sender, &self.released, &self.height];
         Box::new(v.into_iter())
     }
 }
@@ -125,6 +129,11 @@ pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<
             |_pk, d: &UnbondRecord| format!("{}-{}", d.staker, d.released),
             UNBOND_RECORD_NAMESPACE,
             "unbond_record__staker_released",
+        ),
+        height: MultiIndex::new(
+            |_pk, d: &UnbondRecord| d.height.to_string(),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__height",
         ),
     };
     IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
