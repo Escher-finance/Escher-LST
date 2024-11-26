@@ -56,6 +56,7 @@ pub fn instantiate(
         ucs01_relay_contract: msg.ucs01_relay_contract,
         fee_rate: msg.fee_rate,
         revenue_receiver: msg.revenue_receiver,
+        unbonding_time: msg.unbonding_time,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -89,6 +90,7 @@ pub fn execute(
             execute::set_token_admin(deps, info, denom, new_admin)
         }
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
+        ExecuteMsg::ProcessUnbonding { id } => execute::process_unbonding(deps, env, info, id),
         ExecuteMsg::Reset {} => execute::reset(deps, env, info),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::SetParameters {

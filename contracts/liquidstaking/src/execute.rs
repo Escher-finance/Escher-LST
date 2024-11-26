@@ -1,10 +1,10 @@
 use crate::error::ContractError;
-use crate::event::BondEvent;
+use crate::event::{BondEvent, UnbondEvent};
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::state::{
-    increment_tokens, unbond_history, UnbondRecord, PARAMETERS, STATE, VALIDATORS_REGISTRY,
+    increment_tokens, unbond_record, UnbondRecord, PARAMETERS, STATE, VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
@@ -296,7 +296,7 @@ pub fn unbond(
         amount: unbond_amount.clone(),
         denom: liquidstaking_denom.clone(),
     };
-    let id = increment_tokens(deps.storage).unwrap();
+    let id: u64 = increment_tokens(deps.storage).unwrap();
     let history = UnbondRecord {
         id,
         height: env.block.height,
@@ -310,10 +310,11 @@ pub fn unbond(
         },
         undelegations,
         created: env.block.time,
+        completion: env.block.time.plus_seconds(params.unbonding_time),
         released: false,
         released_time: Timestamp::from_nanos(000_000_000),
     };
-    unbond_history().save(deps.storage, id, &history)?;
+    unbond_record().save(deps.storage, id, &history)?;
 
     // // update total bond, supply and exchange rate here
     state.total_bond_amount = total_bond_amount - undelegate_amount;
@@ -322,11 +323,22 @@ pub fn unbond(
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
+    let unbond_event = UnbondEvent(
+        sender.clone(),
+        the_staker.clone(),
+        unbond_amount.clone(),
+        undelegate_amount.clone(),
+        state.total_delegated_amount.clone(),
+        total_bond_amount.clone(),
+        state.total_lst_supply.clone(),
+        current_exchange_rate,
+    );
+
     let attrs = get_unbond_attrs(
         sender,
         the_staker,
         current_exchange_rate.to_string(),
-        undelegate_amount.to_string(),
+        unbond_amount.to_string(),
         undelegate_amount.to_string(),
         state.total_delegated_amount.to_string(),
         state.total_bond_amount.to_string(),
@@ -334,7 +346,10 @@ pub fn unbond(
         coin_denom.clone(),
     );
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(attrs);
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_messages(msgs)
+        .add_event(unbond_event)
+        .add_attributes(attrs);
 
     Ok(res)
 }
@@ -343,7 +358,7 @@ fn get_unbond_attrs(
     sender: String,
     the_staker: String,
     current_exchange_rate: String,
-    native_token_unbond_amount: String,
+    unbond_amount: String,
     undelegate_amount: String,
     total_delegated_amount: String,
     total_bond_amount: String,
@@ -355,8 +370,8 @@ fn get_unbond_attrs(
         attr("sender", sender),
         attr("staker", the_staker),
         attr("current_exchange_rate", current_exchange_rate),
-        attr("native_token_unbond_amount", native_token_unbond_amount),
-        attr("undelegate_amount_per_validator", undelegate_amount),
+        attr("unbond_amount", unbond_amount),
+        attr("undelegate_amount", undelegate_amount),
         attr("total_delegated_amount", total_delegated_amount),
         attr("total_bond_amount", total_bond_amount),
         attr("total_lst_supply", total_lst_supply),
@@ -483,7 +498,7 @@ pub fn reset(
     state.exchange_rate = Decimal::one();
     STATE.save(deps.storage, &state)?;
 
-    unbond_history().clear(deps.storage);
+    unbond_record().clear(deps.storage);
     let msgs = get_unbond_all_messages(deps, env.contract.address)?;
 
     let res: Response<TokenFactoryMsg> = Response::new()
@@ -598,6 +613,48 @@ pub fn set_parameters(
             "ucs01_relay_contract",
             ucs01_relay_contract.unwrap_or_else(|| "".to_string()),
         );
+
+    Ok(res)
+}
+
+pub fn process_unbonding(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    id: u64,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let params: crate::state::Parameters = PARAMETERS.load(deps.storage)?;
+    let mut unbond_rec: crate::state::UnbondRecord = unbond_record().load(deps.storage, id)?;
+
+    // query the undelegate_amount in contract balance
+    let contract_address = env.contract.address;
+    let balance = deps
+        .querier
+        .query_balance(contract_address, params.underlying_coin_denom)?;
+
+    if balance.amount < unbond_rec.undelegate_amount.amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    // if exists, send to evm staker
+    let funds = vec![unbond_rec.undelegate_amount.clone()];
+    let wasm_msg = utils::send_to_evm(
+        params.ucs01_relay_contract,
+        params.ucs01_channel,
+        unbond_rec.staker.to_string(),
+        funds,
+    )?;
+
+    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
+
+    // set unbonding record to be released
+    unbond_rec.released = true;
+    unbond_rec.released_time = env.block.time;
+    unbond_record().save(deps.storage, unbond_rec.id, &unbond_rec)?;
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_message(msg);
 
     Ok(res)
 }

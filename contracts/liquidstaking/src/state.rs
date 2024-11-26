@@ -51,6 +51,7 @@ pub struct Parameters {
     pub ucs01_relay_contract: String,
     pub fee_rate: Decimal,
     pub revenue_receiver: String,
+    pub unbonding_time: u64,
 }
 
 impl State {
@@ -84,6 +85,7 @@ pub struct UnbondRecord {
     pub exchange_rate: Decimal,
     pub undelegations: Vec<UndelegationRecord>,
     pub created: Timestamp,
+    pub completion: Timestamp,
     pub released: bool,
     pub released_time: Timestamp,
 }
@@ -93,39 +95,46 @@ pub struct UnbondRecordIndexes<'a> {
     pub sender: MultiIndex<'a, String, UnbondRecord, u64>,
     pub released: MultiIndex<'a, String, UnbondRecord, u64>,
     pub staker_released: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub height: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
-        let v: Vec<&dyn Index<UnbondRecord>> = vec![&self.staker, &self.sender, &self.released];
+        let v: Vec<&dyn Index<UnbondRecord>> =
+            vec![&self.staker, &self.sender, &self.released, &self.height];
         Box::new(v.into_iter())
     }
 }
 
-const UNBOND_HISTORY_NAMESPACE: &str = "unbond_history";
+const UNBOND_RECORD_NAMESPACE: &str = "unbond_record";
 
-pub fn unbond_history<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<'a>> {
+pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<'a>> {
     let indexes = UnbondRecordIndexes {
         staker: MultiIndex::new(
             |_pk, d: &UnbondRecord| d.staker.clone(),
-            UNBOND_HISTORY_NAMESPACE,
-            "unbond_history__staker",
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__staker",
         ),
         sender: MultiIndex::new(
             |_pk, d: &UnbondRecord| d.sender.clone(),
-            UNBOND_HISTORY_NAMESPACE,
-            "unbond_history__sender",
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__sender",
         ),
         released: MultiIndex::new(
             |_pk, d: &UnbondRecord| d.released.to_string(),
-            UNBOND_HISTORY_NAMESPACE,
-            "unbond_history__released",
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__released",
         ),
         staker_released: MultiIndex::new(
             |_pk, d: &UnbondRecord| format!("{}-{}", d.staker, d.released),
-            UNBOND_HISTORY_NAMESPACE,
-            "unbond_history__staker_released",
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__staker_released",
+        ),
+        height: MultiIndex::new(
+            |_pk, d: &UnbondRecord| d.height.to_string(),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__height",
         ),
     };
-    IndexedMap::new(UNBOND_HISTORY_NAMESPACE, indexes)
+    IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
 }
