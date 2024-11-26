@@ -12,7 +12,7 @@ use crate::utils::{
     get_actual_total_bonded, get_actual_total_reward, get_mock_total_reward, to_uint128,
 };
 use cosmwasm_std::{
-    attr, to_json_binary, Addr, Attribute, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,
+    attr, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,
     DistributionMsg, Env, MessageInfo, Response, StakingMsg, StdResult, SubMsg, Timestamp, Uint128,
 };
 
@@ -27,7 +27,7 @@ pub fn bond(
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom;
     let sender = info.sender;
-    let the_staker: String = staker.unwrap_or_else(|| "".to_string());
+    let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
 
     let payment: Coin;
     // if amount is none it should use senders funds to delegate
@@ -222,7 +222,7 @@ pub fn unbond(
     let coin_denom = params.underlying_coin_denom;
     let liquidstaking_denom = params.liquidstaking_denom;
     let sender = info.sender.to_string();
-    let the_staker: String = staker.unwrap_or_else(|| "".to_string());
+    let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
 
     // coin must have be sent along with transaction and it should be in liquid staking coin denom
     if info.funds.len() > 1usize {
@@ -638,16 +638,27 @@ pub fn process_unbonding(
         return Err(ContractError::NotEnoughAvailableFund {});
     }
 
-    // if exists, send to evm staker
-    let funds = vec![unbond_rec.undelegate_amount.clone()];
-    let wasm_msg = utils::send_to_evm(
-        params.ucs01_relay_contract,
-        params.ucs01_channel,
-        unbond_rec.staker.to_string(),
-        funds,
-    )?;
-
-    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
+    // if exists, send to staker (it can be on same chain or other chain like evm/bera)
+    let msg: CosmosMsg<TokenFactoryMsg> = {
+        if unbond_rec.staker != unbond_rec.sender {
+            let funds = vec![unbond_rec.undelegate_amount.clone()];
+            let wasm_msg = utils::send_to_evm(
+                params.ucs01_relay_contract,
+                params.ucs01_channel,
+                unbond_rec.staker.to_string(),
+                funds,
+            )?;
+            let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
+            msg
+        } else {
+            let bank_msg = BankMsg::Send {
+                to_address: unbond_rec.staker.clone(),
+                amount: vec![unbond_rec.undelegate_amount.clone()],
+            };
+            let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
+            msg
+        }
+    };
 
     // set unbonding record to be released
     unbond_rec.released = true;
