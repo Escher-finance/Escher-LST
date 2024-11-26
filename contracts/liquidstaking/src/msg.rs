@@ -14,6 +14,7 @@ pub struct InstantiateMsg {
     pub ucs01_relay_contract: String,
     pub fee_rate: Decimal,
     pub revenue_receiver: String,
+    pub unbonding_time: u64,
 }
 
 #[cw_ownable_execute]

@@ -56,6 +56,7 @@ pub fn instantiate(
         ucs01_relay_contract: msg.ucs01_relay_contract,
         fee_rate: msg.fee_rate,
         revenue_receiver: msg.revenue_receiver,
+        unbonding_time: msg.unbonding_time,
     };
     PARAMETERS.save(deps.storage, &params)?;
 

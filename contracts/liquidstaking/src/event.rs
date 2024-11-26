@@ -29,6 +29,7 @@ pub fn UnbondEvent(
     sender: String,
     staker: String,
     unbond_amount: Uint128,
+    undelegate_amount: Uint128,
     delegated_amount: Uint128,
     total_bond_amount: Uint128,
     total_supply: Uint128,
@@ -38,6 +39,7 @@ pub fn UnbondEvent(
         .add_attribute("sender", sender)
         .add_attribute("staker", staker)
         .add_attribute("unbond_amount", unbond_amount)
+        .add_attribute("undelegate_amount", undelegate_amount)
         .add_attribute("delegated_amount", delegated_amount)
         .add_attribute("total_bond_amount", total_bond_amount)
         .add_attribute("total_supply", total_supply)

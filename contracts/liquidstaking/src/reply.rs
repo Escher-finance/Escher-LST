@@ -1,10 +1,10 @@
 use crate::error::ContractError;
-use crate::msg::{BondRewardsPayload, MintTokensPayload, TransferMsg, Ucs01RelayExecuteMsg};
+use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::state::{Balance, Parameters, BALANCE, LOG, PARAMETERS};
 use crate::utils;
 use cosmwasm_std::{
-    entry_point, from_json, to_json_binary, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply,
-    Response, StakingMsg, StdError, Uint128, WasmMsg,
+    entry_point, from_json, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StakingMsg,
+    Uint128, WasmMsg,
 };
 pub const MINT_TOKENS_REPLY_ID: u64 = 123;
 pub const BOND_WITHDRAW_REWARD_REPLY_ID: u64 = 124;
@@ -69,12 +69,14 @@ pub fn transfer(
     };
 
     let funds = vec![coin_amount.clone()];
-    let msg: CosmosMsg = send_to_evm(
+    let wasm_msg: WasmMsg = utils::send_to_evm(
         params.ucs01_relay_contract,
         params.ucs01_channel,
         receiver.to_string(),
         funds,
     )?;
+
+    let msg: CosmosMsg = CosmosMsg::Wasm(wasm_msg);
 
     let res: Response = Response::new()
         .add_message(msg)
@@ -83,29 +85,6 @@ pub fn transfer(
         .add_attribute("amount", coin_amount.amount.to_string())
         .add_attribute("denom", coin_amount.denom);
     Ok(res)
-}
-
-pub fn send_to_evm(
-    contract_addr: String,
-    channel: String,
-    receiver: String,
-    funds: Vec<Coin>,
-) -> Result<CosmosMsg, StdError> {
-    let relay_transfer_msg: Ucs01RelayExecuteMsg = Ucs01RelayExecuteMsg::Transfer(TransferMsg {
-        channel,
-        receiver,
-        memo: "Send back to EVM".to_string(),
-        timeout: None,
-    });
-    let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
-
-    let msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr,
-        msg: transfer_relay_msg,
-        funds,
-    });
-
-    Ok(msg)
 }
 
 fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
