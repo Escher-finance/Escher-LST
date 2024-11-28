@@ -7,7 +7,8 @@ use cosmwasm_std::{
     Uint128, WasmMsg,
 };
 pub const MINT_TOKENS_REPLY_ID: u64 = 123;
-pub const BOND_WITHDRAW_REWARD_REPLY_ID: u64 = 124;
+pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
+pub const BOND_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {

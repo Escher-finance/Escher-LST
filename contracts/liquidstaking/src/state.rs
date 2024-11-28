@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Coin, Decimal, StdResult, Storage, Timestamp, Uint128};
+use cosmwasm_std::{Addr, Coin, Decimal, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 
 use crate::msg::UndelegationRecord;
@@ -52,6 +52,8 @@ pub struct Parameters {
     pub fee_rate: Decimal,
     pub revenue_receiver: String,
     pub unbonding_time: u64,
+    // cw20 contract address
+    pub cw20_address: Option<Addr>,
 }
 
 impl State {

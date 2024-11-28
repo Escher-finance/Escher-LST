@@ -15,6 +15,7 @@ pub struct InstantiateMsg {
     pub fee_rate: Decimal,
     pub revenue_receiver: String,
     pub unbonding_time: u64,
+    pub cw20_address: Option<Addr>,
 }
 
 #[cw_ownable_execute]
@@ -50,6 +51,7 @@ pub enum ExecuteMsg {
         ucs01_channel: Option<String>,
         ucs01_relay_contract: Option<String>,
         unbonding_time: Option<u64>,
+        cw20_address: Option<Addr>,
     },
     /// Update Validators
     UpdateValidators {

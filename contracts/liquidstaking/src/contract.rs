@@ -57,6 +57,7 @@ pub fn instantiate(
         fee_rate: msg.fee_rate,
         revenue_receiver: msg.revenue_receiver,
         unbonding_time: msg.unbonding_time,
+        cw20_address: msg.cw20_address,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -102,6 +103,7 @@ pub fn execute(
             ucs01_channel,
             ucs01_relay_contract,
             unbonding_time,
+            cw20_address,
         } => execute::set_parameters(
             deps,
             env,
@@ -111,6 +113,7 @@ pub fn execute(
             ucs01_channel,
             ucs01_relay_contract,
             unbonding_time,
+            cw20_address,
         ),
     }
 }
