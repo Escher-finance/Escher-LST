@@ -4,7 +4,8 @@ use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::state::{
-    increment_tokens, unbond_record, UnbondRecord, PARAMETERS, STATE, VALIDATORS_REGISTRY,
+    increment_tokens, unbond_record, UnbondRecord, Validator, PARAMETERS, STATE,
+    VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
@@ -432,6 +433,8 @@ pub fn process_rewards(
     env: Env,
     info: MessageInfo,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom;
@@ -555,6 +558,7 @@ pub fn update_ownership(
     info: MessageInfo,
     action: cw_ownable::Action,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
     if action == cw_ownable::Action::RenounceOwnership {
         return Err(ContractError::OwnershipCannotBeRenounced);
     };
@@ -575,6 +579,7 @@ pub fn set_parameters(
     liquidstaking_denom: Option<String>,
     ucs01_channel: Option<String>,
     ucs01_relay_contract: Option<String>,
+    unbonding_time: Option<u64>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -592,6 +597,9 @@ pub fn set_parameters(
     params.ucs01_relay_contract = ucs01_relay_contract
         .clone()
         .unwrap_or_else(|| params.ucs01_relay_contract);
+    params.unbonding_time = unbonding_time
+        .clone()
+        .unwrap_or_else(|| params.unbonding_time);
 
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -668,4 +676,82 @@ pub fn process_unbonding(
     let res: Response<TokenFactoryMsg> = Response::new().add_message(msg);
 
     Ok(res)
+}
+
+/// Update the ownership of the contract.
+#[allow(clippy::needless_pass_by_value)]
+pub fn update_validators(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    validators: Vec<Validator>,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let mut validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let prev_validators = validators_reg.validators.clone();
+    validators_reg.validators = validators.clone();
+    VALIDATORS_REGISTRY.save(deps.storage, &validators_reg)?;
+
+    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> =
+        adjust_validators_delegation(deps, env.contract.address, prev_validators, validators)?;
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs);
+    Ok(res)
+}
+
+pub fn adjust_validators_delegation(
+    deps: DepsMut,
+    delegator: Addr,
+    prev_validators: Vec<Validator>,
+    validators: Vec<Validator>,
+) -> Result<Vec<CosmosMsg<TokenFactoryMsg>>, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let denom = params.underlying_coin_denom;
+
+    let (validator_delegation_map, total_delegated_amount) =
+        utils::get_validator_delegation_map_with_total_bond(
+            deps,
+            delegator.to_string(),
+            prev_validators,
+        )?;
+
+    let correct_validator_delegation_map =
+        utils::get_validator_delegation_map_base_on_weight(validators, total_delegated_amount)?;
+
+    let (surplus_validators, deficient_validators) = utils::get_surplus_deficit_validators(
+        validator_delegation_map,
+        correct_validator_delegation_map,
+    );
+
+    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> =
+        utils::get_restaking_msgs(surplus_validators, deficient_validators, denom);
+
+    Ok(msgs)
+}
+
+// let undelegate_staking_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Staking(undelegate_msg);
+// msgs.push(undelegate_staking_msg);
+
+#[cfg(test)]
+#[test]
+fn validator_restaking_adjustment() {
+    let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+    let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+
+    validator_delegation_map.insert("A".into(), Uint128::new(50000));
+    validator_delegation_map.insert("B".into(), Uint128::new(50000));
+
+    correct_validator_delegation_map.insert("B".into(), Uint128::new(30000));
+    correct_validator_delegation_map.insert("C".into(), Uint128::new(30000));
+    correct_validator_delegation_map.insert("D".into(), Uint128::new(40000));
+
+    let (surplus, deficit) = utils::get_surplus_deficit_validators(
+        validator_delegation_map,
+        correct_validator_delegation_map,
+    );
+
+    let denom = "muno".to_string();
+    let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
+    println!("msgs: {:?}", msgs);
 }

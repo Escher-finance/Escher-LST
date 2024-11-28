@@ -49,6 +49,11 @@ pub enum ExecuteMsg {
         liquidstaking_denom: Option<String>,
         ucs01_channel: Option<String>,
         ucs01_relay_contract: Option<String>,
+        unbonding_time: Option<u64>,
+    },
+    /// Update Validators
+    UpdateValidators {
+        validators: Vec<Validator>,
     },
     /// Reset will set state to initial state and unbond all delegations
     Reset {},
@@ -131,8 +136,22 @@ pub struct BondRewardsPayload {
     pub amount: Uint128,
     pub validator: String,
 }
+
 #[cw_serde]
 pub struct UndelegationRecord {
     pub amount: Uint128,
     pub validator: Validator,
+}
+
+#[cw_serde]
+pub enum DelegationDiff {
+    Surplus,
+    Deficit,
+}
+
+#[cw_serde]
+pub struct ValidatorDelegation {
+    pub address: String,
+    pub delegation_diff: DelegationDiff,
+    pub diff_amount: Uint128,
 }

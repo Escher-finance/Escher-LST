@@ -1,13 +1,13 @@
-use crate::msg::{TransferMsg, Ucs01RelayExecuteMsg};
+use crate::msg::{TransferMsg, Ucs01RelayExecuteMsg, ValidatorDelegation};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::ContractError;
-use crate::{msg::UndelegationRecord, state::Validator};
+use crate::{msg::DelegationDiff, msg::UndelegationRecord, state::Validator};
 use cosmwasm_std::{
-    to_json_binary, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, QuerierWrapper,
-    StakingMsg, StdResult, Uint128, Uint256, WasmMsg,
+    to_json_binary, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut,
+    QuerierWrapper, StakingMsg, StdResult, Uint128, Uint256, WasmMsg,
 };
+use std::collections::HashMap;
 use std::str::FromStr;
-// to_json_binary, GrpcQuery, QueryRequest,
 
 const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
 
@@ -119,12 +119,12 @@ pub fn split_revenue(amount: Uint128, fee_rate: Decimal) -> (Uint128, Uint128) {
     (restake_amount, fee_amount)
 }
 
-pub fn calculate_delegated_amount(amount: Uint128, fee_rate: Decimal) -> Uint128 {
+pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
     let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (fee_rate * decimal_fract).to_uint_ceil();
-    let fee_amount =
+    let fract = (ratio * decimal_fract).to_uint_ceil();
+    let delegate_amount =
         Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
-    fee_amount
+    delegate_amount
 }
 
 pub fn get_burn_msg(denom: String, burn_amount: Uint128, delegator: String) -> TokenFactoryMsg {
@@ -208,4 +208,164 @@ pub fn send_to_evm(
         msg: transfer_relay_msg,
         funds,
     });
+}
+
+pub fn calculate_delegate(amount: Uint128, fee_rate: Decimal) -> (Uint128, Uint128) {
+    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
+    let fract = (fee_rate * decimal_fract).to_uint_ceil();
+    let fee_amount =
+        Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
+    let restake_amount = amount - fee_amount;
+    (restake_amount, fee_amount)
+}
+
+pub fn get_validator_delegation_map_with_total_bond(
+    deps: DepsMut,
+    delegator: String,
+    validators: Vec<Validator>,
+) -> Result<(HashMap<String, Uint128>, Uint128), ContractError> {
+    let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+
+    let mut total_delegated_amount = Uint128::from(0u32);
+
+    for validator in validators {
+        let validator_bond = deps
+            .querier
+            .query_delegation(delegator.clone(), validator.address.clone())?;
+
+        let delegation_amount = match validator_bond {
+            Some(delegation) => delegation.amount.amount,
+            None => Uint128::from(0u32),
+        };
+        validator_delegation_map.insert(validator.address.to_string(), delegation_amount);
+        total_delegated_amount += delegation_amount;
+    }
+
+    Ok((validator_delegation_map, total_delegated_amount))
+}
+
+pub fn get_validator_delegation_map_base_on_weight(
+    validators: Vec<Validator>,
+    total_delegated_amount: Uint128,
+) -> Result<HashMap<String, Uint128>, ContractError> {
+    let total_weight = validators
+        .iter()
+        .map(|v| v.weight)
+        .reduce(|a, b| (a + b))
+        .unwrap_or(0);
+
+    let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+
+    for validator in validators {
+        let ratio = Decimal::from_ratio(validator.weight, total_weight);
+        let delegation_amount = calculate_delegated_amount(total_delegated_amount, ratio);
+        correct_validator_delegation_map.insert(validator.address.to_string(), delegation_amount);
+    }
+
+    Ok(correct_validator_delegation_map)
+}
+
+pub fn get_surplus_deficit_validators(
+    validator_delegation_map: HashMap<String, Uint128>,
+    correct_validator_delegation_map: HashMap<String, Uint128>,
+) -> (Vec<ValidatorDelegation>, Vec<ValidatorDelegation>) {
+    let mut surplus_validators: Vec<ValidatorDelegation> = vec![];
+    let mut deficient_validators: Vec<ValidatorDelegation> = vec![];
+    for (key, previous_amount) in validator_delegation_map.clone().iter_mut() {
+        // check if old validator key exists on new validators map
+        if correct_validator_delegation_map.get(key).is_none() {
+            // because old validator not exists on new one that means the previous validator
+            // need to be restaked fully so it is surplus
+            surplus_validators.push(ValidatorDelegation {
+                address: key.to_string(),
+                delegation_diff: DelegationDiff::Surplus,
+                diff_amount: *previous_amount,
+            })
+        };
+    }
+
+    for (new_validator_key, correct_amount) in correct_validator_delegation_map.clone().iter_mut() {
+        // check if previous validator exists
+        match validator_delegation_map.get(new_validator_key) {
+            Some(previous_amount) => {
+                if *previous_amount > *correct_amount {
+                    surplus_validators.push(ValidatorDelegation {
+                        address: new_validator_key.to_string(),
+                        delegation_diff: DelegationDiff::Surplus,
+                        diff_amount: *previous_amount - *correct_amount,
+                    })
+                } else {
+                    deficient_validators.push(ValidatorDelegation {
+                        address: new_validator_key.to_string(),
+                        delegation_diff: DelegationDiff::Deficit,
+                        diff_amount: *correct_amount - *previous_amount,
+                    })
+                }
+            }
+            None => deficient_validators.push(ValidatorDelegation {
+                address: new_validator_key.to_string(),
+                delegation_diff: DelegationDiff::Deficit,
+                diff_amount: correct_amount.clone(),
+            }),
+        }
+    }
+
+    (surplus_validators, deficient_validators)
+}
+
+pub fn get_restaking_msgs(
+    mut surplus_validators: Vec<ValidatorDelegation>,
+    mut deficient_validators: Vec<ValidatorDelegation>,
+    denom: String,
+) -> Vec<CosmosMsg<TokenFactoryMsg>> {
+    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+
+    surplus_validators.sort_by(|a, b| b.diff_amount.cmp(&a.diff_amount));
+    deficient_validators.sort_by_key(|a| a.diff_amount);
+
+    for surplus_validator in surplus_validators.iter_mut() {
+        for deficient_validator in deficient_validators.iter_mut() {
+            if surplus_validator.diff_amount < deficient_validator.diff_amount {
+                if surplus_validator.diff_amount == Uint128::from(0u32) {
+                    break;
+                }
+
+                println!("{:?} <> {:?}", surplus_validator, deficient_validator);
+                // the deficit amount higher than surplus amount so we can restake all surplus amount
+                let undelegate_msg = CosmosMsg::Staking(StakingMsg::Redelegate {
+                    src_validator: surplus_validator.address.clone(),
+                    dst_validator: deficient_validator.address.clone(),
+                    amount: Coin {
+                        amount: surplus_validator.diff_amount,
+                        denom: denom.clone(),
+                    },
+                });
+                surplus_validator.diff_amount = Uint128::from(0u32);
+                deficient_validator.diff_amount =
+                    deficient_validator.diff_amount - surplus_validator.diff_amount;
+
+                msgs.push(undelegate_msg);
+                //
+            } else {
+                println!("{:?} <> {:?}", surplus_validator, deficient_validator);
+
+                let undelegate_msg: CosmosMsg<TokenFactoryMsg> =
+                    CosmosMsg::Staking(StakingMsg::Redelegate {
+                        src_validator: surplus_validator.address.clone(),
+                        dst_validator: deficient_validator.address.clone(),
+                        amount: Coin {
+                            amount: deficient_validator.diff_amount,
+                            denom: denom.clone(),
+                        },
+                    });
+
+                surplus_validator.diff_amount =
+                    surplus_validator.diff_amount - deficient_validator.diff_amount;
+                deficient_validator.diff_amount = Uint128::from(0u32);
+                msgs.push(undelegate_msg);
+            }
+        }
+    }
+
+    msgs
 }
