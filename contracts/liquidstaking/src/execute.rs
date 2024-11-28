@@ -2,7 +2,9 @@ use crate::error::ContractError;
 use crate::event::{BondEvent, UnbondEvent, UpdateValidatorsEvent};
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
-use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
+use crate::reply::{
+    BOND_WITHDRAW_REWARD_REPLY_ID, MINT_CW20_TOKENS_REPLY_ID, MINT_TOKENS_REPLY_ID,
+};
 use crate::state::{
     increment_tokens, unbond_record, UnbondRecord, Validator, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
@@ -15,6 +17,7 @@ use crate::utils::{
 use cosmwasm_std::{
     attr, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,
     DistributionMsg, Env, MessageInfo, Response, StakingMsg, StdResult, SubMsg, Timestamp, Uint128,
+    WasmMsg,
 };
 
 pub fn bond(
@@ -182,17 +185,35 @@ pub fn bond(
     };
 
     let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
-    if !cfg!(test) {
-        let payload = MintTokensPayload {
-            sender: sender.to_string(),
-            staker: the_staker.clone(),
-            amount: mint_amount,
-        };
-        let payload_bin = to_json_binary(&payload)?;
+    let payload = MintTokensPayload {
+        sender: sender.to_string(),
+        staker: the_staker.clone(),
+        amount: mint_amount,
+    };
+    let payload_bin = to_json_binary(&payload)?;
 
+    if !cfg!(test) {
         let sub_msg: SubMsg<TokenFactoryMsg> = SubMsg::reply_always(mint_msg, MINT_TOKENS_REPLY_ID)
             .with_payload(payload_bin)
             .into();
+        sub_msgs.push(sub_msg);
+    } else {
+        let recipient = delegator.to_string();
+        let mint = cw20::Cw20ExecuteMsg::Mint {
+            recipient,
+            amount: mint_amount,
+        };
+        let mint_bin = to_json_binary(&mint)?;
+        let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: params.cw20_address.unwrap().to_string(),
+            msg: mint_bin,
+            funds: vec![],
+        });
+
+        let sub_msg: SubMsg<TokenFactoryMsg> =
+            SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID)
+                .with_payload(payload_bin)
+                .into();
         sub_msgs.push(sub_msg);
     }
 
@@ -580,6 +601,7 @@ pub fn set_parameters(
     ucs01_channel: Option<String>,
     ucs01_relay_contract: Option<String>,
     unbonding_time: Option<u64>,
+    cw20_address: Option<Addr>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -600,6 +622,12 @@ pub fn set_parameters(
     params.unbonding_time = unbonding_time
         .clone()
         .unwrap_or_else(|| params.unbonding_time);
+    params.cw20_address = cw20_address.clone();
+
+    let cw20_addr_string = match cw20_address {
+        Some(cw20) => cw20.to_string(),
+        None => "".to_string(),
+    };
 
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -620,7 +648,8 @@ pub fn set_parameters(
         .add_attribute(
             "ucs01_relay_contract",
             ucs01_relay_contract.unwrap_or_else(|| "".to_string()),
-        );
+        )
+        .add_attribute("cw20_address", cw20_addr_string);
 
     Ok(res)
 }
