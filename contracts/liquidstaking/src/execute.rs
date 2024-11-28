@@ -103,17 +103,20 @@ pub fn bond(
     }
 
     // calculate remaining
-    let remaining_amount = payment.amount - total_delegated;
-    let remaining_staking_msg: CosmosMsg<TokenFactoryMsg> =
-        CosmosMsg::Staking(StakingMsg::Delegate {
-            validator: first_validator,
-            amount: Coin {
-                denom: coin_denom.clone(),
-                amount: remaining_amount,
-            },
-        });
 
-    msgs.push(remaining_staking_msg.into());
+    let remaining_amount = payment.amount - total_delegated;
+    if !remaining_amount.is_zero() {
+        let remaining_staking_msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Staking(StakingMsg::Delegate {
+                validator: first_validator,
+                amount: Coin {
+                    denom: coin_denom.clone(),
+                    amount: remaining_amount,
+                },
+            });
+
+        msgs.push(remaining_staking_msg.into());
+    }
 
     let delegator = env.contract.address;
     let validators_list: Vec<String> = validators_reg
@@ -197,25 +200,26 @@ pub fn bond(
             .with_payload(payload_bin)
             .into();
         sub_msgs.push(sub_msg);
-    } else {
-        let recipient = delegator.to_string();
-        let mint = cw20::Cw20ExecuteMsg::Mint {
-            recipient,
-            amount: mint_amount,
-        };
-        let mint_bin = to_json_binary(&mint)?;
-        let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: params.cw20_address.unwrap().to_string(),
-            msg: mint_bin,
-            funds: vec![],
-        });
-
-        let sub_msg: SubMsg<TokenFactoryMsg> =
-            SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID)
-                .with_payload(payload_bin)
-                .into();
-        sub_msgs.push(sub_msg);
     }
+    // else {
+    //     let recipient = delegator.to_string();
+    //     let mint = cw20::Cw20ExecuteMsg::Mint {
+    //         recipient,
+    //         amount: mint_amount,
+    //     };
+    //     let mint_bin = to_json_binary(&mint)?;
+    //     let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+    //         contract_addr: params.cw20_address.unwrap().to_string(),
+    //         msg: mint_bin,
+    //         funds: vec![],
+    //     });
+
+    //     let sub_msg: SubMsg<TokenFactoryMsg> =
+    //         SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID)
+    //             .with_payload(payload_bin)
+    //             .into();
+    //     sub_msgs.push(sub_msg);
+    // }
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
@@ -867,4 +871,14 @@ fn validator_restaking_adjustment_4() {
     let denom = "muno".to_string();
     let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
     println!("\nmsgs: {:?}", msgs);
+}
+
+#[test]
+fn test_delegate_amount() {
+    let weight: u32 = 1;
+    let total_weight: u32 = 1;
+    let ratio = Decimal::from_ratio(Uint128::from(weight), Uint128::from(total_weight));
+    let amount = Uint128::from(10u32);
+    let delegate_amount = utils::calculate_delegated_amount(amount, ratio);
+    println!("delegate_amount: {:?}", delegate_amount);
 }
