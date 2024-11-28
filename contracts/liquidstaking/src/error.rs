@@ -27,6 +27,9 @@ pub enum ContractError {
     #[error("NotEnoughFund")]
     NotEnoughFund {},
 
+    #[error("requires at least one validator")]
+    EmptyValidator {},
+
     #[error("NotEnoughAvailableFund")]
     NotEnoughAvailableFund {},
 

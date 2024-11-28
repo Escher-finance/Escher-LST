@@ -93,11 +93,15 @@ pub fn execute(
         ExecuteMsg::ProcessUnbonding { id } => execute::process_unbonding(deps, env, info, id),
         ExecuteMsg::Reset {} => execute::reset(deps, env, info),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
+        ExecuteMsg::UpdateValidators { validators } => {
+            execute::update_validators(deps, env, info, validators)
+        }
         ExecuteMsg::SetParameters {
             underlying_coin_denom,
             liquidstaking_denom,
             ucs01_channel,
             ucs01_relay_contract,
+            unbonding_time,
         } => execute::set_parameters(
             deps,
             env,
@@ -106,6 +110,7 @@ pub fn execute(
             liquidstaking_denom,
             ucs01_channel,
             ucs01_relay_contract,
+            unbonding_time,
         ),
     }
 }

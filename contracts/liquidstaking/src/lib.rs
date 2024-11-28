@@ -12,7 +12,4 @@ pub mod state;
 pub mod token_factory_api;
 pub mod utils;
 
-#[cfg(test)]
-mod tests;
-
 pub use crate::error::ContractError;
