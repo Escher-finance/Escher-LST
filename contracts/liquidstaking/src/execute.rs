@@ -1,5 +1,5 @@
 use crate::error::ContractError;
-use crate::event::{BondEvent, UnbondEvent};
+use crate::event::{BondEvent, UnbondEvent, UpdateValidatorsEvent};
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{BOND_WITHDRAW_REWARD_REPLY_ID, MINT_TOKENS_REPLY_ID};
@@ -688,15 +688,24 @@ pub fn update_validators(
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
+    if validators.len() < 1 {
+        return Err(ContractError::EmptyValidator {});
+    }
+
     let mut validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let prev_validators = validators_reg.validators.clone();
     validators_reg.validators = validators.clone();
     VALIDATORS_REGISTRY.save(deps.storage, &validators_reg)?;
 
-    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> =
-        adjust_validators_delegation(deps, env.contract.address, prev_validators, validators)?;
+    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = adjust_validators_delegation(
+        deps,
+        env.contract.address,
+        prev_validators.clone(),
+        validators.clone(),
+    )?;
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs);
+    let event = UpdateValidatorsEvent(info.sender.to_string(), prev_validators, validators);
+    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_event(event);
     Ok(res)
 }
 
@@ -736,6 +745,8 @@ pub fn adjust_validators_delegation(
 #[cfg(test)]
 #[test]
 fn validator_restaking_adjustment() {
+    use std::collections::HashMap;
+
     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
 
@@ -754,4 +765,77 @@ fn validator_restaking_adjustment() {
     let denom = "muno".to_string();
     let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
     println!("msgs: {:?}", msgs);
+}
+
+#[test]
+fn validator_restaking_adjustment_2() {
+    use std::collections::HashMap;
+
+    let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+    let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+
+    validator_delegation_map.insert("A".into(), Uint128::new(50000));
+    validator_delegation_map.insert("B".into(), Uint128::new(50000));
+    validator_delegation_map.insert("C".into(), Uint128::new(50000));
+
+    correct_validator_delegation_map.insert("B".into(), Uint128::new(75000));
+    correct_validator_delegation_map.insert("C".into(), Uint128::new(75000));
+
+    let (surplus, deficit) = utils::get_surplus_deficit_validators(
+        validator_delegation_map,
+        correct_validator_delegation_map,
+    );
+
+    let denom = "muno".to_string();
+    let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
+    println!("msgs: {:?}", msgs);
+}
+
+#[test]
+fn validator_restaking_adjustment_3() {
+    use std::collections::HashMap;
+
+    let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+    let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+
+    validator_delegation_map.insert("A".into(), Uint128::new(30000));
+    validator_delegation_map.insert("B".into(), Uint128::new(40000));
+    validator_delegation_map.insert("C".into(), Uint128::new(30000));
+
+    correct_validator_delegation_map.insert("B".into(), Uint128::new(25000));
+    correct_validator_delegation_map.insert("C".into(), Uint128::new(25000));
+    correct_validator_delegation_map.insert("D".into(), Uint128::new(50000));
+
+    let (surplus, deficit) = utils::get_surplus_deficit_validators(
+        validator_delegation_map,
+        correct_validator_delegation_map,
+    );
+
+    let denom = "muno".to_string();
+    let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
+    println!("\nmsgs: {:?}", msgs);
+}
+
+#[test]
+fn validator_restaking_adjustment_4() {
+    use std::collections::HashMap;
+
+    let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+    let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+
+    validator_delegation_map.insert("B".into(), Uint128::new(40000));
+    validator_delegation_map.insert("C".into(), Uint128::new(30000));
+    validator_delegation_map.insert("A".into(), Uint128::new(30000));
+
+    correct_validator_delegation_map.insert("A".into(), Uint128::new(80000));
+    correct_validator_delegation_map.insert("B".into(), Uint128::new(20000));
+
+    let (surplus, deficit) = utils::get_surplus_deficit_validators(
+        validator_delegation_map,
+        correct_validator_delegation_map,
+    );
+
+    let denom = "muno".to_string();
+    let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
+    println!("\nmsgs: {:?}", msgs);
 }

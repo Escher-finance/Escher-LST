@@ -330,7 +330,6 @@ pub fn get_restaking_msgs(
                     break;
                 }
 
-                println!("{:?} <> {:?}", surplus_validator, deficient_validator);
                 // the deficit amount higher than surplus amount so we can restake all surplus amount
                 let undelegate_msg = CosmosMsg::Staking(StakingMsg::Redelegate {
                     src_validator: surplus_validator.address.clone(),
