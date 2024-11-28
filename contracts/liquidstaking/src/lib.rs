@@ -9,6 +9,9 @@ pub mod query;
 pub mod relay;
 pub mod reply;
 pub mod state;
+
+#[cfg(test)]
+pub mod tests;
 pub mod token_factory_api;
 pub mod utils;
 
