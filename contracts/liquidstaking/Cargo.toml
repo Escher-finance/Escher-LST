@@ -6,6 +6,13 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[build]
+# remove this flag if you want to build contract for non union
+rustflags = ["--cfg", "union"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(union)'] }
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 
@@ -30,6 +37,7 @@ optimize = """docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
   cosmwasm/optimizer:0.16.0
 """
+
 
 [dependencies]
 cosmwasm-schema = "2.1.0"

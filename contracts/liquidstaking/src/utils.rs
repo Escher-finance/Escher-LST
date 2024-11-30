@@ -368,5 +368,3 @@ pub fn get_restaking_msgs(
 
     msgs
 }
-
-
