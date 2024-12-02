@@ -24,9 +24,20 @@ type InstantiateMsg struct {
 
 type ExecuteMsg_Reset struct{}
 
+type ExecuteMsg_Bond struct {
+	Staker *string `json:"staker"`
+	Amount *Coin   `json:"amount"`
+}
+
+type ExecuteMsg_SetParameters struct {
+	CW20Address *string `json:"cw20_address"`
+}
+
 // The messages to execute the Liquid Staking contract.
 type ExecuteMsg struct {
-	Reset *ExecuteMsg_Reset `json:"reset,omitempty"`
+	Reset         *ExecuteMsg_Reset         `json:"reset,omitempty"`
+	Bond          *ExecuteMsg_Bond          `json:"bond,omitempty"`
+	SetParameters *ExecuteMsg_SetParameters `json:"set_parameters,omitempty"`
 }
 
 type QueryMsg_Balance struct {
