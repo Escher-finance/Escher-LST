@@ -2,7 +2,7 @@ module github.com/Escher-finance/evm-union-liquid-staking/interchaintest
 
 go 1.22.5
 
-toolchain go1.23.2
+toolchain go1.23.3
 
 require (
 	cosmossdk.io/api v0.7.3

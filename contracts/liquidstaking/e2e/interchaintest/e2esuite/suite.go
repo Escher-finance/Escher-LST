@@ -20,8 +20,10 @@ import (
 type TestSuite struct {
 	suite.Suite
 
-	ChainA          *cosmos.CosmosChain
-	UserA           ibc.Wallet
+	ChainA *cosmos.CosmosChain
+	UserA  ibc.Wallet
+	UserB  ibc.Wallet
+
 	ChainAConnID    string
 	ChainAChannelID string
 	dockerClient    *dockerclient.Client
@@ -56,12 +58,13 @@ func (s *TestSuite) SetupSuite(ctx context.Context, chainSpecs []*interchaintest
 		SkipPathCreation: true,
 	}))
 
-
-	// Fund a user account on ChainA and ChainB
+	// Fund a user account on ChainA
 	userFunds := math.NewInt(10000000000)
 	users := interchaintest.GetAndFundTestUsers(t, ctx, t.Name(), userFunds, s.ChainA)
 	s.UserA = users[0]
 
+	s.UserB, err = s.ChainA.BuildWallet(ctx, "isak", "manual champion squirrel price purchase space evidence media absurd portion sick float")
+	s.Require().NoError(err)
 
 	err = testutil.WaitForBlocks(ctx, 2, s.ChainA)
 	s.Require().NoError(err)
