@@ -71,7 +71,7 @@ pub fn instantiate(
     };
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new())
+    Ok(Response::new().add_attribute("action", "instantiate"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -83,7 +83,7 @@ pub fn execute(
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     match msg {
         ExecuteMsg::Bond { staker, amount } => execute::bond(deps, env, info, staker, amount),
-        ExecuteMsg::Unbond { staker } => execute::unbond(deps, env, info, staker),
+        ExecuteMsg::Unbond { staker, amount } => execute::unbond(deps, env, info, staker, amount),
         ExecuteMsg::Transfer { amount, receiver } => {
             execute::transfer(deps, env, info, amount, receiver)
         }

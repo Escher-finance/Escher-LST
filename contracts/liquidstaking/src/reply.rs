@@ -21,9 +21,28 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
 
     match msg.id {
         MINT_TOKENS_REPLY_ID => on_mint_tokens(deps, env, msg),
+        MINT_CW20_TOKENS_REPLY_ID => on_mint_cw20_tokens(deps, env, msg),
         BOND_WITHDRAW_REWARD_REPLY_ID => on_bond_rewards(deps, env, msg),
         _ => Ok(Response::new()),
     }
+}
+
+fn on_mint_cw20_tokens(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+    let params: Parameters = PARAMETERS.load(deps.storage)?;
+    let payload: MintTokensPayload = from_json(msg.payload)?;
+
+    let staker_balance = deps.querier.query_balance(
+        payload.staker.to_string(),
+        params.liquidstaking_denom.clone(),
+    )?;
+
+    let res: Response = Response::new()
+        .add_attribute("action", "mint_cw20")
+        .add_attribute("receiver", payload.staker.to_string())
+        .add_attribute("amount", payload.amount.to_string())
+        .add_attribute("denom", params.liquidstaking_denom)
+        .add_attribute("staked_token_balance", staker_balance.amount.to_string());
+    Ok(res)
 }
 
 fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {

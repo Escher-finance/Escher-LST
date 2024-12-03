@@ -11,7 +11,7 @@ use crate::state::{
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
-    calculate_undelegate_amount, get_mock_total_reward,
+    get_mock_total_reward,
 };
 use crate::ContractError;
 use cosmwasm_std::testing::{message_info, mock_dependencies_with_balance, mock_env, MockApi};
@@ -165,7 +165,9 @@ fn proper_instantiation() {
 
     let env = mock_env();
     let res = set_up(deps.as_mut(), env, vec![val1]);
-    assert_eq!(res.unwrap().messages.len(), 0);
+    let response = res.unwrap();
+    assert_eq!(response.clone().messages.len(), 0);
+    println!("res.unwrap(): {:?}", response);
 }
 
 #[test]
@@ -375,11 +377,11 @@ fn test_unbond_record() {
 
 #[test]
 fn undelegate_amount_calculation() {
-    let native_token_amount = Uint128::new(1100);
-    let delegated_amount = Uint128::new(1000);
+    let staking_token_amount = Uint128::new(1000);
     let total_bonded_amount = Uint128::new(1100);
 
-    let token =
-        calculate_undelegate_amount(native_token_amount, delegated_amount, total_bonded_amount);
+    let current_exchange_rate = Decimal::from_ratio(total_bonded_amount, staking_token_amount);
+    let unbond_amount = Uint128::new(500);
+    let token = calculate_native_token_from_staking_token(unbond_amount, current_exchange_rate);
     println!("calculate_undelegate_amount: {:?}", token);
 }

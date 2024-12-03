@@ -192,6 +192,7 @@ pub fn bond(
         // Start to mint according to staked token
         let sub_msg: SubMsg<TokenFactoryMsg> = get_staked_token_submsg(
             delegator.to_string(),
+            the_staker.to_string(),
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,
@@ -219,6 +220,7 @@ pub fn bond(
 #[cfg(union)]
 fn get_staked_token_submsg(
     delegator: String,
+    staker: String,
     mint_amount: Uint128,
     liquidstaking_denom: String,
     payload_bin: Binary,
@@ -238,14 +240,15 @@ fn get_staked_token_submsg(
 
 #[cfg(not(union))]
 fn get_staked_token_submsg(
-    delegator: String,
+    _delegator: String,
+    staker: String,
     mint_amount: Uint128,
     _liquidstaking_denom: String,
     payload_bin: Binary,
     params: Parameters,
 ) -> SubMsg<TokenFactoryMsg> {
     let mint = cw20::Cw20ExecuteMsg::Mint {
-        recipient: delegator,
+        recipient: staker,
         amount: mint_amount,
     };
     let mint_bin = to_json_binary(&mint).unwrap();
@@ -261,11 +264,42 @@ fn get_staked_token_submsg(
     sub_msg
 }
 
+#[cfg(union)]
+fn burn_token(
+    delegator: String,
+    amount: Uint128,
+    liquidstaking_denom: String,
+    cw20_address: Option<Addr>,
+) -> CosmosMsg<TokenFactoryMsg> {
+    let burn_msg = utils::get_burn_msg(liquidstaking_denom.clone(), amount, delegator.to_string());
+    let msg: CosmosMsg<TokenFactoryMsg> = burn_msg.into();
+    msg
+}
+
+#[cfg(not(union))]
+fn burn_token(
+    _delegator: String,
+    amount: Uint128,
+    _liquidstaking_denom: String,
+    cw20_address: Option<Addr>,
+) -> CosmosMsg<TokenFactoryMsg> {
+    let execute_burn = cw20::Cw20ExecuteMsg::Burn { amount };
+    let burn_bin = to_json_binary(&execute_burn).unwrap();
+    let burn_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: cw20_address.unwrap().to_string(),
+        msg: burn_bin,
+        funds: vec![],
+    });
+    let msg: CosmosMsg<TokenFactoryMsg> = burn_msg.into();
+    msg
+}
+
 pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     staker: Option<String>,
+    amount: Option<Uint128>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -274,19 +308,24 @@ pub fn unbond(
     let sender = info.sender.to_string();
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
 
-    // coin must have be sent along with transaction and it should be in liquid staking coin denom
-    if info.funds.len() > 1usize {
-        return Err(ContractError::InvalidAsset {});
+    let unbond_amount: Uint128;
+    if cfg!(union) {
+        // coin must have be sent along with transaction and it should be in liquid staking coin denom
+        if info.funds.len() > 1usize {
+            return Err(ContractError::InvalidAsset {});
+        }
+
+        // coin must have be sent along with transaction and it should be in liquid staking coin denom
+        let payment = info
+            .funds
+            .iter()
+            .find(|x| x.denom == liquidstaking_denom && x.amount > Uint128::zero())
+            .ok_or_else(|| ContractError::NoAsset {})?;
+
+        unbond_amount = payment.amount;
+    } else {
+        unbond_amount = amount.unwrap();
     }
-
-    // coin must have be sent along with transaction and it should be in liquid staking coin denom
-    let payment = info
-        .funds
-        .iter()
-        .find(|x| x.denom == liquidstaking_denom && x.amount > Uint128::zero())
-        .ok_or_else(|| ContractError::NoAsset {})?;
-
-    let unbond_amount = payment.amount;
 
     let validators_list: Vec<String> = validators_reg
         .validators
@@ -320,7 +359,7 @@ pub fn unbond(
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
     let undelegate_amount: Uint128 =
-        calculate_native_token_from_staking_token(payment.amount.clone(), current_exchange_rate);
+        calculate_native_token_from_staking_token(unbond_amount.clone(), current_exchange_rate);
 
     let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
 
@@ -335,10 +374,11 @@ pub fn unbond(
     );
     msgs.extend(undelegate_msgs);
 
-    let burn_msg = utils::get_burn_msg(
-        liquidstaking_denom.clone(),
-        unbond_amount,
+    let burn_msg = burn_token(
         delegator.to_string(),
+        unbond_amount,
+        liquidstaking_denom.clone(),
+        params.cw20_address,
     );
     msgs.push(burn_msg.into());
 
