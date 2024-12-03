@@ -29,6 +29,11 @@ type ExecuteMsg_Bond struct {
 	Amount *Coin   `json:"amount"`
 }
 
+type ExecuteMsg_Unbond struct {
+	Staker *string  `json:"staker"`
+	Amount *Uint128 `json:"amount"`
+}
+
 type ExecuteMsg_SetParameters struct {
 	CW20Address *string `json:"cw20_address"`
 }
@@ -37,21 +42,17 @@ type ExecuteMsg_SetParameters struct {
 type ExecuteMsg struct {
 	Reset         *ExecuteMsg_Reset         `json:"reset,omitempty"`
 	Bond          *ExecuteMsg_Bond          `json:"bond,omitempty"`
+	Unbond        *ExecuteMsg_Unbond        `json:"unbond,omitempty"`
 	SetParameters *ExecuteMsg_SetParameters `json:"set_parameters,omitempty"`
 }
 
-type QueryMsg_Balance struct {
-	Amount      uint64 `json:"amount,omitempty"`
-	LastUpdated uint64 `json:"last_updated,omitempty"`
-}
-
 type QueryMsg_Parameters struct{}
+type QueryMsg_State struct{}
 
 // The messages to query the Liquid Staking contract.
 type QueryMsg struct {
-	// Balances returns the latest balances
-	Balance    *QueryMsg_Balance    `json:"balance,omitempty"`
-	Parameters *QueryMsg_Parameters `json:"parameters"`
+	Parameters *QueryMsg_Parameters `json:"parameters,omitempty"`
+	State      *QueryMsg_State      `json:"state,omitempty"`
 }
 
 // ParametersResponse return parameters
@@ -64,6 +65,15 @@ type ParametersResponse struct {
 	RevenueReceiver     string  `json:"revenue_receiver"`
 	UnbondingTime       uint64  `json:"unbonding_time"`
 	Cw20Address         *string `json:"cw20_address,omitempty"`
+}
+
+type State struct {
+	ExchangeRate         string `json:"exchange_rate"`
+	TotalBondAmount      string `json:"total_bond_amount"`
+	TotalDelegatedAmount string `json:"total_delegated_amount"`
+	TotalLstSupply       string `json:"total_lst_supply"`
+	BondCounter          uint64 `json:"bond_counter"`
+	LastBondTime         uint64 `json:"last_bond_time"`
 }
 
 type WeightedVoteOption struct {
@@ -83,14 +93,6 @@ Use `from` to create instances of this and `u64` to get the value out:
 let b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```
 */
 type Uint64 string
-
-// State is the state of the IBC application's channel. This application only supports one channel.
-type State struct {
-	// The IBC channel, as defined by cosmwasm.
-	Channel IbcChannel `json:"channel"`
-	// The status of the channel.
-	ChannelStatus Status `json:"channel_status"`
-}
 
 // Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)
 type Expiration struct {

@@ -52,23 +52,28 @@ func (s *ContractTestSuite) SetupContractTestSuite(ctx context.Context) {
 	codeId, err := s.ChainA.StoreContract(ctx, s.UserA.KeyName(), "../../artifacts/evm_union_liquid_staking.wasm")
 	s.Require().NoError(err)
 
-	validator, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
+	validator1, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
+	validator2, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
 
 	val1 := liquidstaking.Validator{
-		Address: &validator,
+		Address: &validator1,
 		Weight:  1,
 	}
 
-	validators := []liquidstaking.Validator{val1}
+	val2 := liquidstaking.Validator{
+		Address: &validator2,
+		Weight:  1,
+	}
+
+	validators := []liquidstaking.Validator{val1, val2}
 
 	nativeDenom := s.ChainA.Config().Denom
-	lstDenom := "sttoken"
+	lstDenom := "lmuno"
 
 	revenueReceiver := s.UserB.FormattedAddress()
 
 	ucs01Channel := "abc"
 	ucs01RelayContract := "def"
-	//cw20address := "123"
 
 	// Instantiate the contract with channel:
 	instantiateMsg := liquidstaking.InstantiateMsg{
@@ -82,7 +87,7 @@ func (s *ContractTestSuite) SetupContractTestSuite(ctx context.Context) {
 		Validators:          validators,
 	}
 
-	s.Contract, err = types.Instantiate[liquidstaking.InstantiateMsg, liquidstaking.ExecuteMsg, liquidstaking.QueryMsg](ctx, s.UserA.KeyName(), codeId, s.ChainA, instantiateMsg, "--gas", "500000")
+	s.Contract, err = types.Instantiate[liquidstaking.InstantiateMsg, liquidstaking.ExecuteMsg, liquidstaking.QueryMsg](ctx, s.UserA.KeyName(), codeId, s.ChainA, instantiateMsg, "--gas", "auto")
 	s.Require().NoError(err)
 
 	minter := cw20.MinterResponse{
@@ -90,29 +95,27 @@ func (s *ContractTestSuite) SetupContractTestSuite(ctx context.Context) {
 	}
 
 	coin := cw20.Cw20Coin{
-		Amount:  "100000000000000000000000",
+		Amount:  "1000000000000",
 		Address: s.UserA.FormattedAddress(),
 	}
 	initialBalances := []cw20.Cw20Coin{coin}
 	cw20InstantiateMsg := cw20.InstantiateMsg{
 		Name:            "lMuno",
 		Symbol:          "lmuno",
-		Decimals:        18,
+		Decimals:        6,
 		InitialBalances: initialBalances,
 		Mint:            &minter,
 	}
 
-	s.Cw20Contract, err = types.Instantiate[cw20.InstantiateMsg, cw20.ExecuteMsg, cw20.QueryMsg](ctx, s.UserA.KeyName(), lstCodeId, s.ChainA, cw20InstantiateMsg, "--gas", "500000")
+	s.Cw20Contract, err = types.Instantiate[cw20.InstantiateMsg, cw20.ExecuteMsg, cw20.QueryMsg](ctx, s.UserA.KeyName(), lstCodeId, s.ChainA, cw20InstantiateMsg, "--gas", "auto")
 	s.Require().NoError(err)
 
 	cw20Address := s.Cw20Contract.Address
 
 	setParameters := liquidstaking.ExecuteMsg_SetParameters{CW20Address: &cw20Address}
 	executeMsg := liquidstaking.ExecuteMsg{SetParameters: &setParameters}
-	resp, err := s.Contract.Execute(ctx, s.UserA.KeyName(), executeMsg, "--gas", "auto")
+	_, err = s.Contract.Execute(ctx, s.UserA.KeyName(), executeMsg, "--gas", "auto")
 	s.Require().NoError(err)
-
-	s.Logger.Info(fmt.Sprintf("resp %+v\n", resp))
 }
 
 func TestWithContractTestSuite(t *testing.T) {
@@ -148,11 +151,70 @@ func (s *ContractTestSuite) ContractBondTest() {
 
 		s.Logger.Info(fmt.Sprintf("liquid staking params %+v\n", parameters))
 
-		executeMsg := liquidstaking.ExecuteMsg{Bond: &liquidstaking.ExecuteMsg_Bond{}}
-		resp, err := s.Contract.Execute(ctx, s.UserA.KeyName(), executeMsg, "--amount", "1000000000token", "--gas", "auto")
+		var balance cw20.BalanceResponse
+		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.UserA.FormattedAddress()}}, &balance)
 		s.Require().NoError(err)
-		s.Logger.Info(fmt.Sprintf("resp %+v\n", resp))
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Before staking ::: User A balance %s: %s lmuno", s.UserA.FormattedAddress(), balance))
 
+		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.UserB.FormattedAddress()}}, &balance)
+		s.Require().NoError(err)
+
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Before staking ::: User B balance %s: %s lmuno", s.UserB.FormattedAddress(), balance))
+
+		executeMsg := liquidstaking.ExecuteMsg{Bond: &liquidstaking.ExecuteMsg_Bond{}}
+		_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--amount", "1000000token", "--gas", "auto")
+		s.Require().NoError(err)
+
+		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.UserB.FormattedAddress()}}, &balance)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> After staking ::: User B balance %s: %s lmuno", s.UserB.FormattedAddress(), balance))
+
+		var state liquidstaking.State
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
+
+		_, err = s.Contract.Execute(ctx, s.UserC.KeyName(), executeMsg, "--amount", "500000token", "--gas", "auto")
+		s.Require().NoError(err)
+
+		_, err = s.Contract.Execute(ctx, s.UserD.KeyName(), executeMsg, "--amount", "200000token", "--gas", "auto")
+		s.Require().NoError(err)
+
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
+
+	})
+
+	s.Run("TestUnbond", func() {
+		s.Logger.Info("TestUnbondBond")
+		var unbond_amount liquidstaking.Uint128 = "500000"
+
+		var state liquidstaking.State
+		err := s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
+
+		cw20ExecuteMsg := cw20.ExecuteMsg{Transfer: &cw20.ExecuteMsg_Transfer{Amount: unbond_amount, Recipient: s.Contract.Address}}
+		_, err = s.Cw20Contract.Execute(ctx, s.UserB.KeyName(), cw20ExecuteMsg, "--gas", "auto")
+		s.Require().NoError(err)
+
+		var balance cw20.BalanceResponse
+		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.Contract.Address}}, &balance)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Before unbond ::: Contract %s: %s lmuno", s.Contract.Address, balance))
+
+		executeMsg := liquidstaking.ExecuteMsg{Unbond: &liquidstaking.ExecuteMsg_Unbond{Amount: &unbond_amount}}
+		_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--gas", "auto")
+		s.Require().NoError(err)
+
+		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.Contract.Address}}, &balance)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> After unbond ::: Contract %s: %s lmuno", s.Contract.Address, balance))
+
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
 	})
 
 }

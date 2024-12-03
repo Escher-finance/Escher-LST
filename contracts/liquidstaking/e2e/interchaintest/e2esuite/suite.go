@@ -23,6 +23,8 @@ type TestSuite struct {
 	ChainA *cosmos.CosmosChain
 	UserA  ibc.Wallet
 	UserB  ibc.Wallet
+	UserC  ibc.Wallet
+	UserD  ibc.Wallet
 
 	ChainAConnID    string
 	ChainAChannelID string
@@ -59,11 +61,22 @@ func (s *TestSuite) SetupSuite(ctx context.Context, chainSpecs []*interchaintest
 	}))
 
 	// Fund a user account on ChainA
-	userFunds := math.NewInt(10000000000)
+	userFunds := math.NewInt(100_000_000)
 	users := interchaintest.GetAndFundTestUsers(t, ctx, t.Name(), userFunds, s.ChainA)
 	s.UserA = users[0]
 
-	s.UserB, err = s.ChainA.BuildWallet(ctx, "isak", "manual champion squirrel price purchase space evidence media absurd portion sick float")
+	mnemonicB := "manual champion squirrel price purchase space evidence media absurd portion sick float"
+	s.UserB, err = interchaintest.GetAndFundTestUserWithMnemonic(ctx, t.Name(), mnemonicB, userFunds, s.ChainA)
+	s.Require().NoError(err)
+
+	userCFunds := math.NewInt(1_000_000)
+	mnemonicC := "between swallow already bean morning peasant half damage display win brick grunt immense lizard poem visa move fence other drip power siege diary ahead"
+	s.UserC, err = interchaintest.GetAndFundTestUserWithMnemonic(ctx, t.Name(), mnemonicC, userCFunds, s.ChainA)
+	s.Require().NoError(err)
+
+	userDFunds := math.NewInt(100_000_000)
+	mnemonicD := "always join mean salon bachelor circle truck silk base deal inquiry solar"
+	s.UserD, err = interchaintest.GetAndFundTestUserWithMnemonic(ctx, t.Name(), mnemonicD, userDFunds, s.ChainA)
 	s.Require().NoError(err)
 
 	err = testutil.WaitForBlocks(ctx, 2, s.ChainA)

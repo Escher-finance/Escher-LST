@@ -7,9 +7,18 @@ import (
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
 )
 
+func create(x int64) *int64 {
+	return &x
+}
+
+func createInt(x int) *int {
+	return &x
+}
+
 var DefaultChainSpecs = []*interchaintest.ChainSpec{
 	// -- WASMD --
 	{
+		NumValidators: createInt(3),
 		ChainConfig: ibc.ChainConfig{
 			Type:    "cosmos",
 			Name:    "wasmd",
@@ -24,6 +33,7 @@ var DefaultChainSpecs = []*interchaintest.ChainSpec{
 			Bin:            "wasmd",
 			Bech32Prefix:   "wasm",
 			Denom:          "token",
+			CoinDecimals:   create(6),
 			GasPrices:      "0.01token",
 			GasAdjustment:  1.3,
 			EncodingConfig: e2esuite.EncodingConfig(),

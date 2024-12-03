@@ -8,7 +8,7 @@ edition = "2021"
 
 [build]
 # remove this flag if you want to build contract for non union
-rustflags = ["--cfg", "union"]
+# rustflags = ["--cfg", "union"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(union)'] }
@@ -42,7 +42,7 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 [dependencies]
 cosmwasm-schema = "2.1.0"
 cosmwasm-std = { version = "2.1.0", features = [
-  "staking", 
+  "staking",
   "stargate",
   "cosmwasm_1_4",
   "cosmwasm_2_0",
@@ -57,6 +57,4 @@ semver = "1.0"
 cw20 = "2.0.0"
 
 [dev-dependencies]
-cw-multi-test = { version = "2.2.0", features = [
-  "staking"
-] }
+cw-multi-test = { version = "2.2.0", features = ["staking"] }

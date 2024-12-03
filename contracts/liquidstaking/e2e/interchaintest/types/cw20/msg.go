@@ -1,5 +1,7 @@
 package cw20
 
+import "github.com/Escher-finance/evm-union-liquid-staking/interchaintest/types/liquidstaking"
+
 type Url string
 
 type Embedded string
@@ -38,7 +40,24 @@ type Cw20Coin struct {
 	Address string `json:"address"`
 }
 
-// The messages to execute the Liquid Staking contract.
-type ExecuteMsg struct{}
+type ExecuteMsg_Transfer struct {
+	Recipient string                `json:"recipient"`
+	Amount    liquidstaking.Uint128 `json:"amount"`
+}
 
-type QueryMsg struct{}
+// The messages to execute the Liquid Staking contract.
+type ExecuteMsg struct {
+	Transfer *ExecuteMsg_Transfer `json:"transfer,omitempty"`
+}
+
+type QueryMsg_Balance struct {
+	Address string `json:"address"`
+}
+
+type QueryMsg struct {
+	Balance *QueryMsg_Balance `json:"balance,omitempty"`
+}
+
+type BalanceResponse struct {
+	Balance string `json:"balance"`
+}
