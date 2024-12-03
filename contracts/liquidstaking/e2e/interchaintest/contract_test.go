@@ -169,20 +169,20 @@ func (s *ContractTestSuite) ContractBondTest() {
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> After staking ::: User B balance %s: %s lmuno", s.UserB.FormattedAddress(), balance))
 
-		var state liquidstaking.State
-		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
-		s.Require().NoError(err)
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
+		// var state liquidstaking.State
+		// err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
+		// s.Require().NoError(err)
+		// s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
 
-		_, err = s.Contract.Execute(ctx, s.UserC.KeyName(), executeMsg, "--amount", "500000token", "--gas", "auto")
-		s.Require().NoError(err)
+		// _, err = s.Contract.Execute(ctx, s.UserC.KeyName(), executeMsg, "--amount", "500000token", "--gas", "auto")
+		// s.Require().NoError(err)
 
-		_, err = s.Contract.Execute(ctx, s.UserD.KeyName(), executeMsg, "--amount", "200000token", "--gas", "auto")
-		s.Require().NoError(err)
+		// _, err = s.Contract.Execute(ctx, s.UserD.KeyName(), executeMsg, "--amount", "200000token", "--gas", "auto")
+		// s.Require().NoError(err)
 
-		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
-		s.Require().NoError(err)
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
+		// err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
+		// s.Require().NoError(err)
+		// s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
 
 	})
 
@@ -215,6 +215,14 @@ func (s *ContractTestSuite) ContractBondTest() {
 		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
+
+		userB := s.UserB.FormattedAddress()
+
+		var unbondRecords []liquidstaking.UnbondRecord
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{UnbondRecord: &liquidstaking.QueryMsg_UnbondRecord{Staker: &userB}}, &unbondRecords)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondRecords:  %+v", unbondRecords))
+
 	})
 
 }

@@ -49,10 +49,17 @@ type ExecuteMsg struct {
 type QueryMsg_Parameters struct{}
 type QueryMsg_State struct{}
 
+type QueryMsg_UnbondRecord struct {
+	Staker   *string `json:"staker,omitempty"`
+	Sender   *string `json:"sender,omitempty"`
+	Released *bool   `json:"released,omitempty"`
+}
+
 // The messages to query the Liquid Staking contract.
 type QueryMsg struct {
-	Parameters *QueryMsg_Parameters `json:"parameters,omitempty"`
-	State      *QueryMsg_State      `json:"state,omitempty"`
+	Parameters   *QueryMsg_Parameters   `json:"parameters,omitempty"`
+	State        *QueryMsg_State        `json:"state,omitempty"`
+	UnbondRecord *QueryMsg_UnbondRecord `json:"unbond_record,omitempty"`
 }
 
 // ParametersResponse return parameters
@@ -74,6 +81,26 @@ type State struct {
 	TotalLstSupply       string `json:"total_lst_supply"`
 	BondCounter          uint64 `json:"bond_counter"`
 	LastBondTime         uint64 `json:"last_bond_time"`
+}
+
+type UndelegationRecord struct {
+	Amount    Uint128   `json:"amount"`
+	Validator Validator `json:"validator"`
+}
+
+type UnbondRecord struct {
+	Id                uint64               `json:"id"`
+	Height            uint64               `json:"height"`
+	Sender            string               `json:"sender"`
+	Staker            string               `json:"staker"`
+	Amount            Coin                 `json:"amount"`
+	Undelegate_amount Coin                 `json:"undelegate_amount"`
+	Exchange_rate     Decimal              `json:"exchange_rate"`
+	Undelegations     []UndelegationRecord `json:"undelegations"`
+	Created           string               `json:"created"`
+	Completion        string               `json:"completion"`
+	Released          bool                 `json:"released"`
+	Released_time     string               `json:"released_time"`
 }
 
 type WeightedVoteOption struct {
