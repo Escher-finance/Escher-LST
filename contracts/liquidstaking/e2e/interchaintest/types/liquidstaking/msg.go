@@ -46,8 +46,9 @@ type ExecuteMsg struct {
 	SetParameters *ExecuteMsg_SetParameters `json:"set_parameters,omitempty"`
 }
 
-type QueryMsg_Parameters struct{}
-type QueryMsg_State struct{}
+type ValidatorsRegistry struct {
+	Validators []Validator `json:"validators"`
+}
 
 type QueryMsg_UnbondRecord struct {
 	Staker   *string `json:"staker,omitempty"`
@@ -55,11 +56,16 @@ type QueryMsg_UnbondRecord struct {
 	Released *bool   `json:"released,omitempty"`
 }
 
+type QueryMsg_Parameters struct{}
+type QueryMsg_State struct{}
+type QueryMsg_Validators struct{}
+
 // The messages to query the Liquid Staking contract.
 type QueryMsg struct {
 	Parameters   *QueryMsg_Parameters   `json:"parameters,omitempty"`
 	State        *QueryMsg_State        `json:"state,omitempty"`
 	UnbondRecord *QueryMsg_UnbondRecord `json:"unbond_record,omitempty"`
+	Validators   *QueryMsg_Validators   `json:"validators,omitempty"`
 }
 
 // ParametersResponse return parameters

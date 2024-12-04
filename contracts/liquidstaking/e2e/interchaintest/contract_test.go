@@ -53,7 +53,7 @@ func (s *ContractTestSuite) SetupContractTestSuite(ctx context.Context) {
 	s.Require().NoError(err)
 
 	validator1, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
-	validator2, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
+	validator2, err := s.ChainA.Validators[1].KeyBech32(ctx, "validator", "val")
 
 	val1 := liquidstaking.Validator{
 		Address: &validator1,
@@ -145,16 +145,22 @@ func (s *ContractTestSuite) ContractBondTest() {
 		str := string(stdout)
 		s.Logger.Info(fmt.Sprintf("staking params %s\n", str))
 
-		var parameters liquidstaking.ParametersResponse
-		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{Parameters: &liquidstaking.QueryMsg_Parameters{}}, &parameters)
+		// var parameters liquidstaking.ParametersResponse
+		// err = s.Contract.Query(ctx, liquidstaking.QueryMsg{Parameters: &liquidstaking.QueryMsg_Parameters{}}, &parameters)
+		// s.Require().NoError(err)
+
+		// s.Logger.Info(fmt.Sprintf("liquid staking params %+v\n", parameters))
+
+		var validators liquidstaking.ValidatorsRegistry
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{Validators: &liquidstaking.QueryMsg_Validators{}}, &validators)
 		s.Require().NoError(err)
 
-		s.Logger.Info(fmt.Sprintf("liquid staking params %+v\n", parameters))
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> VALIDATORS >>>>>>>>>>>>> %v", validators))
 
 		var balance cw20.BalanceResponse
-		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.UserA.FormattedAddress()}}, &balance)
-		s.Require().NoError(err)
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Before staking ::: User A balance %s: %s lmuno", s.UserA.FormattedAddress(), balance))
+		// err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.UserA.FormattedAddress()}}, &balance)
+		// s.Require().NoError(err)
+		// s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Before staking ::: User A balance %s: %s lmuno", s.UserA.FormattedAddress(), balance))
 
 		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.UserB.FormattedAddress()}}, &balance)
 		s.Require().NoError(err)
@@ -165,9 +171,16 @@ func (s *ContractTestSuite) ContractBondTest() {
 		_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--amount", "1000000token", "--gas", "auto")
 		s.Require().NoError(err)
 
+		//s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Bond Response From User B %s: %+v", s.UserB.FormattedAddress(), resp))
+
 		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.UserB.FormattedAddress()}}, &balance)
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> After staking ::: User B balance %s: %s lmuno", s.UserB.FormattedAddress(), balance))
+
+		// ensure there are staking delegation appears
+		delegations, err := s.ChainA.StakingQueryDelegations(ctx, s.Contract.Address)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Delegations From User B %s: %+v", s.UserB.FormattedAddress(), delegations))
 
 		// var state liquidstaking.State
 		// err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
@@ -208,6 +221,23 @@ func (s *ContractTestSuite) ContractBondTest() {
 		_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--gas", "auto")
 		s.Require().NoError(err)
 
+		// ensure unbonding delegation appears
+		unbondings, err := s.ChainA.StakingQueryUnbondingDelegations(ctx, s.UserB.FormattedAddress())
+		s.Require().NoError(err)
+
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations:  %+v", unbondings))
+
+		validator1, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
+
+		unbondings, err = s.ChainA.StakingQueryUnbondingDelegationsFrom(ctx, validator1)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations from:  %s: %+v", validator1, unbondings))
+
+		validator2, err := s.ChainA.Validators[1].KeyBech32(ctx, "validator", "val")
+		unbondings, err = s.ChainA.StakingQueryUnbondingDelegationsFrom(ctx, validator2)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations from:  %s: %+v", validator2, unbondings))
+
 		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.Contract.Address}}, &balance)
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> After unbond ::: Contract %s: %s lmuno", s.Contract.Address, balance))
@@ -222,6 +252,11 @@ func (s *ContractTestSuite) ContractBondTest() {
 		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{UnbondRecord: &liquidstaking.QueryMsg_UnbondRecord{Staker: &userB}}, &unbondRecords)
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondRecords:  %+v", unbondRecords))
+
+		// ensure unbonding delegation appears
+		unbondings, err = s.ChainA.StakingQueryUnbondingDelegations(ctx, s.UserB.FormattedAddress())
+
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations:  %+v", unbondings))
 
 	})
 
