@@ -71,7 +71,7 @@ func (s *ContractTestSuite) SetupContractTestSuite(ctx context.Context) {
 	nativeDenom := s.ChainA.Config().Denom
 	lstDenom := "lmuno"
 
-	revenueReceiver := s.UserB.FormattedAddress()
+	revenueReceiver := s.UserA.FormattedAddress()
 
 	ucs01Channel := "abc"
 	ucs01RelayContract := "def"
@@ -82,9 +82,9 @@ func (s *ContractTestSuite) SetupContractTestSuite(ctx context.Context) {
 		LiquidstakingDenom:  lstDenom,
 		Ucs01Channel:        ucs01Channel,
 		Ucs01RelayContract:  ucs01RelayContract,
-		FeeRate:             "100000000000000000",
+		FeeRate:             "0.1",
 		RevenueReceiver:     revenueReceiver,
-		UnbondingTime:       4000,
+		UnbondingTime:       10000,
 		Validators:          validators,
 	}
 
@@ -173,7 +173,7 @@ func (s *ContractTestSuite) ContractBondTest() {
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Before staking ::: User B balance %s: %s lmuno", s.UserB.FormattedAddress(), balance))
 
 		executeMsg := liquidstaking.ExecuteMsg{Bond: &liquidstaking.ExecuteMsg_Bond{}}
-		_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--amount", "8000000000token", "--gas", "auto")
+		_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--amount", "800000000token", "--gas", "auto")
 		s.Require().NoError(err)
 
 		//s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Bond Response From User B %s: %+v", s.UserB.FormattedAddress(), resp))
@@ -229,8 +229,11 @@ func (s *ContractTestSuite) ContractBondTest() {
 		_, err = s.Contract.Execute(ctx, s.UserA.KeyName(), executeMsg, "--gas", "auto")
 		s.Require().NoError(err)
 
+		validator1, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
+		validator2, err := s.ChainA.Validators[1].KeyBech32(ctx, "validator", "val")
+		validators_addr := []string{validator1, validator2}
 		var bondAmount liquidstaking.TotalBond
-		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{TotalBondAmount: &liquidstaking.QueryMsg_TotalBondAmount{Delegator: s.Contract.Address, Denom: s.ChainA.Config().Denom}}, &bondAmount)
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{TotalBondAmount: &liquidstaking.QueryMsg_TotalBondAmount{Delegator: s.Contract.Address, Denom: s.ChainA.Config().Denom, Validators: validators_addr}}, &bondAmount)
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract TotalBondAmount:  %+v", bondAmount))
 
