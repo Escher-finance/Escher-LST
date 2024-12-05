@@ -12,7 +12,7 @@ use crate::state::{
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     self, calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
-    get_actual_total_bonded, get_actual_total_reward, get_mock_total_reward, to_uint128,
+    get_actual_total_delegated, get_actual_total_reward, get_mock_total_reward, to_uint128,
 };
 use cosmwasm_std::{
     attr, to_json_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, DecCoin, Decimal,
@@ -128,7 +128,7 @@ pub fn bond(
     // logic to mint token and update the supply and total_bond_amount
     let mut state = STATE.load(deps.storage)?;
     let total_bond_amount: Uint128;
-    let delegated_amount = get_actual_total_bonded(
+    let delegated_amount = get_actual_total_delegated(
         deps.querier,
         delegator.to_string(),
         coin_denom.clone(),
@@ -336,7 +336,7 @@ pub fn unbond(
     let mut state = STATE.load(deps.storage)?;
 
     let delegator = env.contract.address;
-    let delegated_amount = get_actual_total_bonded(
+    let delegated_amount = get_actual_total_delegated(
         deps.querier,
         delegator.to_string(),
         coin_denom.clone(),
@@ -770,7 +770,12 @@ pub fn process_unbonding(
     unbond_rec.released_time = env.block.time;
     unbond_record().save(deps.storage, unbond_rec.id, &unbond_rec)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_message(msg);
+    let res: Response<TokenFactoryMsg> = Response::new()
+    .add_message(msg)
+    .add_attribute("action", "transfer_unbonding")
+    .add_attribute("staker", unbond_rec.staker)
+    .add_attribute("amount", unbond_rec.undelegate_amount.amount)
+    .add_attribute("denom", unbond_rec.undelegate_amount.denom);
 
     Ok(res)
 }

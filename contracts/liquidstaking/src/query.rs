@@ -4,7 +4,7 @@ use crate::state::{
     Balance, Parameters, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
-use crate::utils::{get_actual_total_bonded, get_actual_total_reward};
+use crate::utils::{get_actual_total_delegated, get_actual_total_reward};
 use cosmwasm_std::{entry_point, to_json_binary, Order};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
 use cw_ownable::get_ownership;
@@ -59,7 +59,7 @@ pub fn query_total_staked_amount(
     coin_denom: String,
     validators_list: Vec<String>,
 ) -> StdResult<TotalBond> {
-    let delegated_amount = get_actual_total_bonded(
+    let delegated_amount = get_actual_total_delegated(
         deps.querier,
         delegator.to_string(),
         coin_denom.clone(),

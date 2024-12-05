@@ -29,7 +29,7 @@ pub fn calculate_native_token_from_staking_token(
 }
 
 /// get total delegated token value from validators in native token
-pub fn get_actual_total_bonded(
+pub fn get_actual_total_delegated(
     querier: QuerierWrapper,
     delegator: String,
     denom: String,
