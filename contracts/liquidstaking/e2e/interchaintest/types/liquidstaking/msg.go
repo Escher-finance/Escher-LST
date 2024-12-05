@@ -38,12 +38,20 @@ type ExecuteMsg_SetParameters struct {
 	CW20Address *string `json:"cw20_address"`
 }
 
+type ExecuteMsg_ProcessUnbonding struct {
+	Id uint64 `json:"id"`
+}
+
+type ExecuteMsg_ProcessRewards struct{}
+
 // The messages to execute the Liquid Staking contract.
 type ExecuteMsg struct {
-	Reset         *ExecuteMsg_Reset         `json:"reset,omitempty"`
-	Bond          *ExecuteMsg_Bond          `json:"bond,omitempty"`
-	Unbond        *ExecuteMsg_Unbond        `json:"unbond,omitempty"`
-	SetParameters *ExecuteMsg_SetParameters `json:"set_parameters,omitempty"`
+	ProcessRewards   *ExecuteMsg_ProcessRewards   `json:"process_rewards,omitempty"`
+	Reset            *ExecuteMsg_Reset            `json:"reset,omitempty"`
+	Bond             *ExecuteMsg_Bond             `json:"bond,omitempty"`
+	Unbond           *ExecuteMsg_Unbond           `json:"unbond,omitempty"`
+	SetParameters    *ExecuteMsg_SetParameters    `json:"set_parameters,omitempty"`
+	ProcessUnbonding *ExecuteMsg_ProcessUnbonding `json:"process_unbonding,omitempty"`
 }
 
 type ValidatorsRegistry struct {
@@ -60,12 +68,19 @@ type QueryMsg_Parameters struct{}
 type QueryMsg_State struct{}
 type QueryMsg_Validators struct{}
 
+type QueryMsg_TotalBondAmount struct {
+	Delegator  string   `json:"delegator,omitempty"`
+	Denom      string   `json:"denom,omitempty"`
+	Validators []string `json:"validators,omitempty"`
+}
+
 // The messages to query the Liquid Staking contract.
 type QueryMsg struct {
-	Parameters   *QueryMsg_Parameters   `json:"parameters,omitempty"`
-	State        *QueryMsg_State        `json:"state,omitempty"`
-	UnbondRecord *QueryMsg_UnbondRecord `json:"unbond_record,omitempty"`
-	Validators   *QueryMsg_Validators   `json:"validators,omitempty"`
+	Parameters      *QueryMsg_Parameters      `json:"parameters,omitempty"`
+	State           *QueryMsg_State           `json:"state,omitempty"`
+	UnbondRecord    *QueryMsg_UnbondRecord    `json:"unbond_record,omitempty"`
+	Validators      *QueryMsg_Validators      `json:"validators,omitempty"`
+	TotalBondAmount *QueryMsg_TotalBondAmount `json:"total_bond_amount,omitempty"`
 }
 
 // ParametersResponse return parameters
@@ -107,6 +122,12 @@ type UnbondRecord struct {
 	Completion        string               `json:"completion"`
 	Released          bool                 `json:"released"`
 	Released_time     string               `json:"released_time"`
+}
+
+type TotalBond struct {
+	Amount    Uint128 `json:"amount"`
+	Delegated Uint128 `json:"delegated"`
+	Reward    Uint128 `json:"reward"`
 }
 
 type WeightedVoteOption struct {

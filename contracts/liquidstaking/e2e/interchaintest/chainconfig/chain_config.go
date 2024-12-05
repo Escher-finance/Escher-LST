@@ -34,7 +34,7 @@ var DefaultChainSpecs = []*interchaintest.ChainSpec{
 			Bech32Prefix:   "wasm",
 			Denom:          "token",
 			CoinDecimals:   create(6),
-			GasPrices:      "0.01token",
+			GasPrices:      "0.0token",
 			GasAdjustment:  1.3,
 			EncodingConfig: e2esuite.EncodingConfig(),
 			TrustingPeriod: "508h",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -157,6 +158,10 @@ func (s *ContractTestSuite) ContractBondTest() {
 
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> VALIDATORS >>>>>>>>>>>>> %v", validators))
 
+		BBalance, err := s.ChainA.BankQueryAllBalances(ctx, s.UserB.FormattedAddress())
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf("::::::::::: User B balance initially : %+v token", BBalance))
+
 		var balance cw20.BalanceResponse
 		// err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.UserA.FormattedAddress()}}, &balance)
 		// s.Require().NoError(err)
@@ -168,7 +173,7 @@ func (s *ContractTestSuite) ContractBondTest() {
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Before staking ::: User B balance %s: %s lmuno", s.UserB.FormattedAddress(), balance))
 
 		executeMsg := liquidstaking.ExecuteMsg{Bond: &liquidstaking.ExecuteMsg_Bond{}}
-		_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--amount", "1000000token", "--gas", "auto")
+		_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--amount", "8000000000token", "--gas", "auto")
 		s.Require().NoError(err)
 
 		//s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Bond Response From User B %s: %+v", s.UserB.FormattedAddress(), resp))
@@ -177,10 +182,24 @@ func (s *ContractTestSuite) ContractBondTest() {
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> After staking ::: User B balance %s: %s lmuno", s.UserB.FormattedAddress(), balance))
 
+		BBalance, err = s.ChainA.BankQueryAllBalances(ctx, s.UserB.FormattedAddress())
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf("::::::::::: User B After staking : %+v token", BBalance))
+
 		// ensure there are staking delegation appears
 		delegations, err := s.ChainA.StakingQueryDelegations(ctx, s.Contract.Address)
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Delegations From User B %s: %+v", s.UserB.FormattedAddress(), delegations))
+
+		time.Sleep(20 * time.Second)
+		validator1, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
+		validator2, err := s.ChainA.Validators[1].KeyBech32(ctx, "validator", "val")
+		var bondAmount liquidstaking.TotalBond
+
+		validators_addr := []string{validator1, validator2}
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{TotalBondAmount: &liquidstaking.QueryMsg_TotalBondAmount{Delegator: s.Contract.Address, Denom: s.ChainA.Config().Denom, Validators: validators_addr}}, &bondAmount)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract TotalBondAmount:  %+v", bondAmount))
 
 		// var state liquidstaking.State
 		// err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
@@ -196,68 +215,107 @@ func (s *ContractTestSuite) ContractBondTest() {
 		// err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
 		// s.Require().NoError(err)
 		// s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
-
 	})
 
-	s.Run("TestUnbond", func() {
-		s.Logger.Info("TestUnbondBond")
-		var unbond_amount liquidstaking.Uint128 = "500000"
+	s.Run("TestProcessRewards", func() {
+		s.Logger.Info("TestProcessRewards")
 
 		var state liquidstaking.State
 		err := s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
 
-		cw20ExecuteMsg := cw20.ExecuteMsg{Transfer: &cw20.ExecuteMsg_Transfer{Amount: unbond_amount, Recipient: s.Contract.Address}}
-		_, err = s.Cw20Contract.Execute(ctx, s.UserB.KeyName(), cw20ExecuteMsg, "--gas", "auto")
+		executeMsg := liquidstaking.ExecuteMsg{ProcessRewards: &liquidstaking.ExecuteMsg_ProcessRewards{}}
+		_, err = s.Contract.Execute(ctx, s.UserA.KeyName(), executeMsg, "--gas", "auto")
 		s.Require().NoError(err)
 
-		var balance cw20.BalanceResponse
-		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.Contract.Address}}, &balance)
+		var bondAmount liquidstaking.TotalBond
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{TotalBondAmount: &liquidstaking.QueryMsg_TotalBondAmount{Delegator: s.Contract.Address, Denom: s.ChainA.Config().Denom}}, &bondAmount)
 		s.Require().NoError(err)
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Before unbond ::: Contract %s: %s lmuno", s.Contract.Address, balance))
-
-		executeMsg := liquidstaking.ExecuteMsg{Unbond: &liquidstaking.ExecuteMsg_Unbond{Amount: &unbond_amount}}
-		_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--gas", "auto")
-		s.Require().NoError(err)
-
-		// ensure unbonding delegation appears
-		unbondings, err := s.ChainA.StakingQueryUnbondingDelegations(ctx, s.UserB.FormattedAddress())
-		s.Require().NoError(err)
-
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations:  %+v", unbondings))
-
-		validator1, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
-
-		unbondings, err = s.ChainA.StakingQueryUnbondingDelegationsFrom(ctx, validator1)
-		s.Require().NoError(err)
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations from:  %s: %+v", validator1, unbondings))
-
-		validator2, err := s.ChainA.Validators[1].KeyBech32(ctx, "validator", "val")
-		unbondings, err = s.ChainA.StakingQueryUnbondingDelegationsFrom(ctx, validator2)
-		s.Require().NoError(err)
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations from:  %s: %+v", validator2, unbondings))
-
-		err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.Contract.Address}}, &balance)
-		s.Require().NoError(err)
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> After unbond ::: Contract %s: %s lmuno", s.Contract.Address, balance))
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract TotalBondAmount:  %+v", bondAmount))
 
 		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
 		s.Require().NoError(err)
 		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
-
-		userB := s.UserB.FormattedAddress()
-
-		var unbondRecords []liquidstaking.UnbondRecord
-		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{UnbondRecord: &liquidstaking.QueryMsg_UnbondRecord{Staker: &userB}}, &unbondRecords)
-		s.Require().NoError(err)
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondRecords:  %+v", unbondRecords))
-
-		// ensure unbonding delegation appears
-		unbondings, err = s.ChainA.StakingQueryUnbondingDelegations(ctx, s.UserB.FormattedAddress())
-
-		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations:  %+v", unbondings))
-
 	})
+
+	// s.Run("TestUnbond", func() {
+	// 	s.Logger.Info("TestUnbondBond")
+	// 	var unbond_amount liquidstaking.Uint128 = "500000"
+
+	// 	var state liquidstaking.State
+	// 	err := s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
+	// 	s.Require().NoError(err)
+	// 	s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
+
+	// 	cw20ExecuteMsg := cw20.ExecuteMsg{Transfer: &cw20.ExecuteMsg_Transfer{Amount: unbond_amount, Recipient: s.Contract.Address}}
+	// 	_, err = s.Cw20Contract.Execute(ctx, s.UserB.KeyName(), cw20ExecuteMsg, "--gas", "auto")
+	// 	s.Require().NoError(err)
+
+	// 	var balance cw20.BalanceResponse
+	// 	err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.Contract.Address}}, &balance)
+	// 	s.Require().NoError(err)
+	// 	s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Before unbond ::: Contract %s: %s lmuno", s.Contract.Address, balance))
+
+	// 	executeMsg := liquidstaking.ExecuteMsg{Unbond: &liquidstaking.ExecuteMsg_Unbond{Amount: &unbond_amount}}
+	// 	_, err = s.Contract.Execute(ctx, s.UserB.KeyName(), executeMsg, "--gas", "auto")
+	// 	s.Require().NoError(err)
+
+	// 	// ensure unbonding delegation appears
+	// 	unbondings, err := s.ChainA.StakingQueryUnbondingDelegations(ctx, s.Contract.Address)
+	// 	s.Require().NoError(err)
+
+	// 	s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations:  %+v", unbondings))
+
+	// 	err = s.Cw20Contract.Query(ctx, cw20.QueryMsg{Balance: &cw20.QueryMsg_Balance{Address: s.Contract.Address}}, &balance)
+	// 	s.Require().NoError(err)
+	// 	s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> After unbond ::: Contract %s: %s lmuno", s.Contract.Address, balance))
+
+	// 	err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
+	// 	s.Require().NoError(err)
+	// 	s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State:  %+v", state))
+
+	// 	userB := s.UserB.FormattedAddress()
+
+	// 	var unbondRecords []liquidstaking.UnbondRecord
+	// 	False := false
+	// 	err = s.Contract.Query(ctx, liquidstaking.QueryMsg{UnbondRecord: &liquidstaking.QueryMsg_UnbondRecord{Staker: &userB, Released: &False}}, &unbondRecords)
+	// 	s.Require().NoError(err)
+	// 	s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondRecords:  %+v", unbondRecords))
+
+	// 	// ensure unbonding delegation appears
+	// 	unbondings, err = s.ChainA.StakingQueryUnbondingDelegations(ctx, s.Contract.Address)
+	// 	s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations before sleep:  %+v", unbondings))
+
+	// 	s.Logger.Info("Sleep 10 secs")
+
+	// 	time.Sleep(10 * time.Second)
+
+	// 	s.Logger.Info("Check unbonding delegations again")
+
+	// 	// ensure unbonding delegation appears
+	// 	unbondings, err = s.ChainA.StakingQueryUnbondingDelegations(ctx, s.Contract.Address)
+	// 	s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondingDelegations:  %+v", unbondings))
+
+	// 	BBalances, err := s.ChainA.BankQueryAllBalances(ctx, s.UserB.FormattedAddress())
+	// 	s.Require().NoError(err)
+	// 	s.Logger.Info(fmt.Sprintf(":::::::::: User B balance before process unbonding : %+v", BBalances))
+
+	// 	executeMsg = liquidstaking.ExecuteMsg{ProcessUnbonding: &liquidstaking.ExecuteMsg_ProcessUnbonding{Id: 1}}
+	// 	_, err = s.Contract.Execute(ctx, s.UserA.KeyName(), executeMsg, "--gas", "auto")
+	// 	s.Require().NoError(err)
+	// 	//s.Logger.Info(fmt.Sprintf("::::::::::: Process Unbonding Response : %+v", res))
+
+	// 	err = testutil.WaitForBlocks(ctx, 3, s.ChainA)
+	// 	s.Require().NoError(err)
+
+	// 	BBalances, err = s.ChainA.BankQueryAllBalances(ctx, s.UserB.FormattedAddress())
+	// 	s.Require().NoError(err)
+	// 	s.Logger.Info(fmt.Sprintf("::::::::::: User B balance after process unbonding : %+v", BBalances))
+
+	// 	err = s.Contract.Query(ctx, liquidstaking.QueryMsg{UnbondRecord: &liquidstaking.QueryMsg_UnbondRecord{Staker: &userB}}, &unbondRecords)
+	// 	s.Require().NoError(err)
+	// 	s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> UnbondRecords:  %+v", unbondRecords))
+	// })
 
 }
