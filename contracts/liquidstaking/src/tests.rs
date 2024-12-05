@@ -167,7 +167,6 @@ fn proper_instantiation() {
     let res = set_up(deps.as_mut(), env, vec![val1]);
     let response = res.unwrap();
     assert_eq!(response.clone().messages.len(), 0);
-    println!("res.unwrap(): {:?}", response);
 }
 
 #[test]
@@ -198,7 +197,6 @@ fn execute_bond() {
         amount: None,
     };
     let res1 = app.execute_contract(owner.clone(), ls_contract_addr.clone(), &bond_msg, &[]);
-    println!("{:?}", res1);
     assert!(res1.is_err());
 
     let fund = Coin {
@@ -214,12 +212,12 @@ fn execute_bond() {
             &vec![fund],
         )
         .unwrap();
-    println!("{:?}", res2);
+    // println!("{:?}", res2);
 
     let msg = QueryMsg::State {};
     let res: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr.clone(), &msg);
     let state: State = res.unwrap();
-    println!("{:?}", state);
+    // println!("{:?}", state);
 
     let fund2 = Coin {
         amount: Uint128::new(1000),
@@ -234,11 +232,11 @@ fn execute_bond() {
             &vec![fund2],
         )
         .unwrap();
-    println!("{:?}", res3);
+    //println!("{:?}", res3);
 
     let res2: Result<State, StdError> = app.wrap().query_wasm_smart(ls_contract_addr, &msg);
     let state2: State = res2.unwrap();
-    println!("{:?}", state2);
+    //println!("{:?}", state2);
 }
 
 #[test]
@@ -303,7 +301,7 @@ fn test_unbond_record() {
     let _res = set_up(deps.as_mut(), env, vec![val]);
 
     let mut id = increment_tokens(&mut deps.storage).unwrap();
-    println!("{}", id);
+    //println!("{}", id);
 
     let staker = deps.api.addr_make("staker");
     let sender1 = deps.api.addr_make("sender1");
@@ -362,7 +360,7 @@ fn test_unbond_record() {
         .range(&deps.storage, None, None, Order::Ascending)
         .map(|n| n.unwrap().1)
         .collect::<Vec<_>>();
-    println!("{:?}", unbonded_list1);
+    //println!("{:?}", unbonded_list1);
 
     let unbonded_list2 = unbond_record()
         .idx
@@ -372,7 +370,7 @@ fn test_unbond_record() {
         .map(|n| n.unwrap().1)
         .collect::<Vec<_>>();
 
-    println!("{:?}", unbonded_list2);
+    //println!("{:?}", unbonded_list2);
 }
 
 #[test]
@@ -384,4 +382,18 @@ fn undelegate_amount_calculation() {
     let unbond_amount = Uint128::new(500);
     let token = calculate_native_token_from_staking_token(unbond_amount, current_exchange_rate);
     println!("calculate_undelegate_amount: {:?}", token);
+}
+
+#[test]
+fn split_revenue() {
+    use crate::utils;
+    let reward_amount = Uint128::new(251);
+    let fee_rate = Decimal::from_str("0.1").unwrap();
+
+
+    //check Decimal(100000000000000000)
+    println!("fee_rate: {:?}", fee_rate);
+    println!("{}", "Decimal(100000000000000000)");
+    let (restake, fee) = utils::split_revenue(reward_amount, fee_rate);
+    println!("split_revenue: {}, restake: {}, fee: {}", reward_amount, restake, fee);
 }

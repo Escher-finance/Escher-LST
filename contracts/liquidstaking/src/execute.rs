@@ -540,7 +540,7 @@ pub fn process_rewards(
 
         let mut payload = BondRewardsPayload {
             validator: validator.address.clone(),
-            amount: Uint128::new(0),
+            amount: Uint128::zero(),
         };
 
         if result.is_ok() {
@@ -556,20 +556,21 @@ pub fn process_rewards(
                 validator: validator.address.to_string(),
             });
 
-        let payload_bin = to_json_binary(&payload)?;
+            if payload.amount != Uint128::zero() {
+                let payload_bin = to_json_binary(&payload)?;
 
-        let sub_msg: SubMsg<TokenFactoryMsg> =
-            SubMsg::reply_always(withdraw_reward_msg, BOND_WITHDRAW_REWARD_REPLY_ID)
-                .with_payload(payload_bin)
-                .into();
-        sub_msgs.push(sub_msg);
-
-        attrs.push(attr("amount", payload.amount.to_string()));
+                let sub_msg: SubMsg<TokenFactoryMsg> =
+                    SubMsg::reply_always(withdraw_reward_msg, BOND_WITHDRAW_REWARD_REPLY_ID)
+                        .with_payload(payload_bin)
+                        .into();
+                sub_msgs.push(sub_msg);
+            }
+            attrs.push(attr("amount", payload.amount.to_string()));
     }
 
     let res: Response<TokenFactoryMsg> = Response::new()
-        .add_submessages(sub_msgs)
-        .add_attributes(attrs);
+        .add_attributes(attrs)
+        .add_submessages(sub_msgs);
 
     Ok(res)
 }
@@ -949,5 +950,5 @@ fn test_delegate_amount() {
     let ratio = Decimal::from_ratio(Uint128::from(weight), Uint128::from(total_weight));
     let amount = Uint128::from(10u32);
     let delegate_amount = utils::calculate_delegated_amount(amount, ratio);
-    println!("delegate_amount: {:?}", delegate_amount);
+    println!("delegate_amount: {}", delegate_amount);
 }

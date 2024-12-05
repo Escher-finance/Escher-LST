@@ -1,9 +1,10 @@
+
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::state::{Balance, Parameters, BALANCE, LOG, PARAMETERS};
 use crate::utils;
 use cosmwasm_std::{
-    entry_point, from_json, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StakingMsg,
+    entry_point, from_json, attr, Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StakingMsg,
     Uint128, WasmMsg,
 };
 pub const MINT_TOKENS_REPLY_ID: u64 = 123;
@@ -112,32 +113,49 @@ fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Con
     let params = PARAMETERS.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom;
     let payload: BondRewardsPayload = from_json(msg.payload)?;
+    let mut msgs: Vec<CosmosMsg> = vec![];
 
-    let (restake_amount, fee_amount) = utils::split_revenue(payload.amount, params.fee_rate);
-    let amount = Coin {
-        amount: restake_amount,
-        denom: coin_denom.to_string(),
-    };
-    // Redelegate
-    let staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Delegate {
-        validator: payload.validator.to_string(),
-        amount,
-    });
+    let mut attrs: Vec<Attribute> = vec![
+        attr("action", "restake_rewards"),
+        attr("validator", payload.validator.to_string()),
+        attr("fee_rate", format!("{:?}", params.fee_rate)),
+        attr("amount", payload.amount.to_string()),
+        attr("revenue_receiver", params.revenue_receiver.to_string())
+    ];
+    
+    if payload.amount != Uint128::zero() {
+        let (restake_amount, fee_amount) = utils::split_revenue(payload.amount, params.fee_rate);
+        let amount = Coin {
+            amount: restake_amount,
+            denom: coin_denom.to_string(),
+        };
+        // Redelegate
+        let staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: payload.validator.to_string(),
+            amount,
+        });
+    
+        let bank_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: params.revenue_receiver,
+            amount: vec![Coin {
+                amount: fee_amount,
+                denom: coin_denom.clone(),
+            }],
+        });
 
-    let bank_msg = CosmosMsg::Bank(BankMsg::Send {
-        to_address: params.revenue_receiver,
-        amount: vec![Coin {
-            amount: fee_amount,
-            denom: coin_denom.clone(),
-        }],
-    });
+        attrs.push(attr("restake_amount", restake_amount.to_string()));
+        attrs.push(attr("fee_amount", fee_amount.to_string()));
+        attrs.push(attr("validator", payload.validator.to_string()));
+
+        msgs.push(staking_msg);
+        msgs.push(bank_msg);
+    }
+    
     // Transfer fee to receiver
     let res: Response = Response::new()
-        .add_message(staking_msg)
-        .add_message(bank_msg)
-        .add_attribute("action", "stake_rewards")
-        .add_attribute("validator", payload.validator.to_string())
-        .add_attribute("amount", payload.amount.to_string());
+        .add_messages(msgs)
+        .add_attributes(attrs);
+        
     Ok(res)
 }
 
