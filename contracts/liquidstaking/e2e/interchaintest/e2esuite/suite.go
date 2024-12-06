@@ -7,13 +7,14 @@ import (
 	dockerclient "github.com/docker/docker/client"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
 
 	interchaintest "github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
 	"github.com/strangelove-ventures/interchaintest/v8/testreporter"
 	"github.com/strangelove-ventures/interchaintest/v8/testutil"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest"
 )
 
 // TestSuite is a suite of tests that require two chains and a relayer
@@ -31,6 +32,7 @@ type TestSuite struct {
 	dockerClient    *dockerclient.Client
 	network         string
 	Logger          *zap.Logger
+	FileLogger      *zap.Logger
 	ExecRep         *testreporter.RelayerExecReporter
 }
 
@@ -42,7 +44,26 @@ func (s *TestSuite) SetupSuite(ctx context.Context, chainSpecs []*interchaintest
 
 	t := s.T()
 
+	// Custom configuration
+	config := zap.Config{
+		Encoding:    "json",                                  // Output format (json or console)
+		Level:       zap.NewAtomicLevelAt(zapcore.InfoLevel), // Log level
+		OutputPaths: []string{"./logfile.log"},               // Output destinations
+		EncoderConfig: zapcore.EncoderConfig{
+			TimeKey:        "ts",                          // Key for the timestamp field
+			MessageKey:     "msg",                         // Key for the message field
+			StacktraceKey:  "stacktrace",                  // Key for the stacktrace field
+			LineEnding:     zapcore.DefaultLineEnding,     // Line ending character
+			EncodeLevel:    zapcore.LowercaseLevelEncoder, // Log level format
+			EncodeTime:     zapcore.ISO8601TimeEncoder,    // Timestamp format
+			EncodeDuration: zapcore.StringDurationEncoder, // Duration format
+			EncodeCaller:   zapcore.ShortCallerEncoder,    // Caller format
+		},
+	}
+
+	// Build the logger with the custom configuration
 	s.Logger = zaptest.NewLogger(t)
+	s.FileLogger, _ = config.Build()
 	s.dockerClient, s.network = interchaintest.DockerSetup(t)
 
 	cf := interchaintest.NewBuiltinChainFactory(s.Logger, chainSpecs)

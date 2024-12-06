@@ -4,7 +4,7 @@ package liquidstaking
 // Validator is the state of the IBC application's channel. This application only supports one channel.
 type Validator struct {
 	// The IBC channel, as defined by cosmwasm.
-	Address *string `json:"address"`
+	Address string `json:"address"`
 	// The status of the channel.
 	Weight uint64 `json:"weight"`
 }
@@ -68,19 +68,19 @@ type QueryMsg_Parameters struct{}
 type QueryMsg_State struct{}
 type QueryMsg_Validators struct{}
 
-type QueryMsg_TotalBondAmount struct {
-	Delegator  string   `json:"delegator,omitempty"`
-	Denom      string   `json:"denom,omitempty"`
-	Validators []string `json:"validators,omitempty"`
+type QueryMsg_StakingLiquidity struct {
+	Delegator  *string   `json:"delegator,omitempty"`
+	Denom      *string   `json:"denom,omitempty"`
+	Validators *[]string `json:"validators,omitempty"`
 }
 
 // The messages to query the Liquid Staking contract.
 type QueryMsg struct {
-	Parameters      *QueryMsg_Parameters      `json:"parameters,omitempty"`
-	State           *QueryMsg_State           `json:"state,omitempty"`
-	UnbondRecord    *QueryMsg_UnbondRecord    `json:"unbond_record,omitempty"`
-	Validators      *QueryMsg_Validators      `json:"validators,omitempty"`
-	TotalBondAmount *QueryMsg_TotalBondAmount `json:"total_bond_amount,omitempty"`
+	Parameters       *QueryMsg_Parameters       `json:"parameters,omitempty"`
+	State            *QueryMsg_State            `json:"state,omitempty"`
+	UnbondRecord     *QueryMsg_UnbondRecord     `json:"unbond_record,omitempty"`
+	Validators       *QueryMsg_Validators       `json:"validators,omitempty"`
+	StakingLiquidity *QueryMsg_StakingLiquidity `json:"staking_liquidity,omitempty"`
 }
 
 // ParametersResponse return parameters
@@ -124,10 +124,12 @@ type UnbondRecord struct {
 	Released_time     string               `json:"released_time"`
 }
 
-type TotalBond struct {
-	Amount    Uint128 `json:"amount"`
-	Delegated Uint128 `json:"delegated"`
-	Reward    Uint128 `json:"reward"`
+type StakingLiquidity struct {
+	Amount       Uint128   `json:"amount"`
+	Delegated    Uint128   `json:"delegated"`
+	Reward       Uint128   `json:"reward"`
+	ExchangeRate Uint128   `json:"exchange_rate"`
+	Time         Timestamp `json:"time"`
 }
 
 type WeightedVoteOption struct {
