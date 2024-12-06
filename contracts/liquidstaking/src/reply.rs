@@ -1,11 +1,10 @@
-
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::state::{Balance, Parameters, BALANCE, LOG, PARAMETERS};
 use crate::utils;
 use cosmwasm_std::{
-    entry_point, from_json, attr, Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StakingMsg,
-    Uint128, WasmMsg,
+    attr, entry_point, from_json, Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply,
+    Response, StakingMsg, Uint128, WasmMsg,
 };
 pub const MINT_TOKENS_REPLY_ID: u64 = 123;
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
@@ -120,9 +119,9 @@ fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Con
         attr("validator", payload.validator.to_string()),
         attr("fee_rate", format!("{:?}", params.fee_rate)),
         attr("amount", payload.amount.to_string()),
-        attr("revenue_receiver", params.revenue_receiver.to_string())
+        attr("revenue_receiver", params.revenue_receiver.to_string()),
     ];
-    
+
     if payload.amount != Uint128::zero() {
         let (restake_amount, fee_amount) = utils::split_revenue(payload.amount, params.fee_rate);
         let amount = Coin {
@@ -134,7 +133,7 @@ fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Con
             validator: payload.validator.to_string(),
             amount,
         });
-    
+
         let bank_msg = CosmosMsg::Bank(BankMsg::Send {
             to_address: params.revenue_receiver,
             amount: vec![Coin {
@@ -150,12 +149,10 @@ fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Con
         msgs.push(staking_msg);
         msgs.push(bank_msg);
     }
-    
+
     // Transfer fee to receiver
-    let res: Response = Response::new()
-        .add_messages(msgs)
-        .add_attributes(attrs);
-        
+    let res: Response = Response::new().add_messages(msgs).add_attributes(attrs);
+
     Ok(res)
 }
 

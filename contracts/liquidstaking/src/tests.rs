@@ -3,6 +3,7 @@ use std::str::FromStr;
 use crate::contract::execute;
 use crate::contract::instantiate;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::query;
 use crate::query::query;
 use crate::state::{
     increment_tokens, unbond_record, State, UnbondRecord, Validator as EscherValidator,
@@ -301,7 +302,6 @@ fn test_unbond_record() {
     let _res = set_up(deps.as_mut(), env, vec![val]);
 
     let mut id = increment_tokens(&mut deps.storage).unwrap();
-    //println!("{}", id);
 
     let staker = deps.api.addr_make("staker");
     let sender1 = deps.api.addr_make("sender1");
@@ -348,29 +348,22 @@ fn test_unbond_record() {
         exchange_rate: exchange_rate,
         created: ts,
         completion: ts,
-        released: false,
+        released: true,
         released_time: ts,
     };
     let _res2 = unbond_record().save(&mut deps.storage, id, &history);
 
-    let unbonded_list1 = unbond_record()
-        .idx
-        .released
-        .prefix("true".to_string())
-        .range(&deps.storage, None, None, Order::Ascending)
-        .map(|n| n.unwrap().1)
-        .collect::<Vec<_>>();
-    //println!("{:?}", unbonded_list1);
-
-    let unbonded_list2 = unbond_record()
-        .idx
-        .released
-        .prefix("false".to_string())
-        .range(&deps.storage, None, None, Order::Ascending)
-        .map(|n| n.unwrap().1)
-        .collect::<Vec<_>>();
-
-    //println!("{:?}", unbonded_list2);
+    let unbonded_list1 =
+        query::query_unbond_record(&deps.storage, Some(staker.to_string()), None, None).unwrap();
+    println!("unbonded_list2: {:?}", unbonded_list1);
+    println!("==========");
+    let unbonded_list2 =
+        query::query_unbond_record(&deps.storage, Some(staker.to_string()), None, Some(false))
+            .unwrap();
+    println!("unbonded_list2: {:?}", unbonded_list2);
+    println!("==========");
+    let unbonded_list3 = query::query_unbond_record(&deps.storage, None, None, Some(true)).unwrap();
+    println!("unbonded_list3: {:?}", unbonded_list3);
 }
 
 #[test]
@@ -390,10 +383,12 @@ fn split_revenue() {
     let reward_amount = Uint128::new(251);
     let fee_rate = Decimal::from_str("0.1").unwrap();
 
-
     //check Decimal(100000000000000000)
     println!("fee_rate: {:?}", fee_rate);
     println!("{}", "Decimal(100000000000000000)");
     let (restake, fee) = utils::split_revenue(reward_amount, fee_rate);
-    println!("split_revenue: {}, restake: {}, fee: {}", reward_amount, restake, fee);
+    println!(
+        "split_revenue: {}, restake: {}, fee: {}",
+        reward_amount, restake, fee
+    );
 }

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::state::{Balance, Parameters, State, UnbondRecord, Validator, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
+use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
@@ -73,11 +73,11 @@ pub enum QueryMsg {
     Parameters {},
     #[returns(ValidatorsRegistry)]
     Validators {},
-    #[returns(TotalBond)]
-    TotalBondAmount {
-        delegator: String,
-        denom: String,
-        validators: Vec<String>,
+    #[returns(StakingLiquidity)]
+    StakingLiquidity {
+        delegator: Option<String>,
+        denom: Option<String>,
+        validators: Option<Vec<String>>,
     },
     #[returns(Balance)]
     Balance {},
@@ -116,10 +116,12 @@ pub enum Ucs01RelayExecuteMsg {
 pub struct MigrateMsg {}
 
 #[cw_serde]
-pub struct TotalBond {
+pub struct StakingLiquidity {
     pub amount: Uint128,
     pub delegated: Uint128,
     pub reward: Uint128,
+    pub exchange_rate: Decimal,
+    pub time: Timestamp,
 }
 
 #[cw_serde]
