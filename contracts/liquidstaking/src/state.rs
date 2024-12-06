@@ -102,8 +102,13 @@ pub struct UnbondRecordIndexes<'a> {
 
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
-        let v: Vec<&dyn Index<UnbondRecord>> =
-            vec![&self.staker, &self.sender, &self.released, &self.height];
+        let v: Vec<&dyn Index<UnbondRecord>> = vec![
+            &self.staker,
+            &self.sender,
+            &self.released,
+            &self.staker_released,
+            &self.height,
+        ];
         Box::new(v.into_iter())
     }
 }
