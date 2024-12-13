@@ -61,6 +61,13 @@ pub fn instantiate(
     };
     PARAMETERS.save(deps.storage, &params)?;
 
+    let chain;
+    if cfg!(nonunion){
+        chain = "nonunion".into();
+    } else {
+        chain = "union".into();
+    }
+
     let state = State {
         exchange_rate: Decimal::one(),
         total_delegated_amount: Uint128::new(0),
@@ -68,6 +75,7 @@ pub fn instantiate(
         total_lst_supply: Uint128::new(0),
         bond_counter: 0,
         last_bond_time: 0,
+        chain
     };
     STATE.save(deps.storage, &state)?;
 

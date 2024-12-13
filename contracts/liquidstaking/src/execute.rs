@@ -217,10 +217,10 @@ pub fn bond(
     Ok(res)
 }
 
-#[cfg(union)]
+#[cfg(not(nonunion))]
 fn get_staked_token_submsg(
     delegator: String,
-    staker: String,
+    _staker: String,
     mint_amount: Uint128,
     liquidstaking_denom: String,
     payload_bin: Binary,
@@ -238,7 +238,7 @@ fn get_staked_token_submsg(
     sub_msg
 }
 
-#[cfg(not(union))]
+#[cfg(nonunion)]
 fn get_staked_token_submsg(
     _delegator: String,
     staker: String,
@@ -264,19 +264,19 @@ fn get_staked_token_submsg(
     sub_msg
 }
 
-#[cfg(union)]
+#[cfg(not(nonunion))]
 fn burn_token(
     delegator: String,
     amount: Uint128,
     liquidstaking_denom: String,
-    cw20_address: Option<Addr>,
+    _cw20_address: Option<Addr>,
 ) -> CosmosMsg<TokenFactoryMsg> {
     let burn_msg = utils::get_burn_msg(liquidstaking_denom.clone(), amount, delegator.to_string());
     let msg: CosmosMsg<TokenFactoryMsg> = burn_msg.into();
     msg
 }
 
-#[cfg(not(union))]
+#[cfg(nonunion)]
 fn burn_token(
     _delegator: String,
     amount: Uint128,
@@ -309,7 +309,7 @@ pub fn unbond(
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
 
     let unbond_amount: Uint128;
-    if cfg!(union) {
+    if cfg!(not(nonunion)) {
         // coin must have be sent along with transaction and it should be in liquid staking coin denom
         if info.funds.len() > 1usize {
             return Err(ContractError::InvalidAsset {});
