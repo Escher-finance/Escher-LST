@@ -47,10 +47,10 @@ func (s *ContractTestSuite) SetupContractTestSuite(ctx context.Context) {
 	err := testutil.WaitForBlocks(ctx, 5, s.ChainA)
 	s.Require().NoError(err)
 
-	lstCodeId, err := s.ChainA.StoreContract(ctx, s.UserA.KeyName(), "../../artifacts/cw20_base.wasm")
+	lstCodeId, err := s.ChainA.StoreContract(ctx, s.UserA.KeyName(), "../contracts/cw20_base.wasm")
 	s.Require().NoError(err)
 
-	codeId, err := s.ChainA.StoreContract(ctx, s.UserA.KeyName(), "../../artifacts/evm_union_liquid_staking.wasm")
+	codeId, err := s.ChainA.StoreContract(ctx, s.UserA.KeyName(), "../contracts/evm_union_liquid_staking.wasm")
 	s.Require().NoError(err)
 
 	validator1, err := s.ChainA.Validators[0].KeyBech32(ctx, "validator", "val")
@@ -139,23 +139,28 @@ func (s *ContractTestSuite) ContractBondTest() {
 		s.FileLogger.Info("TestBond")
 		s.FileLogger.Info("===================================================================")
 
-		// cmd := []string{"wasmd", "query", "staking", "params",
-		// 	"--node", s.ChainA.GetRPCAddress(),
-		// 	"--output", "json",
-		// }
-		// stdout, _, err := s.ChainA.Exec(ctx, cmd, nil)
-		// s.Require().NoError(err)
-		// str := string(stdout)
-		// s.FileLogger.Info(fmt.Sprintf("staking params %s\n", str))
+		var state liquidstaking.State
+		err := s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
+		s.Require().NoError(err)
+		s.Logger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State -> %+v", state))
 
-		// var parameters liquidstaking.ParametersResponse
-		// err = s.Contract.Query(ctx, liquidstaking.QueryMsg{Parameters: &liquidstaking.QueryMsg_Parameters{}}, &parameters)
-		// s.Require().NoError(err)
+		cmd := []string{"wasmd", "query", "staking", "params",
+			"--node", s.ChainA.GetRPCAddress(),
+			"--output", "json",
+		}
+		stdout, _, err := s.ChainA.Exec(ctx, cmd, nil)
+		s.Require().NoError(err)
+		str := string(stdout)
+		s.FileLogger.Info(fmt.Sprintf("staking params %s\n", str))
 
-		// s.FileLogger.Info(fmt.Sprintf("liquid staking params %+v\n", parameters))
+		var parameters liquidstaking.ParametersResponse
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{Parameters: &liquidstaking.QueryMsg_Parameters{}}, &parameters)
+		s.Require().NoError(err)
+
+		s.FileLogger.Info(fmt.Sprintf("liquid staking params %+v\n", parameters))
 
 		var validators liquidstaking.ValidatorsRegistry
-		err := s.Contract.Query(ctx, liquidstaking.QueryMsg{Validators: &liquidstaking.QueryMsg_Validators{}}, &validators)
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{Validators: &liquidstaking.QueryMsg_Validators{}}, &validators)
 		s.Require().NoError(err)
 
 		s.FileLogger.Info(fmt.Sprintf(">>>>>>>>>>>> VALIDATORS >>>>>>>>>>>>> %v", validators))
@@ -202,7 +207,6 @@ func (s *ContractTestSuite) ContractBondTest() {
 		s.Require().NoError(err)
 		s.FileLogger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract StakingLiquidity:  %+v", bondAmount))
 
-		var state liquidstaking.State
 		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{State: &liquidstaking.QueryMsg_State{}}, &state)
 		s.Require().NoError(err)
 		s.FileLogger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract State After User B do Bond: 800000000token -> %+v", state))
@@ -264,8 +268,9 @@ func (s *ContractTestSuite) ContractBondTest() {
 		s.Require().NoError(err)
 		s.FileLogger.Info(fmt.Sprintf("::::::::::: User A balance before Process Rewards (withdraw and restaking) : %+v", ABalances))
 
-		var bondAmount liquidstaking.TotalBond
-		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{StakingLiquidity: &liquidstaking.QueryMsg_StakingLiquidity{Delegator: s.Contract.Address, Denom: s.ChainA.Config().Denom, Validators: validators_addr}}, &bondAmount)
+		var bondAmount liquidstaking.StakingLiquidity
+		denom := s.ChainA.Config().Denom
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{StakingLiquidity: &liquidstaking.QueryMsg_StakingLiquidity{Delegator: &s.Contract.Address, Denom: &denom, Validators: &validators_addr}}, &bondAmount)
 		s.Require().NoError(err)
 		s.FileLogger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract StakingLiquidity Before Process Rewards (withdraw and restaking):  %+v", bondAmount))
 
@@ -273,7 +278,7 @@ func (s *ContractTestSuite) ContractBondTest() {
 		_, err = s.Contract.Execute(ctx, s.UserA.KeyName(), executeMsg, "--gas", "auto")
 		s.Require().NoError(err)
 
-		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{StakingLiquidity: &liquidstaking.QueryMsg_StakingLiquidity{Delegator: s.Contract.Address, Denom: s.ChainA.Config().Denom, Validators: validators_addr}}, &bondAmount)
+		err = s.Contract.Query(ctx, liquidstaking.QueryMsg{StakingLiquidity: &liquidstaking.QueryMsg_StakingLiquidity{Delegator: &s.Contract.Address, Denom: &denom, Validators: &validators_addr}}, &bondAmount)
 		s.Require().NoError(err)
 		s.FileLogger.Info(fmt.Sprintf(">>>>>>>>>>>> Contract StakingLiquidity After Process Rewards (withdraw and restaking):  %+v", bondAmount))
 

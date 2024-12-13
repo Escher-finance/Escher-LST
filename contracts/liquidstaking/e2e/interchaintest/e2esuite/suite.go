@@ -48,7 +48,7 @@ func (s *TestSuite) SetupSuite(ctx context.Context, chainSpecs []*interchaintest
 	config := zap.Config{
 		Encoding:    "json",                                  // Output format (json or console)
 		Level:       zap.NewAtomicLevelAt(zapcore.InfoLevel), // Log level
-		OutputPaths: []string{"./logfile.log"},               // Output destinations
+		OutputPaths: []string{"./test_output.log"},           // Output destinations
 		EncoderConfig: zapcore.EncoderConfig{
 			TimeKey:        "ts",                          // Key for the timestamp field
 			MessageKey:     "msg",                         // Key for the message field

@@ -102,6 +102,7 @@ type State struct {
 	TotalLstSupply       string `json:"total_lst_supply"`
 	BondCounter          uint64 `json:"bond_counter"`
 	LastBondTime         uint64 `json:"last_bond_time"`
+	Chain                string `json:"chain"`
 }
 
 type UndelegationRecord struct {
