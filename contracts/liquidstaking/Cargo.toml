@@ -4,14 +4,8 @@ version = "0.1.11"
 authors = ["isakfm <isak.rickyanto@gmail.com>"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[build]
-# remove this flag if you want to build contract for non union
-# rustflags = ["--cfg", "union"]
-
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(union)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(nonunion)'] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
