@@ -28,6 +28,9 @@ export type ChainConfig = {
   contracts: {
     lst: string;
     cw20: string;
+    icaController?: {
+      codeId: number;
+    };
   };
   gasPrice: string;
   connectionID: string;
@@ -71,6 +74,9 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     contracts: {
       lst: "cosmos1c2f79k5kykr5s4zhknn5w56hs5c9a8zxh4w03x07dnzwyrcj4pfspyf0pr",
       cw20: "cosmos1t3f4zxve6725sf4glrnlar8uku78j0nyfl0ppzgfju9ft9phvqwqren6rp",
+      icaController: {
+        codeId: 112,
+      },
     },
     gasPrice: "0.01stake",
     connectionID: "connection-26",
