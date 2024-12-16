@@ -307,15 +307,16 @@ pub fn unbond(
     let liquidstaking_denom = params.liquidstaking_denom;
     let sender = info.sender.to_string();
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
+    let delegator = env.contract.address;
 
     let unbond_amount: Uint128;
     if cfg!(not(nonunion)) {
+        //this will handle union chain
         // coin must have be sent along with transaction and it should be in liquid staking coin denom
         if info.funds.len() > 1usize {
             return Err(ContractError::InvalidAsset {});
         }
 
-        // coin must have be sent along with transaction and it should be in liquid staking coin denom
         let payment = info
             .funds
             .iter()
@@ -324,7 +325,20 @@ pub fn unbond(
 
         unbond_amount = payment.amount;
     } else {
+        // this will handle non union chain
+        // need to find staked token balance of sender
         unbond_amount = amount.unwrap();
+        let msg = cw20::Cw20QueryMsg::Balance {
+            address: delegator.to_string(),
+        };
+
+        let balance: cw20::BalanceResponse = deps
+            .querier
+            .query_wasm_smart(params.cw20_address.clone().unwrap(), &msg)?;
+
+        if balance.balance < unbond_amount {
+            return Err(ContractError::NotEnoughAvailableFund {});
+        }
     }
 
     let validators_list: Vec<String> = validators_reg
@@ -335,7 +349,6 @@ pub fn unbond(
 
     let mut state = STATE.load(deps.storage)?;
 
-    let delegator = env.contract.address;
     let delegated_amount = get_actual_total_delegated(
         deps.querier,
         delegator.to_string(),

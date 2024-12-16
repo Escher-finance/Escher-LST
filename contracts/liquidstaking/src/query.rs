@@ -5,7 +5,7 @@ use crate::state::{
     VALIDATORS_REGISTRY,
 };
 use crate::utils::{get_actual_total_delegated, get_actual_total_reward};
-use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order};
+use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
 use cw_ownable::get_ownership;
 
@@ -95,14 +95,17 @@ pub fn query_staking_liquidity(
     let total_bond_amount = delegated_amount + total_reward;
 
     let state: State = STATE.load(deps.storage)?;
-    let exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
+    let mut exchange_rate: Decimal = Decimal::one();
+    if total_bond_amount != Uint128::zero() && state.total_lst_supply != Uint128::zero() {
+        exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
+    }
 
     Ok(StakingLiquidity {
         amount: total_bond_amount,
         delegated: delegated_amount,
         reward: total_reward,
         exchange_rate,
-        time: env.block.time
+        time: env.block.time,
     })
 }
 
