@@ -19,19 +19,20 @@ This e2e test will test these functionalities:
 
 ### How to run e2e test
 
-1. Make sure you are on e2e branch 
-2. Build the contract wasm file first for CW20 and Liquid Staking Contract
+1. Build the contract wasm file first for CW20 from [CW20 repo](https://github.com/CosmWasm/cw-plus/tree/main/contracts/cw20-base) then copy to contracts folder
 
-To build wasm for Liquid Staking Contract:
-Go to root directory of liquid staking contract then build wasm with rust flag cfg is set to nonunion
+2. Buid contract wasm for Escher Liquid Staking Contract by following instructions below:
 
-Before running this command, make sure you install wasm-opt first:
-> cargo install wasm-opt
+    a. Go to root directory of liquid staking contract then build wasm with rust flag cfg is set to nonunion
 
-Then if u have wasm-opt already, run this command:
+    b. Before running this command, make sure you install wasm-opt first:
+    > cargo install wasm-opt
 
-> RUSTFLAGS="-C link-arg=-s --cfg nonunion" cargo build --release --lib --target=wasm32-unknown-unknown
-> wasm-opt -Os --signext-lowering "target/wasm32-unknown-unknown/release/evm_union_liquid_staking.wasm" -o "e2e/contracts/evm_union_liquid_staking.wasm"
+    c. Then if u have wasm-opt already, run this command:
+
+    > RUSTFLAGS="-C link-arg=-s --cfg nonunion" cargo build --release --lib --target=wasm32-unknown-unknown 
+    
+    > wasm-opt -Os --signext-lowering "target/wasm32-unknown-unknown/release/evm_union_liquid_staking.wasm" -o "e2e/contracts/evm_union_liquid_staking.wasm"
 
 
 3. Run the Go test in interchaintest folder
