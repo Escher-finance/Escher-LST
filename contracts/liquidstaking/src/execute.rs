@@ -6,18 +6,18 @@ use crate::reply::{
     BOND_WITHDRAW_REWARD_REPLY_ID, MINT_CW20_TOKENS_REPLY_ID, MINT_TOKENS_REPLY_ID,
 };
 use crate::state::{
-    increment_tokens, unbond_record, UnbondRecord, Validator, PARAMETERS, STATE,
+    increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     self, calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
-    get_actual_total_bonded, get_actual_total_reward, get_mock_total_reward, to_uint128,
+    get_actual_total_delegated, get_actual_total_reward, get_mock_total_reward, to_uint128,
 };
 use cosmwasm_std::{
-    attr, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,
-    DistributionMsg, Env, MessageInfo, Response, StakingMsg, StdResult, SubMsg, Timestamp, Uint128,
-    WasmMsg,
+    attr, to_json_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, DecCoin, Decimal,
+    DepsMut, DistributionMsg, Env, MessageInfo, Response, StakingMsg, StdResult, SubMsg, Timestamp,
+    Uint128, WasmMsg,
 };
 
 pub fn bond(
@@ -29,7 +29,7 @@ pub fn bond(
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
-    let coin_denom = params.underlying_coin_denom;
+    let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
 
@@ -128,7 +128,7 @@ pub fn bond(
     // logic to mint token and update the supply and total_bond_amount
     let mut state = STATE.load(deps.storage)?;
     let total_bond_amount: Uint128;
-    let delegated_amount = get_actual_total_bonded(
+    let delegated_amount = get_actual_total_delegated(
         deps.querier,
         delegator.to_string(),
         coin_denom.clone(),
@@ -180,13 +180,6 @@ pub fn bond(
 
     STATE.save(deps.storage, &state)?;
 
-    // Start to mint according to staked token
-    let mint_msg = TokenFactoryMsg::MintTokens {
-        denom: params.liquidstaking_denom.clone(),
-        amount: mint_amount,
-        mint_to_address: delegator.to_string(),
-    };
-
     let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
     let payload = MintTokensPayload {
         sender: sender.to_string(),
@@ -196,30 +189,17 @@ pub fn bond(
     let payload_bin = to_json_binary(&payload)?;
 
     if !cfg!(test) {
-        let sub_msg: SubMsg<TokenFactoryMsg> = SubMsg::reply_always(mint_msg, MINT_TOKENS_REPLY_ID)
-            .with_payload(payload_bin)
-            .into();
+        // Start to mint according to staked token
+        let sub_msg: SubMsg<TokenFactoryMsg> = get_staked_token_submsg(
+            delegator.to_string(),
+            the_staker.to_string(),
+            mint_amount,
+            params.liquidstaking_denom.clone(),
+            payload_bin,
+            params,
+        );
         sub_msgs.push(sub_msg);
     }
-    // else {
-    //     let recipient = delegator.to_string();
-    //     let mint = cw20::Cw20ExecuteMsg::Mint {
-    //         recipient,
-    //         amount: mint_amount,
-    //     };
-    //     let mint_bin = to_json_binary(&mint)?;
-    //     let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-    //         contract_addr: params.cw20_address.unwrap().to_string(),
-    //         msg: mint_bin,
-    //         funds: vec![],
-    //     });
-
-    //     let sub_msg: SubMsg<TokenFactoryMsg> =
-    //         SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID)
-    //             .with_payload(payload_bin)
-    //             .into();
-    //     sub_msgs.push(sub_msg);
-    // }
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
@@ -237,11 +217,89 @@ pub fn bond(
     Ok(res)
 }
 
+#[cfg(not(nonunion))]
+fn get_staked_token_submsg(
+    delegator: String,
+    _staker: String,
+    mint_amount: Uint128,
+    liquidstaking_denom: String,
+    payload_bin: Binary,
+    _params: Parameters,
+) -> SubMsg<TokenFactoryMsg> {
+    let mint_msg = TokenFactoryMsg::MintTokens {
+        denom: liquidstaking_denom,
+        amount: mint_amount,
+        mint_to_address: delegator.to_string(),
+    };
+
+    let sub_msg: SubMsg<TokenFactoryMsg> = SubMsg::reply_always(mint_msg, MINT_TOKENS_REPLY_ID)
+        .with_payload(payload_bin)
+        .into();
+    sub_msg
+}
+
+#[cfg(nonunion)]
+fn get_staked_token_submsg(
+    _delegator: String,
+    staker: String,
+    mint_amount: Uint128,
+    _liquidstaking_denom: String,
+    payload_bin: Binary,
+    params: Parameters,
+) -> SubMsg<TokenFactoryMsg> {
+    let mint = cw20::Cw20ExecuteMsg::Mint {
+        recipient: staker,
+        amount: mint_amount,
+    };
+    let mint_bin = to_json_binary(&mint).unwrap();
+    let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: params.cw20_address.unwrap().to_string(),
+        msg: mint_bin,
+        funds: vec![],
+    });
+    let sub_msg: SubMsg<TokenFactoryMsg> =
+        SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID)
+            .with_payload(payload_bin)
+            .into();
+    sub_msg
+}
+
+#[cfg(not(nonunion))]
+fn burn_token(
+    delegator: String,
+    amount: Uint128,
+    liquidstaking_denom: String,
+    _cw20_address: Option<Addr>,
+) -> CosmosMsg<TokenFactoryMsg> {
+    let burn_msg = utils::get_burn_msg(liquidstaking_denom.clone(), amount, delegator.to_string());
+    let msg: CosmosMsg<TokenFactoryMsg> = burn_msg.into();
+    msg
+}
+
+#[cfg(nonunion)]
+fn burn_token(
+    _delegator: String,
+    amount: Uint128,
+    _liquidstaking_denom: String,
+    cw20_address: Option<Addr>,
+) -> CosmosMsg<TokenFactoryMsg> {
+    let execute_burn = cw20::Cw20ExecuteMsg::Burn { amount };
+    let burn_bin = to_json_binary(&execute_burn).unwrap();
+    let burn_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: cw20_address.unwrap().to_string(),
+        msg: burn_bin,
+        funds: vec![],
+    });
+    let msg: CosmosMsg<TokenFactoryMsg> = burn_msg.into();
+    msg
+}
+
 pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     staker: Option<String>,
+    amount: Option<Uint128>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -249,20 +307,39 @@ pub fn unbond(
     let liquidstaking_denom = params.liquidstaking_denom;
     let sender = info.sender.to_string();
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
+    let delegator = env.contract.address;
 
-    // coin must have be sent along with transaction and it should be in liquid staking coin denom
-    if info.funds.len() > 1usize {
-        return Err(ContractError::InvalidAsset {});
+    let unbond_amount: Uint128;
+    if cfg!(not(nonunion)) {
+        //this will handle union chain
+        // coin must have be sent along with transaction and it should be in liquid staking coin denom
+        if info.funds.len() > 1usize {
+            return Err(ContractError::InvalidAsset {});
+        }
+
+        let payment = info
+            .funds
+            .iter()
+            .find(|x| x.denom == liquidstaking_denom && x.amount > Uint128::zero())
+            .ok_or_else(|| ContractError::NoAsset {})?;
+
+        unbond_amount = payment.amount;
+    } else {
+        // this will handle non union chain
+        // need to find staked token balance of sender
+        unbond_amount = amount.unwrap();
+        let msg = cw20::Cw20QueryMsg::Balance {
+            address: delegator.to_string(),
+        };
+
+        let balance: cw20::BalanceResponse = deps
+            .querier
+            .query_wasm_smart(params.cw20_address.clone().unwrap(), &msg)?;
+
+        if balance.balance < unbond_amount {
+            return Err(ContractError::NotEnoughAvailableFund {});
+        }
     }
-
-    // coin must have be sent along with transaction and it should be in liquid staking coin denom
-    let payment = info
-        .funds
-        .iter()
-        .find(|x| x.denom == liquidstaking_denom && x.amount > Uint128::zero())
-        .ok_or_else(|| ContractError::NoAsset {})?;
-
-    let unbond_amount = payment.amount;
 
     let validators_list: Vec<String> = validators_reg
         .validators
@@ -272,8 +349,7 @@ pub fn unbond(
 
     let mut state = STATE.load(deps.storage)?;
 
-    let delegator = env.contract.address;
-    let delegated_amount = get_actual_total_bonded(
+    let delegated_amount = get_actual_total_delegated(
         deps.querier,
         delegator.to_string(),
         coin_denom.clone(),
@@ -296,7 +372,7 @@ pub fn unbond(
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
     let undelegate_amount: Uint128 =
-        calculate_native_token_from_staking_token(payment.amount.clone(), current_exchange_rate);
+        calculate_native_token_from_staking_token(unbond_amount.clone(), current_exchange_rate);
 
     let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
 
@@ -311,10 +387,11 @@ pub fn unbond(
     );
     msgs.extend(undelegate_msgs);
 
-    let burn_msg = utils::get_burn_msg(
-        liquidstaking_denom.clone(),
-        unbond_amount,
+    let burn_msg = burn_token(
         delegator.to_string(),
+        unbond_amount,
+        liquidstaking_denom.clone(),
+        params.cw20_address,
     );
     msgs.push(burn_msg.into());
 
@@ -476,7 +553,7 @@ pub fn process_rewards(
 
         let mut payload = BondRewardsPayload {
             validator: validator.address.clone(),
-            amount: Uint128::new(0),
+            amount: Uint128::zero(),
         };
 
         if result.is_ok() {
@@ -492,20 +569,21 @@ pub fn process_rewards(
                 validator: validator.address.to_string(),
             });
 
-        let payload_bin = to_json_binary(&payload)?;
+        if payload.amount != Uint128::zero() {
+            let payload_bin = to_json_binary(&payload)?;
 
-        let sub_msg: SubMsg<TokenFactoryMsg> =
-            SubMsg::reply_always(withdraw_reward_msg, BOND_WITHDRAW_REWARD_REPLY_ID)
-                .with_payload(payload_bin)
-                .into();
-        sub_msgs.push(sub_msg);
-
+            let sub_msg: SubMsg<TokenFactoryMsg> =
+                SubMsg::reply_always(withdraw_reward_msg, BOND_WITHDRAW_REWARD_REPLY_ID)
+                    .with_payload(payload_bin)
+                    .into();
+            sub_msgs.push(sub_msg);
+        }
         attrs.push(attr("amount", payload.amount.to_string()));
     }
 
     let res: Response<TokenFactoryMsg> = Response::new()
-        .add_submessages(sub_msgs)
-        .add_attributes(attrs);
+        .add_attributes(attrs)
+        .add_submessages(sub_msgs);
 
     Ok(res)
 }
@@ -706,7 +784,12 @@ pub fn process_unbonding(
     unbond_rec.released_time = env.block.time;
     unbond_record().save(deps.storage, unbond_rec.id, &unbond_rec)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_message(msg);
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "transfer_unbonding")
+        .add_attribute("staker", unbond_rec.staker)
+        .add_attribute("amount", unbond_rec.undelegate_amount.amount)
+        .add_attribute("denom", unbond_rec.undelegate_amount.denom);
 
     Ok(res)
 }
@@ -880,5 +963,5 @@ fn test_delegate_amount() {
     let ratio = Decimal::from_ratio(Uint128::from(weight), Uint128::from(total_weight));
     let amount = Uint128::from(10u32);
     let delegate_amount = utils::calculate_delegated_amount(amount, ratio);
-    println!("delegate_amount: {:?}", delegate_amount);
+    println!("delegate_amount: {}", delegate_amount);
 }

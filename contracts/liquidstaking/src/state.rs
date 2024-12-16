@@ -29,6 +29,8 @@ pub struct State {
     pub bond_counter: u64,
     // last_bond_time
     pub last_bond_time: u64,
+    // is union chain
+    pub chain: String,
 }
 
 #[cw_serde]
@@ -97,13 +99,16 @@ pub struct UnbondRecordIndexes<'a> {
     pub sender: MultiIndex<'a, String, UnbondRecord, u64>,
     pub released: MultiIndex<'a, String, UnbondRecord, u64>,
     pub staker_released: MultiIndex<'a, String, UnbondRecord, u64>,
-    pub height: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
-        let v: Vec<&dyn Index<UnbondRecord>> =
-            vec![&self.staker, &self.sender, &self.released, &self.height];
+        let v: Vec<&dyn Index<UnbondRecord>> = vec![
+            &self.staker,
+            &self.sender,
+            &self.released,
+            &self.staker_released,
+        ];
         Box::new(v.into_iter())
     }
 }
@@ -131,11 +136,6 @@ pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<
             |_pk, d: &UnbondRecord| format!("{}-{}", d.staker, d.released),
             UNBOND_RECORD_NAMESPACE,
             "unbond_record__staker_released",
-        ),
-        height: MultiIndex::new(
-            |_pk, d: &UnbondRecord| d.height.to_string(),
-            UNBOND_RECORD_NAMESPACE,
-            "unbond_record__height",
         ),
     };
     IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
