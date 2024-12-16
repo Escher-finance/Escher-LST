@@ -1,0 +1,258 @@
+{
+    "total_count": "21",
+    "count": "1",
+    "page_number": "2",
+    "page_total": "2",
+    "limit": "20",
+    "txs": [
+        {
+            "height": "1861433",
+            "txhash": "C0F2DA870346EBB9F3D3F988D800A77766346647ADC25960AA0CB098B1CAD180",
+            "codespace": "",
+            "code": 0,
+            "data": "12760A302F636F736D7761736D2E7761736D2E76312E4D7367496E7374616E7469617465436F6E7472616374526573706F6E736512420A40756E696F6E31786A7A667573666D34367A3336333433367870786877716E38787A6466326875326A6A307467676134736365346D786D72326173793667393064",
+            "raw_log": "",
+            "logs": [],
+            "info": "",
+            "gas_wanted": "469074",
+            "gas_used": "354593",
+            "tx": {
+                "@type": "/cosmos.tx.v1beta1.Tx",
+                "body": {
+                    "messages": [
+                        {
+                            "@type": "/cosmwasm.wasm.v1.MsgInstantiateContract",
+                            "sender": "union1vnglhewf3w66cquy6hr7urjv3589srheampz42",
+                            "admin": "union1vnglhewf3w66cquy6hr7urjv3589srheampz42",
+                            "code_id": "102",
+                            "label": "nomos-ica-controller",
+                            "msg": {
+                                "owner": "union1vnglhewf3w66cquy6hr7urjv3589srheampz42",
+                                "channel_open_init_options": {
+                                    "connection_id": "connection-14",
+                                    "counterparty_connection_id": "connection-0",
+                                    "counterparty_port_id": "0xBe53A7aC42877Fe369883CcEd5908Afd4EC5669b",
+                                    "channel_ordering": "ORDER_UNORDERED"
+                                }
+                            },
+                            "funds": []
+                        }
+                    ],
+                    "memo": "Instantiating a new contract",
+                    "timeout_height": "0",
+                    "extension_options": [],
+                    "non_critical_extension_options": []
+                },
+                "auth_info": {
+                    "signer_infos": [
+                        {
+                            "public_key": {
+                                "@type": "/cosmos.crypto.secp256k1.PubKey",
+                                "key": "Ar+bkzrZxNL499sbEKQqnLtAoZUdPM0FPr2/EyHsah+n"
+                            },
+                            "mode_info": {
+                                "single": {
+                                    "mode": "SIGN_MODE_DIRECT"
+                                }
+                            },
+                            "sequence": "20"
+                        }
+                    ],
+                    "fee": {
+                        "amount": [
+                            {
+                                "denom": "muno",
+                                "amount": "1173"
+                            }
+                        ],
+                        "gas_limit": "469074",
+                        "payer": "",
+                        "granter": ""
+                    },
+                    "tip": null
+                },
+                "signatures": [
+                    "+AhLdqb6TJ6QkFO//etwrQNnXHVX/D5+FBv/MAMM0qly0VLXXE7rlAUHK2g3ygoe0mtOEf2SB1HrVLV0QWiUpw=="
+                ]
+            },
+            "timestamp": "2024-07-24T06:28:55Z",
+            "events": [
+                {
+                    "type": "coin_spent",
+                    "attributes": [
+                        {
+                            "key": "spender",
+                            "value": "union1vnglhewf3w66cquy6hr7urjv3589srheampz42",
+                            "index": true
+                        },
+                        {
+                            "key": "amount",
+                            "value": "1173muno",
+                            "index": true
+                        }
+                    ]
+                },
+                {
+                    "type": "coin_received",
+                    "attributes": [
+                        {
+                            "key": "receiver",
+                            "value": "union17xpfvakm2amg962yls6f84z3kell8c5l6wzg9v",
+                            "index": true
+                        },
+                        {
+                            "key": "amount",
+                            "value": "1173muno",
+                            "index": true
+                        }
+                    ]
+                },
+                {
+                    "type": "transfer",
+                    "attributes": [
+                        {
+                            "key": "recipient",
+                            "value": "union17xpfvakm2amg962yls6f84z3kell8c5l6wzg9v",
+                            "index": true
+                        },
+                        {
+                            "key": "sender",
+                            "value": "union1vnglhewf3w66cquy6hr7urjv3589srheampz42",
+                            "index": true
+                        },
+                        {
+                            "key": "amount",
+                            "value": "1173muno",
+                            "index": true
+                        }
+                    ]
+                },
+                {
+                    "type": "message",
+                    "attributes": [
+                        {
+                            "key": "sender",
+                            "value": "union1vnglhewf3w66cquy6hr7urjv3589srheampz42",
+                            "index": true
+                        }
+                    ]
+                },
+                {
+                    "type": "tx",
+                    "attributes": [
+                        {
+                            "key": "fee",
+                            "value": "1173muno",
+                            "index": true
+                        },
+                        {
+                            "key": "fee_payer",
+                            "value": "union1vnglhewf3w66cquy6hr7urjv3589srheampz42",
+                            "index": true
+                        }
+                    ]
+                },
+                {
+                    "type": "tx",
+                    "attributes": [
+                        {
+                            "key": "acc_seq",
+                            "value": "union1vnglhewf3w66cquy6hr7urjv3589srheampz42/20",
+                            "index": true
+                        }
+                    ]
+                },
+                {
+                    "type": "tx",
+                    "attributes": [
+                        {
+                            "key": "signature",
+                            "value": "+AhLdqb6TJ6QkFO//etwrQNnXHVX/D5+FBv/MAMM0qly0VLXXE7rlAUHK2g3ygoe0mtOEf2SB1HrVLV0QWiUpw==",
+                            "index": true
+                        }
+                    ]
+                },
+                {
+                    "type": "message",
+                    "attributes": [
+                        {
+                            "key": "action",
+                            "value": "/cosmwasm.wasm.v1.MsgInstantiateContract",
+                            "index": true
+                        },
+                        {
+                            "key": "sender",
+                            "value": "union1vnglhewf3w66cquy6hr7urjv3589srheampz42",
+                            "index": true
+                        },
+                        {
+                            "key": "module",
+                            "value": "wasm",
+                            "index": true
+                        },
+                        {
+                            "key": "msg_index",
+                            "value": "0",
+                            "index": true
+                        }
+                    ]
+                },
+                {
+                    "type": "instantiate",
+                    "attributes": [
+                        {
+                            "key": "_contract_address",
+                            "value": "union1xjzfusfm46z363436xpxhwqn8xzdf2hu2jj0tgga4sce4mxmr2asy6g90d",
+                            "index": true
+                        },
+                        {
+                            "key": "code_id",
+                            "value": "102",
+                            "index": true
+                        },
+                        {
+                            "key": "msg_index",
+                            "value": "0",
+                            "index": true
+                        }
+                    ]
+                },
+                {
+                    "type": "channel_open_init",
+                    "attributes": [
+                        {
+                            "key": "port_id",
+                            "value": "wasm.union1xjzfusfm46z363436xpxhwqn8xzdf2hu2jj0tgga4sce4mxmr2asy6g90d",
+                            "index": true
+                        },
+                        {
+                            "key": "channel_id",
+                            "value": "channel-108",
+                            "index": true
+                        },
+                        {
+                            "key": "counterparty_port_id",
+                            "value": "0xBe53A7aC42877Fe369883CcEd5908Afd4EC5669b",
+                            "index": true
+                        },
+                        {
+                            "key": "connection_id",
+                            "value": "connection-14",
+                            "index": true
+                        },
+                        {
+                            "key": "version",
+                            "value": "{\"version\":\"ics27-1\",\"controller_connection_id\":\"connection-14\",\"host_connection_id\":\"connection-0\",\"address\":\"\",\"encoding\":\"proto3\",\"tx_type\":\"sdk_multi_msg\"}",
+                            "index": true
+                        },
+                        {
+                            "key": "msg_index",
+                            "value": "0",
+                            "index": true
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

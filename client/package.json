@@ -1,0 +1,48 @@
+{
+  "name": "next-app-template",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@cosmjs/cosmwasm-stargate": "^0.32.3",
+    "@cosmjs/stargate": "^0.32.3",
+    "@cosmostation/cosmos-client": "^0.0.5",
+    "@cosmostation/extension-client": "^0.1.15",
+    "@nextui-org/react": "^2.6.8",
+    "@osmosis-labs/proto-codecs": "^5.1.0",
+    "@react-aria/visually-hidden": "^3.8.3",
+    "@types/node": "20.5.7",
+    "@types/react": "^18.2.30",
+    "@types/react-dom": "18.2.7",
+    "autoprefixer": "10.4.15",
+    "bignumber.js": "^9.1.2",
+    "bufferutil": "^4.0.8",
+    "clsx": "^2.0.0",
+    "eslint": "8.48.0",
+    "eslint-config-next": "13.4.19",
+    "framer-motion": "^11.14.1",
+    "intl-messageformat": "^10.5.0",
+    "next": "14.0.4",
+    "next-themes": "^0.2.1",
+    "nomos-v2": "^1.1.0",
+    "osmojs": "^16.14.0",
+    "postcss": "8.4.29",
+    "react": "18.2.0",
+    "react-copy-to-clipboard": "^5.1.0",
+    "react-dom": "18.2.0",
+    "tailwind-variants": "^0.1.18",
+    "tailwindcss": "^3.4.16",
+    "typescript": "5.0.4",
+    "utf-8-validate": "^5.0.10",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/react-copy-to-clipboard": "^5.0.7"
+  }
+}
