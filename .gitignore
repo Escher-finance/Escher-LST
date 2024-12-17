@@ -1,4 +1,6 @@
-
-
-# Dotenv file
 .env
+
+client/node_modules/*
+
+client/.next
+

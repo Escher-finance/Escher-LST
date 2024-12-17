@@ -55,7 +55,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
   "lst-network": {
     chainId: "lst",
     chainName: "LST Network",
-    rpc: "http://100.42.181.110:26657",
+    rpc: "https://lst.rickyanto.com:443",
     rest: "http://100.42.181.110:1317",
     stakeCurrency: currency["lst-network"],
     bip44: {
