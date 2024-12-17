@@ -92,7 +92,9 @@ export async function checkUnbonding() {
     }
 }
 
-const act = process.env.npm_config_name ? process.env.npm_config_name : "none"
+const args = process.argv;
+
+const act = process.env.npm_config_name ? process.env.npm_config_name : args[2]
 
 console.log("Action: " + act);
 if (act == "process_unbonding") {
