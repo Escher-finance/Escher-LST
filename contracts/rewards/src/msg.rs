@@ -30,10 +30,12 @@ pub enum ExecuteLstMsg {
 
 #[cw_ownable_query]
 #[cw_serde]
+#[non_exhaustive]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     #[returns(Config)]
     Config {},
 }
 
+#[cw_serde]
 pub enum MigrateMsg {}
