@@ -610,7 +610,7 @@ dependencies = [
 
 [[package]]
 name = "evm-union-liquid-staking"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
