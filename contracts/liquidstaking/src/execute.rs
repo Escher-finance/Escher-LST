@@ -1,5 +1,7 @@
 use crate::error::ContractError;
-use crate::event::{BondEvent, ProcessRewardsEvent, UnbondEvent, UpdateValidatorsEvent};
+use crate::event::{
+    BondEvent, ProcessRewardsEvent, ProcessUnbondingEvent, UnbondEvent, UpdateValidatorsEvent,
+};
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{
@@ -855,6 +857,12 @@ pub fn process_unbonding(
         }
     };
 
+    let ev = ProcessUnbondingEvent(
+        unbond_rec.staker.to_string(),
+        unbond_rec.undelegate_amount.amount.clone(),
+        unbond_rec.undelegate_amount.denom.clone(),
+    );
+
     // set unbonding record to be released
     unbond_rec.released = true;
     unbond_rec.released_time = env.block.time;
@@ -862,6 +870,7 @@ pub fn process_unbonding(
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_message(msg)
+        .add_event(ev)
         .add_attribute("action", "transfer_unbonding")
         .add_attribute("staker", unbond_rec.staker)
         .add_attribute("amount", unbond_rec.undelegate_amount.amount)
