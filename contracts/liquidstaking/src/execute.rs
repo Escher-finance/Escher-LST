@@ -778,6 +778,15 @@ pub fn set_parameters(
         None => "".to_string(),
     };
 
+    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+
+    if reward_address.is_some() {
+        let msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+                address: reward_address.unwrap().to_string(),
+            });
+        msgs.push(msg);
+    }
     PARAMETERS.save(deps.storage, &params)?;
 
     let res: Response<TokenFactoryMsg> = Response::new()
