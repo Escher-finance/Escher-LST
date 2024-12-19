@@ -54,15 +54,14 @@ pub fn instantiate(
         liquidstaking_denom: msg.liquidstaking_denom,
         ucs01_channel: msg.ucs01_channel,
         ucs01_relay_contract: msg.ucs01_relay_contract,
-        fee_rate: msg.fee_rate,
-        revenue_receiver: msg.revenue_receiver,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
+        reward_address: None,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
     let chain;
-    if cfg!(nonunion){
+    if cfg!(nonunion) {
         chain = "nonunion".into();
     } else {
         chain = "union".into();
@@ -75,7 +74,7 @@ pub fn instantiate(
         total_lst_supply: Uint128::new(0),
         bond_counter: 0,
         last_bond_time: 0,
-        chain
+        chain,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -112,6 +111,7 @@ pub fn execute(
             ucs01_relay_contract,
             unbonding_time,
             cw20_address,
+            reward_address,
         } => execute::set_parameters(
             deps,
             env,
@@ -122,7 +122,9 @@ pub fn execute(
             ucs01_relay_contract,
             unbonding_time,
             cw20_address,
+            reward_address,
         ),
+        ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
     }
 }
 

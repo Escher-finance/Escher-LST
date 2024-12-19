@@ -368,3 +368,59 @@ pub fn get_restaking_msgs(
 
     msgs
 }
+
+pub fn get_delegate_to_validator_msgs(
+    delegate_amount: Uint128,
+    coin_denom: String,
+    validators: Vec<Validator>,
+) -> Vec<CosmosMsg<TokenFactoryMsg>> {
+    let total_weight = validators
+        .iter()
+        .map(|v| v.weight)
+        .reduce(|a, b| (a + b))
+        .unwrap_or(1);
+
+    let mut total_delegated: Uint128 = Uint128::from(0u32);
+
+    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+    let mut first_validator: String = "".to_string();
+
+    for (pos, validator) in validators.into_iter().enumerate() {
+        let ratio =
+            Decimal::from_ratio(Uint128::from(validator.weight), Uint128::from(total_weight));
+
+        let delegate_amount = calculate_delegated_amount(delegate_amount, ratio);
+        total_delegated += delegate_amount;
+        let amount = Coin {
+            amount: delegate_amount.clone(),
+            denom: coin_denom.to_string(),
+        };
+        let staking_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: validator.address.to_string(),
+            amount,
+        });
+
+        msgs.push(staking_msg.into());
+
+        if pos == 0 {
+            first_validator = validator.address.to_string();
+        }
+    }
+
+    // calculate remaining
+
+    let remaining_amount = delegate_amount - total_delegated;
+    if !remaining_amount.is_zero() {
+        let remaining_staking_msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Staking(StakingMsg::Delegate {
+                validator: first_validator,
+                amount: Coin {
+                    denom: coin_denom.clone(),
+                    amount: remaining_amount,
+                },
+            });
+
+        msgs.push(remaining_staking_msg.into());
+    }
+    msgs
+}

@@ -47,4 +47,7 @@ pub enum ContractError {
 
     #[error("this contract must have an owner")]
     OwnershipCannotBeRenounced,
+
+    #[error("withdraw contract address is not set")]
+    NoRewardAddress,
 }

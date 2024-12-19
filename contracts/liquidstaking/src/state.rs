@@ -51,11 +51,11 @@ pub struct Parameters {
     pub liquidstaking_denom: String,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,
-    pub fee_rate: Decimal,
-    pub revenue_receiver: String,
     pub unbonding_time: u64,
     // cw20 contract address
     pub cw20_address: Option<Addr>,
+    // reward contract address
+    pub reward_address: Option<Addr>,
 }
 
 impl State {

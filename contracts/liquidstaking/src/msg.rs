@@ -18,6 +18,11 @@ pub struct InstantiateMsg {
     pub cw20_address: Option<Addr>,
 }
 
+#[cw_serde]
+pub enum ExecuteRewardMsg {
+    SplitReward {},
+}
+
 #[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
@@ -53,6 +58,7 @@ pub enum ExecuteMsg {
         ucs01_relay_contract: Option<String>,
         unbonding_time: Option<u64>,
         cw20_address: Option<Addr>,
+        reward_address: Option<Addr>,
     },
     /// Update Validators
     UpdateValidators {
@@ -60,6 +66,8 @@ pub enum ExecuteMsg {
     },
     /// Reset will set state to initial state and unbond all delegations
     Reset {},
+    /// Redelegate will delegate the balance
+    Redelegate {},
 }
 
 #[cw_ownable_query]
