@@ -28,9 +28,7 @@ export type ChainConfig = {
   contracts: {
     lst: string;
     cw20: string;
-    icaController?: {
-      codeId: number;
-    };
+    reward: string;
   };
   gasPrice: string;
   connectionID: string;
@@ -55,7 +53,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
   "lst-network": {
     chainId: "lst",
     chainName: "LST Network",
-    rpc: "https://lst.rickyanto.com:443",
+    rpc: "http://100.42.181.110:26657",
     rest: "http://100.42.181.110:1317",
     stakeCurrency: currency["lst-network"],
     bip44: {
@@ -74,9 +72,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     contracts: {
       lst: "cosmos1c2f79k5kykr5s4zhknn5w56hs5c9a8zxh4w03x07dnzwyrcj4pfspyf0pr",
       cw20: "cosmos1t3f4zxve6725sf4glrnlar8uku78j0nyfl0ppzgfju9ft9phvqwqren6rp",
-      icaController: {
-        codeId: 112,
-      },
+      reward: "cosmos1pd7kfgvr5tpcv0xnlv46c4jsq9jg2r799xxrcwqdm4l2jhq2pjwqyg4puh",
     },
     gasPrice: "0.01stake",
     connectionID: "connection-26",

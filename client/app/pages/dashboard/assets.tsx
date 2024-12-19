@@ -9,7 +9,7 @@ export default function Assets() {
 
     const [stakeBalance, setStakeBalance] = useState("");
     const [lstakeBalance, setLstakeBalance] = useState("0");
-    const faucetURL = "https://lstfaucet.rickyanto.com/";
+    const faucetURL = "http://lstfaucet.rickyanto.com/";
 
     const {
         client,

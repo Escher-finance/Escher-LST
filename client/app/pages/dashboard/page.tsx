@@ -7,6 +7,7 @@ import { Tabs, Tab } from "@nextui-org/react";
 import UnbondingRecords from "./unbonding_records";
 import Liquidity from "./liquidity";
 import ContractAssets from "./contract_assets";
+import RewardAsset from "./reward_asset";
 export default function Dashboard() {
 
 
@@ -20,7 +21,7 @@ export default function Dashboard() {
             <div className="flex flex-col gap-4">
               <Assets />
 
-              <ContractAssets />
+              <RewardAsset />
             </div>
 
             <Liquidity />

@@ -18,6 +18,8 @@ import DecodePacket from "./decode";
 import InstantiateAuthz from "./instantiate_authz";
 import SetParams from "./set_params";
 import SetMinter from "./set_minter";
+import InstantiateReward from "./instantiate_reward";
+import SetReward from "./set_reward";
 
 export default function Utils() {
   return (
@@ -147,6 +149,20 @@ export default function Utils() {
               title="Set Minter"
             >
               <SetMinter />
+            </AccordionItem>
+            <AccordionItem
+              key="18"
+              aria-label="Instantiate Reward"
+              title="Instantiate Reward"
+            >
+              <InstantiateReward />
+            </AccordionItem>
+            <AccordionItem
+              key="19"
+              aria-label="Set Reward"
+              title="Set Reward"
+            >
+              <SetReward />
             </AccordionItem>
           </Accordion>
         </div>
