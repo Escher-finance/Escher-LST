@@ -109,16 +109,6 @@ pub fn calculate_undelegate_amount(
     let undelegate_native_decimal = native_token_undelegate_decimal * ratio;
     undelegate_native_decimal.to_uint_floor()
 }
-
-pub fn split_revenue(amount: Uint128, fee_rate: Decimal) -> (Uint128, Uint128) {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (fee_rate * decimal_fract).to_uint_ceil();
-    let fee_amount =
-        Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
-    let restake_amount = amount - fee_amount;
-    (restake_amount, fee_amount)
-}
-
 pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
     let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
     let fract = (ratio * decimal_fract).to_uint_ceil();
@@ -208,15 +198,6 @@ pub fn send_to_evm(
         msg: transfer_relay_msg,
         funds,
     });
-}
-
-pub fn calculate_delegate(amount: Uint128, fee_rate: Decimal) -> (Uint128, Uint128) {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (fee_rate * decimal_fract).to_uint_ceil();
-    let fee_amount =
-        Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
-    let restake_amount = amount - fee_amount;
-    (restake_amount, fee_amount)
 }
 
 pub fn get_validator_delegation_map_with_total_bond(

@@ -12,7 +12,6 @@ pub struct InstantiateMsg {
     pub liquidstaking_denom: String,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,
-    pub fee_rate: Decimal,
     pub revenue_receiver: String,
     pub unbonding_time: u64,
     pub cw20_address: Option<Addr>,

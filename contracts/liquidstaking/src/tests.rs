@@ -46,7 +46,6 @@ fn set_up(
         liquidstaking_denom: denom_name.clone(),
         ucs01_channel: "channel-01".to_string(),
         ucs01_relay_contract: ucs01_relay_contract.to_string(),
-        fee_rate: Decimal::from_str("0.1").unwrap(),
         revenue_receiver: receiver.to_string(),
         unbonding_time: 1000u64,
         cw20_address: Some(cw20_contract),
@@ -142,7 +141,6 @@ fn setup_contract() -> (Addr, StakingApp, Addr) {
         liquidstaking_denom: ls_denom_name,
         ucs01_channel: "channel-01".to_string(),
         ucs01_relay_contract: ucs01_relay_contract.to_string(),
-        fee_rate: Decimal::from_str("0.1").unwrap(),
         revenue_receiver: receiver.to_string(),
         unbonding_time: 1000u64,
         cw20_address: Some(cw20_contract),
@@ -375,20 +373,4 @@ fn undelegate_amount_calculation() {
     let unbond_amount = Uint128::new(500);
     let token = calculate_native_token_from_staking_token(unbond_amount, current_exchange_rate);
     println!("calculate_undelegate_amount: {:?}", token);
-}
-
-#[test]
-fn split_revenue() {
-    use crate::utils;
-    let reward_amount = Uint128::new(251);
-    let fee_rate = Decimal::from_str("0.1").unwrap();
-
-    //check Decimal(100000000000000000)
-    println!("fee_rate: {:?}", fee_rate);
-    println!("{}", "Decimal(100000000000000000)");
-    let (restake, fee) = utils::split_revenue(reward_amount, fee_rate);
-    println!(
-        "split_revenue: {}, restake: {}, fee: {}",
-        reward_amount, restake, fee
-    );
 }

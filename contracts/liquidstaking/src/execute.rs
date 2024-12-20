@@ -779,6 +779,7 @@ pub fn set_parameters(
         Some(cw20) => cw20.to_string(),
         None => "".to_string(),
     };
+    let mut reward_address_str = "".to_string();
 
     let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
 
@@ -788,10 +789,12 @@ pub fn set_parameters(
                 address: reward_address.unwrap().to_string(),
             });
         msgs.push(msg);
+        reward_address_str = reward_address.unwrap().to_string();
     }
     PARAMETERS.save(deps.storage, &params)?;
 
     let res: Response<TokenFactoryMsg> = Response::new()
+        .add_messages(msgs)
         .add_attribute("action", "set_parameters")
         .add_attribute(
             "liquidstaking_denom",
@@ -809,7 +812,8 @@ pub fn set_parameters(
             "ucs01_relay_contract",
             ucs01_relay_contract.unwrap_or_else(|| "".to_string()),
         )
-        .add_attribute("cw20_address", cw20_addr_string);
+        .add_attribute("cw20_address", cw20_addr_string)
+        .add_attribute("reward_address", reward_address_str);
 
     Ok(res)
 }
