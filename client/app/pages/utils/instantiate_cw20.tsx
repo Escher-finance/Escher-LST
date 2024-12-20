@@ -15,6 +15,10 @@ export default function InstantiateCW20() {
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      alert("no user");
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const msg = {
@@ -39,7 +43,7 @@ export default function InstantiateCW20() {
         admin: userAddress,
       };
 
-      const instantiateResult = await client.instantiate(
+      const instantiateResult = await client?.instantiate(
         userAddress,
         Number(code_id),
         msg,
@@ -47,8 +51,8 @@ export default function InstantiateCW20() {
         "auto",
         instantiateOptions
       );
-      console.log(instantiateResult.contractAddress);
-      alert(instantiateResult.contractAddress);
+      console.log(instantiateResult?.contractAddress);
+      alert(instantiateResult?.contractAddress);
 
     } catch (err) {
       console.log(err);

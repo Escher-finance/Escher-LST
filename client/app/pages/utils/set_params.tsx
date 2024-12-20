@@ -15,21 +15,24 @@ export default function SetParams() {
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const liquidstaking_denom = formEntries.liquidstaking_denom.toString();
     const lst_contract = formEntries.lst_contract.toString();
     const msg = {
-        set_parameters : {
-          liquidstaking_denom,
-        }
+      set_parameters: {
+        liquidstaking_denom,
+      }
     };
 
     console.log(JSON.stringify(msg));
     try {
-      const res = await client.execute(userAddress, lst_contract, msg, "auto");
-      alert(res.transactionHash);
+      const res = await client?.execute(userAddress, lst_contract, msg, "auto");
+      alert(res?.transactionHash);
 
     } catch (err) {
       console.log(err);

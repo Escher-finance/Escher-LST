@@ -15,6 +15,9 @@ export default function InstantiateAuthz() {
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
@@ -31,7 +34,7 @@ export default function InstantiateAuthz() {
         admin: userAddress,
       }
 
-      const instantiateResult = await client.instantiate(
+      const instantiateResult = await client?.instantiate(
         userAddress,
         code_id,
         msg,
@@ -39,8 +42,8 @@ export default function InstantiateAuthz() {
         "auto",
         instantiateOptions
       );
-      console.log(instantiateResult.contractAddress);
-      alert(instantiateResult.contractAddress);
+      console.log(instantiateResult?.contractAddress);
+      alert(instantiateResult?.contractAddress);
 
     } catch (err) {
       console.log(err);

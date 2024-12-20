@@ -1,5 +1,7 @@
 use crate::error::ContractError;
-use crate::event::{BondEvent, UnbondEvent, UpdateValidatorsEvent};
+use crate::event::{
+    BondEvent, ProcessRewardsEvent, ProcessUnbondingEvent, UnbondEvent, UpdateValidatorsEvent,
+};
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
 use crate::relay::send_to_evm;
 use crate::reply::{
@@ -32,6 +34,7 @@ pub fn bond(
     let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
+    let delegator = env.contract.address;
 
     let payment: Coin;
     // if amount is none it should use senders funds to delegate
@@ -56,7 +59,7 @@ pub fn bond(
         // if amount exists it should use this contract fund to delegate
         let lst_balance = deps
             .querier
-            .query_balance(env.contract.address.to_string(), coin_denom.clone())?;
+            .query_balance(delegator.to_string(), coin_denom.clone())?;
 
         if lst_balance.amount < the_amount.clone() {
             return Err(ContractError::NotEnoughFund {});
@@ -68,57 +71,12 @@ pub fn bond(
         };
     }
 
-    let total_weight = validators_reg
-        .validators
-        .iter()
-        .map(|v| v.weight)
-        .reduce(|a, b| (a + b))
-        .unwrap_or(1);
+    let msgs = utils::get_delegate_to_validator_msgs(
+        payment.amount,
+        params.underlying_coin_denom.to_string(),
+        validators_reg.validators.clone(),
+    );
 
-    let mut total_delegated: Uint128 = Uint128::from(0u32);
-
-    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
-    let mut first_validator: String = "".to_string();
-
-    for (pos, validator) in validators_reg.clone().validators.into_iter().enumerate() {
-        let ratio =
-            Decimal::from_ratio(Uint128::from(validator.weight), Uint128::from(total_weight));
-
-        let delegate_amount = utils::calculate_delegated_amount(payment.amount, ratio);
-        total_delegated += delegate_amount;
-        let amount = Coin {
-            amount: delegate_amount.clone(),
-            denom: coin_denom.to_string(),
-        };
-        let staking_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Staking(StakingMsg::Delegate {
-            validator: validator.address.to_string(),
-            amount,
-        });
-
-        msgs.push(staking_msg.into());
-
-        if pos == 0 {
-            first_validator = validator.address.to_string();
-        }
-    }
-
-    // calculate remaining
-
-    let remaining_amount = payment.amount - total_delegated;
-    if !remaining_amount.is_zero() {
-        let remaining_staking_msg: CosmosMsg<TokenFactoryMsg> =
-            CosmosMsg::Staking(StakingMsg::Delegate {
-                validator: first_validator,
-                amount: Coin {
-                    denom: coin_denom.clone(),
-                    amount: remaining_amount,
-                },
-            });
-
-        msgs.push(remaining_staking_msg.into());
-    }
-
-    let delegator = env.contract.address;
     let validators_list: Vec<String> = validators_reg
         .validators
         .iter()
@@ -127,7 +85,7 @@ pub fn bond(
 
     // logic to mint token and update the supply and total_bond_amount
     let mut state = STATE.load(deps.storage)?;
-    let total_bond_amount: Uint128;
+
     let delegated_amount = get_actual_total_delegated(
         deps.querier,
         delegator.to_string(),
@@ -135,6 +93,7 @@ pub fn bond(
         validators_list.clone(),
     );
 
+    let total_bond_amount: Uint128;
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
         let reward = get_actual_total_reward(
@@ -189,7 +148,7 @@ pub fn bond(
     let payload_bin = to_json_binary(&payload)?;
 
     if !cfg!(test) {
-        // Start to mint according to staked token
+        // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg<TokenFactoryMsg> = get_staked_token_submsg(
             delegator.to_string(),
             the_staker.to_string(),
@@ -457,6 +416,109 @@ pub fn unbond(
     Ok(res)
 }
 
+pub fn redelegate(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let coin_denom = params.underlying_coin_denom.clone();
+
+    if params.reward_address.is_none() {
+        return Err(ContractError::NoRewardAddress {});
+    }
+    // make sure sender is the rewards contract
+    if params.reward_address.unwrap() != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let delegator = env.contract.address;
+
+    if info.funds.len() > 1usize {
+        return Err(ContractError::InvalidAsset {});
+    }
+
+    let payment = Coin {
+        amount: info
+            .funds
+            .iter()
+            .find(|x| x.denom == coin_denom && x.amount > Uint128::zero())
+            .ok_or_else(|| ContractError::NoAsset {})?
+            .amount
+            .clone(),
+        denom: coin_denom.clone(),
+    };
+
+    let msgs = utils::get_delegate_to_validator_msgs(
+        payment.amount,
+        params.underlying_coin_denom.to_string(),
+        validators_reg.validators.clone(),
+    );
+
+    let validators_list: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    // logic to mint token and update the supply and total_bond_amount
+    let mut state = STATE.load(deps.storage)?;
+
+    let delegated_amount = get_actual_total_delegated(
+        deps.querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    );
+
+    let total_bond_amount: Uint128;
+    if !cfg!(test) {
+        state.total_delegated_amount = delegated_amount;
+        let reward = get_actual_total_reward(
+            deps.querier,
+            delegator.to_string(),
+            coin_denom.clone(),
+            validators_list,
+        )?;
+
+        total_bond_amount = delegated_amount + reward;
+    } else {
+        total_bond_amount = get_mock_total_reward(state.total_bond_amount);
+    }
+
+    let mut current_exchange_rate = state.exchange_rate;
+
+    if !total_bond_amount.is_zero() && !state.total_lst_supply.is_zero() {
+        current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
+    }
+
+    let mint_amount = calculate_staking_token_from_rate(payment.amount, current_exchange_rate);
+
+    let total_lst_supply = state.total_lst_supply;
+
+    // after update exchange rate we update the state
+    state.bond_counter = state.bond_counter + 1;
+    state.total_bond_amount = total_bond_amount + payment.amount;
+    state.total_lst_supply = total_lst_supply + mint_amount;
+    state.total_delegated_amount += payment.amount;
+    state.last_bond_time = env.block.time.nanos();
+    state.update_exchange_rate();
+
+    STATE.save(deps.storage, &state)?;
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(vec![
+        attr("action", "redelegate"),
+        attr("from", info.sender.to_string()),
+        attr("payment_amount", payment.amount.to_string()),
+        attr("denom", coin_denom.to_string()),
+        attr("exchange_rate", state.exchange_rate.to_string()),
+    ]);
+
+    Ok(res)
+}
+
 fn get_unbond_attrs(
     sender: String,
     the_staker: String,
@@ -546,6 +608,8 @@ pub fn process_rewards(
 
     let mut attrs = vec![attr("action", "process_rewards"), attr("from", sender)];
 
+    let mut total_amount: Uint128 = Uint128::zero();
+
     for validator in validators_reg.validators {
         let result: StdResult<Vec<DecCoin>> = deps
             .querier
@@ -560,6 +624,7 @@ pub fn process_rewards(
             for reward in result.unwrap() {
                 if reward.denom == coin_denom {
                     payload.amount = to_uint128(reward.amount.to_uint_floor())?;
+                    total_amount += payload.amount;
                 }
             }
         }
@@ -581,8 +646,10 @@ pub fn process_rewards(
         attrs.push(attr("amount", payload.amount.to_string()));
     }
 
+    let ev = ProcessRewardsEvent(total_amount);
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_attributes(attrs)
+        .add_event(ev)
         .add_submessages(sub_msgs);
 
     Ok(res)
@@ -610,6 +677,36 @@ pub fn reset(
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "reset");
+
+    Ok(res)
+}
+
+pub fn move_to_reward(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let params = PARAMETERS.load(deps.storage)?;
+
+    let balance = deps
+        .querier
+        .query_balance(env.contract.address, params.underlying_coin_denom)?;
+
+    if balance.amount < Uint128::one() {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let bank_msg = BankMsg::Send {
+        to_address: params.reward_address.unwrap().to_string(),
+        amount: vec![balance.clone()],
+    };
+    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "move_to_reward_contract")
+        .add_attribute("amount", balance.amount.to_string());
 
     Ok(res)
 }
@@ -684,6 +781,7 @@ pub fn set_parameters(
     ucs01_relay_contract: Option<String>,
     unbonding_time: Option<u64>,
     cw20_address: Option<Addr>,
+    reward_address: Option<Addr>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -705,15 +803,28 @@ pub fn set_parameters(
         .clone()
         .unwrap_or_else(|| params.unbonding_time);
     params.cw20_address = cw20_address.clone();
+    params.reward_address = reward_address.clone();
 
     let cw20_addr_string = match cw20_address {
         Some(cw20) => cw20.to_string(),
         None => "".to_string(),
     };
+    let mut reward_address_str = "".to_string();
 
+    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+
+    if reward_address.is_some() {
+        let msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+                address: reward_address.clone().unwrap().to_string(),
+            });
+        msgs.push(msg);
+        reward_address_str = reward_address.unwrap().to_string();
+    }
     PARAMETERS.save(deps.storage, &params)?;
 
     let res: Response<TokenFactoryMsg> = Response::new()
+        .add_messages(msgs)
         .add_attribute("action", "set_parameters")
         .add_attribute(
             "liquidstaking_denom",
@@ -731,7 +842,8 @@ pub fn set_parameters(
             "ucs01_relay_contract",
             ucs01_relay_contract.unwrap_or_else(|| "".to_string()),
         )
-        .add_attribute("cw20_address", cw20_addr_string);
+        .add_attribute("cw20_address", cw20_addr_string)
+        .add_attribute("reward_address", reward_address_str);
 
     Ok(res)
 }
@@ -779,6 +891,12 @@ pub fn process_unbonding(
         }
     };
 
+    let ev = ProcessUnbondingEvent(
+        unbond_rec.staker.to_string(),
+        unbond_rec.undelegate_amount.amount.clone(),
+        unbond_rec.undelegate_amount.denom.clone(),
+    );
+
     // set unbonding record to be released
     unbond_rec.released = true;
     unbond_rec.released_time = env.block.time;
@@ -786,6 +904,7 @@ pub fn process_unbonding(
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_message(msg)
+        .add_event(ev)
         .add_attribute("action", "transfer_unbonding")
         .add_attribute("staker", unbond_rec.staker)
         .add_attribute("amount", unbond_rec.undelegate_amount.amount)

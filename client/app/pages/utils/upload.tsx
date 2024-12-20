@@ -41,11 +41,14 @@ const ContractUpload = () => {
   }
 
   const upload = async () => {
+    if (!userAddress || !fileData) {
+      return;
+    }
     console.log("user Address", userAddress);
-    const uploadResult = await client.upload(userAddress, fileData, "auto", "");
+    const uploadResult = await client?.upload(userAddress, fileData, "auto", "");
 
     console.log("uploadResult");
-    const codeId = uploadResult.codeId;
+    const codeId = uploadResult?.codeId;
     alert("Code ID:" + codeId);
     return codeId;
   };
@@ -54,7 +57,10 @@ const ContractUpload = () => {
     setIsUploading(true);
     try {
       const theCodeID = await upload();
-
+      if (!theCodeID) {
+        alert("error");
+        return;
+      }
       setCodeID(theCodeID.toString());
     } catch (err) {
       console.log("Failed to upload");

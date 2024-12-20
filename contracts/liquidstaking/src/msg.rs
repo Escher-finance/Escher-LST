@@ -12,10 +12,14 @@ pub struct InstantiateMsg {
     pub liquidstaking_denom: String,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,
-    pub fee_rate: Decimal,
     pub revenue_receiver: String,
     pub unbonding_time: u64,
     pub cw20_address: Option<Addr>,
+}
+
+#[cw_serde]
+pub enum ExecuteRewardMsg {
+    SplitReward {},
 }
 
 #[cw_ownable_execute]
@@ -53,6 +57,7 @@ pub enum ExecuteMsg {
         ucs01_relay_contract: Option<String>,
         unbonding_time: Option<u64>,
         cw20_address: Option<Addr>,
+        reward_address: Option<Addr>,
     },
     /// Update Validators
     UpdateValidators {
@@ -60,6 +65,10 @@ pub enum ExecuteMsg {
     },
     /// Reset will set state to initial state and unbond all delegations
     Reset {},
+    /// Redelegate will delegate the balance
+    Redelegate {},
+    /// Move native balance to reward contract
+    MoveToReward {},
 }
 
 #[cw_ownable_query]

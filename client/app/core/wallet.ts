@@ -6,7 +6,7 @@ import { getOfflineSigner } from "@cosmostation/cosmos-client";
 
 export async function initializeKeplr(
   network: ChainConfig | null,
-  setCient: (client: any) => void,
+  setClient: (client: SigningCosmWasmClient) => void,
   setUserAddress: (addr: string) => void,
   setAuthenticated: (val: boolean) => void
 ) {
@@ -17,7 +17,7 @@ export async function initializeKeplr(
     };
     (window as any).keplr.enable(network?.chainId);
 
-    if (network) setClientNomos(network, "keplr", setCient, setUserAddress, setAuthenticated);
+    if (network) setClientNomos(network, "keplr", setClient, setUserAddress, setAuthenticated);
   } catch (e) {
     alert("Failed to suggest the chain:" + e);
   }
@@ -25,7 +25,7 @@ export async function initializeKeplr(
 
 export async function initializeLeap(
   network: ChainConfig | null,
-  setCient: (client: any) => void,
+  setClient: (client: SigningCosmWasmClient) => void,
   setUserAddress: (addr: string) => void,
   setAuthenticated: (val: boolean) => void
 ) {
@@ -36,7 +36,7 @@ export async function initializeLeap(
     };
     (window as any).leap.enable(network?.chainId);
 
-    if (network) setClientNomos(network, "leap", setCient, setUserAddress, setAuthenticated);
+    if (network) setClientNomos(network, "leap", setClient, setUserAddress, setAuthenticated);
   } catch {
     alert("Failed to suggest the chain");
   }
@@ -44,13 +44,13 @@ export async function initializeLeap(
 
 export async function initializeCosmos(
   network: ChainConfig | null,
-  setCient: (client: any) => void,
+  setClient: (client: SigningCosmWasmClient) => void,
   setUserAddress: (addr: string) => void,
   setAuthenticated: (val: boolean) => void
 ) {
   try {
     if (network)
-      setClientNomos(network, "cosmostation", setCient, setUserAddress, setAuthenticated);
+      setClientNomos(network, "cosmostation", setClient, setUserAddress, setAuthenticated);
   } catch {
     alert("Failed to suggest the chain");
   }
@@ -59,7 +59,7 @@ export async function initializeCosmos(
 export async function setClientNomos(
   network: ChainConfig,
   selectedWallet: string | null,
-  setCient: (client: any) => void,
+  setClient: (client: SigningCosmWasmClient) => void,
   setUserAddress: (addr: string) => void,
   setAuthenticated: (val: boolean) => void
 ) {
@@ -88,7 +88,7 @@ export async function setClientNomos(
   });
   console.log("setClientNomos");
   console.log(cosmosClient);
-  setCient(cosmosClient);
+  setClient(cosmosClient);
 
   const accounts = await offlineSigner.getAccounts();
 

@@ -1,7 +1,7 @@
 "use client";
 
+import { useState } from "react";
 import InstantiateCW20 from "./instantiate_cw20";
-import InstantiateICA from "./instantiate_ica";
 import ContractUpload from "./upload";
 import InstantiateLiquidStaking from "./instantiate_lst";
 import ExecuteBond from "./execute_bond";
@@ -18,8 +18,15 @@ import DecodePacket from "./decode";
 import InstantiateAuthz from "./instantiate_authz";
 import SetParams from "./set_params";
 import SetMinter from "./set_minter";
+import InstantiateReward from "./instantiate_reward";
+import SetReward from "./set_reward";
+import MoveToReward from "./move_to_reward";
 
 export default function Utils() {
+
+  const [stateKey, setStateKey] = useState(1);
+
+
   return (
     <div className="w-full flex flex-col gap-4">
       <div className="w-full">
@@ -34,13 +41,6 @@ export default function Utils() {
               title="Upload Contract"
             >
               <ContractUpload />
-            </AccordionItem>
-            <AccordionItem
-              key="2"
-              aria-label="InstantiateICA"
-              title="InstantiateICA"
-            >
-              <InstantiateICA />
             </AccordionItem>
             <AccordionItem
               key="3"
@@ -61,7 +61,7 @@ export default function Utils() {
               aria-label="Execute Bond"
               title="Execute Bond"
             >
-              <ExecuteBond />
+              <ExecuteBond stateKey={stateKey} setStateKey={setStateKey} />
             </AccordionItem>
             <AccordionItem
               key="6"
@@ -103,7 +103,7 @@ export default function Utils() {
               aria-label="Unbond"
               title="Unbond"
             >
-              <Unbond />
+              <Unbond stateKey={stateKey} setStateKey={setStateKey} />
             </AccordionItem>
             <AccordionItem
               key="12"
@@ -147,6 +147,27 @@ export default function Utils() {
               title="Set Minter"
             >
               <SetMinter />
+            </AccordionItem>
+            <AccordionItem
+              key="18"
+              aria-label="Instantiate Reward"
+              title="Instantiate Reward"
+            >
+              <InstantiateReward />
+            </AccordionItem>
+            <AccordionItem
+              key="19"
+              aria-label="Set Reward"
+              title="Set Reward"
+            >
+              <SetReward />
+            </AccordionItem>
+            <AccordionItem
+              key="20"
+              aria-label="Move To Reward"
+              title="Move To Reward"
+            >
+              <MoveToReward />
             </AccordionItem>
           </Accordion>
         </div>

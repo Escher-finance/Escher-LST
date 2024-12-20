@@ -5,7 +5,13 @@ import { Card, CardBody, CardHeader, Divider } from "@nextui-org/react";
 import { useState, useEffect } from "react";
 import { useGlobalContext } from "@/app/core/context";
 
-export default function Liquidity() {
+
+interface AssetsProps {
+    stateKey: number;
+}
+
+export default function Liquidity({ stateKey }: AssetsProps) {
+
     const [liquidity, setLiquidity] = useState<any>(null);
     const [state, setState] = useState<any>(null);
     const [tokenInfo, setTokenInfo] = useState<any>(null);
@@ -17,50 +23,57 @@ export default function Liquidity() {
     } = useGlobalContext();
 
 
+    const getLiquidity = async () => {
+        const msg: any = {
+            staking_liquidity: {}
+        };
+
+        const liquidity = await client?.queryContractSmart(
+            network?.contracts.lst,
+            msg
+        );
+
+        setLiquidity(liquidity);
+    }
+
+    const getState = async () => {
+        const msg: any = {
+            state: {}
+        };
+
+        const state = await client?.queryContractSmart(
+            network?.contracts.lst,
+            msg
+        );
+
+        setState(state);
+    }
+
+    const getTokenInfo = async () => {
+        const msg: any = {
+            token_info: {}
+        };
+
+        const token_info = await client?.queryContractSmart(
+            network?.contracts.cw20,
+            msg
+        );
+
+        setTokenInfo(token_info);
+    }
+
     useEffect(() => {
-        const getLiquidity = async () => {
-            const msg: any = {
-                staking_liquidity: {}
-            };
-
-            const liquidity = await client.queryContractSmart(
-                network?.contracts.lst,
-                msg
-            );
-
-            setLiquidity(liquidity);
-        }
-
-        const getState = async () => {
-            const msg: any = {
-                state: {}
-            };
-
-            const state = await client.queryContractSmart(
-                network?.contracts.lst,
-                msg
-            );
-
-            setState(state);
-        }
-
-        const getTokenInfo = async () => {
-            const msg: any = {
-                token_info: {}
-            };
-
-            const token_info = await client.queryContractSmart(
-                network?.contracts.cw20,
-                msg
-            );
-
-            setTokenInfo(token_info);
-        }
-
         getLiquidity();
         getState();
         getTokenInfo();
     }, []);
+
+    useEffect(() => {
+        getLiquidity();
+        getState();
+        getTokenInfo();
+    }, [stateKey]);
+
 
     return (
         <Card className="w-full flex">

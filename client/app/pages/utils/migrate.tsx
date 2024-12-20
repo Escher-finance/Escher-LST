@@ -8,14 +8,18 @@ import {
   Input,
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
-import {PressEvent} from "@react-types/shared";
+import { PressEvent } from "@react-types/shared";
 
 export default function Migrate() {
-  const { userAddress, client } = useGlobalContext();
+  const { userAddress, client, network } = useGlobalContext();
 
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      alert("no user");
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
@@ -26,8 +30,8 @@ export default function Migrate() {
 
     console.log(JSON.stringify(msg));
     try {
-      const res = await client.migrate(userAddress, lst_contract, code_id, msg, "auto");
-      alert(res.transactionHash);
+      const res = await client?.migrate(userAddress, lst_contract, code_id, msg, "auto");
+      alert(res?.transactionHash);
 
     } catch (err) {
       console.log(err);
@@ -35,14 +39,17 @@ export default function Migrate() {
   };
 
   const reset = async (e: PressEvent) => {
-
-    let lst_contract = "union1x70fmdv965fj6hm4lmyudxyphl6j9vweukmc3fxja3mamgqrup6qf9mv3x";
+    if (!userAddress) {
+      alert("no user");
+      return;
+    }
+    let lst_contract = network?.contracts.lst;
     try {
       let msg = {
         reset: {}
       };
-      const res = await client.execute(userAddress, lst_contract, msg, "auto");
-      alert(res.transactionHash);
+      const res = await client?.execute(userAddress, lst_contract, msg, "auto");
+      alert(res?.transactionHash);
 
     } catch (err) {
       console.log(err);
@@ -59,7 +66,7 @@ export default function Migrate() {
               isRequired
               name="lst_contract"
               label="LiquidStaking Contract"
-              defaultValue="union1x70fmdv965fj6hm4lmyudxyphl6j9vweukmc3fxja3mamgqrup6qf9mv3x"
+              defaultValue={network?.contracts.lst}
             />
           </CardBody>
           <CardBody className="w-full gap-4">

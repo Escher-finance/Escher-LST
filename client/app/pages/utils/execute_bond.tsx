@@ -8,12 +8,24 @@ import {
   Input,
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
+import { useState } from "react";
 
-export default function ExecuteBond() {
+interface KeyProps {
+  stateKey: number;
+  setStateKey: (key: number) => void;
+}
+
+export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
   const { userAddress, client, network } = useGlobalContext();
+
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
+    if (!userAddress) {
+      alert("no user");
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
@@ -26,15 +38,19 @@ export default function ExecuteBond() {
 
     console.log(JSON.stringify(msg));
     try {
+      setIsLoading(true);
       const funds = [{
         amount,
         denom: "stake"
       }];
-      const res = await client.execute(userAddress, network?.contracts.lst, msg, "auto", "execute bond", funds);
-      alert(res.transactionHash);
-
+      const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto", "execute bond", funds);
+      alert(res?.transactionHash);
+      let newKey = stateKey + 1;
+      setStateKey(newKey);
+      setIsLoading(false);
     } catch (err) {
       console.log(err);
+      setIsLoading(false);
     }
   };
 
@@ -51,7 +67,7 @@ export default function ExecuteBond() {
             />
           </CardBody>
           <CardFooter>
-            <Button type="submit">Bond</Button>
+            <Button type="submit" isLoading={isLoading}>Bond</Button>
           </CardFooter>
         </Card>
       </form>

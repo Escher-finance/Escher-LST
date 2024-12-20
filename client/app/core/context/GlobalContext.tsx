@@ -1,5 +1,6 @@
 "use client";
 
+import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import Networks, { ChainConfig } from "../../../config/networks.config";
 import { createContext, useState } from "react";
 
@@ -13,8 +14,8 @@ interface IGlobalContextProps {
   network: ChainConfig;
   setNetwork: (network: ChainConfig) => void;
 
-  client: any;
-  setCient: (client: any) => void;
+  client: SigningCosmWasmClient | undefined;
+  setClient: (client: SigningCosmWasmClient) => void;
 
   icaAddress: string | null;
   setICAAddress: (icaAddress: string | null) => void;
@@ -40,8 +41,8 @@ export const GlobalContext = createContext<IGlobalContextProps>({
   setUserAddress: () => { },
   network: Networks["lst-network"],
   setNetwork: () => { },
-  client: null,
-  setCient: () => { },
+  client: undefined,
+  setClient: () => { },
   queryClient: null,
   setQueryClient: () => { },
   icaAddress: null,
@@ -55,7 +56,7 @@ export const GlobalContextProvider = ({ children }: Props) => {
   const [authenticated, setAuthenticated] = useState(false);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [network, setNetwork] = useState<ChainConfig>(Networks["lst-network"]);
-  const [client, setCient] = useState();
+  const [client, setClient] = useState<SigningCosmWasmClient>();
   const [queryClient, setQueryClient] = useState();
   const [icaAddress, setICAAddress] = useState<string | null>(null);
   const [icaControllerAddress, setICAControllerAddress] = useState<string | null>(null);
@@ -75,7 +76,7 @@ export const GlobalContextProvider = ({ children }: Props) => {
         setNetwork,
 
         client,
-        setCient,
+        setClient,
 
         queryClient,
         setQueryClient,

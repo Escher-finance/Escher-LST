@@ -15,6 +15,9 @@ export default function SetMinter() {
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
@@ -28,8 +31,8 @@ export default function SetMinter() {
 
     console.log(JSON.stringify(msg));
     try {
-      const res = await client.execute(userAddress, cw20_contract, msg, "auto");
-      alert(res.transactionHash);
+      const res = await client?.execute(userAddress, cw20_contract, msg, "auto");
+      alert(res?.transactionHash);
 
     } catch (err) {
       console.log(err);

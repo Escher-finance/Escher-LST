@@ -1,9 +1,9 @@
 "use client";
 
-import React, {useState, useEffect} from "react";
-import {Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Button} from "@nextui-org/react";
-import {LocalStorage} from "@/app/lib/localstorage";
-import {useGlobalContext} from "@/app/core/context";
+import React, { useState, useEffect } from "react";
+import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Button } from "@nextui-org/react";
+import { LocalStorage } from "@/app/lib/localstorage";
+import { useGlobalContext } from "@/app/core/context";
 import {
   initializeKeplr,
   initializeLeap,
@@ -12,6 +12,7 @@ import {
 } from "@/app/core/wallet";
 import Networks from "@/config/networks.config";
 import { CopyIcon, UserIcon } from "@/components/icons";
+import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 
 export const truncateAddressSE = (address: any, start: number = 4, end: number = 4) => {
   try {
@@ -34,7 +35,7 @@ const copyToClipboard = async (text: string) => {
 export const Wallet = () => {
   const {
     network,
-    setCient,
+    setClient,
     setUserAddress,
     setAuthenticated,
     authenticated,
@@ -44,17 +45,17 @@ export const Wallet = () => {
 
   useEffect(() => {
     const initializeClient = async (
-      setCient: (client: any) => void,
+      setClient: (client: SigningCosmWasmClient) => void,
       setUserAddress: (userAddress: string | null) => void,
       setAuthenticated: (authenticated: boolean) => void
     ) => {
       if (LocalStorage.isAuthenticated() && LocalStorage.getWallet() != null) {
         const net = (Networks as any)[LocalStorage.getNetworkId() || "lst-network"];
-        console.log({net, key: LocalStorage.getNetworkId() || "lst-network"});
+        console.log({ net, key: LocalStorage.getNetworkId() || "lst-network" });
         await setClientNomos(
           (Networks as any)[LocalStorage.getNetworkId() || "lst-network"],
           LocalStorage.getWallet(),
-          setCient,
+          setClient,
           setUserAddress,
           setAuthenticated
         );
@@ -62,8 +63,8 @@ export const Wallet = () => {
       }
     };
 
-    initializeClient(setCient, setUserAddress, setAuthenticated);
-  }, [setCient, setUserAddress, setAuthenticated]);
+    initializeClient(setClient, setUserAddress, setAuthenticated);
+  }, [setClient, setUserAddress, setAuthenticated]);
 
   async function disconnect() {
     (window as any).wallet = null;
@@ -78,7 +79,7 @@ export const Wallet = () => {
     address: string | null | undefined;
   }
 
-  const WalletMenuProfile = ({address}: WalletMenuProps) => {
+  const WalletMenuProfile = ({ address }: WalletMenuProps) => {
     return (
       <Dropdown>
         <DropdownTrigger>
@@ -87,7 +88,7 @@ export const Wallet = () => {
           </Button>
         </DropdownTrigger>
         <DropdownMenu variant="faded" aria-label="Dropdown menu with icons" >
-          <DropdownItem key="1" endContent={<CopyIcon />} onPress={() => { copyToClipboard(address? address : "")}}>Copy address</DropdownItem>
+          <DropdownItem key="1" endContent={<CopyIcon />} onPress={() => { copyToClipboard(address ? address : "") }}>Copy address</DropdownItem>
           <DropdownItem key="2" onPress={disconnect}>Disconnect</DropdownItem>
         </DropdownMenu>
       </Dropdown>
@@ -109,17 +110,17 @@ export const Wallet = () => {
             switch (wallet) {
               case "keplr":
                 setWalletLoading(true);
-                await initializeKeplr(network, setCient, setUserAddress, setAuthenticated);
+                await initializeKeplr(network, setClient, setUserAddress, setAuthenticated);
                 setWalletLoading(false);
                 break;
               case "leap":
                 setWalletLoading(true);
-                await initializeLeap(network, setCient, setUserAddress, setAuthenticated);
+                await initializeLeap(network, setClient, setUserAddress, setAuthenticated);
                 setWalletLoading(false);
                 break;
               case "cosmostation":
                 setWalletLoading(true);
-                await initializeCosmos(network, setCient, setUserAddress, setAuthenticated);
+                await initializeCosmos(network, setClient, setUserAddress, setAuthenticated);
                 setWalletLoading(false);
                 break;
             }

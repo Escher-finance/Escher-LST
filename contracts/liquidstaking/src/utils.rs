@@ -109,16 +109,6 @@ pub fn calculate_undelegate_amount(
     let undelegate_native_decimal = native_token_undelegate_decimal * ratio;
     undelegate_native_decimal.to_uint_floor()
 }
-
-pub fn split_revenue(amount: Uint128, fee_rate: Decimal) -> (Uint128, Uint128) {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (fee_rate * decimal_fract).to_uint_ceil();
-    let fee_amount =
-        Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
-    let restake_amount = amount - fee_amount;
-    (restake_amount, fee_amount)
-}
-
 pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
     let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
     let fract = (ratio * decimal_fract).to_uint_ceil();
@@ -208,15 +198,6 @@ pub fn send_to_evm(
         msg: transfer_relay_msg,
         funds,
     });
-}
-
-pub fn calculate_delegate(amount: Uint128, fee_rate: Decimal) -> (Uint128, Uint128) {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (fee_rate * decimal_fract).to_uint_ceil();
-    let fee_amount =
-        Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
-    let restake_amount = amount - fee_amount;
-    (restake_amount, fee_amount)
 }
 
 pub fn get_validator_delegation_map_with_total_bond(
@@ -366,5 +347,61 @@ pub fn get_restaking_msgs(
         }
     }
 
+    msgs
+}
+
+pub fn get_delegate_to_validator_msgs(
+    delegate_amount: Uint128,
+    coin_denom: String,
+    validators: Vec<Validator>,
+) -> Vec<CosmosMsg<TokenFactoryMsg>> {
+    let total_weight = validators
+        .iter()
+        .map(|v| v.weight)
+        .reduce(|a, b| (a + b))
+        .unwrap_or(1);
+
+    let mut total_delegated: Uint128 = Uint128::from(0u32);
+
+    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+    let mut first_validator: String = "".to_string();
+
+    for (pos, validator) in validators.into_iter().enumerate() {
+        let ratio =
+            Decimal::from_ratio(Uint128::from(validator.weight), Uint128::from(total_weight));
+
+        let delegate_amount = calculate_delegated_amount(delegate_amount, ratio);
+        total_delegated += delegate_amount;
+        let amount = Coin {
+            amount: delegate_amount.clone(),
+            denom: coin_denom.to_string(),
+        };
+        let staking_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: validator.address.to_string(),
+            amount,
+        });
+
+        msgs.push(staking_msg.into());
+
+        if pos == 0 {
+            first_validator = validator.address.to_string();
+        }
+    }
+
+    // calculate remaining
+
+    let remaining_amount = delegate_amount - total_delegated;
+    if !remaining_amount.is_zero() {
+        let remaining_staking_msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Staking(StakingMsg::Delegate {
+                validator: first_validator,
+                amount: Coin {
+                    denom: coin_denom.clone(),
+                    amount: remaining_amount,
+                },
+            });
+
+        msgs.push(remaining_staking_msg.into());
+    }
     msgs
 }

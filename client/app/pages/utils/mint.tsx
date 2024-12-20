@@ -15,18 +15,22 @@ export default function Mint() {
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      alert("no user");
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const lst_contract = formEntries.lst_contract.toString();
     const msg = {
-        mint : {}
+      mint: {}
     };
 
     console.log(JSON.stringify(msg));
     try {
-      const res = await client.execute(userAddress, lst_contract, msg, "auto", "execute bond", []);
-      alert(res.transactionHash);
+      const res = await client?.execute(userAddress, lst_contract, msg, "auto", "execute bond", []);
+      alert(res?.transactionHash);
 
     } catch (err) {
       console.log(err);

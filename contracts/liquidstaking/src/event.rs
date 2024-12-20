@@ -1,5 +1,6 @@
 use crate::state::Validator;
 use cosmwasm_std::{attr, Attribute, Decimal, Event, Uint128};
+
 pub const BOND_EVENT: &str = "bond";
 
 #[allow(non_snake_case)]
@@ -35,7 +36,7 @@ pub fn UnbondEvent(
     total_supply: Uint128,
     exchange_rate: Decimal,
 ) -> Event {
-    Event::new(BOND_EVENT.to_string())
+    Event::new(UNBOND_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", staker)
         .add_attribute("unbond_amount", unbond_amount)
@@ -59,13 +60,31 @@ pub fn UpdateValidatorsEvent(
 
     for val in prev_validators.into_iter() {
         attrs.push(attr("prev_validator_addr", val.address));
-        attrs.push(attr("prev_validator_weigt", val.weight.to_string()));
+        attrs.push(attr("prev_validator_weight", val.weight.to_string()));
     }
 
     for val in new_validators.into_iter() {
         attrs.push(attr("new_validator_addr", val.address));
-        attrs.push(attr("new_validator_weigt", val.weight.to_string()));
+        attrs.push(attr("new_validator_weight", val.weight.to_string()));
     }
 
     Event::new(UPDATE_VALIDATORS_EVENT.to_string()).add_attributes(attrs)
+}
+
+pub const PROCESS_REWARDS_EVENT: &str = "process_rewards";
+
+#[allow(non_snake_case)]
+pub fn ProcessRewardsEvent(total_amount: Uint128) -> Event {
+    Event::new(PROCESS_REWARDS_EVENT.to_string())
+        .add_attribute("total_amount", total_amount.to_string())
+}
+
+pub const PROCESS_UNBONDING_EVENT: &str = "process_unbonding";
+
+#[allow(non_snake_case)]
+pub fn ProcessUnbondingEvent(staker: String, amount: Uint128, denom: String) -> Event {
+    Event::new(PROCESS_UNBONDING_EVENT.to_string())
+        .add_attribute("staker", staker)
+        .add_attribute("amount", amount.to_string())
+        .add_attribute("denom", denom)
 }

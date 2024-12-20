@@ -32,12 +32,12 @@ export default function QueryTotalBond() {
                 }
             };
             const lst_contract = "union1h6efy80ax2d362zsuexhjy34gqnlru5neuhgegv2ed33ma8ge63s9le8v0"
-            const res = await client.queryContractSmart(
+            const res = await client?.queryContractSmart(
                 lst_contract,
                 msg
             );
             alert(JSON.stringify(res));
-            setTotalBond(res.amount);
+            setTotalBond(res?.amount);
 
         } catch (err) {
             console.log(err);
