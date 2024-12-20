@@ -67,6 +67,8 @@ pub enum ExecuteMsg {
     Reset {},
     /// Redelegate will delegate the balance
     Redelegate {},
+    /// Move native balance to reward contract
+    MoveToReward {},
 }
 
 #[cw_ownable_query]

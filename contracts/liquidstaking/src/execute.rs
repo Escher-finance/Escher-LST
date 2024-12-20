@@ -681,6 +681,36 @@ pub fn reset(
     Ok(res)
 }
 
+pub fn move_to_reward(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let params = PARAMETERS.load(deps.storage)?;
+
+    let balance = deps
+        .querier
+        .query_balance(env.contract.address, params.underlying_coin_denom)?;
+
+    if balance.amount < Uint128::one() {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let bank_msg = BankMsg::Send {
+        to_address: params.reward_address.unwrap().to_string(),
+        amount: vec![balance.clone()],
+    };
+    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "move_to_reward_contract")
+        .add_attribute("amount", balance.amount.to_string());
+
+    Ok(res)
+}
+
 pub fn get_unbond_all_messages(
     deps: DepsMut,
     delegator: Addr,

@@ -125,6 +125,7 @@ pub fn execute(
             reward_address,
         ),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
+        ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
     }
 }
 
