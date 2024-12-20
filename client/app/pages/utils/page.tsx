@@ -20,6 +20,7 @@ import SetParams from "./set_params";
 import SetMinter from "./set_minter";
 import InstantiateReward from "./instantiate_reward";
 import SetReward from "./set_reward";
+import MoveToReward from "./move_to_reward";
 
 export default function Utils() {
   return (
@@ -163,6 +164,13 @@ export default function Utils() {
               title="Set Reward"
             >
               <SetReward />
+            </AccordionItem>
+            <AccordionItem
+              key="20"
+              aria-label="Move To Reward"
+              title="Move To Reward"
+            >
+              <MoveToReward />
             </AccordionItem>
           </Accordion>
         </div>

@@ -1,20 +1,22 @@
 "use client";
 
 
-import { Card, CardBody, CardHeader, Divider } from "@nextui-org/react";
+import { Button, Card, CardBody, CardHeader, Divider } from "@nextui-org/react";
 import { useState, useEffect } from "react";
 import { useGlobalContext } from "@/app/core/context";
 
-interface AssetsProps {
+
+interface KeyProps {
     stateKey: number;
 }
 
-export default function RevenueAssets({ stateKey }: AssetsProps) {
-
+export default function RevenueAssets({ stateKey }: KeyProps) {
 
     const [stakeBalance, setStakeBalance] = useState("");
     const [lstakeBalance, setLstakeBalance] = useState("0");
+    const faucetURL = "http://lstfaucet.rickyanto.com/";
 
+    const receiver = "cosmos1pss37x3hwq5ytk7uhf9fjcpcd7k20pekq6xtlz";
     const {
         client,
         userAddress,
@@ -22,17 +24,21 @@ export default function RevenueAssets({ stateKey }: AssetsProps) {
     } = useGlobalContext();
 
     const getNativeBalance = async () => {
-        let bal = await client.getBalance(network?.contracts.reward, "stake");
-        setStakeBalance(bal.amount);
+        let bal = await client?.getBalance(receiver, "stake");
+        if (bal) {
+            setStakeBalance(bal.amount);
+        }
+
     }
+
     const getBalance = async () => {
         const msg: any = {
             balance: {
-                address: network?.contracts.reward
+                address: receiver
             }
         };
 
-        const { balance } = await client.queryContractSmart(
+        const { balance } = await client?.queryContractSmart(
             network?.contracts.cw20,
             msg
         );
@@ -45,7 +51,6 @@ export default function RevenueAssets({ stateKey }: AssetsProps) {
         getBalance();
     }
 
-
     useEffect(() => {
         loadBalance();
     }, [stateKey]);
@@ -54,9 +59,28 @@ export default function RevenueAssets({ stateKey }: AssetsProps) {
         loadBalance();
     }, [userAddress]);
 
+
+    const faucetRequest = async () => {
+        const msg = {
+            address: userAddress,
+            coins: ["100000stake"]
+        };
+        console.log(msg);
+        const response = await fetch(faucetURL, {
+            method: "POST",
+            body: JSON.stringify(msg),
+            headers: {
+                "Content-type": "application/json; charset=UTF-8",
+            },
+        });
+
+        console.log(JSON.stringify(response.body));
+        getNativeBalance();
+    }
+
     return (
         <Card className="w-full flex">
-            <CardHeader className="text-lg p-3">Reward Contract Assets</CardHeader>
+            <CardHeader className="text-lg p-3 gap-5">Revenue Receiver </CardHeader>
             <Divider />
             <CardBody className="gap-1">
                 <div className="flex flex-col">

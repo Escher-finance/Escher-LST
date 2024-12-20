@@ -9,14 +9,21 @@ import {
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
 import { getExecuteContractMessage } from "@/utils/msg";
+import { useState } from "react";
 
-export default function Unbond() {
+interface KeyProps {
+  stateKey: number;
+  setStateKey: (key: number) => void;
+}
+
+export default function Unbond({ stateKey, setStateKey }: KeyProps) {
   const { userAddress, client, network } = useGlobalContext();
-
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    setIsLoading(true);
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
@@ -54,11 +61,15 @@ export default function Unbond() {
 
 
       let msgs = [executeTransferCW20Msg, executeUnbondingMsg];
-      const res = await client.signAndBroadcast(userAddress, msgs, "auto", "");
-      alert(res.transactionHash);
-      console.log(res.transactionHash);
+      const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "");
+      alert(res?.transactionHash);
+      console.log(res?.transactionHash);
 
+      let newKey = stateKey + 1;
+      setStateKey(newKey);
+      setIsLoading(false);
     } catch (err) {
+      setIsLoading(false);
       console.log(err);
     }
   };
@@ -76,7 +87,7 @@ export default function Unbond() {
             />
           </CardBody>
           <CardFooter>
-            <Button type="submit">Unbond</Button>
+            <Button type="submit" isLoading={isLoading}>Unbond</Button>
           </CardFooter>
         </Card>
       </form>

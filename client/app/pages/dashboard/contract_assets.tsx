@@ -5,7 +5,11 @@ import { Card, CardBody, CardHeader, Divider } from "@nextui-org/react";
 import { useState, useEffect } from "react";
 import { useGlobalContext } from "@/app/core/context";
 
-export default function ContractAssets() {
+interface AssetsProps {
+    stateKey: number;
+}
+
+export default function ContractAssets({ stateKey }: AssetsProps) {
 
     const [stakeBalance, setStakeBalance] = useState("");
     const [lstakeBalance, setLstakeBalance] = useState("0");
@@ -17,8 +21,11 @@ export default function ContractAssets() {
     } = useGlobalContext();
 
     const getNativeBalance = async () => {
-        let bal = await client.getBalance(network?.contracts.lst, "stake");
-        setStakeBalance(bal.amount);
+        let bal = await client?.getBalance(network?.contracts.lst, "stake");
+        if (bal) {
+            setStakeBalance(bal.amount);
+        }
+
     }
     const getBalance = async () => {
         const msg: any = {
@@ -27,7 +34,7 @@ export default function ContractAssets() {
             }
         };
 
-        const { balance } = await client.queryContractSmart(
+        const { balance } = await client?.queryContractSmart(
             network?.contracts.cw20,
             msg
         );
@@ -42,11 +49,15 @@ export default function ContractAssets() {
 
     useEffect(() => {
         loadBalance();
+    }, [stateKey]);
+
+    useEffect(() => {
+        loadBalance();
     }, [userAddress]);
 
     return (
         <Card className="w-full flex">
-            <CardHeader className="text-xl p-3">LST Contract Assets</CardHeader>
+            <CardHeader className="text-lg p-3">LST Contract Assets</CardHeader>
             <Divider />
             <CardBody className="gap-1">
                 <div className="flex flex-col">

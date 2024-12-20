@@ -36,7 +36,7 @@ export default function InstantiateReward() {
                 admin: userAddress,
             };
 
-            const instantiateResult = await client.instantiate(
+            const instantiateResult = await client?.instantiate(
                 userAddress,
                 code_id,
                 msg,
@@ -44,8 +44,8 @@ export default function InstantiateReward() {
                 "auto",
                 instantiateOptions
             );
-            console.log(instantiateResult.contractAddress);
-            alert(instantiateResult.contractAddress);
+            console.log(instantiateResult?.contractAddress);
+            alert(instantiateResult?.contractAddress);
 
         } catch (err) {
             console.log(err);

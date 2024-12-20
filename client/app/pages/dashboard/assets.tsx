@@ -5,7 +5,11 @@ import { Button, Card, CardBody, CardHeader, Divider } from "@nextui-org/react";
 import { useState, useEffect } from "react";
 import { useGlobalContext } from "@/app/core/context";
 
-export default function Assets() {
+interface AssetsProps {
+    stateKey: number;
+}
+
+export default function Assets({ stateKey }: AssetsProps) {
 
     const [stakeBalance, setStakeBalance] = useState("");
     const [lstakeBalance, setLstakeBalance] = useState("0");
@@ -44,6 +48,11 @@ export default function Assets() {
 
     useEffect(() => {
         loadBalance();
+    }, [stateKey]);
+
+
+    useEffect(() => {
+        loadBalance();
     }, [userAddress]);
 
 
@@ -67,7 +76,7 @@ export default function Assets() {
 
     return (
         <Card className="w-full flex">
-            <CardHeader className="text-xl p-3 gap-5">Your Assets  <Button onPress={faucetRequest}>Faucet Request Token</Button></CardHeader>
+            <CardHeader className="text-lg p-3 gap-5">My Assets <Button onPress={faucetRequest}>Faucet Request</Button></CardHeader>
             <Divider />
             <CardBody className="gap-1">
                 <div className="flex flex-col">
