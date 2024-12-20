@@ -786,7 +786,7 @@ pub fn set_parameters(
     if reward_address.is_some() {
         let msg: CosmosMsg<TokenFactoryMsg> =
             CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
-                address: reward_address.unwrap().to_string(),
+                address: reward_address.clone().unwrap().to_string(),
             });
         msgs.push(msg);
         reward_address_str = reward_address.unwrap().to_string();
