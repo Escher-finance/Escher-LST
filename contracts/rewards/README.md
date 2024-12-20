@@ -8,3 +8,9 @@ To instantiate need these config:
 - revenue_receiver
 - fee_rate
 - coin_denom
+
+## Build wasm
+
+> cargo build
+
+> cargo run-script optimize
