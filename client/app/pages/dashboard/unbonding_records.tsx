@@ -25,7 +25,7 @@ export default function UnbondingRecords() {
                 }
             };
 
-            const records = await client.queryContractSmart(
+            const records = await client?.queryContractSmart(
                 network?.contracts.lst,
                 msg
             );

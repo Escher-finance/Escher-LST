@@ -1,7 +1,7 @@
 "use client";
 
+import { useState } from "react";
 import InstantiateCW20 from "./instantiate_cw20";
-import InstantiateICA from "./instantiate_ica";
 import ContractUpload from "./upload";
 import InstantiateLiquidStaking from "./instantiate_lst";
 import ExecuteBond from "./execute_bond";
@@ -23,6 +23,10 @@ import SetReward from "./set_reward";
 import MoveToReward from "./move_to_reward";
 
 export default function Utils() {
+
+  const [stateKey, setStateKey] = useState(1);
+
+
   return (
     <div className="w-full flex flex-col gap-4">
       <div className="w-full">
@@ -37,13 +41,6 @@ export default function Utils() {
               title="Upload Contract"
             >
               <ContractUpload />
-            </AccordionItem>
-            <AccordionItem
-              key="2"
-              aria-label="InstantiateICA"
-              title="InstantiateICA"
-            >
-              <InstantiateICA />
             </AccordionItem>
             <AccordionItem
               key="3"
@@ -64,7 +61,7 @@ export default function Utils() {
               aria-label="Execute Bond"
               title="Execute Bond"
             >
-              <ExecuteBond />
+              <ExecuteBond stateKey={stateKey} setStateKey={setStateKey} />
             </AccordionItem>
             <AccordionItem
               key="6"
@@ -106,7 +103,7 @@ export default function Utils() {
               aria-label="Unbond"
               title="Unbond"
             >
-              <Unbond />
+              <Unbond stateKey={stateKey} setStateKey={setStateKey} />
             </AccordionItem>
             <AccordionItem
               key="12"

@@ -15,6 +15,9 @@ export default function TransferEVM() {
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
@@ -22,19 +25,19 @@ export default function TransferEVM() {
     const denom = formEntries.denom.toString();
     const lst_contract = formEntries.lst_contract.toString();
     const msg = {
-        transfer : {
-            amount: {
-                amount,
-                denom,
-            },
-            receiver: "15Ee7c367F4232241028c36E720803100757c6e9"
-        }
+      transfer: {
+        amount: {
+          amount,
+          denom,
+        },
+        receiver: "15Ee7c367F4232241028c36E720803100757c6e9"
+      }
     };
 
     console.log(JSON.stringify(msg));
     try {
-      const res = await client.execute(userAddress, lst_contract, msg, "auto", "execute bond", []);
-      alert(res.transactionHash);
+      const res = await client?.execute(userAddress, lst_contract, msg, "auto", "execute bond", []);
+      alert(res?.transactionHash);
 
     } catch (err) {
       console.log(err);

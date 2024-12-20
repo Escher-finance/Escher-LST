@@ -6,6 +6,7 @@ import {
     CardFooter,
     Button,
     Input,
+    user,
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
 
@@ -15,6 +16,9 @@ export default function InstantiateReward() {
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
         e.preventDefault();
+        if (!userAddress) {
+            return;
+        }
         const form = e.target;
         const formData = new FormData(form);
         const formEntries = Object.fromEntries(formData.entries());

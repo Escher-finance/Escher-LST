@@ -32,7 +32,7 @@ export const getMessage = (msg: { typeUrl: string; value: Object }) => {
 };
 
 const TransferBack = () => {
-  const { client, userAddress, walletAddress, icaControllerAddress, icaAddress } =
+  const { client, userAddress, icaControllerAddress, icaAddress } =
     useGlobalContext();
   const [isExecuting, setIsExecuting] = useState(false);
 
@@ -70,10 +70,10 @@ const TransferBack = () => {
         transfer_from_i_c_a,
       };
 
-      const res = await client.execute(userAddress, walletAddress, msg, "auto");
+      //const res = await client?.execute(userAddress, walletAddress, msg, "auto");
 
-      alert(res.transactionHash);
-      console.log(JSON.stringify(res));
+      //alert(res?.transactionHash);
+      //console.log(JSON.stringify(res));
     } catch (e) {
       console.log(e);
       console.log("Failed to execute");
@@ -91,7 +91,7 @@ const TransferBack = () => {
               name="ica_address"
               isRequired
               label="ICA Address"
-              defaultValue={icaAddress? icaAddress: ""}
+              defaultValue={icaAddress ? icaAddress : ""}
             />
             <Input
               name="amount"

@@ -28,7 +28,7 @@ export default function Liquidity({ stateKey }: AssetsProps) {
             staking_liquidity: {}
         };
 
-        const liquidity = await client.queryContractSmart(
+        const liquidity = await client?.queryContractSmart(
             network?.contracts.lst,
             msg
         );
@@ -41,7 +41,7 @@ export default function Liquidity({ stateKey }: AssetsProps) {
             state: {}
         };
 
-        const state = await client.queryContractSmart(
+        const state = await client?.queryContractSmart(
             network?.contracts.lst,
             msg
         );
@@ -54,7 +54,7 @@ export default function Liquidity({ stateKey }: AssetsProps) {
             token_info: {}
         };
 
-        const token_info = await client.queryContractSmart(
+        const token_info = await client?.queryContractSmart(
             network?.contracts.cw20,
             msg
         );

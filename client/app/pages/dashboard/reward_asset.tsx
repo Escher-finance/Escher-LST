@@ -22,8 +22,11 @@ export default function RevenueAssets({ stateKey }: AssetsProps) {
     } = useGlobalContext();
 
     const getNativeBalance = async () => {
-        let bal = await client.getBalance(network?.contracts.reward, "stake");
-        setStakeBalance(bal.amount);
+        let bal = await client?.getBalance(network?.contracts.reward, "stake");
+        if (bal) {
+            setStakeBalance(bal.amount);
+        }
+
     }
     const getBalance = async () => {
         const msg: any = {
@@ -32,7 +35,7 @@ export default function RevenueAssets({ stateKey }: AssetsProps) {
             }
         };
 
-        const { balance } = await client.queryContractSmart(
+        const { balance } = await client?.queryContractSmart(
             network?.contracts.cw20,
             msg
         );

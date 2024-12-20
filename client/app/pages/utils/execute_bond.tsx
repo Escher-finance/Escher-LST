@@ -22,6 +22,10 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
+    if (!userAddress) {
+      alert("no user");
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
@@ -39,8 +43,8 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
         amount,
         denom: "stake"
       }];
-      const res = await client.execute(userAddress, network?.contracts.lst, msg, "auto", "execute bond", funds);
-      alert(res.transactionHash);
+      const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto", "execute bond", funds);
+      alert(res?.transactionHash);
       let newKey = stateKey + 1;
       setStateKey(newKey);
       setIsLoading(false);

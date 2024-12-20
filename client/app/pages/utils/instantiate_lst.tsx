@@ -15,6 +15,10 @@ export default function InstantiateLiquidStaking() {
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      alert("no user");
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
@@ -43,7 +47,7 @@ export default function InstantiateLiquidStaking() {
         admin: userAddress,
       };
 
-      const instantiateResult = await client.instantiate(
+      const instantiateResult = await client?.instantiate(
         userAddress,
         liquid_staking_code_id,
         msg,
@@ -51,8 +55,8 @@ export default function InstantiateLiquidStaking() {
         "auto",
         instantiateOptions
       );
-      console.log(instantiateResult.contractAddress);
-      alert(instantiateResult.contractAddress);
+      console.log(instantiateResult?.contractAddress);
+      alert(instantiateResult?.contractAddress);
 
     } catch (err) {
       console.log(err);

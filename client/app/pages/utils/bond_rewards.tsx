@@ -15,20 +15,24 @@ export default function BondRewards() {
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      alert("no user is logged in");
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const lst_contract = formEntries.lst_contract.toString();
     const msg = {
-        bond_rewards : {}
+      bond_rewards: {}
     };
 
     console.log(JSON.stringify(msg));
     try {
       const funds: any[] = [];
-      const res = await client.execute(userAddress, lst_contract, msg, "auto", "execute bond", funds);
-      alert(res.transactionHash);
-      console.log(res.transactionHash);
+      const res = await client?.execute(userAddress, lst_contract, msg, "auto", "execute bond", funds);
+      alert(res?.transactionHash);
+      console.log(res?.transactionHash);
     } catch (err) {
       console.log(err);
     }
@@ -36,8 +40,8 @@ export default function BondRewards() {
 
   return (
     <div className="w-full flex flex-row gap-4">
-      <form onSubmit={handleSubmit}  className="w-full flex">
-        <Card  className="w-full flex">
+      <form onSubmit={handleSubmit} className="w-full flex">
+        <Card className="w-full flex">
           <CardBody className="gap-4">
             <Input
               isRequired

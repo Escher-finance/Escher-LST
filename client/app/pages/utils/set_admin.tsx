@@ -15,22 +15,25 @@ export default function SetAdmin() {
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
+    if (!userAddress) {
+      return;
+    }
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const denom = "factory/union1vnglhewf3w66cquy6hr7urjv3589srheampz42/stmomo";
     const lst_contract = formEntries.lst_contract.toString();
     const msg = {
-        set_token_admin : {
-            denom,
-            new_admin: "union1vnglhewf3w66cquy6hr7urjv3589srheampz42"
-        }
+      set_token_admin: {
+        denom,
+        new_admin: "union1vnglhewf3w66cquy6hr7urjv3589srheampz42"
+      }
     };
 
     console.log(JSON.stringify(msg));
     try {
-      const res = await client.execute(userAddress, lst_contract, msg, "auto", "execute bond", []);
-      alert(res.transactionHash);
+      const res = await client?.execute(userAddress, lst_contract, msg, "auto", "execute bond", []);
+      alert(res?.transactionHash);
 
     } catch (err) {
       console.log(err);

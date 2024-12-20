@@ -6,8 +6,8 @@ import { useState, useEffect } from "react";
 import { useGlobalContext } from "@/app/core/context";
 import { IndexedTx } from "@cosmjs/stargate";
 
-BigInt.prototype.toJSON = function () {
-    return Number(this);
+(BigInt.prototype as any).toJSON = function () {
+    return this.toString();
 };
 
 export default function Transactions() {

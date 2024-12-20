@@ -20,36 +20,36 @@ export default function QueryConfig() {
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
         e.preventDefault();
-   
+
         try {
             const msg = {
                 validators: {}
             };
             const lst_contract = "union1tkqqlr3xdvr20ywnmtjgrdstqdepj74teq5vmltgl2zvsn9sgwusrdfv8y"
-            const res = await client.queryContractSmart(
+            const res = await client?.queryContractSmart(
                 lst_contract,
                 msg
             );
-            let data = "Validators: " + JSON.stringify(res.validators);
-            
+            let data = "Validators: " + JSON.stringify(res?.validators);
 
-            const res2 = await client.queryContractSmart(
+
+            const res2 = await client?.queryContractSmart(
                 lst_contract,
-                { balance :{}}
+                { balance: {} }
             );
 
-            data +=  "\nBalance " + JSON.stringify(res2);
+            data += "\nBalance " + JSON.stringify(res2);
 
-            const res3 = await client.queryContractSmart(
+            const res3 = await client?.queryContractSmart(
                 lst_contract,
-                { log :{}}
+                { log: {} }
             );
 
             data += "\nLog " + JSON.stringify(res3);
 
-            const res4 = await client.queryContractSmart(
+            const res4 = await client?.queryContractSmart(
                 lst_contract,
-                { state :{}}
+                { state: {} }
             );
 
             data += "\nState : " + JSON.stringify(res4);
@@ -63,19 +63,19 @@ export default function QueryConfig() {
     return (
         <div className="w-full">
             <form onSubmit={handleSubmit}>
-                    <div className="text-left">
-                        Validators:
-                        <Textarea
-                            variant="underlined"
-                            labelPlacement="outside"
-                            placeholder="Enter your description"
-                            value={data}
-                            onValueChange={setData}
-                            minRows={5}
+                <div className="text-left">
+                    Validators:
+                    <Textarea
+                        variant="underlined"
+                        labelPlacement="outside"
+                        placeholder="Enter your description"
+                        value={data}
+                        onValueChange={setData}
+                        minRows={5}
 
-                        />
-                    </div>
-                        <Button type="submit">Query</Button>
+                    />
+                </div>
+                <Button type="submit">Query</Button>
             </form>
         </div>
     );
