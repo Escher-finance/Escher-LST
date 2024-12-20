@@ -23,7 +23,7 @@ uniond --node $RPC query bank balances union1vnglhewf3w66cquy6hr7urjv3589srheamp
 | Component                                   | Description                                          | Language(s)           |
 | ------------------------------------------- | ---------------------------------------------------- | --------------------- |
 | [ICA Controller Factory](https://github.com/Escher-finance/evm-ibc-apps/blob/main/contracts/ica/src/ICAControllerFactory.sol)                       | Solidity Factory contract to create new ICA Controller contract  | Solidity                  |
-| [ICA Controller Contract](https://github.com/Escher-finance/evm-ibc-apps/blob/main/contracts/ica/src/ICAController.sol)                      | Solidity Factory contract to create new ICA Controller contract  | Solidity                  |
+| [ICA Controller Contract](https://github.com/Escher-finance/evm-ibc-apps/blob/main/contracts/ica/src/ICAController.sol)                      | Solidity Factory contract to create new ICA and send messages to ICA  | Solidity                  |
 
 
 
