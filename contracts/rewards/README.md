@@ -9,7 +9,9 @@ To instantiate need these config:
 - fee_rate
 - coin_denom
 
-## Build wasm
+## Build Contract 
+
+This will generate wasm file in artifacts folder.
 
 > cargo build
 

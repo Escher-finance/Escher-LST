@@ -1,18 +1,32 @@
-# Deployment Scripts
+# LST Contract Deployment Scripts
 
-1. Run upload liquid staking and reward script
+1. To run the script to upload and instantiate contracts we need these data in env vars. Set these values and put in .env file
 
-Get the code id of those contracts
+- MNEMONIC="mnemonic of account"
+- CW20_WASM_PATH="cw20 contract wasm absolute file path"
+- LST_WASM_PATH="liquid staking contract wasm absolute file path"
+- REWARD_WASM_PATH="reward contract wasm absolute file path"
 
-2. Prepare these data as env vars and put in .env file
 
-- underlying_coin_denom
-- validators (put as comma separated values)
-- liquidstaking_denom
-- ucs01_channel
-- ucs01_relay_contract
-- revenue_receiver
-- unbonding_time
-- cw20_address
 
-2. Run instantiate liquid staking script
+2. Prepare these data as env vars and set in src/config.ts
+
+- chainId
+- chainName
+- coinDenom
+- lstCoinDenom
+- lstCoinSymbol
+- rpc
+- rest
+- ucs01Channel
+- ucs01RelayContract
+- feeRate
+- revenueReceiver
+- validator
+
+3. Run setup script
+
+```
+npm install
+npm run start
+```
