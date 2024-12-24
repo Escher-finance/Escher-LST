@@ -12,9 +12,21 @@ pub struct InstantiateMsg {
     pub liquidstaking_denom: String,
     pub ucs01_channel: String,
     pub ucs01_relay_contract: String,
-    pub revenue_receiver: String,
+    pub revenue_receiver: Addr,
     pub unbonding_time: u64,
+    pub reward_code_id: u64,
+    pub fee_rate: Decimal,
+    pub coin_denom: String,
     pub cw20_address: Option<Addr>,
+    pub salt: String,
+}
+
+#[cw_serde]
+pub struct InstantiateRewardMsg {
+    pub lst_contract: Addr,
+    pub revenue_receiver: Addr,
+    pub fee_rate: Decimal,
+    pub coin_denom: String,
 }
 
 #[cw_serde]
