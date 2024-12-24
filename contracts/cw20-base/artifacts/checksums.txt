@@ -1,0 +1,1 @@
+eb573070c669d60e7eada6efb3e3a6dadefbdeabe0316531d8ed038649447aa9  cw20_base.wasm
