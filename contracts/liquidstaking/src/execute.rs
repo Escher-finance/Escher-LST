@@ -37,7 +37,9 @@ pub fn bond(
     let delegator = env.contract.address;
 
     let payment: Coin;
-    // if amount is none it should use senders funds to delegate
+    // if amount is none it should use senders funds to delegate and this assume the
+    // transaction happen on same chain, original staker/sender to contract is on same cosmos based chain
+    // so it will use sender funds to do bond
     if amount.is_none() {
         // coin must have be sent along with transaction and it should be in underlying coin denom
         if info.funds.len() > 1usize {
@@ -55,8 +57,12 @@ pub fn bond(
             denom: coin_denom.clone(),
         };
     } else {
-        let the_amount = amount.unwrap().clone().amount;
         // if amount exists it should use this contract fund to delegate
+        // and this only can be called by "owner" or backend script using owner sign to do bond on behalf of original staker
+        cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+        let the_amount = amount.unwrap().clone().amount;
+
         let lst_balance = deps
             .querier
             .query_balance(delegator.to_string(), coin_denom.clone())?;
@@ -167,6 +173,7 @@ pub fn bond(
         .add_attributes(vec![
             attr("action", "mint"),
             attr("from", sender),
+            attr("staker", staker)
             attr("payment_amount", payment.amount.to_string()),
             attr("denom", coin_denom.to_string()),
             attr("minted", mint_amount),
@@ -270,8 +277,8 @@ pub fn unbond(
 
     let unbond_amount: Uint128;
     if cfg!(not(nonunion)) {
-        //this will handle union chain
-        // coin must have be sent along with transaction and it should be in liquid staking coin denom
+        // this will handle union chain
+        // coin must be sent along with transaction and it should be in liquid staking coin denom
         if info.funds.len() > 1usize {
             return Err(ContractError::InvalidAsset {});
         }
