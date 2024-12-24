@@ -50,4 +50,10 @@ pub enum ContractError {
 
     #[error("withdraw contract address is not set")]
     NoRewardAddress,
+
+    #[error("InvalidCodeID")]
+    InvalidCodeID { message: String },
+
+    #[error("error when computing the instantiate2 address: {0}")]
+    Instantiate2AddressError(#[from] cosmwasm_std::Instantiate2AddressError),
 }

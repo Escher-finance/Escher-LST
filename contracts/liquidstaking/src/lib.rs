@@ -3,6 +3,7 @@ mod error;
 pub mod execute;
 
 pub mod event;
+pub mod instantiate;
 #[allow(unused_imports)]
 pub mod msg;
 pub mod query;
@@ -12,6 +13,7 @@ pub mod state;
 
 #[cfg(test)]
 pub mod tests;
+
 pub mod token_factory_api;
 pub mod utils;
 

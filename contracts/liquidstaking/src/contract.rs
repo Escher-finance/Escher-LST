@@ -1,3 +1,4 @@
+use crate::instantiate::create_reward;
 use crate::token_factory_api::TokenFactoryMsg;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
@@ -18,7 +19,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
@@ -49,6 +50,17 @@ pub fn instantiate(
     let reg = ValidatorsRegistry { validators };
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
 
+    let (reward_msg, reward_addr) = create_reward(
+        &deps,
+        &env,
+        msg.salt,
+        msg.reward_code_id,
+        env.clone().contract.address,
+        msg.revenue_receiver,
+        msg.fee_rate,
+        msg.coin_denom,
+    )?;
+
     let params = Parameters {
         underlying_coin_denom: msg.underlying_coin_denom,
         liquidstaking_denom: msg.liquidstaking_denom,
@@ -56,7 +68,7 @@ pub fn instantiate(
         ucs01_relay_contract: msg.ucs01_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
-        reward_address: None,
+        reward_address: Some(reward_addr),
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -78,7 +90,9 @@ pub fn instantiate(
     };
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::new().add_attribute("action", "instantiate"))
+    Ok(Response::new()
+        .add_attribute("action", "instantiate")
+        .add_message(reward_msg))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
