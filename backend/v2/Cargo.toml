@@ -1,0 +1,29 @@
+[package]
+name = "escher-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prost = "0.13.3"
+rand_core = "0.6.4"
+
+prost-types = "0.13.3"
+serde_json = "1.0.132"
+serde = { version="1.0.214", features=["serde_derive"]}
+thiserror = "2.0.0"
+tokio = { version = "1.15.0", features = ["full"] }
+anyhow = "1.0.93"
+futures-util = "0.3.30"
+sha2 = "0.10.8"
+chrono = "0.4.38"
+
+eyre = "0.6.12"
+tokio-retry = "0.3.0"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+tracing-appender = "0.2.3"
+tonic = "0.12.3"
+cosmrs = "0.21.0"
+tendermint-rpc = { git = "https://github.com/unionlabs/tendermint-rs", branch = "v0.39.1-bn254", features = ["http-client"] }
+
+cosmos-client = { path = "cosmos-client" }
