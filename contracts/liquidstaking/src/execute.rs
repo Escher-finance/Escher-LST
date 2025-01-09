@@ -28,6 +28,7 @@ pub fn bond(
     info: MessageInfo,
     staker: Option<String>,
     amount: Option<Coin>,
+    salt: String,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -59,7 +60,7 @@ pub fn bond(
     } else {
         // if amount exists it should use this contract fund to delegate
         // and this only can be called by "owner" or backend script using owner sign to do bond on behalf of original staker
-        cw_ownable::assert_owner(deps.storage, &info.sender)?;
+        cw_ownable::assert_owner(deps.storage, &sender)?;
 
         let the_amount = amount.unwrap().clone().amount;
 
@@ -150,6 +151,7 @@ pub fn bond(
         sender: sender.to_string(),
         staker: the_staker.clone(),
         amount: mint_amount,
+        salt,
     };
     let payload_bin = to_json_binary(&payload)?;
 
@@ -173,7 +175,7 @@ pub fn bond(
         .add_attributes(vec![
             attr("action", "mint"),
             attr("from", sender),
-            attr("staker", staker)
+            attr("staker", the_staker.to_string()),
             attr("payment_amount", payment.amount.to_string()),
             attr("denom", coin_denom.to_string()),
             attr("minted", mint_amount),
@@ -557,15 +559,17 @@ pub fn transfer(
     _info: MessageInfo,
     amount: Coin,
     receiver: Addr,
+    salt: String,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
 
     let funds = vec![amount.clone()];
     let msg: CosmosMsg<TokenFactoryMsg> = send_to_evm(
-        params.ucs01_relay_contract,
-        params.ucs01_channel,
+        params.ucs03_relay_contract,
+        params.ucs03_channel,
         receiver.to_string(),
         funds,
+        salt,
     )?
     .into();
 
@@ -784,8 +788,8 @@ pub fn set_parameters(
     info: MessageInfo,
     underlying_coin_denom: Option<String>,
     liquidstaking_denom: Option<String>,
-    ucs01_channel: Option<String>,
-    ucs01_relay_contract: Option<String>,
+    ucs03_channel: Option<String>,
+    ucs03_relay_contract: Option<String>,
     unbonding_time: Option<u64>,
     cw20_address: Option<Addr>,
     reward_address: Option<Addr>,
@@ -800,12 +804,12 @@ pub fn set_parameters(
     params.liquidstaking_denom = liquidstaking_denom
         .clone()
         .unwrap_or_else(|| params.liquidstaking_denom);
-    params.ucs01_channel = ucs01_channel
+    params.ucs03_channel = ucs03_channel
         .clone()
-        .unwrap_or_else(|| params.ucs01_channel);
-    params.ucs01_relay_contract = ucs01_relay_contract
+        .unwrap_or_else(|| params.ucs03_channel);
+    params.ucs03_relay_contract = ucs03_relay_contract
         .clone()
-        .unwrap_or_else(|| params.ucs01_relay_contract);
+        .unwrap_or_else(|| params.ucs03_relay_contract);
     params.unbonding_time = unbonding_time
         .clone()
         .unwrap_or_else(|| params.unbonding_time);
@@ -842,12 +846,12 @@ pub fn set_parameters(
             underlying_coin_denom.unwrap_or_else(|| "".to_string()),
         )
         .add_attribute(
-            "ucs01_channel",
-            ucs01_channel.unwrap_or_else(|| "".to_string()),
+            "ucs03_channel",
+            ucs03_channel.unwrap_or_else(|| "".to_string()),
         )
         .add_attribute(
-            "ucs01_relay_contract",
-            ucs01_relay_contract.unwrap_or_else(|| "".to_string()),
+            "ucs03_relay_contract",
+            ucs03_relay_contract.unwrap_or_else(|| "".to_string()),
         )
         .add_attribute("cw20_address", cw20_addr_string)
         .add_attribute("reward_address", reward_address_str);
@@ -860,6 +864,7 @@ pub fn process_unbonding(
     env: Env,
     info: MessageInfo,
     id: u64,
+    salt: String,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -881,10 +886,11 @@ pub fn process_unbonding(
         if unbond_rec.staker != unbond_rec.sender {
             let funds = vec![unbond_rec.undelegate_amount.clone()];
             let wasm_msg = utils::send_to_evm(
-                params.ucs01_relay_contract,
-                params.ucs01_channel,
+                params.ucs03_relay_contract,
+                params.ucs03_channel,
                 unbond_rec.staker.to_string(),
                 funds,
+                salt,
             )?;
             let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
             msg

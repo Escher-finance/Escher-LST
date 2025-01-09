@@ -74,13 +74,14 @@ fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, Contr
     }
 
     // transfer to evm/bera
-    return transfer(deps, payload.amount, payload.staker);
+    return transfer(deps, payload.amount, payload.staker, payload.salt);
 }
 
 pub fn transfer(
     deps: DepsMut,
     amount: Uint128,
     receiver: String,
+    salt: String
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
 
@@ -91,10 +92,11 @@ pub fn transfer(
 
     let funds = vec![coin_amount.clone()];
     let wasm_msg: WasmMsg = utils::send_to_evm(
-        params.ucs01_relay_contract,
-        params.ucs01_channel,
+        params.ucs03_relay_contract,
+        params.ucs03_channel,
         receiver.to_string(),
         funds,
+        salt
     )?;
 
     let msg: CosmosMsg = CosmosMsg::Wasm(wasm_msg);

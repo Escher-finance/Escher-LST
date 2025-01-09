@@ -39,13 +39,13 @@ fn set_up(
     let receiver = Addr::unchecked("receiver");
 
     let cw20_contract = Addr::unchecked("cw20_contract");
-    let ucs01_relay_contract = Addr::unchecked("relay_contract");
+    let ucs03_relay_contract = Addr::unchecked("relay_contract");
     let msg = InstantiateMsg {
         underlying_coin_denom: denom_name.clone(),
         validators,
         liquidstaking_denom: denom_name.clone(),
-        ucs01_channel: "channel-01".to_string(),
-        ucs01_relay_contract: ucs01_relay_contract.to_string(),
+        ucs03_channel: "channel-01".to_string(),
+        ucs03_relay_contract: ucs03_relay_contract.to_string(),
         revenue_receiver: receiver.to_string(),
         unbonding_time: 1000u64,
         cw20_address: Some(cw20_contract),
@@ -134,13 +134,13 @@ fn setup_contract() -> (Addr, StakingApp, Addr) {
     let receiver = Addr::unchecked(make_addr("receiver"));
 
     let cw20_contract = Addr::unchecked(make_addr("cw20_contract"));
-    let ucs01_relay_contract = Addr::unchecked(make_addr("relay_contract"));
+    let ucs03_relay_contract = Addr::unchecked(make_addr("relay_contract"));
     let msg = InstantiateMsg {
         underlying_coin_denom: denom_name.clone(),
         validators,
         liquidstaking_denom: ls_denom_name,
-        ucs01_channel: "channel-01".to_string(),
-        ucs01_relay_contract: ucs01_relay_contract.to_string(),
+        ucs03_channel: "channel-01".to_string(),
+        ucs03_relay_contract: ucs03_relay_contract.to_string(),
         revenue_receiver: receiver.to_string(),
         unbonding_time: 1000u64,
         cw20_address: Some(cw20_contract),

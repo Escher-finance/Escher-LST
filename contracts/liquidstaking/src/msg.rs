@@ -10,8 +10,8 @@ pub struct InstantiateMsg {
     pub underlying_coin_denom: String,
     pub validators: Vec<Validator>,
     pub liquidstaking_denom: String,
-    pub ucs01_channel: String,
-    pub ucs01_relay_contract: String,
+    pub ucs03_channel: String,
+    pub ucs03_relay_contract: String,
     pub revenue_receiver: Addr,
     pub unbonding_time: u64,
     pub reward_code_id: u64,
@@ -42,6 +42,7 @@ pub enum ExecuteMsg {
     Bond {
         staker: Option<String>,
         amount: Option<Coin>,
+        salt: String,
     },
     /// Send liquid staking denom then undelegate native denom according exchange rate from validator
     Unbond {
@@ -49,12 +50,9 @@ pub enum ExecuteMsg {
         amount: Option<Uint128>,
     },
     ProcessRewards {},
-    Transfer {
-        amount: Coin,
-        receiver: Addr,
-    },
     ProcessUnbonding {
         id: u64,
+        salt: String,
     },
     /// Set new token factory denom admin
     SetTokenAdmin {
@@ -65,8 +63,8 @@ pub enum ExecuteMsg {
     SetParameters {
         underlying_coin_denom: Option<String>,
         liquidstaking_denom: Option<String>,
-        ucs01_channel: Option<String>,
-        ucs01_relay_contract: Option<String>,
+        ucs03_channel: Option<String>,
+        ucs03_relay_contract: Option<String>,
         unbonding_time: Option<u64>,
         cw20_address: Option<Addr>,
         reward_address: Option<Addr>,
@@ -114,23 +112,27 @@ pub enum QueryMsg {
 
 pub type Fees = BTreeMap<String, Coin>;
 
+
 /// This is the message we accept via Receive
 #[cw_serde]
-pub struct TransferMsg {
+pub struct UCS03TransferMsg {
     /// The local channel to send the packets on
     pub channel: String,
     /// The remote address to send to.
     pub receiver: String,
     /// How long the packet lives in seconds. If not specified, use default_timeout
     pub timeout: Option<u64>,
-    /// The memo
-    pub memo: String,
+    /// The salt
+    pub salt: String,
+    /// only_maker
+    pub only_maker: bool,
 }
 
+
 #[cw_serde]
-pub enum Ucs01RelayExecuteMsg {
+pub enum Ucs03RelayExecuteMsg {
     /// This allows us to transfer native tokens
-    Transfer(TransferMsg),
+    Transfer(UCS03TransferMsg),
 }
 
 #[cw_serde]
@@ -155,6 +157,7 @@ pub struct MintTokensPayload {
     pub sender: String,
     pub staker: String,
     pub amount: Uint128,
+    pub salt: String,
 }
 
 #[cw_serde]

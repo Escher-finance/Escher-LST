@@ -64,8 +64,8 @@ pub fn instantiate(
     let params = Parameters {
         underlying_coin_denom: msg.underlying_coin_denom,
         liquidstaking_denom: msg.liquidstaking_denom,
-        ucs01_channel: msg.ucs01_channel,
-        ucs01_relay_contract: msg.ucs01_relay_contract,
+        ucs03_channel: msg.ucs03_channel,
+        ucs03_relay_contract: msg.ucs03_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
         reward_address: Some(reward_addr),
@@ -103,16 +103,13 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     match msg {
-        ExecuteMsg::Bond { staker, amount } => execute::bond(deps, env, info, staker, amount),
+        ExecuteMsg::Bond { staker, amount, salt } => execute::bond(deps, env, info, staker, amount, salt),
         ExecuteMsg::Unbond { staker, amount } => execute::unbond(deps, env, info, staker, amount),
-        ExecuteMsg::Transfer { amount, receiver } => {
-            execute::transfer(deps, env, info, amount, receiver)
-        }
         ExecuteMsg::SetTokenAdmin { denom, new_admin } => {
             execute::set_token_admin(deps, info, denom, new_admin)
         }
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
-        ExecuteMsg::ProcessUnbonding { id } => execute::process_unbonding(deps, env, info, id),
+        ExecuteMsg::ProcessUnbonding { id, salt } => execute::process_unbonding(deps, env, info, id, salt),
         ExecuteMsg::Reset {} => execute::reset(deps, env, info),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::UpdateValidators { validators } => {
@@ -121,8 +118,8 @@ pub fn execute(
         ExecuteMsg::SetParameters {
             underlying_coin_denom,
             liquidstaking_denom,
-            ucs01_channel,
-            ucs01_relay_contract,
+            ucs03_channel,
+            ucs03_relay_contract,
             unbonding_time,
             cw20_address,
             reward_address,
@@ -132,8 +129,8 @@ pub fn execute(
             info,
             underlying_coin_denom,
             liquidstaking_denom,
-            ucs01_channel,
-            ucs01_relay_contract,
+            ucs03_channel,
+            ucs03_relay_contract,
             unbonding_time,
             cw20_address,
             reward_address,

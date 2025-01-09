@@ -1,4 +1,4 @@
-use crate::msg::{TransferMsg, Ucs01RelayExecuteMsg, ValidatorDelegation};
+use crate::msg::{UCS03TransferMsg, Ucs03RelayExecuteMsg, ValidatorDelegation};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::ContractError;
 use crate::{msg::DelegationDiff, msg::UndelegationRecord, state::Validator};
@@ -184,12 +184,14 @@ pub fn send_to_evm(
     channel: String,
     receiver: String,
     funds: Vec<Coin>,
+    salt: String,
 ) -> Result<WasmMsg, ContractError> {
-    let relay_transfer_msg: Ucs01RelayExecuteMsg = Ucs01RelayExecuteMsg::Transfer(TransferMsg {
+    let relay_transfer_msg: Ucs03RelayExecuteMsg = Ucs03RelayExecuteMsg::Transfer(UCS03TransferMsg {
         channel,
         receiver,
-        memo: "Send back to EVM".to_string(),
         timeout: None,
+        salt,
+        only_maker: false,
     });
     let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
 

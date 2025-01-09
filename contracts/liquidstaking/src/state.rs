@@ -49,8 +49,8 @@ pub struct ValidatorsRegistry {
 pub struct Parameters {
     pub underlying_coin_denom: String,
     pub liquidstaking_denom: String,
-    pub ucs01_channel: String,
-    pub ucs01_relay_contract: String,
+    pub ucs03_channel: String,
+    pub ucs03_relay_contract: String,
     pub unbonding_time: u64,
     // cw20 contract address
     pub cw20_address: Option<Addr>,
