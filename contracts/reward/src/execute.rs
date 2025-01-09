@@ -9,6 +9,8 @@ use cosmwasm_std::{
 };
 
 pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    
     let config = CONFIG.load(deps.storage)?;
     // only liquid staking contract able to call this function
     if info.sender != config.lst_contract_address {
@@ -67,12 +69,13 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
 pub fn set_config(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     lst_contract_address: Option<Addr>,
     revenue_receiver: Option<Addr>,
     fee_rate: Option<Decimal>,
     coin_denom: Option<String>,
 ) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let mut config = CONFIG.load(deps.storage)?;
 
     config.lst_contract_address = lst_contract_address

@@ -1,5 +1,5 @@
 [package]
-name = "rewards"
+name = "reward"
 version = "0.1.1"
 authors = ["isakfm <isak.rickyanto@gmail.com>"]
 edition = "2021"

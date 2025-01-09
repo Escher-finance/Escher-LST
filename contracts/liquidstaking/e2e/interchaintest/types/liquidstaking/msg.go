@@ -13,8 +13,8 @@ type Validator struct {
 type InstantiateMsg struct {
 	UnderlyingCoinDenom string      `json:"underlying_coin_denom"`
 	LiquidstakingDenom  string      `json:"liquidstaking_denom"`
-	Ucs01Channel        string      `json:"ucs01_channel"`
-	Ucs01RelayContract  string      `json:"ucs01_relay_contract"`
+	Ucs03Channel        string      `json:"ucs03_channel"`
+	Ucs03RelayContract  string      `json:"ucs03_relay_contract"`
 	FeeRate             string      `json:"fee_rate"`
 	RevenueReceiver     string      `json:"revenue_receiver"`
 	UnbondingTime       uint64      `json:"unbonding_time"`
@@ -87,8 +87,8 @@ type QueryMsg struct {
 type ParametersResponse struct {
 	UnderlyingCoinDenom string  `json:"underlying_coin_denom"`
 	LiquidstakingDenom  string  `json:"liquidstaking_denom"`
-	Ucs01Channel        string  `json:"ucs01_channel"`
-	Ucs01RelayContract  string  `json:"ucs01_relay_contract"`
+	Ucs03Channel        string  `json:"ucs03_channel"`
+	Ucs03RelayContract  string  `json:"ucs03_relay_contract"`
 	FeeRate             string  `json:"fee_rate"`
 	RevenueReceiver     string  `json:"revenue_receiver"`
 	UnbondingTime       uint64  `json:"unbonding_time"`
