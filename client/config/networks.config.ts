@@ -36,12 +36,11 @@ export type ChainConfig = {
   counterpartyPortID: string;
 };
 
-type SupportedNetworks = "lst-network";
+type SupportedNetworks = "uniontestnet";
 
 
 const currency: Record<SupportedNetworks, Currency> = {
-
-  "lst-network": {
+  "uniontestnet": {
     coinDenom: "STK",
     coinMinimalDenom: "stake",
     coinDecimals: 6,
@@ -50,12 +49,12 @@ const currency: Record<SupportedNetworks, Currency> = {
 
 const Networks: Record<SupportedNetworks, ChainConfig> = {
 
-  "lst-network": {
-    chainId: "lst",
-    chainName: "LST Network",
-    rpc: "https://lst.rickyanto.com",
-    rest: "https://lst.rickyanto.com",
-    stakeCurrency: currency["lst-network"],
+  "uniontestnet": {
+    chainId: "union-testnet-9",
+    chainName: "uniontestnet",
+    rest: "https://rest.testnet-9.union.build",
+    rpc: "https://rpc.testnet-9.union.build",
+    stakeCurrency: currency["uniontestnet"],
     bip44: {
       coinType: 118
     },
@@ -67,8 +66,8 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
       bech32PrefixConsAddr: "cosmosvalcons",
       bech32PrefixConsPub: "cosmosvalconspub",
     },
-    currencies: [currency["lst-network"]],
-    feeCurrencies: [currency["lst-network"]],
+    currencies: [currency["uniontestnet"]],
+    feeCurrencies: [currency["uniontestnet"]],
     contracts: {
       lst: "cosmos1c2f79k5kykr5s4zhknn5w56hs5c9a8zxh4w03x07dnzwyrcj4pfspyf0pr",
       cw20: "cosmos1t3f4zxve6725sf4glrnlar8uku78j0nyfl0ppzgfju9ft9phvqwqren6rp",
@@ -82,7 +81,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
 };
 
 export const BaseNetworks: Record<SupportedNetworks, ChainConfig> = {
-  "lst-network": Networks["lst-network"],
+  "uniontestnet": Networks["uniontestnet"],
 };
 
 export default Networks;
