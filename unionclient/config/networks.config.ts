@@ -2,6 +2,7 @@ export type Currency = {
   coinDenom: string;
   coinMinimalDenom: string;
   coinDecimals: number;
+  liquidStakingDenom: string;
 };
 
 export type CoinType = {
@@ -42,8 +43,9 @@ type SupportedNetworks = "uniontestnet";
 const currency: Record<SupportedNetworks, Currency> = {
   "uniontestnet": {
     coinDenom: "STK",
-    coinMinimalDenom: "stake",
+    coinMinimalDenom: "muno",
     coinDecimals: 6,
+    liquidStakingDenom: "limuno",
   },
 };
 
@@ -59,19 +61,19 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
       coinType: 118
     },
     bech32Config: {
-      bech32PrefixAccAddr: "cosmos",
-      bech32PrefixAccPub: "cosmospub",
-      bech32PrefixValAddr: "cosmosvaloper",
-      bech32PrefixValPub: "cosmosvaloperpub",
-      bech32PrefixConsAddr: "cosmosvalcons",
-      bech32PrefixConsPub: "cosmosvalconspub",
+      bech32PrefixAccAddr: "union",
+      bech32PrefixAccPub: "unionpub",
+      bech32PrefixValAddr: "unionvaloper",
+      bech32PrefixValPub: "unionvaloperpub",
+      bech32PrefixConsAddr: "unionvalcons",
+      bech32PrefixConsPub: "unionvalconspub",
     },
     currencies: [currency["uniontestnet"]],
     feeCurrencies: [currency["uniontestnet"]],
     contracts: {
-      lst: "cosmos1c2f79k5kykr5s4zhknn5w56hs5c9a8zxh4w03x07dnzwyrcj4pfspyf0pr",
-      cw20: "cosmos1t3f4zxve6725sf4glrnlar8uku78j0nyfl0ppzgfju9ft9phvqwqren6rp",
-      reward: "cosmos1pd7kfgvr5tpcv0xnlv46c4jsq9jg2r799xxrcwqdm4l2jhq2pjwqyg4puh",
+      lst: "union1c2f79k5kykr5s4zhknn5w56hs5c9a8zxh4w03x07dnzwyrcj4pfspyf0pr",
+      cw20: "union1t3f4zxve6725sf4glrnlar8uku78j0nyfl0ppzgfju9ft9phvqwqren6rp",
+      reward: "union1pd7kfgvr5tpcv0xnlv46c4jsq9jg2r799xxrcwqdm4l2jhq2pjwqyg4puh",
     },
     gasPrice: "0.01stake",
     connectionID: "connection-26",

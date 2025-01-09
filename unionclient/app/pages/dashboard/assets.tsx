@@ -25,31 +25,16 @@ export default function Assets({ stateKey }: AssetsProps) {
         if (!userAddress) {
             return;
         }
-        let bal = await client?.getBalance(userAddress, "stake");
+        let bal = await client?.getBalance(userAddress, network?.stakeCurrency.coinMinimalDenom);
         if (bal) {
             setStakeBalance(bal.amount);
         }
 
     }
 
-    const getBalance = async () => {
-        const msg: any = {
-            balance: {
-                address: userAddress
-            }
-        };
-
-        const { balance } = await client?.queryContractSmart(
-            network?.contracts.cw20,
-            msg
-        );
-
-        setLstakeBalance(balance);
-    }
 
     const loadBalance = async () => {
         getNativeBalance();
-        getBalance();
     }
 
     useEffect(() => {
@@ -65,7 +50,7 @@ export default function Assets({ stateKey }: AssetsProps) {
     const faucetRequest = async () => {
         const msg = {
             address: userAddress,
-            coins: ["100000stake"]
+            coins: ["100000muno"]
         };
         console.log(msg);
         const response = await fetch(faucetURL, {
@@ -82,15 +67,15 @@ export default function Assets({ stateKey }: AssetsProps) {
 
     return (
         <Card className="w-full flex">
-            <CardHeader className="text-lg p-3 gap-5">My Assets <Button onPress={faucetRequest}>Faucet Request</Button></CardHeader>
+            <CardHeader className="text-lg p-3 gap-5">My Assets</CardHeader>
             <Divider />
             <CardBody className="gap-1">
                 <div className="flex flex-col">
                     <div className="p-3 text-sm">
-                        Native: {stakeBalance} stake
+                        Native: {stakeBalance} {network?.stakeCurrency.coinMinimalDenom}
                     </div>
                     <div className="p-3 text-sm">
-                        LSToken: {lstakeBalance} lqStake
+                        LSToken: {lstakeBalance} {network?.stakeCurrency.liquidStakingDenom}
                     </div>
                 </div>
             </CardBody>

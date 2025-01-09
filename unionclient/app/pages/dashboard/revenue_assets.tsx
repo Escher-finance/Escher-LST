@@ -16,7 +16,7 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
     const [lstakeBalance, setLstakeBalance] = useState("0");
     const faucetURL = "http://lstfaucet.rickyanto.com/";
 
-    const receiver = "cosmos1pss37x3hwq5ytk7uhf9fjcpcd7k20pekq6xtlz";
+    const receiver = "union1vnglhewf3w66cquy6hr7urjv3589srheampz42";
     const {
         client,
         userAddress,
@@ -24,7 +24,7 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
     } = useGlobalContext();
 
     const getNativeBalance = async () => {
-        let bal = await client?.getBalance(receiver, "stake");
+        let bal = await client?.getBalance(receiver, network?.stakeCurrency.coinMinimalDenom);
         if (bal) {
             setStakeBalance(bal.amount);
         }

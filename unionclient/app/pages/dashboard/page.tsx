@@ -5,10 +5,10 @@ import Unbond from "../utils/unbond";
 import Assets from "./assets";
 import { Tabs, Tab } from "@nextui-org/react";
 import UnbondingRecords from "./unbonding_records";
-import Liquidity from "./liquidity";
-import ContractAssets from "./contract_assets";
-import RewardAsset from "./reward_asset";
-import RevenueAssets from "./revenue_assets";
+// import Liquidity from "./liquidity";
+// import ContractAssets from "./contract_assets";
+// import RewardAsset from "./reward_asset";
+// import RevenueAssets from "./revenue_assets";
 import { useState } from "react";
 
 export default function Dashboard() {
@@ -26,28 +26,28 @@ export default function Dashboard() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-row gap-4">
                 <Assets stateKey={stateKey} />
-                <RevenueAssets stateKey={stateKey} />
+                {/* <RevenueAssets stateKey={stateKey} /> */}
               </div>
               <div className="flex flex-row gap-4">
-                <RewardAsset stateKey={stateKey} />
-                <ContractAssets stateKey={stateKey} />
+                {/* <RewardAsset stateKey={stateKey} />
+                <ContractAssets stateKey={stateKey} /> */}
               </div>
 
             </div>
 
-            <Liquidity stateKey={stateKey} />
+            {/* <Liquidity stateKey={stateKey} /> */}
           </div>
 
-          <Tabs aria-label="Tabs sizes" className="mt-10 p-3">
+          {/* <Tabs aria-label="Tabs sizes" className="mt-10 p-3">
             <Tab key="bond" title="Bond">
               <ExecuteBond stateKey={stateKey} setStateKey={setStateKey} />
             </Tab>
             <Tab key="unbond" title="Unbond" >
               <Unbond stateKey={stateKey} setStateKey={setStateKey} />
             </Tab>
-          </Tabs>
+          </Tabs> */}
 
-          <UnbondingRecords />
+          {/* <UnbondingRecords /> */}
         </div>
 
       </div>

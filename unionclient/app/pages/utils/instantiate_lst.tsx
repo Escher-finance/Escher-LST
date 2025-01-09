@@ -31,8 +31,8 @@ export default function InstantiateLiquidStaking() {
         { weight: 1, address: "cosmosvaloper1h492ust5a9qzhh4zhhhlyva9v8ftn5sz99k4yp" }
       ],
       liquidstaking_denom: "lqstake",
-      ucs01_channel: "channel-86",
-      ucs01_relay_contract: "union1m87a5scxnnk83wfwapxlufzm58qe2v65985exff70z95a2yr86yq7hl08h",
+      ucs03_channel: "channel-86",
+      ucs03_relay_contract: "union1m87a5scxnnk83wfwapxlufzm58qe2v65985exff70z95a2yr86yq7hl08h",
       fee_rate: "0.1",
       revenue_receiver: "cosmos1pss37x3hwq5ytk7uhf9fjcpcd7k20pekq6xtlz",
       unbonding_time: 10,

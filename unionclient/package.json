@@ -6,12 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "patch-package"
   },
   "dependencies": {
-    "@cosmjs/cosmwasm-stargate": "^0.32.3",
+    "@cosmjs/cosmwasm-stargate": "0.32.4",
     "@cosmjs/proto-signing": "^0.32.4",
-    "@cosmjs/stargate": "^0.32.3",
+    "@cosmjs/stargate": "0.32.4",
+    "@cosmjs/tendermint-rpc": "^0.32.4",
     "@cosmostation/cosmos-client": "^0.0.5",
     "@cosmostation/extension-client": "^0.1.15",
     "@nextui-org/link": "^2.2.5",
@@ -43,7 +45,8 @@
     "typescript": "5.0.4",
     "utf-8-validate": "^5.0.10",
     "uuid": "^9.0.1",
-    "ws": "^8.14.2"
+    "ws": "^8.14.2",
+    "@unionlabs/client": "^0.0.40"
   },
   "devDependencies": {
     "@types/react-copy-to-clipboard": "^5.0.7",
