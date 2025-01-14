@@ -183,7 +183,7 @@ pub fn get_undelegate_from_validator_msgs(
 
 pub fn send_to_evm(
     env: Env,
-    contract_addr: String,
+    ucs03_contract_addr: String,
     channel_id: u32,
     receiver: Bytes,
     base_token: String,
@@ -214,7 +214,7 @@ pub fn send_to_evm(
     let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
 
     return Ok(WasmMsg::Execute {
-        contract_addr,
+        contract_addr: ucs03_contract_addr,
         msg: transfer_relay_msg,
         funds,
     });

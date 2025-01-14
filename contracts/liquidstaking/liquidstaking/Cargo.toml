@@ -1,13 +1,27 @@
 [package]
-edition      = { workspace = true }
+edition = "2021"
 name         = "liquidstaking"
 version      = "0.1.15"
+
+[profile.dev]
+lto = "thin"
+strip = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(nonunion)'] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [features]
 library = []
+
+[package.metadata.scripts]
+optimize = """docker run --rm -v "$(pwd)":/code \
+  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
+  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+  cosmwasm/optimizer:0.16.0
+"""
 
 
 [dependencies]
@@ -30,9 +44,6 @@ cw20 = "2.0.0"
 
 [dependencies.unionlabs_primitives]
 path = "../unionlabs-primitives"
-
-[lints]
-workspace = true
 
 
 [dev-dependencies]

@@ -80,6 +80,13 @@ pub enum ExecuteMsg {
     Redelegate {},
     /// Move native balance to reward contract
     MoveToReward {},
+    Transfer {
+        amount: Coin,
+        receiver: String,
+        ucs03_channel_id: u32,
+        ucs03_relay_contract: String,
+        salt: String,
+    },
 }
 
 #[cw_ownable_query]

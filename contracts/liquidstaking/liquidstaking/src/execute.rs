@@ -903,6 +903,42 @@ pub fn process_unbonding(
     Ok(res)
 }
 
+pub fn transfer(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    amount: Coin,
+    receiver: String,
+    ucs03_channel_id: u32,
+    ucs03_contract: String,
+    salt: String,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+
+    let funds = vec![amount.clone()];
+    let wasm_msg = utils::send_to_evm(
+        env,
+        ucs03_contract,
+        ucs03_channel_id,
+        Bytes::from_str(receiver.as_str()).unwrap(),
+        params.underlying_coin_denom.clone(),
+        amount.amount,
+        Bytes::from_str(params.underlying_coin_denom.as_str()).unwrap(),
+        Uint256::zero(),
+        funds,
+        FixedBytes::from_str(salt.as_str()).unwrap(),
+    )?;
+    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "transfer")
+        .add_attribute("receiver", receiver.to_string())
+        .add_attribute("amount", amount.amount.to_string())
+        .add_attribute("denom", amount.denom);
+    Ok(res)
+}
+
 /// Update the ownership of the contract.
 #[allow(clippy::needless_pass_by_value)]
 pub fn update_validators(

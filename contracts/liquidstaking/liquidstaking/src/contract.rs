@@ -1,7 +1,9 @@
 use crate::instantiate::create_reward;
 use crate::token_factory_api::TokenFactoryMsg;
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128};
+use cosmwasm_std::{
+    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
+};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
@@ -91,9 +93,9 @@ pub fn instantiate(
     STATE.save(deps.storage, &state)?;
 
     let set_withdraw_msg: CosmosMsg<TokenFactoryMsg> =
-    CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
-        address: reward_addr.to_string(),
-    });
+        CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+            address: reward_addr.to_string(),
+        });
 
     let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![reward_msg, set_withdraw_msg];
 
@@ -110,13 +112,19 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     match msg {
-        ExecuteMsg::Bond { staker, amount, salt } => execute::bond(deps, env, info, staker, amount, salt),
+        ExecuteMsg::Bond {
+            staker,
+            amount,
+            salt,
+        } => execute::bond(deps, env, info, staker, amount, salt),
         ExecuteMsg::Unbond { staker, amount } => execute::unbond(deps, env, info, staker, amount),
         ExecuteMsg::SetTokenAdmin { denom, new_admin } => {
             execute::set_token_admin(deps, info, denom, new_admin)
         }
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
-        ExecuteMsg::ProcessUnbonding { id, salt } => execute::process_unbonding(deps, env, info, id, salt),
+        ExecuteMsg::ProcessUnbonding { id, salt } => {
+            execute::process_unbonding(deps, env, info, id, salt)
+        }
         ExecuteMsg::Reset {} => execute::reset(deps, env, info),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::UpdateValidators { validators } => {
@@ -144,6 +152,22 @@ pub fn execute(
         ),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
         ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
+        ExecuteMsg::Transfer {
+            amount,
+            receiver,
+            ucs03_channel_id,
+            ucs03_relay_contract,
+            salt,
+        } => execute::transfer(
+            deps,
+            env,
+            info,
+            amount,
+            receiver,
+            ucs03_channel_id,
+            ucs03_relay_contract,
+            salt,
+        ),
     }
 }
 

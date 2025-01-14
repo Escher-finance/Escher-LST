@@ -1,20 +1,20 @@
 [package]
 name = "unionlabs_primitives"
-edition      = { workspace = true }
+edition      = "2021"
 version = "0.0.1"
 
 [dependencies]
-alloy-primitives = { workspace = true, optional = true }
-base64           = { workspace = true, optional = true, features = ["std"] }
-bincode          = { workspace = true, optional = true, features = ["alloc"] }
-generic-array    = { workspace = true, optional = true }
-hex              = { workspace = true, features = ["std"] }
-primitive-types  = { workspace = true, optional = true }
-rlp              = { workspace = true, optional = true }
-serde            = { workspace = true, features = ["derive"], optional = true }
+alloy-primitives        = { version = "0.8.16", default-features = false, optional = true }
+base64                   = { version = "0.21", default-features = false, optional = true,  features = ["std"]  }
+bincode                  = { git = "https://github.com/bincode-org/bincode",  features = ["alloc"]  , optional = true }
+generic-array            = { version = "0.14.7", default-features = false , optional = true }
+hex                      = { version = "0.4.3", features = ["std"] }
+primitive-types          = { version = "0.12.1", default-features = false , optional = true }
+rlp                      = { version = "0.5.2", default-features = false , optional = true }
+serde = { version = "1.0.197", default-features = false, features = ["derive"] , optional = true }
 serde_bytes      = { version = "0.11.15", optional = true }
-thiserror        = { workspace = true }
-typenum          = { workspace = true, optional = true }
+thiserror = { version = "1.0.58" }
+typenum                  = { version = "1.17.0", default-features = false, optional = true }  
 
 
 [features]
