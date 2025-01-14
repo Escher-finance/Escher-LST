@@ -2,8 +2,10 @@ use std::collections::BTreeMap;
 
 use crate::state::{Balance, Parameters, State, UnbondRecord, Validator, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128};
+use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
+use schemars::JsonSchema;
+use unionlabs_primitives::{Bytes, H256};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -16,7 +18,6 @@ pub struct InstantiateMsg {
     pub unbonding_time: u64,
     pub reward_code_id: u64,
     pub fee_rate: Decimal,
-    pub coin_denom: String,
     pub cw20_address: Option<Addr>,
     pub salt: String,
 }
@@ -112,27 +113,21 @@ pub enum QueryMsg {
 
 pub type Fees = BTreeMap<String, Coin>;
 
-
-/// This is the message we accept via Receive
-#[cw_serde]
-pub struct UCS03TransferMsg {
-    /// The local channel to send the packets on
-    pub channel: String,
-    /// The remote address to send to.
-    pub receiver: String,
-    /// How long the packet lives in seconds. If not specified, use default_timeout
-    pub timeout: Option<u64>,
-    /// The salt
-    pub salt: String,
-    /// only_maker
-    pub only_maker: bool,
-}
-
-
-#[cw_serde]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Ucs03RelayExecuteMsg {
-    /// This allows us to transfer native tokens
-    Transfer(UCS03TransferMsg),
+    /// This allows us to transfer via ucs03 relayer
+    Transfer {
+        channel_id: u32,
+        receiver: Bytes,
+        base_token: String,
+        base_amount: Uint128,
+        quote_token: Bytes,
+        quote_amount: Uint256,
+        timeout_height: u64,
+        timeout_timestamp: u64,
+        salt: H256,
+    },
 }
 
 #[cw_serde]

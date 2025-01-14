@@ -1,7 +1,7 @@
 use crate::instantiate::create_reward;
 use crate::token_factory_api::TokenFactoryMsg;
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
+use cosmwasm_std::{CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
@@ -58,7 +58,7 @@ pub fn instantiate(
         env.clone().contract.address,
         msg.revenue_receiver,
         msg.fee_rate,
-        msg.coin_denom,
+        msg.underlying_coin_denom.clone(),
     )?;
 
     let params = Parameters {
@@ -68,7 +68,7 @@ pub fn instantiate(
         ucs03_relay_contract: msg.ucs03_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
-        reward_address: Some(reward_addr),
+        reward_address: reward_addr.clone(),
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -90,9 +90,16 @@ pub fn instantiate(
     };
     STATE.save(deps.storage, &state)?;
 
+    let set_withdraw_msg: CosmosMsg<TokenFactoryMsg> =
+    CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+        address: reward_addr.to_string(),
+    });
+
+    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![reward_msg, set_withdraw_msg];
+
     Ok(Response::new()
         .add_attribute("action", "instantiate")
-        .add_message(reward_msg))
+        .add_messages(msgs))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

@@ -55,7 +55,7 @@ pub struct Parameters {
     // cw20 contract address
     pub cw20_address: Option<Addr>,
     // reward contract address
-    pub reward_address: Option<Addr>,
+    pub reward_address: Addr,
 }
 
 impl State {

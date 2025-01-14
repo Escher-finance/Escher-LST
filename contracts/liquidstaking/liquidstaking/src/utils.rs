@@ -1,15 +1,17 @@
-use crate::msg::{UCS03TransferMsg, Ucs03RelayExecuteMsg, ValidatorDelegation};
+use crate::msg::{Ucs03RelayExecuteMsg, ValidatorDelegation};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::ContractError;
 use crate::{msg::DelegationDiff, msg::UndelegationRecord, state::Validator};
 use cosmwasm_std::{
-    to_json_binary, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut,
+    to_json_binary, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
     QuerierWrapper, StakingMsg, StdResult, Uint128, Uint256, WasmMsg,
 };
 use std::collections::HashMap;
 use std::str::FromStr;
+use unionlabs_primitives::{Bytes, H256};
 
 const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
+const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
 
 /// return how much staking token from underlying native coin denom
 pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
@@ -180,19 +182,35 @@ pub fn get_undelegate_from_validator_msgs(
 }
 
 pub fn send_to_evm(
+    env: Env,
     contract_addr: String,
-    channel: String,
-    receiver: String,
+    channel_id: u32,
+    receiver: Bytes,
+    base_token: String,
+    base_amount: Uint128,
+    quote_token: Bytes,
+    quote_amount: Uint256,
     funds: Vec<Coin>,
-    salt: String,
+    salt: H256,
 ) -> Result<WasmMsg, ContractError> {
-    let relay_transfer_msg: Ucs03RelayExecuteMsg = Ucs03RelayExecuteMsg::Transfer(UCS03TransferMsg {
-        channel,
+    let timeout = env
+        .block
+        .time
+        .plus_seconds(DEFAULT_TIMEOUT_TIMESTAMP_OFFSET)
+        .nanos();
+
+    let relay_transfer_msg: Ucs03RelayExecuteMsg = Ucs03RelayExecuteMsg::Transfer {
+        channel_id,
         receiver,
-        timeout: None,
+        base_token,
+        base_amount,
+        quote_token,
+        quote_amount,
+        timeout_height: 0,
+        timeout_timestamp: timeout,
         salt,
-        only_maker: false,
-    });
+    };
+
     let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
 
     return Ok(WasmMsg::Execute {

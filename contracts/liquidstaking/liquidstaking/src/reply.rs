@@ -1,11 +1,14 @@
+use std::str::FromStr;
+
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
 use crate::state::{Balance, Parameters, BALANCE, LOG, PARAMETERS};
 use crate::utils;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, Uint128, WasmMsg,
+    Env, Reply, Response, Uint128, Uint256, WasmMsg,
 };
+use unionlabs_primitives::{Bytes, H256};
 pub const MINT_TOKENS_REPLY_ID: u64 = 123;
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const BOND_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
@@ -74,29 +77,35 @@ fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, Contr
     }
 
     // transfer to evm/bera
-    return transfer(deps, payload.amount, payload.staker, payload.salt);
+    return transfer(deps, env, payload.amount, payload.staker, payload.salt);
 }
 
 pub fn transfer(
     deps: DepsMut,
+    env: Env,
     amount: Uint128,
     receiver: String,
-    salt: String
+    salt: String,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
 
     let coin_amount = Coin {
         amount,
-        denom: params.liquidstaking_denom,
+        denom: params.liquidstaking_denom.clone(),
     };
 
     let funds = vec![coin_amount.clone()];
     let wasm_msg: WasmMsg = utils::send_to_evm(
+        env,
         params.ucs03_relay_contract,
-        params.ucs03_channel,
-        receiver.to_string(),
+        params.ucs03_channel.parse::<u32>().unwrap(),
+        Bytes::from_str(receiver.as_str()).unwrap(),
+        params.liquidstaking_denom.clone(),
+        amount,
+        Bytes::from_str(params.liquidstaking_denom.as_str()).unwrap(),
+        Uint256::from(0u64),
         funds,
-        salt
+        H256::from_str(&salt).unwrap(),
     )?;
 
     let msg: CosmosMsg = CosmosMsg::Wasm(wasm_msg);
@@ -117,17 +126,14 @@ fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Con
 
     let attrs: Vec<Attribute> = vec![
         attr("action", "execute_split_reward"),
-        attr(
-            "reward_contract",
-            params.reward_address.clone().unwrap().to_string(),
-        ),
+        attr("reward_contract", params.reward_address.clone().to_string()),
     ];
 
     if payload.amount != Uint128::zero() {
         let msg = ExecuteRewardMsg::SplitReward {};
         let msg_bin = to_json_binary(&msg)?;
         let redelegate_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: params.reward_address.unwrap().to_string(),
+            contract_addr: params.reward_address.to_string(),
             msg: msg_bin,
             funds: vec![],
         });

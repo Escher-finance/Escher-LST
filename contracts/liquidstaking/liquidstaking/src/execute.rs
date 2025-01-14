@@ -1,9 +1,10 @@
+use std::str::FromStr;
+
 use crate::error::ContractError;
 use crate::event::{
     BondEvent, ProcessRewardsEvent, ProcessUnbondingEvent, UnbondEvent, UpdateValidatorsEvent,
 };
 use crate::msg::{BondRewardsPayload, MintTokensPayload};
-use crate::relay::send_to_evm;
 use crate::reply::{
     BOND_WITHDRAW_REWARD_REPLY_ID, MINT_CW20_TOKENS_REPLY_ID, MINT_TOKENS_REPLY_ID,
 };
@@ -19,8 +20,9 @@ use crate::utils::{
 use cosmwasm_std::{
     attr, to_json_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, DecCoin, Decimal,
     DepsMut, DistributionMsg, Env, MessageInfo, Response, StakingMsg, StdResult, SubMsg, Timestamp,
-    Uint128, WasmMsg,
+    Uint128, Uint256, WasmMsg,
 };
+use unionlabs_primitives::{Bytes, FixedBytes};
 
 pub fn bond(
     deps: DepsMut,
@@ -435,11 +437,8 @@ pub fn redelegate(
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
 
-    if params.reward_address.is_none() {
-        return Err(ContractError::NoRewardAddress {});
-    }
     // make sure sender is the rewards contract
-    if params.reward_address.unwrap() != info.sender {
+    if params.reward_address != info.sender {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -551,35 +550,6 @@ fn get_unbond_attrs(
         attr("total_lst_supply", total_lst_supply),
         attr("denom", coin_denom),
     ];
-}
-
-pub fn transfer(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    amount: Coin,
-    receiver: Addr,
-    salt: String,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
-    let params = PARAMETERS.load(deps.storage)?;
-
-    let funds = vec![amount.clone()];
-    let msg: CosmosMsg<TokenFactoryMsg> = send_to_evm(
-        params.ucs03_relay_contract,
-        params.ucs03_channel,
-        receiver.to_string(),
-        funds,
-        salt,
-    )?
-    .into();
-
-    let res: Response<TokenFactoryMsg> = Response::new()
-        .add_message(msg)
-        .add_attribute("action", "transfer")
-        .add_attribute("receiver", receiver.to_string())
-        .add_attribute("amount", amount.amount.to_string())
-        .add_attribute("denom", amount.denom);
-    Ok(res)
 }
 
 pub fn set_token_admin(
@@ -709,7 +679,7 @@ pub fn move_to_reward(
     }
 
     let bank_msg = BankMsg::Send {
-        to_address: params.reward_address.unwrap().to_string(),
+        to_address: params.reward_address.to_string(),
         amount: vec![balance.clone()],
     };
     let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
@@ -814,7 +784,9 @@ pub fn set_parameters(
         .clone()
         .unwrap_or_else(|| params.unbonding_time);
     params.cw20_address = cw20_address.clone();
-    params.reward_address = reward_address.clone();
+    params.reward_address = reward_address
+        .clone()
+        .unwrap_or_else(|| params.reward_address);
 
     let cw20_addr_string = match cw20_address {
         Some(cw20) => cw20.to_string(),
@@ -872,10 +844,10 @@ pub fn process_unbonding(
     let mut unbond_rec: crate::state::UnbondRecord = unbond_record().load(deps.storage, id)?;
 
     // query the undelegate_amount in contract balance
-    let contract_address = env.contract.address;
+    let contract_address = env.clone().contract.address;
     let balance = deps
         .querier
-        .query_balance(contract_address, params.underlying_coin_denom)?;
+        .query_balance(contract_address, params.underlying_coin_denom.clone())?;
 
     if balance.amount < unbond_rec.undelegate_amount.amount {
         return Err(ContractError::NotEnoughAvailableFund {});
@@ -886,11 +858,16 @@ pub fn process_unbonding(
         if unbond_rec.staker != unbond_rec.sender {
             let funds = vec![unbond_rec.undelegate_amount.clone()];
             let wasm_msg = utils::send_to_evm(
-                params.ucs03_relay_contract,
-                params.ucs03_channel,
-                unbond_rec.staker.to_string(),
+                env.clone(),
+                params.ucs03_relay_contract.as_str().into(),
+                params.ucs03_channel.parse::<u32>().unwrap(),
+                Bytes::from_str(unbond_rec.staker.as_str()).unwrap(),
+                params.underlying_coin_denom.clone(),
+                unbond_rec.amount.amount,
+                Bytes::from_str(params.underlying_coin_denom.as_str()).unwrap(),
+                Uint256::zero(),
                 funds,
-                salt,
+                FixedBytes::from_str(salt.as_str()).unwrap(),
             )?;
             let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
             msg
