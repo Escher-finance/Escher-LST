@@ -45,12 +45,18 @@ const ContractUpload = () => {
       return;
     }
     console.log("user Address", userAddress);
-    const uploadResult = await client?.upload(userAddress, fileData, "auto", "");
+    try {
+      const uploadResult = await client?.upload(userAddress, fileData, "auto", "");
+      console.log("uploadResult");
+      const codeId = uploadResult?.codeId;
+      alert("Code ID:" + codeId);
+      return codeId;
+    } catch (err) {
+      console.log("Failed to upload");
+      console.log(err);
+      alert(err);
+    }
 
-    console.log("uploadResult");
-    const codeId = uploadResult?.codeId;
-    alert("Code ID:" + codeId);
-    return codeId;
   };
 
   const handleButtonClick = async () => {

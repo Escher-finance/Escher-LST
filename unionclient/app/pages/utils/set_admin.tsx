@@ -21,7 +21,7 @@ export default function SetAdmin() {
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
-    const denom = "factory/union1vnglhewf3w66cquy6hr7urjv3589srheampz42/stmomo";
+    const denom = "actory/union1vnglhewf3w66cquy6hr7urjv3589srheampz42/limuno";
     const lst_contract = formEntries.lst_contract.toString();
     const msg = {
       set_token_admin: {

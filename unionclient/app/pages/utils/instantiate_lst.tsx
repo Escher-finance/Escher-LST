@@ -1,4 +1,5 @@
 "use client";
+import { v4 as uuidv4 } from 'uuid';
 
 import {
   Card,
@@ -26,17 +27,18 @@ export default function InstantiateLiquidStaking() {
 
 
     const msg = {
-      underlying_coin_denom: "stake",
+      underlying_coin_denom: "muno",
       validators: [
-        { weight: 1, address: "cosmosvaloper1h492ust5a9qzhh4zhhhlyva9v8ftn5sz99k4yp" }
+        { weight: 1, address: "unionvaloper1q20xpxw32wmrkm97ha6klj3hqpl4e22jxuqjju" }
       ],
-      liquidstaking_denom: "lqstake",
+      liquidstaking_denom: "limuno",
       ucs03_channel: "channel-86",
       ucs03_relay_contract: "union1m87a5scxnnk83wfwapxlufzm58qe2v65985exff70z95a2yr86yq7hl08h",
       fee_rate: "0.1",
-      revenue_receiver: "cosmos1pss37x3hwq5ytk7uhf9fjcpcd7k20pekq6xtlz",
-      unbonding_time: 10,
-      cw20_address: network?.contracts.cw20,
+      revenue_receiver: "union1vnglhewf3w66cquy6hr7urjv3589srheampz42",
+      reward_code_id: 40,
+      unbonding_time: 60,
+      salt: uuidv4(),
     };
 
     console.log(JSON.stringify(msg));
@@ -55,8 +57,7 @@ export default function InstantiateLiquidStaking() {
         "auto",
         instantiateOptions
       );
-      console.log(instantiateResult?.contractAddress);
-      alert(instantiateResult?.contractAddress);
+      console.log(instantiateResult);
 
     } catch (err) {
       console.log(err);
@@ -73,7 +74,7 @@ export default function InstantiateLiquidStaking() {
               name="liquid_staking_code_id"
               label="Liquid Staking CodeID"
               className="max-w-xs"
-              defaultValue="4"
+              defaultValue="41"
             />
           </CardBody>
           <CardFooter>
