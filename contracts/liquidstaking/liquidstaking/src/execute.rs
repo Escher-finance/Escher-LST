@@ -662,6 +662,38 @@ pub fn reset(
     Ok(res)
 }
 
+pub fn transfer_to_owner(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let params = PARAMETERS.load(deps.storage)?;
+
+    let balance = deps
+        .querier
+        .query_balance(env.contract.address, params.underlying_coin_denom)?;
+
+    if balance.amount < Uint128::one() {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let owner = cw_ownable::get_ownership(deps.storage)?;
+
+    let bank_msg = BankMsg::Send {
+        to_address: owner.owner.unwrap().to_string(),
+        amount: vec![balance.clone()],
+    };
+    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "transfer_to_owner")
+        .add_attribute("amount", balance.amount.to_string());
+
+    Ok(res)
+}
+
 pub fn move_to_reward(
     deps: DepsMut,
     env: Env,
@@ -906,13 +938,15 @@ pub fn process_unbonding(
 pub fn transfer(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     amount: Coin,
     receiver: String,
     ucs03_channel_id: u32,
     ucs03_contract: String,
+    quote_token: String,
     salt: String,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let params = PARAMETERS.load(deps.storage)?;
 
     let funds = vec![amount.clone()];
@@ -923,8 +957,8 @@ pub fn transfer(
         Bytes::from_str(receiver.as_str()).unwrap(),
         params.underlying_coin_denom.clone(),
         amount.amount,
-        Bytes::from_str(params.underlying_coin_denom.as_str()).unwrap(),
-        Uint256::zero(),
+        Bytes::from_str(quote_token.as_str()).unwrap(),
+        Uint256::from(amount.amount),
         funds,
         FixedBytes::from_str(salt.as_str()).unwrap(),
     )?;

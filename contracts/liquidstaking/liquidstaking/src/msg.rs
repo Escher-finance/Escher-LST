@@ -85,8 +85,10 @@ pub enum ExecuteMsg {
         receiver: String,
         ucs03_channel_id: u32,
         ucs03_relay_contract: String,
+        quote_token: String,
         salt: String,
     },
+    TransferToOwner {},
 }
 
 #[cw_ownable_query]

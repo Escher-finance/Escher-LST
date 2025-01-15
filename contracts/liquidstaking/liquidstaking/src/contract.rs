@@ -157,6 +157,7 @@ pub fn execute(
             receiver,
             ucs03_channel_id,
             ucs03_relay_contract,
+            quote_token,
             salt,
         } => execute::transfer(
             deps,
@@ -166,8 +167,10 @@ pub fn execute(
             receiver,
             ucs03_channel_id,
             ucs03_relay_contract,
+            quote_token,
             salt,
         ),
+        ExecuteMsg::TransferToOwner {} => execute::transfer_to_owner(deps, env, info),
     }
 }
 
