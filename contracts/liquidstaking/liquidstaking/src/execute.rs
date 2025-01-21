@@ -4,12 +4,12 @@ use crate::error::ContractError;
 use crate::event::{
     BondEvent, ProcessRewardsEvent, ProcessUnbondingEvent, UnbondEvent, UpdateValidatorsEvent,
 };
-use crate::msg::{BondRewardsPayload, MintTokensPayload};
+use crate::msg::{BondRewardsPayload, MintTokensPayload, ZkgmMessage};
 use crate::reply::{
     BOND_WITHDRAW_REWARD_REPLY_ID, MINT_CW20_TOKENS_REPLY_ID, MINT_TOKENS_REPLY_ID,
 };
 use crate::state::{
-    increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, PARAMETERS, STATE,
+    increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, LOG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
@@ -18,9 +18,9 @@ use crate::utils::{
     get_actual_total_delegated, get_actual_total_reward, get_mock_total_reward, to_uint128,
 };
 use cosmwasm_std::{
-    attr, to_json_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, DecCoin, Decimal,
-    DepsMut, DistributionMsg, Env, MessageInfo, Response, StakingMsg, StdResult, SubMsg, Timestamp,
-    Uint128, Uint256, WasmMsg,
+    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, DecCoin,
+    Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, StakingMsg, StdResult, SubMsg,
+    Timestamp, Uint128, Uint256, WasmMsg,
 };
 use unionlabs_primitives::{Bytes, FixedBytes};
 
@@ -971,6 +971,24 @@ pub fn transfer(
         .add_attribute("amount", amount.amount.to_string())
         .add_attribute("denom", amount.denom);
     Ok(res)
+}
+
+pub fn on_zkgm(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    channel_id: u32,
+    sender: Bytes,
+    message: Bytes,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let msg_bytes = message.as_ref();
+    let payload_msg: ZkgmMessage = from_json(msg_bytes)?;
+    let msg = format!(
+        "onzgkm time:{} channel_id:{} sender:{} message:{:?}",
+        env.block.time, channel_id, sender, payload_msg
+    );
+    LOG.save(deps.storage, &msg)?;
+    Ok(Response::default())
 }
 
 /// Update the ownership of the contract.

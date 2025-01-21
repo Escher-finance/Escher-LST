@@ -36,7 +36,8 @@ pub enum ExecuteRewardMsg {
 }
 
 #[cw_ownable_execute]
-#[cw_serde]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
@@ -89,6 +90,11 @@ pub enum ExecuteMsg {
         salt: String,
     },
     TransferToOwner {},
+    OnZkgm {
+        channel_id: u32,
+        sender: Bytes,
+        message: Bytes,
+    },
 }
 
 #[cw_ownable_query]
@@ -187,4 +193,9 @@ pub struct ValidatorDelegation {
     pub address: String,
     pub delegation_diff: DelegationDiff,
     pub diff_amount: Uint128,
+}
+
+#[cw_serde]
+pub enum ZkgmMessage {
+    Bond { amount: Uint128, salt: String },
 }
