@@ -4,7 +4,7 @@ use crate::state::{
     Balance, Parameters, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
-use crate::utils::{get_actual_total_delegated, get_actual_total_reward};
+use crate::utils::message::{get_actual_total_delegated, get_actual_total_reward};
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
 use cw_ownable::get_ownership;

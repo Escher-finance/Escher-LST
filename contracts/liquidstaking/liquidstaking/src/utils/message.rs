@@ -1,9 +1,13 @@
 use crate::msg::{Ucs03RelayExecuteMsg, ValidatorDelegation};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::ContractError;
-use crate::{msg::DelegationDiff, msg::UndelegationRecord, state::Validator};
+use crate::{
+    msg::DelegationDiff,
+    msg::UndelegationRecord,
+    state::{Validator, PARAMETERS, VALIDATORS_REGISTRY},
+};
 use cosmwasm_std::{
-    to_json_binary, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
+    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
     QuerierWrapper, StakingMsg, StdResult, Uint128, Uint256, WasmMsg,
 };
 use std::collections::HashMap;
@@ -117,16 +121,6 @@ pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
     let delegate_amount =
         Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
     delegate_amount
-}
-
-pub fn get_burn_msg(denom: String, burn_amount: Uint128, delegator: String) -> TokenFactoryMsg {
-    let burn_msg = TokenFactoryMsg::BurnTokens {
-        denom: denom.clone(),
-        amount: burn_amount,
-        burn_from_address: delegator,
-    };
-
-    burn_msg
 }
 
 pub fn get_undelegate_from_validator_msgs(
@@ -424,4 +418,67 @@ pub fn get_delegate_to_validator_msgs(
         msgs.push(remaining_staking_msg.into());
     }
     msgs
+}
+
+pub fn get_unbond_all_messages(
+    deps: DepsMut,
+    delegator: Addr,
+) -> Result<Vec<CosmosMsg<TokenFactoryMsg>>, ContractError> {
+    let delegations_resp = deps.querier.query_all_delegations(delegator);
+    let params = PARAMETERS.load(deps.storage)?;
+    let denom = params.underlying_coin_denom;
+
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+    for (_pos, validator) in validators_reg.validators.iter().enumerate() {
+        let undelegate_amount: Uint128 = delegations_resp
+            .as_ref()
+            .unwrap()
+            .into_iter()
+            .filter(|d| {
+                d.amount.denom == denom
+                    && !d.amount.amount.is_zero()
+                    && d.validator == validator.address
+            })
+            .map(|d| d.amount.amount)
+            .sum();
+
+        let amount = Coin {
+            amount: undelegate_amount.clone(),
+            denom: denom.to_string(),
+        };
+        let undelegate_staking_msg: CosmosMsg<TokenFactoryMsg> =
+            CosmosMsg::Staking(StakingMsg::Undelegate {
+                validator: validator.address.to_string(),
+                amount,
+            });
+
+        msgs.push(undelegate_staking_msg.into());
+    }
+
+    Ok(msgs)
+}
+
+pub fn adjust_validators_delegation(
+    deps: DepsMut,
+    delegator: Addr,
+    prev_validators: Vec<Validator>,
+    validators: Vec<Validator>,
+) -> Result<Vec<CosmosMsg<TokenFactoryMsg>>, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let denom = params.underlying_coin_denom;
+
+    let (validator_delegation_map, total_delegated_amount) =
+        get_validator_delegation_map_with_total_bond(deps, delegator.to_string(), prev_validators)?;
+
+    let correct_validator_delegation_map =
+        get_validator_delegation_map_base_on_weight(validators, total_delegated_amount)?;
+
+    let (surplus_validators, deficient_validators) =
+        get_surplus_deficit_validators(validator_delegation_map, correct_validator_delegation_map);
+
+    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> =
+        get_restaking_msgs(surplus_validators, deficient_validators, denom);
+
+    Ok(msgs)
 }

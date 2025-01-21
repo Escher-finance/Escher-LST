@@ -95,7 +95,7 @@ pub fn transfer(
     };
 
     let funds = vec![coin_amount.clone()];
-    let wasm_msg: WasmMsg = utils::send_to_evm(
+    let wasm_msg: WasmMsg = utils::message::send_to_evm(
         env,
         params.ucs03_relay_contract,
         params.ucs03_channel.parse::<u32>().unwrap(),

@@ -14,8 +14,9 @@ use crate::state::{
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
-    self, calculate_native_token_from_staking_token, calculate_staking_token_from_rate,
-    get_actual_total_delegated, get_actual_total_reward, get_mock_total_reward, to_uint128,
+    self, calc::calculate_native_token_from_staking_token, calc::calculate_staking_token_from_rate,
+    message::get_actual_total_delegated, message::get_actual_total_reward,
+    message::get_mock_total_reward, message::to_uint128,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, DecCoin,
@@ -80,7 +81,7 @@ pub fn bond(
         };
     }
 
-    let msgs = utils::get_delegate_to_validator_msgs(
+    let msgs = utils::message::get_delegate_to_validator_msgs(
         payment.amount,
         params.underlying_coin_denom.to_string(),
         validators_reg.validators.clone(),
@@ -159,7 +160,7 @@ pub fn bond(
 
     if !cfg!(test) {
         // Start to mint according to staked token only if it is not test
-        let sub_msg: SubMsg<TokenFactoryMsg> = get_staked_token_submsg(
+        let sub_msg: SubMsg<TokenFactoryMsg> = utils::token::get_staked_token_submsg(
             delegator.to_string(),
             the_staker.to_string(),
             mint_amount,
@@ -185,83 +186,6 @@ pub fn bond(
         ]);
 
     Ok(res)
-}
-
-#[cfg(not(nonunion))]
-fn get_staked_token_submsg(
-    delegator: String,
-    _staker: String,
-    mint_amount: Uint128,
-    liquidstaking_denom: String,
-    payload_bin: Binary,
-    _params: Parameters,
-) -> SubMsg<TokenFactoryMsg> {
-    let mint_msg = TokenFactoryMsg::MintTokens {
-        denom: liquidstaking_denom,
-        amount: mint_amount,
-        mint_to_address: delegator.to_string(),
-    };
-
-    let sub_msg: SubMsg<TokenFactoryMsg> = SubMsg::reply_always(mint_msg, MINT_TOKENS_REPLY_ID)
-        .with_payload(payload_bin)
-        .into();
-    sub_msg
-}
-
-#[cfg(nonunion)]
-fn get_staked_token_submsg(
-    _delegator: String,
-    staker: String,
-    mint_amount: Uint128,
-    _liquidstaking_denom: String,
-    payload_bin: Binary,
-    params: Parameters,
-) -> SubMsg<TokenFactoryMsg> {
-    let mint = cw20::Cw20ExecuteMsg::Mint {
-        recipient: staker,
-        amount: mint_amount,
-    };
-    let mint_bin = to_json_binary(&mint).unwrap();
-    let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: params.cw20_address.unwrap().to_string(),
-        msg: mint_bin,
-        funds: vec![],
-    });
-    let sub_msg: SubMsg<TokenFactoryMsg> =
-        SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID)
-            .with_payload(payload_bin)
-            .into();
-    sub_msg
-}
-
-#[cfg(not(nonunion))]
-fn burn_token(
-    delegator: String,
-    amount: Uint128,
-    liquidstaking_denom: String,
-    _cw20_address: Option<Addr>,
-) -> CosmosMsg<TokenFactoryMsg> {
-    let burn_msg = utils::get_burn_msg(liquidstaking_denom.clone(), amount, delegator.to_string());
-    let msg: CosmosMsg<TokenFactoryMsg> = burn_msg.into();
-    msg
-}
-
-#[cfg(nonunion)]
-fn burn_token(
-    _delegator: String,
-    amount: Uint128,
-    _liquidstaking_denom: String,
-    cw20_address: Option<Addr>,
-) -> CosmosMsg<TokenFactoryMsg> {
-    let execute_burn = cw20::Cw20ExecuteMsg::Burn { amount };
-    let burn_bin = to_json_binary(&execute_burn).unwrap();
-    let burn_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: cw20_address.unwrap().to_string(),
-        msg: burn_bin,
-        funds: vec![],
-    });
-    let msg: CosmosMsg<TokenFactoryMsg> = burn_msg.into();
-    msg
 }
 
 pub fn unbond(
@@ -350,14 +274,14 @@ pub fn unbond(
         // throw error
         return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker
     }
-    let (undelegate_msgs, undelegations) = utils::get_undelegate_from_validator_msgs(
+    let (undelegate_msgs, undelegations) = utils::message::get_undelegate_from_validator_msgs(
         undelegate_amount,
         coin_denom.clone(),
         validators_reg.validators,
     );
     msgs.extend(undelegate_msgs);
 
-    let burn_msg = burn_token(
+    let burn_msg = utils::token::burn_token(
         delegator.to_string(),
         unbond_amount,
         liquidstaking_denom.clone(),
@@ -459,7 +383,7 @@ pub fn redelegate(
         denom: coin_denom.clone(),
     };
 
-    let msgs = utils::get_delegate_to_validator_msgs(
+    let msgs = utils::message::get_delegate_to_validator_msgs(
         payment.amount,
         params.underlying_coin_denom.to_string(),
         validators_reg.validators.clone(),
@@ -653,7 +577,7 @@ pub fn reset(
     STATE.save(deps.storage, &state)?;
 
     unbond_record().clear(deps.storage);
-    let msgs = get_unbond_all_messages(deps, env.contract.address)?;
+    let msgs = utils::message::get_unbond_all_messages(deps, env.contract.address)?;
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
@@ -722,45 +646,6 @@ pub fn move_to_reward(
         .add_attribute("amount", balance.amount.to_string());
 
     Ok(res)
-}
-
-pub fn get_unbond_all_messages(
-    deps: DepsMut,
-    delegator: Addr,
-) -> Result<Vec<CosmosMsg<TokenFactoryMsg>>, ContractError> {
-    let delegations_resp = deps.querier.query_all_delegations(delegator);
-    let params = PARAMETERS.load(deps.storage)?;
-    let denom = params.underlying_coin_denom;
-
-    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
-    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
-    for (_pos, validator) in validators_reg.validators.iter().enumerate() {
-        let undelegate_amount: Uint128 = delegations_resp
-            .as_ref()
-            .unwrap()
-            .into_iter()
-            .filter(|d| {
-                d.amount.denom == denom
-                    && !d.amount.amount.is_zero()
-                    && d.validator == validator.address
-            })
-            .map(|d| d.amount.amount)
-            .sum();
-
-        let amount = Coin {
-            amount: undelegate_amount.clone(),
-            denom: denom.to_string(),
-        };
-        let undelegate_staking_msg: CosmosMsg<TokenFactoryMsg> =
-            CosmosMsg::Staking(StakingMsg::Undelegate {
-                validator: validator.address.to_string(),
-                amount,
-            });
-
-        msgs.push(undelegate_staking_msg.into());
-    }
-
-    Ok(msgs)
 }
 
 /// Update the ownership of the contract.
@@ -889,7 +774,7 @@ pub fn process_unbonding(
     let msg: CosmosMsg<TokenFactoryMsg> = {
         if unbond_rec.staker != unbond_rec.sender {
             let funds = vec![unbond_rec.undelegate_amount.clone()];
-            let wasm_msg = utils::send_to_evm(
+            let wasm_msg = utils::message::send_to_evm(
                 env.clone(),
                 params.ucs03_relay_contract.as_str().into(),
                 params.ucs03_channel.parse::<u32>().unwrap(),
@@ -950,7 +835,7 @@ pub fn transfer(
     let params = PARAMETERS.load(deps.storage)?;
 
     let funds = vec![amount.clone()];
-    let wasm_msg = utils::send_to_evm(
+    let wasm_msg = utils::message::send_to_evm(
         env,
         ucs03_contract,
         ucs03_channel_id,
@@ -1010,7 +895,7 @@ pub fn update_validators(
     validators_reg.validators = validators.clone();
     VALIDATORS_REGISTRY.save(deps.storage, &validators_reg)?;
 
-    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = adjust_validators_delegation(
+    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = utils::message::adjust_validators_delegation(
         deps,
         env.contract.address,
         prev_validators.clone(),
@@ -1020,36 +905,6 @@ pub fn update_validators(
     let event = UpdateValidatorsEvent(info.sender.to_string(), prev_validators, validators);
     let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_event(event);
     Ok(res)
-}
-
-pub fn adjust_validators_delegation(
-    deps: DepsMut,
-    delegator: Addr,
-    prev_validators: Vec<Validator>,
-    validators: Vec<Validator>,
-) -> Result<Vec<CosmosMsg<TokenFactoryMsg>>, ContractError> {
-    let params = PARAMETERS.load(deps.storage)?;
-    let denom = params.underlying_coin_denom;
-
-    let (validator_delegation_map, total_delegated_amount) =
-        utils::get_validator_delegation_map_with_total_bond(
-            deps,
-            delegator.to_string(),
-            prev_validators,
-        )?;
-
-    let correct_validator_delegation_map =
-        utils::get_validator_delegation_map_base_on_weight(validators, total_delegated_amount)?;
-
-    let (surplus_validators, deficient_validators) = utils::get_surplus_deficit_validators(
-        validator_delegation_map,
-        correct_validator_delegation_map,
-    );
-
-    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> =
-        utils::get_restaking_msgs(surplus_validators, deficient_validators, denom);
-
-    Ok(msgs)
 }
 
 // let undelegate_staking_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Staking(undelegate_msg);

@@ -199,3 +199,19 @@ pub struct ValidatorDelegation {
 pub enum ZkgmMessage {
     Bond { amount: Uint128, salt: String },
 }
+
+pub struct BondData {
+    pub mint_amount: Uint128,
+    pub delegated_amount: Uint128,
+    pub reward: Uint128,
+    pub exchange_rate: Decimal,
+    pub total_supply: Uint128,
+}
+
+pub struct UnbondData {
+    pub undelegate_amount: Uint128,
+    pub delegated_amount: Uint128,
+    pub reward: Uint128,
+    pub exchange_rate: Decimal,
+    pub total_supply: Uint128,
+}

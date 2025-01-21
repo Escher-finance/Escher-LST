@@ -7,7 +7,6 @@ pub mod instantiate;
 #[allow(unused_imports)]
 pub mod msg;
 pub mod query;
-pub mod relay;
 pub mod reply;
 pub mod state;
 
