@@ -130,7 +130,7 @@ pub type Fees = BTreeMap<String, Coin>;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Ucs03RelayExecuteMsg {
+pub enum Ucs03ExecuteMsg {
     /// This allows us to transfer via ucs03 relayer
     Transfer {
         channel_id: u32,
@@ -203,7 +203,7 @@ pub enum ZkgmMessage {
 pub struct BondData {
     pub mint_amount: Uint128,
     pub delegated_amount: Uint128,
-    pub reward: Uint128,
+    pub total_bond_amount: Uint128,
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
 }

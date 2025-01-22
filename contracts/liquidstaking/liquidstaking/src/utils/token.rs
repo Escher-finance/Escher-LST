@@ -1,7 +1,6 @@
-use crate::reply::MINT_TOKENS_REPLY_ID;
-use crate::state::Parameters;
+use crate::reply::{MINT_CW20_TOKENS_REPLY_ID, MINT_TOKENS_REPLY_ID};
 use crate::token_factory_api::TokenFactoryMsg;
-use cosmwasm_std::{Addr, Binary, CosmosMsg, SubMsg, Uint128, WasmMsg};
+use cosmwasm_std::{Addr, Binary, CosmosMsg, SubMsg, Uint128};
 
 #[cfg(not(nonunion))]
 pub fn get_staked_token_submsg(
@@ -10,7 +9,7 @@ pub fn get_staked_token_submsg(
     mint_amount: Uint128,
     liquidstaking_denom: String,
     payload_bin: Binary,
-    _params: Parameters,
+    _cw20_address: Option<Addr>,
 ) -> SubMsg<TokenFactoryMsg> {
     let mint_msg = TokenFactoryMsg::MintTokens {
         denom: liquidstaking_denom,
@@ -31,7 +30,7 @@ pub fn get_staked_token_submsg(
     mint_amount: Uint128,
     _liquidstaking_denom: String,
     payload_bin: Binary,
-    params: Parameters,
+    cw20_address: Option<Addr>,
 ) -> SubMsg<TokenFactoryMsg> {
     let mint = cw20::Cw20ExecuteMsg::Mint {
         recipient: staker,
@@ -39,7 +38,7 @@ pub fn get_staked_token_submsg(
     };
     let mint_bin = to_json_binary(&mint).unwrap();
     let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: params.cw20_address.unwrap().to_string(),
+        contract_addr: cw20_address.unwrap().to_string(),
         msg: mint_bin,
         funds: vec![],
     });

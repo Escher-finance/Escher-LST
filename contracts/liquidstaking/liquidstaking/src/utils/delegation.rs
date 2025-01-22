@@ -1,38 +1,25 @@
-use crate::msg::{Ucs03RelayExecuteMsg, ValidatorDelegation};
+use crate::msg::ValidatorDelegation;
+use crate::state::ValidatorsRegistry;
 use crate::token_factory_api::TokenFactoryMsg;
+use crate::utils::calc;
+use crate::utils::calc::calculate_staking_token_from_rate;
+use crate::utils::delegation;
+use crate::utils::token;
 use crate::ContractError;
 use crate::{
-    msg::DelegationDiff,
     msg::UndelegationRecord,
-    state::{Validator, PARAMETERS, VALIDATORS_REGISTRY},
+    msg::{BondData, DelegationDiff, MintTokensPayload},
+    state::{Parameters, Validator, PARAMETERS, STATE, VALIDATORS_REGISTRY},
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
-    QuerierWrapper, StakingMsg, StdResult, Uint128, Uint256, WasmMsg,
+    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut,
+    QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
 };
 use std::collections::HashMap;
 use std::str::FromStr;
-use unionlabs_primitives::{Bytes, H256};
 
 const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
-const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
-
-/// return how much staking token from underlying native coin denom
-pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (exchange_rate * decimal_fract).to_uint_ceil();
-    Decimal::from_ratio(Uint128::from(DECIMAL_FRACTIONAL) * stake_amount, fract).to_uint_floor()
-}
-
-/// return how much underlying native coin denom from staking token base on exchange rate
-pub fn calculate_native_token_from_staking_token(
-    staking_token: Uint128,
-    exchange_rate: Decimal,
-) -> Uint128 {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (exchange_rate * decimal_fract).to_uint_ceil();
-    Decimal::from_ratio(fract * staking_token, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor()
-}
+pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
 
 /// get total delegated token value from validators in native token
 pub fn get_actual_total_delegated(
@@ -93,7 +80,7 @@ pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
 
 pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
     let ratio = Decimal::from_ratio(Uint128::new(1000), Uint128::new(1005));
-    calculate_staking_token_from_rate(total_bond_amount, ratio)
+    calc::calculate_staking_token_from_rate(total_bond_amount, ratio)
 }
 
 /// return how much to undelegate native token from ratio of total delegated amount divide with total bond with reward value amount
@@ -173,45 +160,6 @@ pub fn get_undelegate_from_validator_msgs(
     }
 
     (msgs, undelegations)
-}
-
-pub fn send_to_evm(
-    env: Env,
-    ucs03_contract_addr: String,
-    channel_id: u32,
-    receiver: Bytes,
-    base_token: String,
-    base_amount: Uint128,
-    quote_token: Bytes,
-    quote_amount: Uint256,
-    funds: Vec<Coin>,
-    salt: H256,
-) -> Result<WasmMsg, ContractError> {
-    let timeout = env
-        .block
-        .time
-        .plus_seconds(DEFAULT_TIMEOUT_TIMESTAMP_OFFSET)
-        .nanos();
-
-    let relay_transfer_msg: Ucs03RelayExecuteMsg = Ucs03RelayExecuteMsg::Transfer {
-        channel_id,
-        receiver,
-        base_token,
-        base_amount,
-        quote_token,
-        quote_amount,
-        timeout_height: 0,
-        timeout_timestamp: timeout,
-        salt,
-    };
-
-    let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
-
-    return Ok(WasmMsg::Execute {
-        contract_addr: ucs03_contract_addr,
-        msg: transfer_relay_msg,
-        funds,
-    });
 }
 
 pub fn get_validator_delegation_map_with_total_bond(
@@ -481,4 +429,146 @@ pub fn adjust_validators_delegation(
         get_restaking_msgs(surplus_validators, deficient_validators, denom);
 
     Ok(msgs)
+}
+
+pub fn get_liquidity_data(
+    querier: QuerierWrapper,
+    delegator: String,
+    coin_denom: String,
+    validators_list: Vec<String>,
+    total_lst_supply: Uint128,
+) -> Result<(Uint128, Uint128, Decimal), ContractError> {
+    let delegated_amount = get_actual_total_delegated(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    );
+
+    let reward = get_actual_total_reward(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list,
+    )?;
+
+    let mut current_exchange_rate = Decimal::one();
+
+    let total_bond_amount = delegated_amount + reward;
+
+    if !delegated_amount.is_zero() && total_lst_supply.is_zero() {
+        current_exchange_rate = Decimal::from_ratio(total_bond_amount, total_lst_supply);
+    }
+
+    Ok((delegated_amount, reward, current_exchange_rate))
+}
+
+pub fn process_bond(
+    storage: &mut dyn Storage,
+    querier: QuerierWrapper,
+    sender: String,
+    staker: String,
+    delegator: Addr,
+    amount: Uint128,
+    bond_time: u64,
+    params: Parameters,
+    validators_reg: ValidatorsRegistry,
+    salt: String,
+) -> Result<
+    (
+        Vec<CosmosMsg<TokenFactoryMsg>>,
+        Vec<SubMsg<TokenFactoryMsg>>,
+        BondData,
+    ),
+    ContractError,
+> {
+    let coin_denom = params.underlying_coin_denom.to_string();
+    let msgs = delegation::get_delegate_to_validator_msgs(
+        amount,
+        coin_denom.to_string(),
+        validators_reg.validators.clone(),
+    );
+
+    let validators_list: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    // logic to mint token and update the supply and total_bond_amount
+    let mut state = STATE.load(storage)?;
+
+    let delegated_amount = get_actual_total_delegated(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    );
+
+    let total_bond_amount: Uint128;
+    if !cfg!(test) {
+        state.total_delegated_amount = delegated_amount;
+        let reward = get_actual_total_reward(
+            querier,
+            delegator.to_string(),
+            coin_denom.clone(),
+            validators_list,
+        )?;
+
+        total_bond_amount = delegated_amount + reward;
+    } else {
+        total_bond_amount = get_mock_total_reward(state.total_bond_amount);
+    }
+
+    let mut exchange_rate = state.exchange_rate;
+
+    if !total_bond_amount.is_zero() && !state.total_lst_supply.is_zero() {
+        exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
+    }
+
+    let mint_amount = calculate_staking_token_from_rate(amount, exchange_rate);
+
+    // after update exchange rate we update the state
+    state.bond_counter = state.bond_counter + 1;
+    state.total_bond_amount = total_bond_amount + amount;
+    state.total_lst_supply += mint_amount;
+    state.total_delegated_amount += amount;
+    state.last_bond_time = bond_time;
+    state.update_exchange_rate();
+
+    STATE.save(storage, &state)?;
+
+    let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
+    let payload = MintTokensPayload {
+        sender: sender.to_string(),
+        staker: staker.clone(),
+        amount: mint_amount,
+        salt,
+    };
+    let payload_bin = to_json_binary(&payload)?;
+
+    if !cfg!(test) {
+        // Start to mint according to staked token only if it is not test
+        let sub_msg: SubMsg<TokenFactoryMsg> = token::get_staked_token_submsg(
+            delegator.to_string(),
+            staker.to_string(),
+            mint_amount,
+            params.liquidstaking_denom.clone(),
+            payload_bin,
+            params.cw20_address,
+        );
+        sub_msgs.push(sub_msg);
+    }
+
+    Ok((
+        msgs,
+        sub_msgs,
+        BondData {
+            mint_amount,
+            delegated_amount: state.total_delegated_amount,
+            total_bond_amount: state.total_bond_amount,
+            exchange_rate,
+            total_supply: state.total_lst_supply,
+        },
+    ))
 }

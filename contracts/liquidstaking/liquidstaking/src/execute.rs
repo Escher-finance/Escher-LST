@@ -4,24 +4,22 @@ use crate::error::ContractError;
 use crate::event::{
     BondEvent, ProcessRewardsEvent, ProcessUnbondingEvent, UnbondEvent, UpdateValidatorsEvent,
 };
-use crate::msg::{BondRewardsPayload, MintTokensPayload, ZkgmMessage};
-use crate::reply::{
-    BOND_WITHDRAW_REWARD_REPLY_ID, MINT_CW20_TOKENS_REPLY_ID, MINT_TOKENS_REPLY_ID,
-};
+use crate::msg::{BondRewardsPayload, ZkgmMessage};
+use crate::reply::BOND_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, LOG, PARAMETERS, STATE,
+    increment_tokens, unbond_record, UnbondRecord, Validator, LOG, PARAMETERS, STATE,
     VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     self, calc::calculate_native_token_from_staking_token, calc::calculate_staking_token_from_rate,
-    message::get_actual_total_delegated, message::get_actual_total_reward,
-    message::get_mock_total_reward, message::to_uint128,
+    delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
+    delegation::get_mock_total_reward, delegation::to_uint128,
 };
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, DecCoin,
-    Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, StakingMsg, StdResult, SubMsg,
-    Timestamp, Uint128, Uint256, WasmMsg,
+    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
+    DepsMut, DistributionMsg, Env, MessageInfo, Response, StdResult, SubMsg, Timestamp, Uint128,
+    Uint256, WasmMsg,
 };
 use unionlabs_primitives::{Bytes, FixedBytes};
 
@@ -42,8 +40,7 @@ pub fn bond(
 
     let payment: Coin;
     // if amount is none it should use senders funds to delegate and this assume the
-    // transaction happen on same chain, original staker/sender to contract is on same cosmos based chain
-    // so it will use sender funds to do bond
+    // transaction happen on same chain directly as the original staker/sender to contract is on same cosmos based chain
     if amount.is_none() {
         // coin must have be sent along with transaction and it should be in underlying coin denom
         if info.funds.len() > 1usize {
@@ -81,108 +78,42 @@ pub fn bond(
         };
     }
 
-    let msgs = utils::message::get_delegate_to_validator_msgs(
-        payment.amount,
-        params.underlying_coin_denom.to_string(),
-        validators_reg.validators.clone(),
-    );
-
-    let validators_list: Vec<String> = validators_reg
-        .validators
-        .iter()
-        .map(|v| v.address.clone())
-        .collect();
-
-    // logic to mint token and update the supply and total_bond_amount
-    let mut state = STATE.load(deps.storage)?;
-
-    let delegated_amount = get_actual_total_delegated(
+    let (msgs, sub_msgs, bond_data) = utils::delegation::process_bond(
+        deps.storage,
         deps.querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list.clone(),
-    );
-
-    let total_bond_amount: Uint128;
-    if !cfg!(test) {
-        state.total_delegated_amount = delegated_amount;
-        let reward = get_actual_total_reward(
-            deps.querier,
-            delegator.to_string(),
-            coin_denom.clone(),
-            validators_list,
-        )?;
-
-        total_bond_amount = delegated_amount + reward;
-    } else {
-        total_bond_amount = get_mock_total_reward(state.total_bond_amount);
-    }
-
-    let mut current_exchange_rate = state.exchange_rate;
-
-    if !total_bond_amount.is_zero() && !state.total_lst_supply.is_zero() {
-        current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
-    }
-
-    let mint_amount = calculate_staking_token_from_rate(payment.amount, current_exchange_rate);
-
-    let total_lst_supply = state.total_lst_supply;
+        sender.to_string(),
+        the_staker.clone(),
+        delegator,
+        payment.amount,
+        env.block.time.nanos(),
+        params,
+        validators_reg,
+        salt,
+    )?;
 
     // create bond event here
     let bond_event = BondEvent(
         sender.to_string(),
         the_staker.clone(),
         payment.amount.clone(),
-        delegated_amount.clone(),
-        total_bond_amount.clone(),
-        total_lst_supply,
-        current_exchange_rate,
+        bond_data.delegated_amount.clone(),
+        bond_data.total_bond_amount.clone(),
+        bond_data.total_supply,
+        bond_data.exchange_rate,
     );
-
-    // after update exchange rate we update the state
-    state.bond_counter = state.bond_counter + 1;
-    state.total_bond_amount = total_bond_amount + payment.amount;
-    state.total_lst_supply = total_lst_supply + mint_amount;
-    state.total_delegated_amount += payment.amount;
-    state.last_bond_time = env.block.time.nanos();
-    state.update_exchange_rate();
-
-    STATE.save(deps.storage, &state)?;
-
-    let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
-    let payload = MintTokensPayload {
-        sender: sender.to_string(),
-        staker: the_staker.clone(),
-        amount: mint_amount,
-        salt,
-    };
-    let payload_bin = to_json_binary(&payload)?;
-
-    if !cfg!(test) {
-        // Start to mint according to staked token only if it is not test
-        let sub_msg: SubMsg<TokenFactoryMsg> = utils::token::get_staked_token_submsg(
-            delegator.to_string(),
-            the_staker.to_string(),
-            mint_amount,
-            params.liquidstaking_denom.clone(),
-            payload_bin,
-            params,
-        );
-        sub_msgs.push(sub_msg);
-    }
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
         .add_submessages(sub_msgs)
         .add_event(bond_event)
         .add_attributes(vec![
-            attr("action", "mint"),
+            attr("action", "bond"),
             attr("from", sender),
             attr("staker", the_staker.to_string()),
-            attr("payment_amount", payment.amount.to_string()),
+            attr("bond_amount", payment.amount.to_string()),
             attr("denom", coin_denom.to_string()),
-            attr("minted", mint_amount),
-            attr("exchange_rate", state.exchange_rate.to_string()),
+            attr("minted", bond_data.mint_amount),
+            attr("exchange_rate", bond_data.exchange_rate.to_string()),
         ]);
 
     Ok(res)
@@ -274,7 +205,7 @@ pub fn unbond(
         // throw error
         return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker
     }
-    let (undelegate_msgs, undelegations) = utils::message::get_undelegate_from_validator_msgs(
+    let (undelegate_msgs, undelegations) = utils::delegation::get_undelegate_from_validator_msgs(
         undelegate_amount,
         coin_denom.clone(),
         validators_reg.validators,
@@ -383,7 +314,7 @@ pub fn redelegate(
         denom: coin_denom.clone(),
     };
 
-    let msgs = utils::message::get_delegate_to_validator_msgs(
+    let msgs = utils::delegation::get_delegate_to_validator_msgs(
         payment.amount,
         params.underlying_coin_denom.to_string(),
         validators_reg.validators.clone(),
@@ -577,7 +508,7 @@ pub fn reset(
     STATE.save(deps.storage, &state)?;
 
     unbond_record().clear(deps.storage);
-    let msgs = utils::message::get_unbond_all_messages(deps, env.contract.address)?;
+    let msgs = utils::delegation::get_unbond_all_messages(deps, env.contract.address)?;
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
@@ -774,7 +705,7 @@ pub fn process_unbonding(
     let msg: CosmosMsg<TokenFactoryMsg> = {
         if unbond_rec.staker != unbond_rec.sender {
             let funds = vec![unbond_rec.undelegate_amount.clone()];
-            let wasm_msg = utils::message::send_to_evm(
+            let wasm_msg = utils::protocol::send_to_evm(
                 env.clone(),
                 params.ucs03_relay_contract.as_str().into(),
                 params.ucs03_channel.parse::<u32>().unwrap(),
@@ -835,7 +766,7 @@ pub fn transfer(
     let params = PARAMETERS.load(deps.storage)?;
 
     let funds = vec![amount.clone()];
-    let wasm_msg = utils::message::send_to_evm(
+    let wasm_msg: WasmMsg = utils::protocol::send_to_evm(
         env,
         ucs03_contract,
         ucs03_channel_id,
@@ -895,7 +826,7 @@ pub fn update_validators(
     validators_reg.validators = validators.clone();
     VALIDATORS_REGISTRY.save(deps.storage, &validators_reg)?;
 
-    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = utils::message::adjust_validators_delegation(
+    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = utils::delegation::adjust_validators_delegation(
         deps,
         env.contract.address,
         prev_validators.clone(),

@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use liquidstaking::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use liquidstaking::msg::{InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {
