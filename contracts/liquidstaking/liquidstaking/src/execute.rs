@@ -28,7 +28,7 @@ pub fn bond(
     env: Env,
     info: MessageInfo,
     staker: Option<String>,
-    amount: Option<Coin>,
+    amount: Option<Uint128>,
     salt: String,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
@@ -62,7 +62,7 @@ pub fn bond(
         // and this only can be called by "owner" or backend script using owner sign to do bond on behalf of original staker
         cw_ownable::assert_owner(deps.storage, &sender)?;
 
-        let the_amount = amount.unwrap().clone().amount;
+        let the_amount = amount.unwrap();
 
         let lst_balance = deps
             .querier
@@ -792,19 +792,32 @@ pub fn transfer(
 pub fn on_zkgm(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     channel_id: u32,
     sender: Bytes,
     message: Bytes,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let msg_bytes = message.as_ref();
-    let payload_msg: ZkgmMessage = from_json(msg_bytes)?;
+    let payload: ZkgmMessage = from_json(msg_bytes)?;
     let msg = format!(
         "onzgkm time:{} channel_id:{} sender:{} message:{:?}",
-        env.block.time, channel_id, sender, payload_msg
+        env.block.time, channel_id, sender, payload
     );
     LOG.save(deps.storage, &msg)?;
-    Ok(Response::default())
+
+    match payload {
+        ZkgmMessage::Bond { amount, salt } => {
+            return bond(
+                deps,
+                env,
+                info,
+                Some(format!("{}", sender)),
+                Some(amount),
+                salt,
+            )
+        }
+        _ => return Ok(Response::default()),
+    }
 }
 
 /// Update the ownership of the contract.
