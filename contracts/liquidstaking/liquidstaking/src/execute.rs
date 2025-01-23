@@ -6,20 +6,16 @@ use crate::event::{
 };
 use crate::msg::{BondRewardsPayload, ZkgmMessage};
 use crate::reply::BOND_WITHDRAW_REWARD_REPLY_ID;
-use crate::state::{
-    increment_tokens, unbond_record, UnbondRecord, Validator, LOG, PARAMETERS, STATE,
-    VALIDATORS_REGISTRY,
-};
+use crate::state::{unbond_record, Validator, LOG, PARAMETERS, STATE, VALIDATORS_REGISTRY};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
-    self, calc::calculate_native_token_from_staking_token, calc::calculate_staking_token_from_rate,
-    delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
-    delegation::get_mock_total_reward, delegation::to_uint128,
+    self, calc::calculate_staking_token_from_rate, delegation::get_actual_total_delegated,
+    delegation::get_actual_total_reward, delegation::get_mock_total_reward, delegation::to_uint128,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
-    DepsMut, DistributionMsg, Env, MessageInfo, Response, StdResult, SubMsg, Timestamp, Uint128,
-    Uint256, WasmMsg,
+    DepsMut, DistributionMsg, Env, MessageInfo, Response, StdResult, SubMsg, Uint128, Uint256,
+    WasmMsg,
 };
 use unionlabs_primitives::{Bytes, FixedBytes};
 
@@ -119,6 +115,52 @@ pub fn bond(
     Ok(res)
 }
 
+pub fn zkgm_unbond(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    staker: String,
+    amount: Uint128,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let sender = info.sender.clone();
+    let delegator = env.contract.address.clone();
+
+    let (msgs, unbond_data) = utils::delegation::process_unbond(
+        env.clone(),
+        deps.storage,
+        deps.querier,
+        sender.to_string(),
+        staker.clone(),
+        delegator,
+        amount,
+        params,
+        validators_reg,
+    )?;
+
+    // create bond event here
+    let unbond_event = UnbondEvent(
+        sender.to_string(),
+        staker,
+        amount,
+        unbond_data.undelegate_amount,
+        unbond_data.delegated_amount,
+        unbond_data.delegated_amount + unbond_data.reward,
+        unbond_data.total_supply,
+        unbond_data.exchange_rate,
+    );
+
+    LOG.save(
+        deps.storage,
+        &format!("{}: {:?}", env.block.time, unbond_event),
+    )?;
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_event(unbond_event);
+
+    Ok(res)
+}
+
 pub fn zkgm_bond(
     deps: DepsMut,
     env: Env,
@@ -188,11 +230,11 @@ pub fn unbond(
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
-    let coin_denom = params.underlying_coin_denom;
-    let liquidstaking_denom = params.liquidstaking_denom;
+    let coin_denom = params.underlying_coin_denom.to_string();
+    let liquidstaking_denom = params.liquidstaking_denom.to_string();
     let sender = info.sender.to_string();
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
-    let delegator = env.contract.address;
+    let delegator = env.contract.address.clone();
 
     let unbond_amount: Uint128;
     if cfg!(not(nonunion)) {
@@ -226,111 +268,44 @@ pub fn unbond(
         }
     }
 
-    let validators_list: Vec<String> = validators_reg
-        .validators
-        .iter()
-        .map(|v| v.address.clone())
-        .collect();
-
-    let mut state = STATE.load(deps.storage)?;
-
-    let delegated_amount = get_actual_total_delegated(
+    let (msgs, unbond_data) = utils::delegation::process_unbond(
+        env.clone(),
+        deps.storage,
         deps.querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list.clone(),
-    );
-    state.total_delegated_amount = delegated_amount;
-    let reward = get_actual_total_reward(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list,
+        sender.to_string(),
+        the_staker.clone(),
+        delegator,
+        unbond_amount,
+        params,
+        validators_reg,
     )?;
 
-    let total_bond_amount = delegated_amount + reward;
-
-    if total_bond_amount.is_zero() || state.total_supply.is_zero() {
-        return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
-    }
-    let current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
-
-    // calculate how much native token undelegated amount from staked token amount base on current exchange rate
-    let undelegate_amount: Uint128 =
-        calculate_native_token_from_staking_token(unbond_amount.clone(), current_exchange_rate);
-
-    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
-
-    if delegated_amount < undelegate_amount {
-        // throw error
-        return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker
-    }
-    let (undelegate_msgs, undelegations) = utils::delegation::get_undelegate_from_validator_msgs(
-        undelegate_amount,
-        coin_denom.clone(),
-        validators_reg.validators,
-    );
-    msgs.extend(undelegate_msgs);
-
-    let burn_msg = utils::token::burn_token(
-        delegator.to_string(),
-        unbond_amount,
-        liquidstaking_denom.clone(),
-        params.cw20_address,
-    );
-    msgs.push(burn_msg.into());
-
-    let unbond_coin = Coin {
-        amount: unbond_amount.clone(),
-        denom: liquidstaking_denom.clone(),
-    };
-    let id: u64 = increment_tokens(deps.storage).unwrap();
-    let history = UnbondRecord {
-        id,
-        height: env.block.height,
-        sender: sender.clone(),
-        staker: the_staker.clone(),
-        amount: unbond_coin,
-        exchange_rate: current_exchange_rate,
-        undelegate_amount: Coin {
-            denom: coin_denom.clone(),
-            amount: undelegate_amount,
-        },
-        undelegations,
-        created: env.block.time,
-        completion: env.block.time.plus_seconds(params.unbonding_time),
-        released: false,
-        released_time: Timestamp::from_nanos(000_000_000),
-    };
-    unbond_record().save(deps.storage, id, &history)?;
-
-    // // update total bond, supply and exchange rate here
-    state.total_bond_amount = total_bond_amount - undelegate_amount;
-    state.total_supply = state.total_supply - unbond_amount;
-    state.total_delegated_amount = delegated_amount - undelegate_amount;
-    state.update_exchange_rate();
-    STATE.save(deps.storage, &state)?;
-
+    // create bond event here
     let unbond_event = UnbondEvent(
-        sender.clone(),
+        sender.to_string(),
         the_staker.clone(),
-        unbond_amount.clone(),
-        undelegate_amount.clone(),
-        state.total_delegated_amount.clone(),
-        total_bond_amount.clone(),
-        state.total_supply.clone(),
-        current_exchange_rate,
+        unbond_amount,
+        unbond_data.undelegate_amount,
+        unbond_data.delegated_amount,
+        unbond_data.delegated_amount + unbond_data.reward,
+        unbond_data.total_supply,
+        unbond_data.exchange_rate,
     );
+
+    LOG.save(
+        deps.storage,
+        &format!("{}: {:?}", env.block.time, unbond_event),
+    )?;
 
     let attrs = get_unbond_attrs(
         sender,
         the_staker,
-        current_exchange_rate.to_string(),
+        unbond_data.exchange_rate.to_string(),
         unbond_amount.to_string(),
-        undelegate_amount.to_string(),
-        state.total_delegated_amount.to_string(),
-        state.total_bond_amount.to_string(),
-        state.total_supply.to_string(),
+        unbond_data.undelegate_amount.to_string(),
+        unbond_data.delegated_amount.to_string(),
+        (unbond_data.delegated_amount + unbond_data.reward).to_string(),
+        unbond_data.total_supply.to_string(),
         coin_denom.clone(),
     );
 
@@ -357,7 +332,7 @@ pub fn redelegate(
         return Err(ContractError::Unauthorized {});
     }
 
-    let delegator = env.contract.address;
+    let delegator = env.contract.address.clone();
 
     if info.funds.len() > 1usize {
         return Err(ContractError::InvalidAsset {});
@@ -875,7 +850,9 @@ pub fn on_zkgm(
         ZkgmMessage::Bond { amount, salt } => {
             return zkgm_bond(deps, env, info, format!("{}", sender), amount, salt)
         }
-        _ => return Ok(Response::default()),
+        ZkgmMessage::Unbond { amount } => {
+            return zkgm_unbond(deps, env, info, format!("{}", sender), amount)
+        }
     }
 }
 

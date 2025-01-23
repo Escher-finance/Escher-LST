@@ -106,6 +106,7 @@ pub fn query_staking_liquidity(
         reward: total_reward,
         exchange_rate,
         time: env.block.time,
+        total_supply: state.total_supply,
     })
 }
 

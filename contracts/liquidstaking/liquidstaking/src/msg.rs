@@ -159,6 +159,7 @@ pub struct StakingLiquidity {
     pub reward: Uint128,
     pub exchange_rate: Decimal,
     pub time: Timestamp,
+    pub total_supply: Uint128,
 }
 
 #[cw_serde]
@@ -202,6 +203,7 @@ pub struct ValidatorDelegation {
 #[cw_serde]
 pub enum ZkgmMessage {
     Bond { amount: Uint128, salt: String },
+    Unbond { amount: Uint128 },
 }
 
 pub struct BondData {
