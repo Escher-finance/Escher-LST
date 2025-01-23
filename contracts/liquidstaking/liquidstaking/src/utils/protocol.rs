@@ -4,7 +4,7 @@ use crate::ContractError;
 use cosmwasm_std::{to_json_binary, Coin, Env, Uint128, Uint256, WasmMsg};
 use unionlabs_primitives::{Bytes, H256};
 
-pub fn send_to_evm(
+pub fn ucs03_transfer(
     env: Env,
     ucs03_contract_addr: String,
     channel_id: u32,

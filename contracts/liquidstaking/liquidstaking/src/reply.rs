@@ -95,15 +95,15 @@ pub fn transfer(
     };
 
     let funds = vec![coin_amount.clone()];
-    let wasm_msg: WasmMsg = utils::protocol::send_to_evm(
+    let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
         env,
         params.ucs03_relay_contract,
-        params.ucs03_channel.parse::<u32>().unwrap(),
+        params.ucs03_channel,
         Bytes::from_str(receiver.as_str()).unwrap(),
         params.liquidstaking_denom.clone(),
         amount,
-        Bytes::from_str(params.liquidstaking_denom.as_str()).unwrap(),
-        Uint256::from(0u64),
+        Bytes::from_str(params.lst_quote_token.as_str()).unwrap(),
+        Uint256::from(amount),
         funds,
         H256::from_str(&salt).unwrap(),
     )?;

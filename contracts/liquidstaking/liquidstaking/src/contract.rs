@@ -71,6 +71,8 @@ pub fn instantiate(
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
         reward_address: reward_addr.clone(),
+        quote_token: msg.quote_token,
+        lst_quote_token: msg.lst_quote_token,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -138,6 +140,8 @@ pub fn execute(
             unbonding_time,
             cw20_address,
             reward_address,
+            quote_token,
+            lst_quote_token,
         } => execute::set_parameters(
             deps,
             env,
@@ -149,6 +153,8 @@ pub fn execute(
             unbonding_time,
             cw20_address,
             reward_address,
+            quote_token,
+            lst_quote_token,
         ),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
         ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
@@ -194,6 +200,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
             actual: CONTRACT_VERSION.to_string(),
         });
     }
+
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     Ok(Response::default())

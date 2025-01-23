@@ -49,13 +49,33 @@ pub struct ValidatorsRegistry {
 pub struct Parameters {
     pub underlying_coin_denom: String,
     pub liquidstaking_denom: String,
-    pub ucs03_channel: String,
+    pub ucs03_channel: u32,
     pub ucs03_relay_contract: String,
     pub unbonding_time: u64,
     // cw20 contract address
     pub cw20_address: Option<Addr>,
     // reward contract address
     pub reward_address: Addr,
+    // quote token
+    pub quote_token: String,
+    // liquid staking quote token
+    pub lst_quote_token: String,
+}
+
+// Parameter is required data to instantiate and run contract
+#[cw_serde]
+pub struct PrevParameters {
+    pub underlying_coin_denom: String,
+    pub liquidstaking_denom: String,
+    pub ucs03_channel: u32,
+    pub ucs03_relay_contract: String,
+    pub unbonding_time: u64,
+    // cw20 contract address
+    pub cw20_address: Option<Addr>,
+    // reward contract address
+    pub reward_address: Addr,
+    // quote token
+    pub quote_token: String,
 }
 
 impl State {

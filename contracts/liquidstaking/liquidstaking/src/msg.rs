@@ -12,7 +12,7 @@ pub struct InstantiateMsg {
     pub underlying_coin_denom: String,
     pub validators: Vec<Validator>,
     pub liquidstaking_denom: String,
-    pub ucs03_channel: String,
+    pub ucs03_channel: u32,
     pub ucs03_relay_contract: String,
     pub revenue_receiver: Addr,
     pub unbonding_time: u64,
@@ -20,6 +20,8 @@ pub struct InstantiateMsg {
     pub fee_rate: Decimal,
     pub cw20_address: Option<Addr>,
     pub salt: String,
+    pub quote_token: String,
+    pub lst_quote_token: String,
 }
 
 #[cw_serde]
@@ -65,11 +67,13 @@ pub enum ExecuteMsg {
     SetParameters {
         underlying_coin_denom: Option<String>,
         liquidstaking_denom: Option<String>,
-        ucs03_channel: Option<String>,
+        ucs03_channel: Option<u32>,
         ucs03_relay_contract: Option<String>,
         unbonding_time: Option<u64>,
         cw20_address: Option<Addr>,
         reward_address: Option<Addr>,
+        quote_token: Option<String>,
+        lst_quote_token: Option<String>,
     },
     /// Update Validators
     UpdateValidators {

@@ -119,6 +119,63 @@ pub fn bond(
     Ok(res)
 }
 
+pub fn zkgm_bond(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    staker: String,
+    amount: Uint128,
+    salt: String,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let coin_denom = params.underlying_coin_denom.clone();
+    let sender = info.sender;
+    let delegator = env.contract.address;
+
+    let (msgs, sub_msgs, bond_data) = utils::delegation::process_bond(
+        deps.storage,
+        deps.querier,
+        sender.to_string(),
+        staker.clone(),
+        delegator,
+        amount,
+        env.block.time.nanos(),
+        params,
+        validators_reg,
+        salt,
+    )?;
+
+    // create bond event here
+    let bond_event = BondEvent(
+        sender.to_string(),
+        staker.clone(),
+        amount.clone(),
+        bond_data.delegated_amount.clone(),
+        bond_data.total_bond_amount.clone(),
+        bond_data.total_supply,
+        bond_data.exchange_rate,
+    );
+
+    LOG.save(deps.storage, &format!("{:?}", bond_event))?;
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_messages(msgs)
+        .add_submessages(sub_msgs)
+        .add_event(bond_event)
+        .add_attributes(vec![
+            attr("action", "bond"),
+            attr("from", sender),
+            attr("staker", staker.to_string()),
+            attr("bond_amount", amount.to_string()),
+            attr("denom", coin_denom.to_string()),
+            attr("minted", bond_data.mint_amount),
+            attr("exchange_rate", bond_data.exchange_rate.to_string()),
+        ]);
+
+    Ok(res)
+}
+
 pub fn unbond(
     deps: DepsMut,
     env: Env,
@@ -606,11 +663,13 @@ pub fn set_parameters(
     info: MessageInfo,
     underlying_coin_denom: Option<String>,
     liquidstaking_denom: Option<String>,
-    ucs03_channel: Option<String>,
+    ucs03_channel: Option<u32>,
     ucs03_relay_contract: Option<String>,
     unbonding_time: Option<u64>,
     cw20_address: Option<Addr>,
     reward_address: Option<Addr>,
+    quote_token: Option<String>,
+    lst_quote_token: Option<String>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -635,6 +694,10 @@ pub fn set_parameters(
     params.reward_address = reward_address
         .clone()
         .unwrap_or_else(|| params.reward_address);
+    params.quote_token = quote_token.clone().unwrap_or_else(|| params.quote_token);
+    params.lst_quote_token = lst_quote_token
+        .clone()
+        .unwrap_or_else(|| params.lst_quote_token);
 
     let cw20_addr_string = match cw20_address {
         Some(cw20) => cw20.to_string(),
@@ -667,7 +730,7 @@ pub fn set_parameters(
         )
         .add_attribute(
             "ucs03_channel",
-            ucs03_channel.unwrap_or_else(|| "".to_string()),
+            ucs03_channel.unwrap_or_else(|| 0).to_string(),
         )
         .add_attribute(
             "ucs03_relay_contract",
@@ -705,10 +768,10 @@ pub fn process_unbonding(
     let msg: CosmosMsg<TokenFactoryMsg> = {
         if unbond_rec.staker != unbond_rec.sender {
             let funds = vec![unbond_rec.undelegate_amount.clone()];
-            let wasm_msg = utils::protocol::send_to_evm(
+            let wasm_msg = utils::protocol::ucs03_transfer(
                 env.clone(),
                 params.ucs03_relay_contract.as_str().into(),
-                params.ucs03_channel.parse::<u32>().unwrap(),
+                params.ucs03_channel,
                 Bytes::from_str(unbond_rec.staker.as_str()).unwrap(),
                 params.underlying_coin_denom.clone(),
                 unbond_rec.amount.amount,
@@ -766,7 +829,7 @@ pub fn transfer(
     let params = PARAMETERS.load(deps.storage)?;
 
     let funds = vec![amount.clone()];
-    let wasm_msg: WasmMsg = utils::protocol::send_to_evm(
+    let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
         env,
         ucs03_contract,
         ucs03_channel_id,
@@ -807,14 +870,7 @@ pub fn on_zkgm(
 
     match payload {
         ZkgmMessage::Bond { amount, salt } => {
-            return bond(
-                deps,
-                env,
-                info,
-                Some(format!("{}", sender)),
-                Some(amount),
-                salt,
-            )
+            return zkgm_bond(deps, env, info, format!("{}", sender), amount, salt)
         }
         _ => return Ok(Response::default()),
     }
