@@ -157,7 +157,10 @@ pub fn zkgm_bond(
         bond_data.exchange_rate,
     );
 
-    LOG.save(deps.storage, &format!("{:?}", bond_event))?;
+    LOG.save(
+        deps.storage,
+        &format!("{}: {:?}", env.block.time, bond_event),
+    )?;
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
