@@ -522,8 +522,8 @@ pub fn process_bond(
 
     let mut exchange_rate = state.exchange_rate;
 
-    if !total_bond_amount.is_zero() && !state.total_lst_supply.is_zero() {
-        exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
+    if !total_bond_amount.is_zero() && !state.total_supply.is_zero() {
+        exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
     }
 
     let mint_amount = calculate_staking_token_from_rate(amount, exchange_rate);
@@ -531,7 +531,7 @@ pub fn process_bond(
     // after update exchange rate we update the state
     state.bond_counter = state.bond_counter + 1;
     state.total_bond_amount = total_bond_amount + amount;
-    state.total_lst_supply += mint_amount;
+    state.total_supply += mint_amount;
     state.total_delegated_amount += amount;
     state.last_bond_time = bond_time;
     state.update_exchange_rate();
@@ -568,7 +568,7 @@ pub fn process_bond(
             delegated_amount: state.total_delegated_amount,
             total_bond_amount: state.total_bond_amount,
             exchange_rate,
-            total_supply: state.total_lst_supply,
+            total_supply: state.total_supply,
         },
     ))
 }

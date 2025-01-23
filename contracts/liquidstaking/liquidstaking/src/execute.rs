@@ -247,10 +247,10 @@ pub fn unbond(
 
     let total_bond_amount = delegated_amount + reward;
 
-    if total_bond_amount.is_zero() || state.total_lst_supply.is_zero() {
+    if total_bond_amount.is_zero() || state.total_supply.is_zero() {
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
     }
-    let current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
+    let current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
     let undelegate_amount: Uint128 =
@@ -303,7 +303,7 @@ pub fn unbond(
 
     // // update total bond, supply and exchange rate here
     state.total_bond_amount = total_bond_amount - undelegate_amount;
-    state.total_lst_supply = state.total_lst_supply - unbond_amount;
+    state.total_supply = state.total_supply - unbond_amount;
     state.total_delegated_amount = delegated_amount - undelegate_amount;
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
@@ -315,7 +315,7 @@ pub fn unbond(
         undelegate_amount.clone(),
         state.total_delegated_amount.clone(),
         total_bond_amount.clone(),
-        state.total_lst_supply.clone(),
+        state.total_supply.clone(),
         current_exchange_rate,
     );
 
@@ -327,7 +327,7 @@ pub fn unbond(
         undelegate_amount.to_string(),
         state.total_delegated_amount.to_string(),
         state.total_bond_amount.to_string(),
-        state.total_lst_supply.to_string(),
+        state.total_supply.to_string(),
         coin_denom.clone(),
     );
 
@@ -410,18 +410,18 @@ pub fn redelegate(
 
     let mut current_exchange_rate = state.exchange_rate;
 
-    if !total_bond_amount.is_zero() && !state.total_lst_supply.is_zero() {
-        current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_lst_supply);
+    if !total_bond_amount.is_zero() && !state.total_supply.is_zero() {
+        current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
     }
 
     let mint_amount = calculate_staking_token_from_rate(payment.amount, current_exchange_rate);
 
-    let total_lst_supply = state.total_lst_supply;
+    let total_lst_supply = state.total_supply;
 
     // after update exchange rate we update the state
     state.bond_counter = state.bond_counter + 1;
     state.total_bond_amount = total_bond_amount + payment.amount;
-    state.total_lst_supply = total_lst_supply + mint_amount;
+    state.total_supply = total_lst_supply + mint_amount;
     state.total_delegated_amount += payment.amount;
     state.last_bond_time = env.block.time.nanos();
     state.update_exchange_rate();
@@ -558,7 +558,7 @@ pub fn reset(
     let mut state = STATE.load(deps.storage)?;
     state.bond_counter = 0;
     state.total_bond_amount = Uint128::new(0);
-    state.total_lst_supply = Uint128::new(0);
+    state.total_supply = Uint128::new(0);
     state.total_delegated_amount = Uint128::new(0);
     state.last_bond_time = 0;
     state.exchange_rate = Decimal::one();

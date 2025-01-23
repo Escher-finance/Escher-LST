@@ -24,7 +24,7 @@ pub struct State {
     // total native token that is delegated, include rewards
     pub total_delegated_amount: Uint128,
     // total liquid staking token that is issued
-    pub total_lst_supply: Uint128,
+    pub total_supply: Uint128,
     // bond_counter how many times bond is called
     pub bond_counter: u64,
     // last_bond_time
@@ -62,26 +62,10 @@ pub struct Parameters {
     pub lst_quote_token: String,
 }
 
-// Parameter is required data to instantiate and run contract
-#[cw_serde]
-pub struct PrevParameters {
-    pub underlying_coin_denom: String,
-    pub liquidstaking_denom: String,
-    pub ucs03_channel: u32,
-    pub ucs03_relay_contract: String,
-    pub unbonding_time: u64,
-    // cw20 contract address
-    pub cw20_address: Option<Addr>,
-    // reward contract address
-    pub reward_address: Addr,
-    // quote token
-    pub quote_token: String,
-}
-
 impl State {
     pub fn update_exchange_rate(&mut self) {
-        if self.total_bond_amount != Uint128::new(0) && self.total_lst_supply != Uint128::new(0) {
-            self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_lst_supply);
+        if self.total_bond_amount != Uint128::new(0) && self.total_supply != Uint128::new(0) {
+            self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_supply);
         }
     }
 }
