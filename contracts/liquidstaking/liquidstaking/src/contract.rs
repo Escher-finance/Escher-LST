@@ -87,7 +87,7 @@ pub fn instantiate(
         exchange_rate: Decimal::one(),
         total_delegated_amount: Uint128::new(0),
         total_bond_amount: Uint128::new(0),
-        total_lst_supply: Uint128::new(0),
+        total_supply: Uint128::new(0),
         bond_counter: 0,
         last_bond_time: 0,
         chain,
