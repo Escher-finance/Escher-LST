@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use crate::state::{Balance, Parameters, State, UnbondRecord, Validator, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
+use cw2::ContractVersion;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use schemars::JsonSchema;
 use unionlabs_primitives::{Bytes, H256};
@@ -128,6 +129,8 @@ pub enum QueryMsg {
         sender: Option<String>,
         released: Option<bool>,
     },
+    #[returns(ContractVersion)]
+    Version {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;
@@ -206,6 +209,7 @@ pub enum ZkgmMessage {
     Unbond { amount: Uint128 },
 }
 
+#[cw_serde]
 pub struct BondData {
     pub mint_amount: Uint128,
     pub delegated_amount: Uint128,
@@ -214,6 +218,7 @@ pub struct BondData {
     pub total_supply: Uint128,
 }
 
+#[cw_serde]
 pub struct UnbondData {
     pub undelegate_amount: Uint128,
     pub delegated_amount: Uint128,

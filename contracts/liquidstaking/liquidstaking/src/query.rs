@@ -7,6 +7,7 @@ use crate::state::{
 use crate::utils::delegation::{get_actual_total_delegated, get_actual_total_reward};
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
+use cw2::ContractVersion;
 use cw_ownable::get_ownership;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -30,7 +31,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             released,
         } => to_json_binary(&(query_unbond_record(deps.storage, staker, sender, released)?)),
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
+        QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
     }
+}
+
+pub fn query_version(storage: &dyn Storage) -> StdResult<ContractVersion> {
+    let ver = cw2::get_contract_version(storage)?;
+    Ok(ver)
 }
 
 pub fn query_state(storage: &dyn Storage) -> StdResult<State> {
