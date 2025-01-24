@@ -905,13 +905,13 @@ fn validator_restaking_adjustment() {
     correct_validator_delegation_map.insert("C".into(), Uint128::new(30000));
     correct_validator_delegation_map.insert("D".into(), Uint128::new(40000));
 
-    let (surplus, deficit) = utils::get_surplus_deficit_validators(
+    let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
         validator_delegation_map,
         correct_validator_delegation_map,
     );
 
     let denom = "muno".to_string();
-    let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
+    let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
     println!("msgs: {:?}", msgs);
 }
 
@@ -929,13 +929,13 @@ fn validator_restaking_adjustment_2() {
     correct_validator_delegation_map.insert("B".into(), Uint128::new(75000));
     correct_validator_delegation_map.insert("C".into(), Uint128::new(75000));
 
-    let (surplus, deficit) = utils::get_surplus_deficit_validators(
+    let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
         validator_delegation_map,
         correct_validator_delegation_map,
     );
 
     let denom = "muno".to_string();
-    let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
+    let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
     println!("msgs: {:?}", msgs);
 }
 
@@ -954,13 +954,13 @@ fn validator_restaking_adjustment_3() {
     correct_validator_delegation_map.insert("C".into(), Uint128::new(25000));
     correct_validator_delegation_map.insert("D".into(), Uint128::new(50000));
 
-    let (surplus, deficit) = utils::get_surplus_deficit_validators(
+    let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
         validator_delegation_map,
         correct_validator_delegation_map,
     );
 
     let denom = "muno".to_string();
-    let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
+    let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
     println!("\nmsgs: {:?}", msgs);
 }
 
@@ -978,13 +978,13 @@ fn validator_restaking_adjustment_4() {
     correct_validator_delegation_map.insert("A".into(), Uint128::new(80000));
     correct_validator_delegation_map.insert("B".into(), Uint128::new(20000));
 
-    let (surplus, deficit) = utils::get_surplus_deficit_validators(
+    let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
         validator_delegation_map,
         correct_validator_delegation_map,
     );
 
     let denom = "muno".to_string();
-    let msgs = utils::get_restaking_msgs(surplus, deficit, denom);
+    let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
     println!("\nmsgs: {:?}", msgs);
 }
 
@@ -994,6 +994,16 @@ fn test_delegate_amount() {
     let total_weight: u32 = 1;
     let ratio = Decimal::from_ratio(Uint128::from(weight), Uint128::from(total_weight));
     let amount = Uint128::from(10u32);
-    let delegate_amount = utils::calculate_delegated_amount(amount, ratio);
+    let delegate_amount = utils::delegation::calculate_delegated_amount(amount, ratio);
     println!("delegate_amount: {}", delegate_amount);
+}
+
+#[test]
+fn test_calculate_native_token() {
+    let staking_token = Uint128::from(10000u32);
+    //60926366
+    let exchange_rate = Decimal::from_str("340").unwrap();
+    let undelegate_amount: Uint128 =
+        utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
+    println!("undelegate_amount: {}", undelegate_amount);
 }
