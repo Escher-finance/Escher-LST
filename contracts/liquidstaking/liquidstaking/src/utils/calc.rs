@@ -18,7 +18,11 @@ pub fn calculate_native_token_from_staking_token(
     staking_token: Uint128,
     exchange_rate: Decimal,
 ) -> Uint128 {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
+    let mut decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
+    let rate_limit = Uint128::from_str("340").unwrap();
+    if exchange_rate.to_uint_ceil() > rate_limit {
+        decimal_fract = Decimal::from_str("340").unwrap();
+    }
     let fract = (exchange_rate * decimal_fract).to_uint_ceil();
     Decimal::from_ratio(fract * staking_token, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor()
 }
