@@ -71,9 +71,14 @@ fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, Contr
     log += format!("transfer to: {} amount: {}", payload.staker, payload.amount).as_str();
     LOG.save(deps.storage, &log)?;
 
+    let coin = Coin {
+        amount: payload.amount,
+        denom: params.liquidstaking_denom,
+    };
+
     // if the sender is not equal as the staker, means it is from other chain
     if payload.sender == payload.staker {
-        return send(deps, payload.amount, payload.staker);
+        return send(deps, coin, payload.staker);
     }
 
     // transfer to evm/bera
@@ -146,17 +151,10 @@ fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Con
     Ok(res)
 }
 
-pub fn send(deps: DepsMut, amount: Uint128, receiver: String) -> Result<Response, ContractError> {
-    let params = PARAMETERS.load(deps.storage)?;
-
-    let coin_amount = Coin {
-        amount,
-        denom: params.underlying_coin_denom,
-    };
-
+pub fn send(_deps: DepsMut, amount: Coin, receiver: String) -> Result<Response, ContractError> {
     let bank_msg: BankMsg = BankMsg::Send {
         to_address: receiver.clone(),
-        amount: vec![coin_amount.clone()],
+        amount: vec![amount.clone()],
     };
 
     let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
@@ -165,7 +163,7 @@ pub fn send(deps: DepsMut, amount: Uint128, receiver: String) -> Result<Response
         .add_message(msg)
         .add_attribute("action", "send")
         .add_attribute("receiver", receiver.to_string())
-        .add_attribute("amount", coin_amount.amount.to_string())
-        .add_attribute("denom", coin_amount.denom);
+        .add_attribute("amount", amount.amount.to_string())
+        .add_attribute("denom", amount.denom);
     Ok(res)
 }
