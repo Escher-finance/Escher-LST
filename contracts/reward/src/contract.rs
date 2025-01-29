@@ -16,14 +16,18 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+    let binding = info.sender.to_string();
+    let owner = Some(binding.as_ref());
+    cw_ownable::initialize_owner(deps.storage, deps.api, owner)?;
+
     let config = Config {
         lst_contract_address: msg.lst_contract,
-        revenue_receiver: msg.revenue_receiver,
+        fee_receiver: msg.fee_receiver,
         fee_rate: msg.fee_rate,
         coin_denom: msg.coin_denom,
     };
@@ -44,7 +48,7 @@ pub fn execute(
         ExecuteMsg::SplitReward {} => execute::split_reward(deps, env, info),
         ExecuteMsg::SetConfig {
             lst_contract_address,
-            revenue_receiver,
+            fee_receiver,
             fee_rate,
             coin_denom,
         } => execute::set_config(
@@ -52,11 +56,12 @@ pub fn execute(
             env,
             info,
             lst_contract_address,
-            revenue_receiver,
+            fee_receiver,
             fee_rate,
             coin_denom,
         ),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
+        ExecuteMsg::TransferToOwner {} => execute::transfer_to_owner(deps, env, info),
     }
 }
 
@@ -89,6 +94,5 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
         });
     }
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
     Ok(Response::default())
 }
