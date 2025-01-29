@@ -18,8 +18,8 @@
 - lstCoinSymbol
 - rpc
 - rest
-- ucs01Channel
-- ucs01RelayContract
+- ucs03Channel
+- ucs03RelayContract
 - feeRate
 - revenueReceiver
 - validator
