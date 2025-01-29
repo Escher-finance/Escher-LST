@@ -4,13 +4,13 @@ use crate::error::ContractError;
 use crate::event::{
     BondEvent, ProcessRewardsEvent, ProcessUnbondingEvent, UnbondEvent, UpdateValidatorsEvent,
 };
-use crate::msg::{BondRewardsPayload, ZkgmMessage};
+use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
 use crate::reply::BOND_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{unbond_record, Validator, LOG, PARAMETERS, STATE, VALIDATORS_REGISTRY};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
-    self, calc::calculate_staking_token_from_rate, delegation::get_actual_total_delegated,
-    delegation::get_actual_total_reward, delegation::get_mock_total_reward, delegation::to_uint128,
+    self, delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
+    delegation::get_mock_total_reward, delegation::to_uint128,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
@@ -97,6 +97,10 @@ pub fn bond(
         bond_data.total_supply,
         bond_data.exchange_rate,
     );
+
+    if bond_data.mint_amount == Uint128::zero() {
+        return Err(ContractError::InvalidMintAmount {});
+    }
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
@@ -238,19 +242,23 @@ pub fn unbond(
 
     let unbond_amount: Uint128;
     if cfg!(not(nonunion)) {
-        // this will handle union chain
-        // coin must be sent along with transaction and it should be in liquid staking coin denom
-        if info.funds.len() > 1usize {
-            return Err(ContractError::InvalidAsset {});
+        if amount.is_none() {
+            // this will handle union chain
+            // coin must be sent along with transaction and it should be in liquid staking coin denom
+            if info.funds.len() > 1usize {
+                return Err(ContractError::InvalidAsset {});
+            }
+
+            let payment = info
+                .funds
+                .iter()
+                .find(|x| x.denom == liquidstaking_denom && x.amount > Uint128::zero())
+                .ok_or_else(|| ContractError::NoAsset {})?;
+
+            unbond_amount = payment.amount;
+        } else {
+            unbond_amount = amount.unwrap();
         }
-
-        let payment = info
-            .funds
-            .iter()
-            .find(|x| x.denom == liquidstaking_denom && x.amount > Uint128::zero())
-            .ok_or_else(|| ContractError::NoAsset {})?;
-
-        unbond_amount = payment.amount;
     } else {
         // this will handle non union chain
         // need to find staked token balance of sender
@@ -386,20 +394,9 @@ pub fn redelegate(
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
     }
 
-    let mut current_exchange_rate = state.exchange_rate;
-
-    if !total_bond_amount.is_zero() && !state.total_supply.is_zero() {
-        current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
-    }
-
-    let mint_amount = calculate_staking_token_from_rate(payment.amount, current_exchange_rate);
-
-    let total_lst_supply = state.total_supply;
-
     // after update exchange rate we update the state
     state.bond_counter = state.bond_counter + 1;
     state.total_bond_amount = total_bond_amount + payment.amount;
-    state.total_supply = total_lst_supply + mint_amount;
     state.total_delegated_amount += payment.amount;
     state.last_bond_time = env.block.time.nanos();
     state.update_exchange_rate();
@@ -648,6 +645,8 @@ pub fn set_parameters(
     reward_address: Option<Addr>,
     quote_token: Option<String>,
     lst_quote_token: Option<String>,
+    fee_receiver: Option<Addr>,
+    fee_rate: Option<Decimal>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -676,6 +675,8 @@ pub fn set_parameters(
     params.lst_quote_token = lst_quote_token
         .clone()
         .unwrap_or_else(|| params.lst_quote_token);
+    params.fee_receiver = fee_receiver.clone().unwrap_or_else(|| params.fee_receiver);
+    params.fee_rate = fee_rate.clone().unwrap_or_else(|| params.fee_rate);
 
     let cw20_addr_string = match cw20_address {
         Some(cw20) => cw20.to_string(),
@@ -694,6 +695,21 @@ pub fn set_parameters(
         reward_address_str = reward_address.unwrap().to_string();
     }
     PARAMETERS.save(deps.storage, &params)?;
+
+    // change the fee receiver and fee rate on reward contract
+    if fee_receiver.is_some() || fee_rate.is_some() {
+        let msg = ExecuteRewardMsg::SetConfig {
+            fee_receiver: fee_receiver,
+            fee_rate: fee_rate,
+        };
+        let msg_bin = to_json_binary(&msg)?;
+        let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: params.reward_address.to_string(),
+            msg: msg_bin,
+            funds: vec![],
+        });
+        msgs.push(msg);
+    }
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
@@ -890,120 +906,225 @@ pub fn update_validators(
 // let undelegate_staking_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Staking(undelegate_msg);
 // msgs.push(undelegate_staking_msg);
 
+pub fn migrate_reward(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    code_id: u64,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let migrate = MigrateMsg {};
+    let msg_bin = to_json_binary(&migrate)?;
+    let migrate_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Migrate {
+        contract_addr: params.reward_address.to_string(),
+        new_code_id: code_id,
+        msg: msg_bin,
+    });
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_message(migrate_msg);
+    Ok(res)
+}
+
+pub fn transfer_reward(deps: DepsMut) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let msg = ExecuteRewardMsg::TransferToOwner {};
+    let msg_bin = to_json_binary(&msg)?;
+    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: params.reward_address.to_string(),
+        msg: msg_bin,
+        funds: vec![],
+    });
+
+    let res: Response<TokenFactoryMsg> = Response::new().add_message(msg);
+    Ok(res)
+}
+
+pub fn burn(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    amount: Uint128,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let params = PARAMETERS.load(deps.storage)?;
+
+    let msg = utils::token::burn_token(
+        env.contract.address.to_string(),
+        amount,
+        params.liquidstaking_denom.clone(),
+        None,
+    );
+
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "burn")
+        .add_attribute("denom", params.liquidstaking_denom)
+        .add_attribute("amount", amount.to_string());
+    Ok(res)
+}
+
 #[cfg(test)]
-#[test]
-fn validator_restaking_adjustment() {
-    use std::collections::HashMap;
+// #[test]
+// fn validator_restaking_adjustment() {
+//     use std::collections::HashMap;
 
-    let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-    let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+//     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+//     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
 
-    validator_delegation_map.insert("A".into(), Uint128::new(50000));
-    validator_delegation_map.insert("B".into(), Uint128::new(50000));
+//     validator_delegation_map.insert("A".into(), Uint128::new(50000));
+//     validator_delegation_map.insert("B".into(), Uint128::new(50000));
 
-    correct_validator_delegation_map.insert("B".into(), Uint128::new(30000));
-    correct_validator_delegation_map.insert("C".into(), Uint128::new(30000));
-    correct_validator_delegation_map.insert("D".into(), Uint128::new(40000));
+//     correct_validator_delegation_map.insert("B".into(), Uint128::new(30000));
+//     correct_validator_delegation_map.insert("C".into(), Uint128::new(30000));
+//     correct_validator_delegation_map.insert("D".into(), Uint128::new(40000));
 
-    let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
-        validator_delegation_map,
-        correct_validator_delegation_map,
-    );
+//     let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
+//         validator_delegation_map,
+//         correct_validator_delegation_map,
+//     );
 
-    let denom = "muno".to_string();
-    let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
-    println!("msgs: {:?}", msgs);
-}
+//     let denom = "muno".to_string();
+//     let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
+//     println!("msgs: {:?}", msgs);
+// }
 
-#[test]
-fn validator_restaking_adjustment_2() {
-    use std::collections::HashMap;
+// #[test]
+// fn validator_restaking_adjustment_2() {
+//     use std::collections::HashMap;
 
-    let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-    let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+//     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+//     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
 
-    validator_delegation_map.insert("A".into(), Uint128::new(50000));
-    validator_delegation_map.insert("B".into(), Uint128::new(50000));
-    validator_delegation_map.insert("C".into(), Uint128::new(50000));
+//     validator_delegation_map.insert("A".into(), Uint128::new(50000));
+//     validator_delegation_map.insert("B".into(), Uint128::new(50000));
+//     validator_delegation_map.insert("C".into(), Uint128::new(50000));
 
-    correct_validator_delegation_map.insert("B".into(), Uint128::new(75000));
-    correct_validator_delegation_map.insert("C".into(), Uint128::new(75000));
+//     correct_validator_delegation_map.insert("B".into(), Uint128::new(75000));
+//     correct_validator_delegation_map.insert("C".into(), Uint128::new(75000));
 
-    let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
-        validator_delegation_map,
-        correct_validator_delegation_map,
-    );
+//     let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
+//         validator_delegation_map,
+//         correct_validator_delegation_map,
+//     );
 
-    let denom = "muno".to_string();
-    let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
-    println!("msgs: {:?}", msgs);
-}
+//     let denom = "muno".to_string();
+//     let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
+//     println!("msgs: {:?}", msgs);
+// }
 
-#[test]
-fn validator_restaking_adjustment_3() {
-    use std::collections::HashMap;
+// #[test]
+// fn validator_restaking_adjustment_3() {
+//     use std::collections::HashMap;
 
-    let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-    let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+//     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+//     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
 
-    validator_delegation_map.insert("A".into(), Uint128::new(30000));
-    validator_delegation_map.insert("B".into(), Uint128::new(40000));
-    validator_delegation_map.insert("C".into(), Uint128::new(30000));
+//     validator_delegation_map.insert("A".into(), Uint128::new(30000));
+//     validator_delegation_map.insert("B".into(), Uint128::new(40000));
+//     validator_delegation_map.insert("C".into(), Uint128::new(30000));
 
-    correct_validator_delegation_map.insert("B".into(), Uint128::new(25000));
-    correct_validator_delegation_map.insert("C".into(), Uint128::new(25000));
-    correct_validator_delegation_map.insert("D".into(), Uint128::new(50000));
+//     correct_validator_delegation_map.insert("B".into(), Uint128::new(25000));
+//     correct_validator_delegation_map.insert("C".into(), Uint128::new(25000));
+//     correct_validator_delegation_map.insert("D".into(), Uint128::new(50000));
 
-    let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
-        validator_delegation_map,
-        correct_validator_delegation_map,
-    );
+//     let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
+//         validator_delegation_map,
+//         correct_validator_delegation_map,
+//     );
 
-    let denom = "muno".to_string();
-    let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
-    println!("\nmsgs: {:?}", msgs);
-}
+//     let denom = "muno".to_string();
+//     let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
+//     println!("\nmsgs: {:?}", msgs);
+// }
 
-#[test]
-fn validator_restaking_adjustment_4() {
-    use std::collections::HashMap;
+// #[test]
+// fn validator_restaking_adjustment_4() {
+//     use std::collections::HashMap;
 
-    let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-    let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+//     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
+//     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
 
-    validator_delegation_map.insert("B".into(), Uint128::new(40000));
-    validator_delegation_map.insert("C".into(), Uint128::new(30000));
-    validator_delegation_map.insert("A".into(), Uint128::new(30000));
+//     validator_delegation_map.insert("B".into(), Uint128::new(40000));
+//     validator_delegation_map.insert("C".into(), Uint128::new(30000));
+//     validator_delegation_map.insert("A".into(), Uint128::new(30000));
 
-    correct_validator_delegation_map.insert("A".into(), Uint128::new(80000));
-    correct_validator_delegation_map.insert("B".into(), Uint128::new(20000));
+//     correct_validator_delegation_map.insert("A".into(), Uint128::new(80000));
+//     correct_validator_delegation_map.insert("B".into(), Uint128::new(20000));
 
-    let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
-        validator_delegation_map,
-        correct_validator_delegation_map,
-    );
+//     let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
+//         validator_delegation_map,
+//         correct_validator_delegation_map,
+//     );
 
-    let denom = "muno".to_string();
-    let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
-    println!("\nmsgs: {:?}", msgs);
-}
+//     let denom = "muno".to_string();
+//     let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
+//     println!("\nmsgs: {:?}", msgs);
+// }
 
-#[test]
-fn test_delegate_amount() {
-    let weight: u32 = 1;
-    let total_weight: u32 = 1;
-    let ratio = Decimal::from_ratio(Uint128::from(weight), Uint128::from(total_weight));
-    let amount = Uint128::from(10u32);
-    let delegate_amount = utils::delegation::calculate_delegated_amount(amount, ratio);
-    println!("delegate_amount: {}", delegate_amount);
-}
-
+// #[test]
+// fn test_delegate_amount() {
+//     let weight: u32 = 1;
+//     let total_weight: u32 = 1;
+//     let ratio = Decimal::from_ratio(Uint128::from(weight), Uint128::from(total_weight));
+//     let amount = Uint128::from(10u32);
+//     let delegate_amount = utils::delegation::calculate_delegated_amount(amount, ratio);
+//     println!("delegate_amount: {}", delegate_amount);
+// }
 #[test]
 fn test_calculate_native_token() {
     let staking_token = Uint128::from(10000u32);
     //60926366
-    let exchange_rate = Decimal::from_str("340").unwrap();
+    let exchange_rate =
+        Decimal::from_ratio(Uint128::from(5350444044771u128), Uint128::from(30000u128));
+
+    println!("exchange_rate: {}", exchange_rate);
+
     let undelegate_amount: Uint128 =
         utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
     println!("undelegate_amount: {}", undelegate_amount);
 }
+
+#[test]
+fn exchange_rate_calculation() {
+    let total_bond = Uint128::new(100);
+
+    let a = Uint128::new(10);
+    let b = Uint128::new(50);
+    let exchange_rate = Decimal::from_ratio(a, b);
+    println!("{:?} / {:?}", total_bond, exchange_rate);
+
+    let token = utils::calc::calculate_staking_token_from_rate(total_bond, exchange_rate);
+
+    println!("token: {:?}", token);
+    assert_eq!(token, Uint128::new(500));
+
+    // - Rewards for 4 days: 1000 Union * 0.0274% * 4 = 1.096 Union
+    // - Total staked Union + rewards (U + R): 1001.096 Union
+    // - Total LUnion (L): 1000 LUnion
+
+    // - New exchange rate: 1001.096 / 1000 = 1.001096 Union per LUnion
+    // - Bob receives: 500 / 1.001096 = 499.45 LUnion
+
+    let a = Uint128::new(1001096);
+    let b = Uint128::new(1000000);
+    let new_exchange_rate = Decimal::from_ratio(a, b);
+
+    let bond_amount = Uint128::new(500000000);
+    let mint_amount =
+        utils::calc::calculate_staking_token_from_rate(bond_amount, new_exchange_rate);
+    assert_eq!(mint_amount, Uint128::new(499452599));
+    println!("mint_amount: {:?}", mint_amount);
+}
+
+// #[test]
+// fn exchange_unbond_rate_calculation() {
+//     let staking_token = Uint128::new(100);
+
+//     let a = Uint128::new(110);
+//     let b = Uint128::new(100);
+//     let exchange_rate = Decimal::from_ratio(a, b);
+
+//     let token =
+//         utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
+//     assert_eq!(token, Uint128::new(110));
+// }

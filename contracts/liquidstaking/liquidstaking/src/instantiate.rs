@@ -59,7 +59,7 @@ pub fn create_reward(
     let reward_label: String = format!("reward-instance-{}", salt);
     let instantiate_msg = InstantiateRewardMsg {
         lst_contract: lst_contract.clone(),
-        revenue_receiver,
+        fee_receiver: revenue_receiver,
         fee_rate,
         coin_denom,
     };

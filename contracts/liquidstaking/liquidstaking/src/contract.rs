@@ -58,8 +58,8 @@ pub fn instantiate(
         msg.salt,
         msg.reward_code_id,
         env.clone().contract.address,
-        msg.revenue_receiver,
-        msg.fee_rate,
+        msg.fee_receiver.clone(),
+        msg.fee_rate.clone(),
         msg.underlying_coin_denom.clone(),
     )?;
 
@@ -73,6 +73,8 @@ pub fn instantiate(
         reward_address: reward_addr.clone(),
         quote_token: msg.quote_token,
         lst_quote_token: msg.lst_quote_token,
+        fee_rate: msg.fee_rate,
+        fee_receiver: msg.fee_receiver,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -142,6 +144,8 @@ pub fn execute(
             reward_address,
             quote_token,
             lst_quote_token,
+            fee_receiver,
+            fee_rate,
         } => execute::set_parameters(
             deps,
             env,
@@ -155,6 +159,8 @@ pub fn execute(
             reward_address,
             quote_token,
             lst_quote_token,
+            fee_receiver,
+            fee_rate,
         ),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
         ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
@@ -182,6 +188,9 @@ pub fn execute(
             sender,
             message,
         } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
+        ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
+        ExecuteMsg::TransferReward {} => execute::transfer_reward(deps),
+        // ExecuteMsg::Burn { amount } => execute::burn(deps, env, info, amount),
     }
 }
 

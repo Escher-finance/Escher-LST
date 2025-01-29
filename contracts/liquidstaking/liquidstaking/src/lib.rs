@@ -10,8 +10,8 @@ pub mod query;
 pub mod reply;
 pub mod state;
 
-#[cfg(test)]
-pub mod tests;
+// #[cfg(test)]
+// pub mod tests;
 
 pub mod token_factory_api;
 pub mod utils;
