@@ -66,6 +66,7 @@ pub fn burn_token(
     liquidstaking_denom: String,
     _cw20_address: Option<Addr>,
 ) -> CosmosMsg<TokenFactoryMsg> {
+    //let burn_amount = amount / Uint128::new(2u128);
     let burn_msg = get_burn_msg(liquidstaking_denom.clone(), amount, delegator.to_string());
     let msg: CosmosMsg<TokenFactoryMsg> = burn_msg.into();
     msg

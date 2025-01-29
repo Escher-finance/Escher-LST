@@ -8,9 +8,7 @@ const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
 
 /// return how much staking token from underlying native coin denom
 pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (exchange_rate * decimal_fract).to_uint_ceil();
-    Decimal::from_ratio(Uint128::from(DECIMAL_FRACTIONAL) * stake_amount, fract).to_uint_floor()
+    (Decimal::from_ratio(stake_amount, Uint128::one()) / exchange_rate).to_uint_ceil()
 }
 
 /// return how much underlying native coin denom from staking token base on exchange rate
@@ -18,13 +16,10 @@ pub fn calculate_native_token_from_staking_token(
     staking_token: Uint128,
     exchange_rate: Decimal,
 ) -> Uint128 {
-    let mut decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let rate_limit = Uint128::from_str("340").unwrap();
-    if exchange_rate.to_uint_ceil() > rate_limit {
-        decimal_fract = Decimal::from_str("340").unwrap();
-    }
-    let fract = (exchange_rate * decimal_fract).to_uint_ceil();
-    Decimal::from_ratio(fract * staking_token, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor()
+    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL));
+    let output =
+        (exchange_rate * decimal_fract) * Decimal::from_ratio(staking_token, Uint128::one());
+    output.to_uint_floor()
 }
 
 pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {

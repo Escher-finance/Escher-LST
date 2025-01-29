@@ -625,10 +625,8 @@ pub fn process_unbond(
     );
 
     let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
-
     if delegated_amount < undelegate_amount {
-        // throw error
-        return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker
+        return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker and if process rewards not happen yet
     }
     let (undelegate_msgs, undelegations) = get_undelegate_from_validator_msgs(
         undelegate_amount,
