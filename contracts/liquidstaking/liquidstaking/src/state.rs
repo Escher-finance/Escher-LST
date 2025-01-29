@@ -60,6 +60,10 @@ pub struct Parameters {
     pub quote_token: String,
     // liquid staking quote token
     pub lst_quote_token: String,
+    // fee fee_rate
+    pub fee_rate: Decimal,
+    // fee receiver
+    pub fee_receiver: Addr,
 }
 
 impl State {

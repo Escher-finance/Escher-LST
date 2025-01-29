@@ -15,7 +15,7 @@ pub struct InstantiateMsg {
     pub liquidstaking_denom: String,
     pub ucs03_channel: u32,
     pub ucs03_relay_contract: String,
-    pub revenue_receiver: Addr,
+    pub fee_receiver: Addr,
     pub unbonding_time: u64,
     pub reward_code_id: u64,
     pub fee_rate: Decimal,
@@ -28,14 +28,24 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub struct InstantiateRewardMsg {
     pub lst_contract: Addr,
-    pub revenue_receiver: Addr,
+    pub fee_receiver: Addr,
     pub fee_rate: Decimal,
     pub coin_denom: String,
 }
 
 #[cw_serde]
 pub enum ExecuteRewardMsg {
+    MigrateMsg {},
     SplitReward {},
+    Transfer {
+        amount: Coin,
+        receiver: String,
+    },
+    SetConfig {
+        fee_receiver: Option<Addr>,
+        fee_rate: Option<Decimal>,
+    },
+    TransferToOwner {},
 }
 
 #[cw_ownable_execute]
@@ -75,6 +85,8 @@ pub enum ExecuteMsg {
         reward_address: Option<Addr>,
         quote_token: Option<String>,
         lst_quote_token: Option<String>,
+        fee_receiver: Option<Addr>,
+        fee_rate: Option<Decimal>,
     },
     /// Update Validators
     UpdateValidators {
@@ -100,6 +112,13 @@ pub enum ExecuteMsg {
         sender: Bytes,
         message: Bytes,
     },
+    MigrateReward {
+        code_id: u64,
+    },
+    // Burn {
+    //     amount: Uint128,
+    // },
+    TransferReward {},
 }
 
 #[cw_ownable_query]
@@ -151,9 +170,6 @@ pub enum Ucs03ExecuteMsg {
         salt: H256,
     },
 }
-
-#[cw_serde]
-pub struct MigrateMsg {}
 
 #[cw_serde]
 pub struct StakingLiquidity {
@@ -226,3 +242,6 @@ pub struct UnbondData {
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
 }
+
+#[cw_serde]
+pub struct MigrateMsg {}
