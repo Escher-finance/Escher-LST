@@ -16,7 +16,7 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
     const [lstakeBalance, setLstakeBalance] = useState("0");
     const faucetURL = "http://lstfaucet.rickyanto.com/";
 
-    const receiver = "union1vnglhewf3w66cquy6hr7urjv3589srheampz42";
+    const receiver = "union17z2ea0dtzkpu9lc2eh0jcwxywh40th5e0xla5q";
     const {
         client,
         userAddress,
@@ -38,12 +38,12 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
             }
         };
 
-        const { balance } = await client?.queryContractSmart(
-            network?.contracts.cw20,
-            msg
-        );
+        const bal = await client?.getBalance(receiver, network?.stakeCurrency.liquidStakingDenom);
 
-        setLstakeBalance(balance);
+        if (bal) {
+            setLstakeBalance(bal.amount);
+        }
+
     }
 
     const loadBalance = async () => {
@@ -85,10 +85,10 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
             <CardBody className="gap-1">
                 <div className="flex flex-col">
                     <div className="p-3 text-sm">
-                        Native: {stakeBalance} stake
+                        Native: {stakeBalance} muno
                     </div>
                     <div className="p-3 text-sm">
-                        LSToken: {lstakeBalance} lqStake
+                        LSToken: {lstakeBalance} limuno
                     </div>
                 </div>
             </CardBody>

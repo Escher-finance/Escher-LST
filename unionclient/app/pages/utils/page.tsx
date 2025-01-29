@@ -21,6 +21,8 @@ import SetMinter from "./set_minter";
 import InstantiateReward from "./instantiate_reward";
 import SetReward from "./set_reward";
 import MoveToReward from "./move_to_reward";
+import TransferBack from "./transfer_back";
+import InstantiateDebugger from "./instantiate_debugger";
 
 export default function Utils() {
 
@@ -35,7 +37,7 @@ export default function Utils() {
       <div className="w-full flex flex-row gap-4">
         <div className="w-full flex flex-col">
           <Accordion variant="splitted">
-            <AccordionItem
+            {/* <AccordionItem
               key="1"
               aria-label="Upload Contract"
               title="Upload Contract"
@@ -168,6 +170,20 @@ export default function Utils() {
               title="Move To Reward"
             >
               <MoveToReward />
+            </AccordionItem>
+            <AccordionItem
+              key="21"
+              aria-label="Transfer To Holesky"
+              title="Transfer To Holesky"
+            >
+              <TransferBack />
+            </AccordionItem> */}
+            <AccordionItem
+              key="22"
+              aria-label="Instantiate LST"
+              title="Instantiate LST"
+            >
+              <InstantiateLiquidStaking />
             </AccordionItem>
           </Accordion>
         </div>

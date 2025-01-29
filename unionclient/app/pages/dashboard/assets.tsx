@@ -29,12 +29,23 @@ export default function Assets({ stateKey }: AssetsProps) {
         if (bal) {
             setStakeBalance(bal.amount);
         }
+    }
+
+    const getBalance = async () => {
+        if (!userAddress) {
+            return;
+        }
+        const bal = await client?.getBalance(userAddress, network?.stakeCurrency.liquidStakingDenom);
+
+        if (bal) {
+            setLstakeBalance(bal.amount);
+        }
 
     }
 
-
     const loadBalance = async () => {
         getNativeBalance();
+        getBalance();
     }
 
     useEffect(() => {
@@ -75,7 +86,7 @@ export default function Assets({ stateKey }: AssetsProps) {
                         Native: {stakeBalance} {network?.stakeCurrency.coinMinimalDenom}
                     </div>
                     <div className="p-3 text-sm">
-                        LSToken: {lstakeBalance} {network?.stakeCurrency.liquidStakingDenom}
+                        LSToken: {lstakeBalance} {network?.stakeCurrency.liquidStakingDenomDisplay}
                     </div>
                 </div>
             </CardBody>

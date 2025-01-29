@@ -9,6 +9,7 @@ import {
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
 import { useState } from "react";
+import { getSalt } from "@/app/lib/salt";
 
 interface KeyProps {
   stateKey: number;
@@ -32,7 +33,8 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
     const amount = formEntries.amount.toString();
     const msg = {
       bond: {
-        staker: userAddress
+        staker: userAddress,
+        salt: getSalt()
       }
     };
 
@@ -41,7 +43,7 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
       setIsLoading(true);
       const funds = [{
         amount,
-        denom: "stake"
+        denom: network?.stakeCurrency.coinMinimalDenom
       }];
       const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto", "execute bond", funds);
       alert(res?.transactionHash);

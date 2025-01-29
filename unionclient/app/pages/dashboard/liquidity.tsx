@@ -14,7 +14,6 @@ export default function Liquidity({ stateKey }: AssetsProps) {
 
     const [liquidity, setLiquidity] = useState<any>(null);
     const [state, setState] = useState<any>(null);
-    const [tokenInfo, setTokenInfo] = useState<any>(null);
 
     const {
         client,
@@ -49,29 +48,15 @@ export default function Liquidity({ stateKey }: AssetsProps) {
         setState(state);
     }
 
-    const getTokenInfo = async () => {
-        const msg: any = {
-            token_info: {}
-        };
-
-        const token_info = await client?.queryContractSmart(
-            network?.contracts.cw20,
-            msg
-        );
-
-        setTokenInfo(token_info);
-    }
 
     useEffect(() => {
         getLiquidity();
         getState();
-        getTokenInfo();
     }, []);
 
     useEffect(() => {
         getLiquidity();
         getState();
-        getTokenInfo();
     }, [stateKey]);
 
 
@@ -94,26 +79,25 @@ export default function Liquidity({ stateKey }: AssetsProps) {
                                     Total Value:
                                 </div>
                                 <div>
-                                    {liquidity.amount} stake
+                                    {liquidity.amount} {network?.stakeCurrency.coinMinimalDenom}
                                 </div>
                                 <div>
                                     Delegated:
                                 </div>
                                 <div>
-                                    {liquidity.delegated} stake
+                                    {liquidity.delegated} {network?.stakeCurrency.coinMinimalDenom}
                                 </div>
                                 <div>
                                     Reward:
                                 </div>
                                 <div>
-                                    {liquidity.reward} stake
+                                    {liquidity.reward} {network?.stakeCurrency.coinMinimalDenom}
                                 </div>
                                 <div>
                                     Total Supply (Liquid Staking Token):
                                 </div>
                                 <div>
-                                    {state?.total_lst_supply} lqStake (lst contract) <br />
-                                    {tokenInfo?.total_supply} lqStake (cw20)
+                                    {state?.total_supply} {network?.stakeCurrency.liquidStakingDenomDisplay} (lst contract) <br />
                                 </div>
                                 <div>
                                     Bond counter:

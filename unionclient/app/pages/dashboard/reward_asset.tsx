@@ -22,25 +22,18 @@ export default function RevenueAssets({ stateKey }: AssetsProps) {
     } = useGlobalContext();
 
     const getNativeBalance = async () => {
-        let bal = await client?.getBalance(network?.contracts.reward, "stake");
+        let bal = await client?.getBalance(network?.contracts.reward, network?.stakeCurrency.coinMinimalDenom);
         if (bal) {
             setStakeBalance(bal.amount);
         }
 
     }
     const getBalance = async () => {
-        const msg: any = {
-            balance: {
-                address: network?.contracts.reward
-            }
-        };
+        const bal = await client?.getBalance(network?.contracts.reward, network?.stakeCurrency.liquidStakingDenom);
 
-        const { balance } = await client?.queryContractSmart(
-            network?.contracts.cw20,
-            msg
-        );
-
-        setLstakeBalance(balance);
+        if (bal) {
+            setLstakeBalance(bal.amount);
+        }
     }
 
     const loadBalance = async () => {
@@ -64,10 +57,10 @@ export default function RevenueAssets({ stateKey }: AssetsProps) {
             <CardBody className="gap-1">
                 <div className="flex flex-col">
                     <div className="p-3 text-sm">
-                        Native: {stakeBalance} stake
+                        Native: {stakeBalance} muno
                     </div>
                     <div className="p-3 text-sm">
-                        LSToken: {lstakeBalance} lqStake
+                        LSToken: {lstakeBalance} limuno
                     </div>
                 </div>
             </CardBody>

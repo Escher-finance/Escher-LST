@@ -1,35 +1,19 @@
 import React, { useState } from "react";
 import {
-  Autocomplete,
-  AutocompleteItem,
   Card,
   CardBody,
   Button,
   Input,
 } from "@nextui-org/react";
-import { defaultRegistryTypes } from "@cosmjs/stargate";
-import { wasmTypes } from "@cosmjs/cosmwasm-stargate";
 import { useGlobalContext } from "@/app/core/context";
-import { osmosisProtoRegistry } from "@osmosis-labs/proto-codecs";
+import { http } from "viem"
+import { holesky } from "viem/chains";
+import { DirectSecp256k1Wallet } from "@cosmjs/proto-signing";
+import { bech32, hex, bytes } from "@scure/base"
 
-const allTypes = [
-  ...defaultRegistryTypes,
-  ...wasmTypes,
-  ...osmosisProtoRegistry,
-];
-export const getMessage = (msg: { typeUrl: string; value: Object }) => {
-  const { typeUrl, value } = msg;
-
-  const encoder = allTypes.find((type) => type[0] === typeUrl);
-
-  if (!encoder) throw new Error(`Message type ${typeUrl} not found`);
-
-  const any = encoder[1].encode(value).finish();
-  return {
-    type_url: typeUrl,
-    value: Buffer.from(any).toString("base64"),
-  };
-};
+export function hexToBytes(hexString: string): Uint8Array {
+  return bytes("hex", hexString.indexOf("0x") === 0 ? hexString.slice(2) : hexString)
+}
 
 const TransferBack = () => {
   const { client, userAddress, icaControllerAddress, icaAddress } =
@@ -44,36 +28,36 @@ const TransferBack = () => {
       const formData = new FormData(form);
       const formEntries = Object.fromEntries(formData.entries());
 
-      const ica_address = formEntries.ica_address.toString();
       const amount = formEntries.amount.toString();
       const denom = formEntries.denom.toString();
-      const ica_controller_address = formEntries.ica_controller_address
-        ? formEntries.ica_controller_address.toString()
-        : undefined;
-      const ica_transfer_channel_id = formEntries.ica_transfer_channel_id
-        ? formEntries.ica_transfer_channel_id.toString()
-        : undefined;
+      const PRIVATE_KEY = "5101e25177a126b6c60291585e1f6f04e9d6da74d6cc7b4383cbb923f84b63d4";
+      const cosmosAccount = await DirectSecp256k1Wallet.fromKey(
+        Uint8Array.from(hexToBytes(PRIVATE_KEY)),
+        "union"
+      );
 
-      const token = {
-        amount,
-        denom,
-      };
+      console.log("cosmosAccount", JSON.stringify(cosmosAccount));
+      // const unionclient = createUnionClient({
+      //   account: cosmosAccount,
+      //   chainId: "union-testnet-9",
+      //   gasPrice: { amount: "0.0025", denom: "muno" },
+      //   transport: http("https://rpc.testnet-9.union.build")
+      // })
 
-      let transfer_from_i_c_a = {
-        ica_address,
-        token,
-        ica_controller_address,
-        ica_transfer_channel_id,
-      };
+      // const transferPayload = {
+      //   amount: BigInt(amount),
+      //   denomAddress: denom,
+      //   destinationChainId: `${holesky.id}`,
+      //   receiver: "0x8478B37E983F520dBCB5d7D3aAD8276B82631aBd"
+      // } satisfies TransferAssetsParameters<"union-testnet-8">
 
-      const msg = {
-        transfer_from_i_c_a,
-      };
 
-      //const res = await client?.execute(userAddress, walletAddress, msg, "auto");
+      // const transfer = await unionclient.transferAsset(transferPayload)
+      // if (transfer.isErr()) {
+      //   console.log(transfer.error)
+      // }
 
-      //alert(res?.transactionHash);
-      //console.log(JSON.stringify(res));
+      // console.log(JSON.stringify(transfer));
     } catch (e) {
       console.log(e);
       console.log("Failed to execute");

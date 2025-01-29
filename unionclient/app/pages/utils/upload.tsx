@@ -45,29 +45,18 @@ const ContractUpload = () => {
       return;
     }
     console.log("user Address", userAddress);
-    try {
-      const uploadResult = await client?.upload(userAddress, fileData, "auto", "");
-      console.log("uploadResult");
-      const codeId = uploadResult?.codeId;
-      alert("Code ID:" + codeId);
-      return codeId;
-    } catch (err) {
-      console.log("Failed to upload");
-      console.log(err);
-      alert(err);
-    }
-
+    await client?.upload(userAddress, fileData, "auto", "");
   };
 
   const handleButtonClick = async () => {
     setIsUploading(true);
     try {
-      const theCodeID = await upload();
-      if (!theCodeID) {
-        alert("error");
-        return;
-      }
-      setCodeID(theCodeID.toString());
+      await upload();
+      // if (!theCodeID) {
+      //   alert("error");
+      //   return;
+      // }
+      // setCodeID(theCodeID.toString());
     } catch (err) {
       console.log("Failed to upload");
       console.log(err);
@@ -86,7 +75,7 @@ const ContractUpload = () => {
             onClick={handleButtonClick}
             disabled={isUploading}
           >
-            {isUploading ? "Uploading ..." : "Upload"}
+            {isUploading ? "Uploading ..." : "Upload Contract"}
           </Button>
           {codeID ? <div>Code ID: {codeID}</div> : ""}
         </CardBody>
