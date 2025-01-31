@@ -37,13 +37,14 @@ export default function Utils() {
       <div className="w-full flex flex-row gap-4">
         <div className="w-full flex flex-col">
           <Accordion variant="splitted">
-            {/* <AccordionItem
+            <AccordionItem
               key="1"
               aria-label="Upload Contract"
               title="Upload Contract"
             >
               <ContractUpload />
             </AccordionItem>
+
             <AccordionItem
               key="3"
               aria-label="InstantiateCW20 Token"
@@ -51,6 +52,7 @@ export default function Utils() {
             >
               <InstantiateCW20 />
             </AccordionItem>
+            {/* 
             <AccordionItem
               key="4"
               aria-label="Instantiate LiquidStaking"

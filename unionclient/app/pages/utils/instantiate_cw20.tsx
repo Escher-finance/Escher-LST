@@ -24,8 +24,8 @@ export default function InstantiateCW20() {
     const msg = {
       decimals: 6,
       initial_balances: [],
-      name: "lqstake",
-      symbol: "lqSTAKE",
+      name: "limuno",
+      symbol: "LIMUNO",
       mint: {
         minter: userAddress
       }
