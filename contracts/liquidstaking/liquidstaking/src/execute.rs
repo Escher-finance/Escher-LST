@@ -230,50 +230,27 @@ pub fn unbond(
     env: Env,
     info: MessageInfo,
     staker: Option<String>,
-    amount: Option<Uint128>,
+    unbond_amount: Uint128,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.to_string();
-    let liquidstaking_denom = params.liquidstaking_denom.to_string();
     let sender = info.sender.to_string();
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
     let delegator = env.contract.address.clone();
 
-    let unbond_amount: Uint128;
-    if cfg!(not(nonunion)) {
-        if amount.is_none() {
-            // this will handle union chain
-            // coin must be sent along with transaction and it should be in liquid staking coin denom
-            if info.funds.len() > 1usize {
-                return Err(ContractError::InvalidAsset {});
-            }
+    // this will handle non union chain
+    // need to find staked token balance
+    let msg = cw20::Cw20QueryMsg::Balance {
+        address: delegator.to_string(),
+    };
 
-            let payment = info
-                .funds
-                .iter()
-                .find(|x| x.denom == liquidstaking_denom && x.amount > Uint128::zero())
-                .ok_or_else(|| ContractError::NoAsset {})?;
+    let balance: cw20::BalanceResponse = deps
+        .querier
+        .query_wasm_smart(params.cw20_address.clone().unwrap(), &msg)?;
 
-            unbond_amount = payment.amount;
-        } else {
-            unbond_amount = amount.unwrap();
-        }
-    } else {
-        // this will handle non union chain
-        // need to find staked token balance of sender
-        unbond_amount = amount.unwrap();
-        let msg = cw20::Cw20QueryMsg::Balance {
-            address: delegator.to_string(),
-        };
-
-        let balance: cw20::BalanceResponse = deps
-            .querier
-            .query_wasm_smart(params.cw20_address.clone().unwrap(), &msg)?;
-
-        if balance.balance < unbond_amount {
-            return Err(ContractError::NotEnoughAvailableFund {});
-        }
+    if balance.balance < unbond_amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
     }
 
     let (msgs, unbond_data) = utils::delegation::process_unbond(

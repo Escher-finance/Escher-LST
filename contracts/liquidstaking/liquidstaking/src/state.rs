@@ -29,8 +29,6 @@ pub struct State {
     pub bond_counter: u64,
     // last_bond_time
     pub last_bond_time: u64,
-    // is union chain
-    pub chain: String,
 }
 
 #[cw_serde]

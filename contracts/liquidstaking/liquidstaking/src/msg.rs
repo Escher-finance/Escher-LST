@@ -62,7 +62,7 @@ pub enum ExecuteMsg {
     /// Send liquid staking denom then undelegate native denom according exchange rate from validator
     Unbond {
         staker: Option<String>,
-        amount: Option<Uint128>,
+        amount: Uint128,
     },
     ProcessRewards {},
     ProcessUnbonding {
