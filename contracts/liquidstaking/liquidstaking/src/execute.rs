@@ -748,6 +748,9 @@ pub fn process_unbonding(
     let params: crate::state::Parameters = PARAMETERS.load(deps.storage)?;
     let mut unbond_rec: crate::state::UnbondRecord = unbond_record().load(deps.storage, id)?;
 
+    if unbond_rec.release == true {
+        return Err(ContractError::CompletedUnbondRecord {});
+    }
     // query the undelegate_amount in contract balance
     let contract_address = env.clone().contract.address;
     let balance = deps

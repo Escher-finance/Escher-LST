@@ -54,6 +54,9 @@ pub enum ContractError {
     #[error("InvalidCodeID")]
     InvalidCodeID { message: String },
 
+    #[error("CompletedUnbondRecord")]
+    CompletedUnbondRecord {},
+
     #[error("InvalidMintAmount")]
     InvalidMintAmount {},
 
