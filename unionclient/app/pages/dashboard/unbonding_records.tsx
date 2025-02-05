@@ -7,7 +7,8 @@ import { useGlobalContext } from "@/app/core/context";
 
 export default function UnbondingRecords() {
 
-    const [unbondingRecords, setUnbondingRecords] = useState<any[]>([]);
+    const [unreleasedUnbondingRecords, setUnreleasedUnbondingRecords] = useState<any[]>([]);
+    const [releasedUnbondingRecords, setReleasedUnbondingRecords] = useState<any[]>([]);
 
     const {
         client,
@@ -30,55 +31,111 @@ export default function UnbondingRecords() {
                 msg
             );
 
-            setUnbondingRecords(records);
+            setUnreleasedUnbondingRecords(records);
+
+
+            const releasedMsg: any = {
+                unbond_record: {
+                    staker: userAddress,
+                    released: true
+                }
+            };
+
+            const releasedRecords = await client?.queryContractSmart(
+                network?.contracts.lst,
+                releasedMsg
+            );
+
+            setReleasedUnbondingRecords(releasedRecords);
         }
 
         getBalance();
     }, []);
 
     return (
-        unbondingRecords.length > 0 ?
-            <Card className="w-full flex mt-6">
-                <CardHeader className="text-lg">Unbonding Records</CardHeader>
-                <Divider />
-                <CardBody className="gap-4">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Unbond Amount</th>
-                                <th>Received Amount</th>
-                                <th>Rate</th>
-                                <th>Started</th>
-                                <th>Completion</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {unbondingRecords.map((record: any) => {
-                                return (
-                                    <><tr>
-                                        <td>
-                                            {record.amount.amount} limuno
-                                        </td>
-                                        <td>
-                                            {record.undelegate_amount.amount} muno
-                                        </td>
-                                        <td>
-                                            {parseFloat(record.exchange_rate).toFixed(2)}
-                                        </td>
-                                        <td>
-                                            {new Date(Number(record.created / 1000000)).toLocaleString()}
-                                        </td>
-                                        <td>
-                                            {new Date(Number(record.completion / 1000000) + 120000).toLocaleString()}
-                                        </td>
-                                    </tr></>
-                                )
-                            })}
+        <Card className="w-full flex mt-6">
+            <CardHeader className="text-lg">Unbonding Records</CardHeader>
+            <Divider />
+            <CardBody className="gap-4">
+                {unreleasedUnbondingRecords.length > 0 &&
+                    <><div className="text-lg">In process</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Unbond Amount</th>
+                                    <th>Received Amount</th>
+                                    <th>Rate</th>
+                                    <th>Started</th>
+                                    <th>Complete Estimation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {unreleasedUnbondingRecords.map((record: any) => {
+                                    return (
+                                        <><tr>
+                                            <td>
+                                                {record.amount.amount} limuno
+                                            </td>
+                                            <td>
+                                                {record.undelegate_amount.amount} muno
+                                            </td>
+                                            <td>
+                                                {parseFloat(record.exchange_rate).toFixed(2)}
+                                            </td>
+                                            <td>
+                                                {new Date(Number(record.created / 1000000)).toLocaleString()}
+                                            </td>
+                                            <td>
+                                                {new Date(Number(record.completion / 1000000) + 120000).toLocaleString()}
+                                            </td>
+                                        </tr></>
+                                    )
+                                })}
 
-                        </tbody>
-                    </table>
-                </CardBody>
-            </Card>
-            : <div>None</div>
+                            </tbody>
+                        </table></>
+                }
+                <br />
+                {releasedUnbondingRecords.length > 0 &&
+                    <><div className="text-lg">RELEASED</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Unbond Amount</th>
+                                    <th>Received Amount</th>
+                                    <th>Rate</th>
+                                    <th>Started</th>
+                                    <th>Released</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {releasedUnbondingRecords.map((record: any) => {
+                                    return (
+                                        <><tr>
+                                            <td>
+                                                {record.amount.amount} limuno
+                                            </td>
+                                            <td>
+                                                {record.undelegate_amount.amount} muno
+                                            </td>
+                                            <td>
+                                                {parseFloat(record.exchange_rate).toFixed(2)}
+                                            </td>
+                                            <td>
+                                                {new Date(Number(record.created / 1000000)).toLocaleString()}
+                                            </td>
+                                            <td>
+                                                {new Date(Number(record.completion / 1000000) + 120000).toLocaleString()}
+                                            </td>
+                                        </tr></>
+                                    )
+                                })}
+
+                            </tbody>
+                        </table>
+                    </>
+                }
+            </CardBody>
+        </Card>
     );
 }

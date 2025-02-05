@@ -38,6 +38,11 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
       }
     };
 
+    if (Number(amount) < 2000000) {
+      alert("Sorry, minimal bond amount is 2000000");
+      return;
+    }
+
     console.log(JSON.stringify(msg));
     try {
       setIsLoading(true);

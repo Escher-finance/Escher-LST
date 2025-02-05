@@ -22,7 +22,6 @@ import InstantiateReward from "./instantiate_reward";
 import SetReward from "./set_reward";
 import MoveToReward from "./move_to_reward";
 import TransferBack from "./transfer_back";
-import InstantiateDebugger from "./instantiate_debugger";
 
 export default function Utils() {
 
