@@ -133,7 +133,7 @@ pub fn query_unbond_record(
             .idx
             .staker
             .prefix(staker.unwrap())
-            .range(storage, None, None, Order::Ascending)
+            .range(storage, None, None, Order::Descending)
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();
 
@@ -145,7 +145,7 @@ pub fn query_unbond_record(
             .idx
             .staker_released
             .prefix(format!("{}-{}", staker.unwrap(), released.unwrap()))
-            .range(storage, None, None, Order::Ascending)
+            .range(storage, None, None, Order::Descending)
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();
 
@@ -157,7 +157,7 @@ pub fn query_unbond_record(
             .idx
             .sender
             .prefix(sender.unwrap())
-            .range(storage, None, None, Order::Ascending)
+            .range(storage, None, None, Order::Descending)
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();
 
@@ -169,7 +169,7 @@ pub fn query_unbond_record(
             .idx
             .released
             .prefix(released.unwrap().to_string())
-            .range(storage, None, None, Order::Ascending)
+            .range(storage, None, None, Order::Descending)
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();
 
