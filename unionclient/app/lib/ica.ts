@@ -1,8 +1,7 @@
 import { defaultRegistryTypes } from "@cosmjs/stargate";
 import { wasmTypes } from "@cosmjs/cosmwasm-stargate";
-import { osmosisProtoRegistry } from "@osmosis-labs/proto-codecs";
 
-export const allTypes = [...defaultRegistryTypes, ...wasmTypes, ...osmosisProtoRegistry];
+export const allTypes = [...defaultRegistryTypes, ...wasmTypes];
 
 export const getMessage = (msg: { typeUrl: string; value: Object }) => {
   const { typeUrl, value } = msg;
