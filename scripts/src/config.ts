@@ -6,8 +6,8 @@ export type ChainConfig = {
     lstCoinSymbol: string,
     rpc: string;
     rest: string;
-    ucs01Channel: string;
-    ucs01RelayContract: string;
+    ucs03Channel: string;
+    ucs03RelayContract: string;
     feeRate: string;
     revenueReceiver: string;
     validator: string;
@@ -18,7 +18,7 @@ export type ChainConfig = {
     };
 };
 
-export type SupportedNetworks = "lst-network" | "union-testnet-9";
+export type SupportedNetworks = "uniontestnet" | "lst-network";
 
 
 export const Networks: Record<SupportedNetworks, ChainConfig> = {
@@ -30,8 +30,8 @@ export const Networks: Record<SupportedNetworks, ChainConfig> = {
         coinDenom: "stake",
         lstCoinDenom: "lqstake",
         lstCoinSymbol: "LQSTAKE",
-        ucs01Channel: "channel-86",
-        ucs01RelayContract: "union1m87a5scxnnk83wfwapxlufzm58qe2v65985exff70z95a2yr86yq7hl08h",
+        ucs03Channel: "channel-86",
+        ucs03RelayContract: "union1m87a5scxnnk83wfwapxlufzm58qe2v65985exff70z95a2yr86yq7hl08h",
         feeRate: "0.1",
         revenueReceiver: "cosmos1pss37x3hwq5ytk7uhf9fjcpcd7k20pekq6xtlz",
         validator: "cosmosvaloper1h492ust5a9qzhh4zhhhlyva9v8ftn5sz99k4yp",
@@ -41,16 +41,16 @@ export const Networks: Record<SupportedNetworks, ChainConfig> = {
             reward: 22,
         },
     },
-    "union-testnet-9": {
-        chainId: "lst",
-        chainName: "LST Network",
+    "uniontestnet": {
+        chainId: "union-testnet-9",
+        chainName: "uniontestnet",
         rpc: "https://rpc.testnet-9.union.build:443",
         rest: "https://api.testnet-9.union.build:443",
-        coinDenom: "stake",
-        lstCoinDenom: "lqstake",
-        lstCoinSymbol: "LQSTAKE",
-        ucs01Channel: "",
-        ucs01RelayContract: "",
+        coinDenom: "muno",
+        lstCoinDenom: "limuno",
+        lstCoinSymbol: "LIMUNO",
+        ucs03Channel: "",
+        ucs03RelayContract: "",
         feeRate: "0.1",
         revenueReceiver: "cosmos1pss37x3hwq5ytk7uhf9fjcpcd7k20pekq6xtlz",
         validator: "cosmosvaloper1h492ust5a9qzhh4zhhhlyva9v8ftn5sz99k4yp",

@@ -61,8 +61,8 @@ export const instantiateLST = async (targetNetwork: SupportedNetworks, cw20Addre
                 { weight: 1, address: "cosmosvaloper1h492ust5a9qzhh4zhhhlyva9v8ftn5sz99k4yp" }
             ],
             liquidstaking_denom: config.lstCoinDenom,
-            ucs01_channel: config.ucs01Channel,
-            ucs01_relay_contract: config.ucs01RelayContract,
+            ucs03_channel: config.ucs03Channel,
+            ucs03_relay_contract: config.ucs03RelayContract,
             fee_rate: config.feeRate,
             revenue_receiver: config.revenueReceiver,
             unbonding_time: 10,

@@ -4,7 +4,7 @@ import { instantiateCW20, instantiateLST } from "./instantiate";
 import dotenv from 'dotenv';
 dotenv.config()
 
-let targetNetwork: SupportedNetworks = "lst-network";
+let targetNetwork: SupportedNetworks = "uniontestnet";
 
 var CW20_WASM_PATH = process.env.CW20_WASM_PATH;
 var LST_WASM_PATH = process.env.LST_WASM_PATH;

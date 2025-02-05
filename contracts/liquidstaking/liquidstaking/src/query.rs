@@ -1,0 +1,180 @@
+use crate::msg::{Log, QueryMsg, StakingLiquidity};
+use crate::state::unbond_record;
+use crate::state::{
+    Balance, Parameters, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
+    VALIDATORS_REGISTRY,
+};
+use crate::utils::delegation::{get_actual_total_delegated, get_actual_total_reward};
+use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
+use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
+use cw2::ContractVersion;
+use cw_ownable::get_ownership;
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::State {} => to_json_binary(&query_state(deps.storage)?),
+        QueryMsg::Parameters {} => to_json_binary(&query_params(deps.storage)?),
+        QueryMsg::Validators {} => to_json_binary(&query_validators(deps.storage)?),
+        QueryMsg::StakingLiquidity {
+            delegator,
+            denom,
+            validators,
+        } => to_json_binary(&query_staking_liquidity(
+            deps, env, delegator, denom, validators,
+        )?),
+        QueryMsg::Balance {} => to_json_binary(&(query_balance(deps.storage)?)),
+        QueryMsg::Log {} => to_json_binary(&(query_log(deps.storage)?)),
+        QueryMsg::UnbondRecord {
+            staker,
+            sender,
+            released,
+        } => to_json_binary(&(query_unbond_record(deps.storage, staker, sender, released)?)),
+        QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
+        QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
+    }
+}
+
+pub fn query_version(storage: &dyn Storage) -> StdResult<ContractVersion> {
+    let ver = cw2::get_contract_version(storage)?;
+    Ok(ver)
+}
+
+pub fn query_state(storage: &dyn Storage) -> StdResult<State> {
+    let state = STATE.load(storage)?;
+    Ok(state)
+}
+
+pub fn query_params(storage: &dyn Storage) -> StdResult<Parameters> {
+    let params = PARAMETERS.load(storage)?;
+    Ok(params)
+}
+
+pub fn query_validators(storage: &dyn Storage) -> StdResult<ValidatorsRegistry> {
+    let validators = VALIDATORS_REGISTRY.load(storage)?;
+    Ok(validators)
+}
+
+pub fn query_balance(storage: &dyn Storage) -> StdResult<Balance> {
+    let balance = BALANCE.load(storage)?;
+    Ok(balance)
+}
+
+pub fn query_staking_liquidity(
+    deps: Deps,
+    env: Env,
+    delegator: Option<String>,
+    coin_denom: Option<String>,
+    validators_list: Option<Vec<String>>,
+) -> StdResult<StakingLiquidity> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let the_delegator = delegator
+        .clone()
+        .unwrap_or_else(|| env.contract.address.to_string());
+
+    let denom = coin_denom
+        .clone()
+        .unwrap_or_else(|| params.underlying_coin_denom.to_string());
+
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let validators_addr: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    let validators = validators_list.clone().unwrap_or_else(|| validators_addr);
+
+    let delegated_amount = get_actual_total_delegated(
+        deps.querier,
+        the_delegator.to_string(),
+        denom.clone(),
+        validators.clone(),
+    );
+
+    let total_reward = get_actual_total_reward(
+        deps.querier,
+        the_delegator.to_string(),
+        denom.clone(),
+        validators,
+    )?;
+
+    let total_bond_amount = delegated_amount + total_reward;
+
+    let state: State = STATE.load(deps.storage)?;
+    let mut exchange_rate: Decimal = Decimal::one();
+    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+        exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
+    }
+
+    Ok(StakingLiquidity {
+        amount: total_bond_amount,
+        delegated: delegated_amount,
+        reward: total_reward,
+        exchange_rate,
+        time: env.block.time,
+        total_supply: state.total_supply,
+    })
+}
+
+pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
+    let log = LOG.load(storage)?;
+    Ok(Log { message: log })
+}
+
+pub fn query_unbond_record(
+    storage: &dyn Storage,
+    staker: Option<String>,
+    sender: Option<String>,
+    released: Option<bool>,
+) -> StdResult<Vec<UnbondRecord>> {
+    if staker.is_some() && released.is_none() {
+        let unbonded_list = unbond_record()
+            .idx
+            .staker
+            .prefix(staker.unwrap())
+            .range(storage, None, None, Order::Descending)
+            .map(|n| n.unwrap().1)
+            .collect::<Vec<_>>();
+
+        return Ok(unbonded_list);
+    }
+
+    if staker.is_some() && released.is_some() {
+        let unbonded_list = unbond_record()
+            .idx
+            .staker_released
+            .prefix(format!("{}-{}", staker.unwrap(), released.unwrap()))
+            .range(storage, None, None, Order::Descending)
+            .map(|n| n.unwrap().1)
+            .collect::<Vec<_>>();
+
+        return Ok(unbonded_list);
+    }
+
+    if staker.is_none() && sender.is_some() {
+        let unbonded_list = unbond_record()
+            .idx
+            .sender
+            .prefix(sender.unwrap())
+            .range(storage, None, None, Order::Descending)
+            .map(|n| n.unwrap().1)
+            .collect::<Vec<_>>();
+
+        return Ok(unbonded_list);
+    }
+
+    if staker.is_none() && released.is_some() {
+        let unbonded_list = unbond_record()
+            .idx
+            .released
+            .prefix(released.unwrap().to_string())
+            .range(storage, None, None, Order::Descending)
+            .map(|n| n.unwrap().1)
+            .collect::<Vec<_>>();
+
+        return Ok(unbonded_list);
+    }
+
+    Ok(vec![])
+}

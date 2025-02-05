@@ -73,15 +73,15 @@ func (s *ContractTestSuite) SetupContractTestSuite(ctx context.Context) {
 
 	revenueReceiver := s.UserA.FormattedAddress()
 
-	ucs01Channel := "abc"
-	ucs01RelayContract := "def"
+	ucs03Channel := "abc"
+	ucs03RelayContract := "def"
 
 	// Instantiate the contract with channel:
 	instantiateMsg := liquidstaking.InstantiateMsg{
 		UnderlyingCoinDenom: nativeDenom,
 		LiquidstakingDenom:  lstDenom,
-		Ucs01Channel:        ucs01Channel,
-		Ucs01RelayContract:  ucs01RelayContract,
+		Ucs03Channel:        ucs03Channel,
+		Ucs03RelayContract:  ucs03RelayContract,
 		FeeRate:             "0.1",
 		RevenueReceiver:     revenueReceiver,
 		UnbondingTime:       10000,

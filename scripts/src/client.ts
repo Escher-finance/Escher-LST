@@ -17,7 +17,7 @@ export const getSignerFromMnemonic = async (): Promise<OfflineDirectSigner> => {
         throw "require mnemonic";
     }
     return DirectSecp256k1HdWallet.fromMnemonic(MNEMONIC, {
-        prefix: "cosmos",
+        prefix: "union",
     })
 };
 

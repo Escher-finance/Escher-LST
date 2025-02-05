@@ -5,7 +5,8 @@ Liquid Staking Contract that enables liquid staking on union chain.
 
 ### Build contract:
 
-> cargo run-script optimize
+> RUSTFLAGS="-C link-arg=-s" cargo build --release --lib --target=wasm32-unknown-unknown
+> sudo wasm-opt -Os --signext-lowering "target/wasm32-unknown-unknown/release/liquidstaking.wasm" -o "artifacts/liquidstaking.wasm"
 
 The wasm file output will be on artifacts folder.
 
