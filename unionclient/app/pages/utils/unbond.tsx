@@ -29,10 +29,29 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
     const formEntries = Object.fromEntries(formData.entries());
     const amount = formEntries.amount.toString();
 
+    const msg: any = {
+      staking_liquidity: {}
+    };
+
+
+    const liquidity = await client?.queryContractSmart(
+      network?.contracts.lst,
+      msg
+    );
+
+    let undelegate_amount = Number(amount) * liquidity.exchange_rate;
+
+    let max_amount = Math.floor(liquidity.delegated / liquidity.exchange_rate);
+    if (undelegate_amount >= liquidity.delegated) {
+      alert("Not enough fund to be undelegated, please reduce your unbonding amount to below < " + max_amount.toString());
+      setIsLoading(false);
+      return;
+    }
 
     try {
       if (!userAddress) {
         alert("no user wallet");
+        setIsLoading(false);
         return;
       }
 
