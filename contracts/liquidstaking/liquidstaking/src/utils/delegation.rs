@@ -641,7 +641,7 @@ pub fn process_unbond(
         liquidstaking_denom.clone(),
         params.cw20_address,
     );
-    msgs.push(burn_msg.into());
+    //msgs.push(burn_msg.into());
 
     let unbond_coin = Coin {
         amount: unbond_amount.clone(),
