@@ -46,7 +46,11 @@ export default function Dashboard() {
             <Tab key="unbond" title="Unbond" >
               <Unbond stateKey={stateKey} setStateKey={setStateKey} />
             </Tab>
+            <Tab key="records" title="Unbonding Process">
+              <UnbondingRecords />
+            </Tab>
           </Tabs>
+
 
         </div>
 

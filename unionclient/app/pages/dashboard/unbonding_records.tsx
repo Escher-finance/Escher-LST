@@ -42,11 +42,43 @@ export default function UnbondingRecords() {
                 <CardHeader className="text-lg">Unbonding Records</CardHeader>
                 <Divider />
                 <CardBody className="gap-4">
-                    <div className="flex flex-row text-sm">
-                        {JSON.stringify(unbondingRecords)}
-                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Unbond Amount</th>
+                                <th>Received Amount</th>
+                                <th>Rate</th>
+                                <th>Started</th>
+                                <th>Completion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {unbondingRecords.map((record: any) => {
+                                return (
+                                    <><tr>
+                                        <td>
+                                            {record.amount.amount} limuno
+                                        </td>
+                                        <td>
+                                            {record.undelegate_amount.amount} muno
+                                        </td>
+                                        <td>
+                                            {parseFloat(record.exchange_rate).toFixed(2)}
+                                        </td>
+                                        <td>
+                                            {new Date(Number(record.created / 1000000)).toLocaleString()}
+                                        </td>
+                                        <td>
+                                            {new Date(Number(record.completion / 1000000) + 120000).toLocaleString()}
+                                        </td>
+                                    </tr></>
+                                )
+                            })}
+
+                        </tbody>
+                    </table>
                 </CardBody>
             </Card>
-            : <></>
+            : <div>None</div>
     );
 }
