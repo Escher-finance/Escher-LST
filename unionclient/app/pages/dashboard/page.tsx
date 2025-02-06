@@ -11,6 +11,7 @@ import RewardAsset from "./reward_asset";
 import RevenueAssets from "./revenue_assets";
 import { useState } from "react";
 import Liquidity from "./liquidity";
+import TransactionHistory from "./transaction_history";
 
 export default function Dashboard() {
 
@@ -48,6 +49,9 @@ export default function Dashboard() {
             </Tab>
             <Tab key="records" title="Unbonding Process">
               <UnbondingRecords />
+            </Tab>
+            <Tab key="history" title="Transactions History">
+              <TransactionHistory />
             </Tab>
           </Tabs>
 

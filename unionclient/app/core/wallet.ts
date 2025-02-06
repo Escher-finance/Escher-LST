@@ -1,12 +1,13 @@
 import Networks, { ChainConfig } from "../../config/networks.config";
 import { LocalStorage } from "../lib/localstorage";
-import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
+import { CosmWasmClient, SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { GasPrice } from "@cosmjs/stargate";
 import { type OfflineSigner } from "@unionlabs/client"
 
 export async function initializeKeplr(
   network: ChainConfig | null,
   setCient: (client: any) => void,
+  setQueryClient: (client: any) => void,
   setUserAddress: (addr: string) => void,
   setAuthenticated: (val: boolean) => void
 ) {
@@ -17,7 +18,7 @@ export async function initializeKeplr(
     };
     (window as any).keplr.enable(network?.chainId);
 
-    if (network) setClientNomos(network, "keplr", setCient, setUserAddress, setAuthenticated);
+    if (network) setClientNomos(network, "keplr", setCient, setQueryClient, setUserAddress, setAuthenticated);
   } catch {
     alert("Failed to suggest the chain");
   }
@@ -26,6 +27,7 @@ export async function initializeKeplr(
 export async function initializeLeap(
   network: ChainConfig | null,
   setCient: (client: any) => void,
+  setQueryClient: (client: any) => void,
   setUserAddress: (addr: string) => void,
   setAuthenticated: (val: boolean) => void
 ) {
@@ -36,7 +38,7 @@ export async function initializeLeap(
     };
     (window as any).leap.enable(network?.chainId);
 
-    if (network) setClientNomos(network, "leap", setCient, setUserAddress, setAuthenticated);
+    if (network) setClientNomos(network, "leap", setCient, setQueryClient, setUserAddress, setAuthenticated);
   } catch {
     alert("Failed to suggest the chain");
   }
@@ -45,12 +47,13 @@ export async function initializeLeap(
 export async function initializeCosmos(
   network: ChainConfig | null,
   setCient: (client: any) => void,
+  setQueryClient: (client: any) => void,
   setUserAddress: (addr: string) => void,
   setAuthenticated: (val: boolean) => void
 ) {
   try {
     if (network)
-      setClientNomos(network, "cosmostation", setCient, setUserAddress, setAuthenticated);
+      setClientNomos(network, "cosmostation", setCient, setQueryClient, setUserAddress, setAuthenticated);
   } catch {
     alert("Failed to suggest the chain");
   }
@@ -60,6 +63,7 @@ export async function setClientNomos(
   network: ChainConfig,
   selectedWallet: string | null,
   setCient: (client: any) => void,
+  setQueryClient: (client: any) => void,
   setUserAddress: (addr: string) => void,
   setAuthenticated: (val: boolean) => void
 ) {
@@ -95,9 +99,14 @@ export async function setClientNomos(
     LocalStorage.setAuthenticated(true);
     LocalStorage.setWallet(selectedWallet);
 
-    console.log("setWalletAndAddress", {
-      offlineSigner: offlineSigner,
-      cosmosClient: cosmosClient,
-    });
+
+    const cosmosQueryClient = await CosmWasmClient.connect(network?.rpc);
+    setQueryClient(cosmosQueryClient);
+
+
+    // console.log("setWalletAndAddress", {
+    //   offlineSigner: offlineSigner,
+    //   cosmosClient: cosmosClient,
+    // });
   }
 }
