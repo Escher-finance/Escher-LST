@@ -27,7 +27,7 @@ export default function TransactionHistory() {
             }
             console.log("before query transactions");
             const results = await queryClient.searchTx(
-                `wasm.staker='${userAddress}' AND wasm.action='bond'`
+                `wasm.staker='${userAddress}' AND wasm.action='bond'  AND wasm._contract_address='${network?.contracts.lst}'`
             );
 
 
