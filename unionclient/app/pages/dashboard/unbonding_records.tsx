@@ -72,7 +72,7 @@ export default function UnbondingRecords() {
                             <tbody>
                                 {unreleasedUnbondingRecords.map((record: any, idx: number) => {
                                     return (
-                                        <><tr key={idx}>
+                                        <><tr key={"unreleased" + idx}>
                                             <td>
                                                 {record.amount.amount} limuno
                                             </td>
