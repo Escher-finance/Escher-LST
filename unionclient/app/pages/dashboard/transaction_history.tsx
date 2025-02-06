@@ -27,11 +27,10 @@ export default function TransactionHistory() {
             }
             console.log("before query transactions");
             const results = await queryClient.searchTx(
-                "wasm.staker='union1vnglhewf3w66cquy6hr7urjv3589srheampz42' AND wasm.action='bond'"
+                `wasm.staker='${userAddress}' AND wasm.action='bond'`
             );
 
 
-            console.log(">>> after query transactions", results.length);
             let recs: any[] = [];
             if (results != undefined && results.length > 0) {
                 // console.log(JSON.stringify(results, (key, value) =>
@@ -39,12 +38,7 @@ export default function TransactionHistory() {
                 // ));
 
                 for (var i = 0; i < results.length; i++) {
-                    console.log("i", i);
                     results[i].events.filter((r: any) => r.type == "wasm").forEach((ev: any) => {
-                        console.log(ev.type);
-                        console.log(JSON.stringify(ev.attributes));
-
-
                         let bond_amount = ev.attributes.find((e: any) => e.key == "bond_amount");
                         if (bond_amount) {
                             recs.push({ "height": results[i].height, "type": "bond", "amount": bond_amount.value, "hash": results[i].hash });
@@ -57,7 +51,7 @@ export default function TransactionHistory() {
 
 
             const unbond_results = await queryClient.searchTx(
-                "wasm.staker='union1vnglhewf3w66cquy6hr7urjv3589srheampz42' AND wasm.action='unbond' AND wasm._contract_address='" + network?.contracts.lst + "'"
+                "wasm.staker='" + userAddress + "' AND wasm.action='unbond' AND wasm._contract_address='" + network?.contracts.lst + "'"
             );
 
             if (unbond_results != undefined && unbond_results.length > 0) {
@@ -66,7 +60,6 @@ export default function TransactionHistory() {
                 // ));
 
                 for (var i = 0; i < unbond_results.length; i++) {
-                    console.log("i", i);
                     unbond_results[i].events.filter((r: any) => r.type == "wasm").forEach((ev: any) => {
                         let unbond_amount = ev.attributes.find((e: any) => e.key == "unbond_amount");
                         if (unbond_amount) {
