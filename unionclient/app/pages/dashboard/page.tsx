@@ -5,8 +5,6 @@ import Unbond from "../utils/unbond";
 import Assets from "./assets";
 import { Tabs, Tab } from "@nextui-org/react";
 import UnbondingRecords from "./unbonding_records";
-// import Liquidity from "./liquidity";
-// import ContractAssets from "./contract_assets";
 import RewardAsset from "./reward_asset";
 import RevenueAssets from "./revenue_assets";
 import { useState } from "react";
@@ -32,7 +30,6 @@ export default function Dashboard() {
               </div>
               <div className="flex flex-row gap-4">
                 <RewardAsset stateKey={stateKey} />
-                {/*<ContractAssets stateKey={stateKey} /> */}
               </div>
 
             </div>

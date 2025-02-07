@@ -32,7 +32,10 @@
     "eslint": "8.48.0",
     "eslint-config-next": "13.4.19",
     "framer-motion": "^11.14.1",
+    "gql.tada": "^1.8.10",
+    "graphql-request": "^7.1.2",
     "intl-messageformat": "^10.5.0",
+    "neverthrow": "^8.1.1",
     "next": "14.0.4",
     "next-themes": "^0.2.1",
     "patch-package": "^8.0.0",
@@ -43,6 +46,7 @@
     "typescript": "5.0.4",
     "utf-8-validate": "^5.0.10",
     "uuid": "^9.0.1",
+    "viem": "^2.22.23",
     "ws": "^8.14.2"
   },
   "devDependencies": {
