@@ -4,7 +4,6 @@
 import { Card, CardBody, CardHeader, Divider } from "@nextui-org/react";
 import { useState, useEffect } from "react";
 import { useGlobalContext } from "@/app/core/context";
-import { IndexedTx } from "@cosmjs/stargate";
 
 export default function TransactionHistory() {
 
@@ -33,9 +32,6 @@ export default function TransactionHistory() {
 
             let recs: any[] = [];
             if (results != undefined && results.length > 0) {
-                // console.log(JSON.stringify(results, (key, value) =>
-                //     typeof value === "bigint" ? Number(value) : value,
-                // ));
 
                 for (var i = 0; i < results.length; i++) {
                     results[i].events.filter((r: any) => r.type == "wasm").forEach((ev: any) => {
@@ -55,9 +51,6 @@ export default function TransactionHistory() {
             );
 
             if (unbond_results != undefined && unbond_results.length > 0) {
-                // console.log(JSON.stringify(results, (key, value) =>
-                //     typeof value === "bigint" ? Number(value) : value,
-                // ));
 
                 for (var i = 0; i < unbond_results.length; i++) {
                     unbond_results[i].events.filter((r: any) => r.type == "wasm").forEach((ev: any) => {
@@ -95,39 +88,7 @@ export default function TransactionHistory() {
 }
 
 
-// <><div className="text-lg">In process</div>
-// <table>
-//     <thead>
-//         <tr>
-//             <th>Unbond Amount</th>
-//             <th>Received Amount</th>
-//             <th>Rate</th>
-//             <th>Started</th>
-//             <th>Complete Estimation</th>
-//         </tr>
-//     </thead>
-//     <tbody>
-//         {unreleasedUnbondingRecords.map((record: any) => {
-//             return (
-//                 <><tr>
-//                     <td>
-//                         {record.amount.amount} limuno
-//                     </td>
-//                     <td>
-//                         {record.undelegate_amount.amount} muno
-//                     </td>
-//                     <td>
-//                         {parseFloat(record.exchange_rate).toFixed(2)}
-//                     </td>
-//                     <td>
-//                         {new Date(Number(record.created / 1000000)).toLocaleString()}
-//                     </td>
-//                     <td>
-//                         {new Date(Number(record.completion / 1000000) + 120000).toLocaleString()}
-//                     </td>
-//                 </tr></>
-//             )
-//         })}
 
-//     </tbody>
-// </table></>
+// console.log(JSON.stringify(results, (key, value) =>
+//     typeof value === "bigint" ? Number(value) : value,
+// ));

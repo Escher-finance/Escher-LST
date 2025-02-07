@@ -18,3 +18,4 @@ export function getSalt() {
     const salt = toHex(rawSalt);
     return salt
 }
+

@@ -12,6 +12,10 @@ export const siteConfig = {
       label: "Utils",
       href: "/pages/utils",
     },
+    {
+      label: "Transfer",
+      href: "/pages/transfer",
+    },
   ],
   navMenuItems: [
     {
@@ -21,6 +25,10 @@ export const siteConfig = {
     {
       label: "Utils",
       href: "/pages/utils",
+    },
+    {
+      label: "Transfer",
+      href: "/pages/transfer",
     },
   ],
   links: {
