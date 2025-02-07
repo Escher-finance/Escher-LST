@@ -8,11 +8,11 @@ import { getTimestamp, getRecommendedChannels, getChannelInfo, getQuoteToken } f
 import { toHex } from "viem";
 import { fromHex } from "viem";
 
-export const chains = [
+const chains = [
     { key: "bbn-test-5", label: "Babylon" },
 ];
 
-export const BASE_TOKEN = "muno";
+const BASE_TOKEN = "muno";
 const SOURCE_CHAIN_ID = "union-testnet-9";
 
 export default function Transfer() {
