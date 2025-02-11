@@ -52,6 +52,7 @@ pub fn instantiate(
     let reg = ValidatorsRegistry { validators };
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
 
+    // create reward contract message to instantiate reward contract that will receive staking reward
     let (reward_msg, reward_addr) = create_reward(
         &deps,
         &env,

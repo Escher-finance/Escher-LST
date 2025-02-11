@@ -10,18 +10,31 @@ use unionlabs_primitives::{Bytes, H256};
 
 #[cw_serde]
 pub struct InstantiateMsg {
+    /// native coin denom
     pub underlying_coin_denom: String,
+    /// list of validator address with weight
     pub validators: Vec<Validator>,
+    /// liquid staking denom name
     pub liquidstaking_denom: String,
+    /// source channel for ucs03 relayer
     pub ucs03_channel: u32,
+    /// ucs03 relay contract address
     pub ucs03_relay_contract: String,
+    /// fee/revenue receiver address
     pub fee_receiver: Addr,
+    /// unbonding time wait period in seconds
     pub unbonding_time: u64,
+    /// reward contract code id
     pub reward_code_id: u64,
+    /// fee/revenue rate from reward
     pub fee_rate: Decimal,
+    /// cw20 contract address
     pub cw20_address: Option<Addr>,
+    /// salt that is used for ucs03 relayer transfer call
     pub salt: String,
+    /// quote token of native token to send to other chain
     pub quote_token: String,
+    /// quote token of liquid staking token to send to other chain
     pub lst_quote_token: String,
 }
 
@@ -37,10 +50,6 @@ pub struct InstantiateRewardMsg {
 pub enum ExecuteRewardMsg {
     MigrateMsg {},
     SplitReward {},
-    Transfer {
-        amount: Coin,
-        receiver: String,
-    },
     SetConfig {
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
@@ -64,12 +73,14 @@ pub enum ExecuteMsg {
         staker: Option<String>,
         amount: Option<Uint128>,
     },
+    // Withdraw staking rewards and call split reward to reward contract
     ProcessRewards {},
+    // Process finished unbonding and send native token back to user
     ProcessUnbonding {
         id: u64,
         salt: String,
     },
-    /// Set new token factory denom admin
+    /// DEPRECATED:: Set new token factory denom admin
     SetTokenAdmin {
         denom: String,
         new_admin: Addr,
@@ -92,12 +103,21 @@ pub enum ExecuteMsg {
     UpdateValidators {
         validators: Vec<Validator>,
     },
-    /// Reset will set state to initial state and unbond all delegations
-    Reset {},
-    /// Redelegate will delegate the balance
+    OnZkgm {
+        channel_id: u32,
+        sender: Bytes,
+        message: Bytes,
+    },
+    /// Redelegate some amount that is called from reward contract as result of split reward call to reward contract
     Redelegate {},
-    /// Move native balance to reward contract
+    /// Call migrate to reward contract
+    MigrateReward {
+        code_id: u64,
+    },
+    /// Below are Utilities for development purpose only
+    /// Move native balance to reward contract (for development phase only)
     MoveToReward {},
+    /// Transfer utility (for development phase only)
     Transfer {
         amount: Coin,
         receiver: String,
@@ -106,19 +126,15 @@ pub enum ExecuteMsg {
         quote_token: String,
         salt: String,
     },
+    /// Reset will set state to initial state and unbond all delegations (for development phase only)
+    Reset {},
+    /// Transfer all native balance of this contract to owner (for development purpose only)
     TransferToOwner {},
-    OnZkgm {
-        channel_id: u32,
-        sender: Bytes,
-        message: Bytes,
-    },
-    MigrateReward {
-        code_id: u64,
-    },
+    // Utilities to transfer reward to this contract (for development only)
+    TransferReward {},
     // Burn {
     //     amount: Uint128,
     // },
-    TransferReward {},
 }
 
 #[cw_ownable_query]

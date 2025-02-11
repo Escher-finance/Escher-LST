@@ -5,7 +5,7 @@ use crate::event::{
     BondEvent, ProcessRewardsEvent, ProcessUnbondingEvent, UnbondEvent, UpdateValidatorsEvent,
 };
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
-use crate::reply::BOND_WITHDRAW_REWARD_REPLY_ID;
+use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{unbond_record, Validator, LOG, PARAMETERS, STATE, VALIDATORS_REGISTRY};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
@@ -19,6 +19,7 @@ use cosmwasm_std::{
 };
 use unionlabs_primitives::{Bytes, FixedBytes};
 
+/// process bond call to contract
 pub fn bond(
     deps: DepsMut,
     env: Env,
@@ -119,6 +120,7 @@ pub fn bond(
     Ok(res)
 }
 
+/// Process zkgm unbond callback by calling process_unbond
 pub fn zkgm_unbond(
     deps: DepsMut,
     env: Env,
@@ -165,6 +167,7 @@ pub fn zkgm_unbond(
     Ok(res)
 }
 
+/// Process zkgm bond callback by calling process_bond
 pub fn zkgm_bond(
     deps: DepsMut,
     env: Env,
@@ -225,6 +228,7 @@ pub fn zkgm_bond(
     Ok(res)
 }
 
+/// Process unbond call to contract
 pub fn unbond(
     deps: DepsMut,
     env: Env,
@@ -325,6 +329,7 @@ pub fn unbond(
     Ok(res)
 }
 
+/// Redelegate some amount that is called from reward contract as result of split reward call to reward contract
 pub fn redelegate(
     deps: DepsMut,
     env: Env,
@@ -439,6 +444,7 @@ fn get_unbond_attrs(
     ];
 }
 
+/// DEPRECATED
 pub fn set_token_admin(
     deps: DepsMut,
     info: MessageInfo,
@@ -460,6 +466,7 @@ pub fn set_token_admin(
     Ok(res)
 }
 
+/// Process rewards by withdraw delegator reward then call redelegate to reward contract on reply
 pub fn process_rewards(
     deps: DepsMut,
     env: Env,
@@ -506,7 +513,7 @@ pub fn process_rewards(
             let payload_bin = to_json_binary(&payload)?;
 
             let sub_msg: SubMsg<TokenFactoryMsg> =
-                SubMsg::reply_always(withdraw_reward_msg, BOND_WITHDRAW_REWARD_REPLY_ID)
+                SubMsg::reply_always(withdraw_reward_msg, PROCESS_WITHDRAW_REWARD_REPLY_ID)
                     .with_payload(payload_bin)
                     .into();
             sub_msgs.push(sub_msg);
@@ -523,6 +530,7 @@ pub fn process_rewards(
     Ok(res)
 }
 
+/// Reset to default state, undelegate all and set state to default
 pub fn reset(
     deps: DepsMut,
     env: Env,
@@ -549,6 +557,7 @@ pub fn reset(
     Ok(res)
 }
 
+/// Transfer all native balance of this contract to owner (for development purpose only)
 pub fn transfer_to_owner(
     deps: DepsMut,
     env: Env,
@@ -581,6 +590,7 @@ pub fn transfer_to_owner(
     Ok(res)
 }
 
+/// Move all native balance to reward contract (for development only)
 pub fn move_to_reward(
     deps: DepsMut,
     env: Env,
@@ -632,6 +642,7 @@ pub fn update_ownership(
     Ok(res)
 }
 
+/// Set contract parameters
 pub fn set_parameters(
     deps: DepsMut,
     _env: Env,
@@ -736,6 +747,7 @@ pub fn set_parameters(
     Ok(res)
 }
 
+/// Process unbond record that is not yet released to sent native token back to staker/user
 pub fn process_unbonding(
     deps: DepsMut,
     env: Env,
@@ -811,6 +823,7 @@ pub fn process_unbonding(
     Ok(res)
 }
 
+/// Transfer token via ucs03 contract
 pub fn transfer(
     deps: DepsMut,
     env: Env,
@@ -849,6 +862,7 @@ pub fn transfer(
     Ok(res)
 }
 
+/// Zkgm callback function to process bond and unbond from another chain
 pub fn on_zkgm(
     deps: DepsMut,
     env: Env,
@@ -906,9 +920,7 @@ pub fn update_validators(
     Ok(res)
 }
 
-// let undelegate_staking_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Staking(undelegate_msg);
-// msgs.push(undelegate_staking_msg);
-
+/// Migrate reward contract
 pub fn migrate_reward(
     deps: DepsMut,
     _env: Env,
@@ -928,6 +940,7 @@ pub fn migrate_reward(
     Ok(res)
 }
 
+/// Transfer all balance in reward contract to this contract
 pub fn transfer_reward(deps: DepsMut) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let msg = ExecuteRewardMsg::TransferToOwner {};
@@ -942,6 +955,7 @@ pub fn transfer_reward(deps: DepsMut) -> Result<Response<TokenFactoryMsg>, Contr
     Ok(res)
 }
 
+/// Burn cw20 token
 pub fn burn(
     deps: DepsMut,
     env: Env,

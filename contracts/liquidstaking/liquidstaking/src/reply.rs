@@ -11,7 +11,7 @@ use cosmwasm_std::{
 use unionlabs_primitives::{Bytes, H256};
 pub const MINT_TOKENS_REPLY_ID: u64 = 123;
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
-pub const BOND_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
+pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
@@ -25,7 +25,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     match msg.id {
         MINT_TOKENS_REPLY_ID => on_mint_tokens(deps, env, msg),
         MINT_CW20_TOKENS_REPLY_ID => on_mint_cw20_tokens(deps, env, msg),
-        BOND_WITHDRAW_REWARD_REPLY_ID => on_bond_rewards(deps, env, msg),
+        PROCESS_WITHDRAW_REWARD_REPLY_ID => on_process_rewards(deps, env, msg),
         _ => Ok(Response::new()),
     }
 }
@@ -85,6 +85,7 @@ fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, Contr
     return transfer(deps, env, payload.amount, payload.staker, payload.salt);
 }
 
+/// Transfer token to other chain via ucs03 relayer
 pub fn transfer(
     deps: DepsMut,
     env: Env,
@@ -124,7 +125,8 @@ pub fn transfer(
     Ok(res)
 }
 
-fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+/// Call redelegate to reward contract after withdraw reward
+fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let payload: BondRewardsPayload = from_json(msg.payload)?;
     let mut msgs: Vec<CosmosMsg> = vec![];
@@ -151,6 +153,7 @@ fn on_bond_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, Con
     Ok(res)
 }
 
+/// Send or transfer token on same chain
 pub fn send(_deps: DepsMut, amount: Coin, receiver: String) -> Result<Response, ContractError> {
     let bank_msg: BankMsg = BankMsg::Send {
         to_address: receiver.clone(),

@@ -76,10 +76,12 @@ pub fn get_actual_total_reward(
     Ok(total_rewards)
 }
 
+/// Convert Uint256 to Uint128
 pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
     Uint128::from_str(&v.to_string())
 }
 
+// for testing only
 pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
     let ratio = Decimal::from_ratio(Uint128::new(1000), Uint128::new(1005));
     calc::calculate_staking_token_from_rate(total_bond_amount, ratio)
@@ -465,6 +467,7 @@ pub fn get_liquidity_data(
     Ok((delegated_amount, reward, current_exchange_rate))
 }
 
+/// Process bond call to mint liquid staking token, delegate/stake base on the bond amount and exchange rate
 pub fn process_bond(
     storage: &mut dyn Storage,
     querier: QuerierWrapper,
@@ -575,6 +578,7 @@ pub fn process_bond(
     ))
 }
 
+/// Process unbond that will burn liquid staking token, undelegate some amount from validator according to exchange rate and create UnbondRecord
 pub fn process_unbond(
     env: Env,
     storage: &mut dyn Storage,
@@ -635,13 +639,14 @@ pub fn process_unbond(
     );
     msgs.extend(undelegate_msgs);
 
-    let burn_msg = token::burn_token(
-        delegator.to_string(),
-        unbond_amount,
-        liquidstaking_denom.clone(),
-        params.cw20_address,
-    );
-    //msgs.push(burn_msg.into());
+    // TODO: update to use cw20 token minter burn
+    // let burn_msg = token::burn_token(
+    //     delegator.to_string(),
+    //     unbond_amount,
+    //     liquidstaking_denom.clone(),
+    //     params.cw20_address,
+    // );
+    // msgs.push(burn_msg.into());
 
     let unbond_coin = Coin {
         amount: unbond_amount.clone(),
