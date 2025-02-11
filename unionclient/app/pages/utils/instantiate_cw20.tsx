@@ -24,10 +24,10 @@ export default function InstantiateCW20() {
     const msg = {
       decimals: 6,
       initial_balances: [],
-      name: "limuno",
-      symbol: "LIMUNO",
+      name: "funny",
+      symbol: "FUNNY",
       mint: {
-        minter: userAddress
+        minter: "union16ex34xjzhv729ygw2hyhdjdseemujesw2d73xgey3wc3mm36mc6s6ehah7"
       }
     };
 
@@ -47,7 +47,7 @@ export default function InstantiateCW20() {
         userAddress,
         Number(code_id),
         msg,
-        "cw20-stake",
+        "cw20",
         "auto",
         instantiateOptions
       );
@@ -69,7 +69,7 @@ export default function InstantiateCW20() {
               name="code_id"
               label="CW20 CodeID"
               className="max-w-xs"
-              defaultValue="1"
+              defaultValue="252"
             />
           </CardBody>
           <CardFooter>
