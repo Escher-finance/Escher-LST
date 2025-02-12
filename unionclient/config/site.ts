@@ -16,6 +16,10 @@ export const siteConfig = {
       label: "Transfer",
       href: "/pages/transfer",
     },
+    {
+      label: "Transfer CW20",
+      href: "/pages/transfer_cw20",
+    }
   ],
   navMenuItems: [
     {
@@ -29,6 +33,10 @@ export const siteConfig = {
     {
       label: "Transfer",
       href: "/pages/transfer",
+    },
+    {
+      label: "Transfer CW20",
+      href: "/pages/transfer_cw20",
     },
   ],
   links: {

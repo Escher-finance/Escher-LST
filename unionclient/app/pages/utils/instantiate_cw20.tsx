@@ -23,12 +23,12 @@ export default function InstantiateCW20() {
     const formData = new FormData(form);
     const msg = {
       decimals: 6,
-      initial_balances: [],
       name: "funny",
       symbol: "FUNNY",
-      mint: {
-        minter: "union16ex34xjzhv729ygw2hyhdjdseemujesw2d73xgey3wc3mm36mc6s6ehah7"
-      }
+      initial_balances: [{
+        address: userAddress,
+        amount: "10000000"
+      }]
     };
 
     const formJson = Object.fromEntries(formData.entries());
