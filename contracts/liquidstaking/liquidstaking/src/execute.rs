@@ -17,7 +17,7 @@ use cosmwasm_std::{
     DepsMut, DistributionMsg, Env, MessageInfo, Response, StdResult, SubMsg, Uint128, Uint256,
     WasmMsg,
 };
-use unionlabs_primitives::{Bytes, FixedBytes};
+use unionlabs_primitives::{Bytes, H256};
 
 /// process bond call to contract
 pub fn bond(
@@ -252,7 +252,7 @@ pub fn unbond(
 
     let balance: cw20::BalanceResponse = deps
         .querier
-        .query_wasm_smart(params.cw20_address.clone().unwrap(), &msg)?;
+        .query_wasm_smart(params.cw20_address.clone(), &msg)?;
 
     if balance.balance < unbond_amount {
         return Err(ContractError::NotEnoughAvailableFund {});
@@ -656,7 +656,7 @@ pub fn set_parameters(
     params.unbonding_time = unbonding_time
         .clone()
         .unwrap_or_else(|| params.unbonding_time);
-    params.cw20_address = cw20_address.clone();
+    params.cw20_address = cw20_address.clone().unwrap_or_else(|| params.cw20_address);
     params.reward_address = reward_address
         .clone()
         .unwrap_or_else(|| params.reward_address);
@@ -765,7 +765,7 @@ pub fn process_unbonding(
                 Bytes::from_str(params.underlying_coin_denom.as_str()).unwrap(),
                 Uint256::zero(),
                 funds,
-                FixedBytes::from_str(salt.as_str()).unwrap(),
+                H256::from_str(salt.as_str()).unwrap(),
             )?;
             let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
             msg
@@ -826,7 +826,7 @@ pub fn transfer(
         Bytes::from_str(quote_token.as_str()).unwrap(),
         Uint256::from(amount),
         vec![],
-        FixedBytes::from_str(salt.as_str()).unwrap(),
+        H256::from_str(&salt).unwrap(),
     )?;
     let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
 
@@ -935,19 +935,14 @@ pub fn transfer_reward(deps: DepsMut) -> Result<Response<TokenFactoryMsg>, Contr
 /// Burn cw20 token
 pub fn burn(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let params = PARAMETERS.load(deps.storage)?;
 
-    let msg = utils::token::burn_token(
-        env.contract.address.to_string(),
-        amount,
-        params.liquidstaking_denom.clone(),
-        None,
-    );
+    let msg = utils::token::burn_token(amount, params.cw20_address.to_string());
 
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_message(msg)

@@ -30,21 +30,43 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     }
 }
 
-fn on_mint_cw20_tokens(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
     let params: Parameters = PARAMETERS.load(deps.storage)?;
     let payload: MintTokensPayload = from_json(msg.payload)?;
 
-    let staker_balance = deps.querier.query_balance(
-        payload.staker.to_string(),
-        params.liquidstaking_denom.clone(),
-    )?;
+    let msg = cw20::Cw20QueryMsg::Balance {
+        address: env.contract.address.to_string(),
+    };
+
+    let balance: cw20::BalanceResponse = deps
+        .querier
+        .query_wasm_smart(params.cw20_address.clone(), &msg)?;
+
+    let mut msgs: Vec<CosmosMsg> = vec![];
+    if payload.staker != payload.sender && balance.balance >= payload.amount {
+        let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
+            env,
+            params.ucs03_relay_contract,
+            params.ucs03_channel,
+            Bytes::from_str(payload.staker.as_str()).unwrap(),
+            params.cw20_address.to_string(),
+            payload.amount.clone(),
+            Bytes::from_str(params.lst_quote_token.as_str()).unwrap(),
+            Uint256::from(payload.amount.clone()),
+            vec![],
+            H256::from_str(payload.salt.as_str()).unwrap(),
+        )?;
+        msgs.push(wasm_msg.into());
+    }
 
     let res: Response = Response::new()
+        .add_messages(msgs)
         .add_attribute("action", "mint_cw20")
         .add_attribute("receiver", payload.staker.to_string())
         .add_attribute("amount", payload.amount.to_string())
         .add_attribute("denom", params.liquidstaking_denom)
-        .add_attribute("staked_token_balance", staker_balance.amount.to_string());
+        .add_attribute("base_denom", params.cw20_address)
+        .add_attribute("staked_token_balance", balance.balance.to_string());
     Ok(res)
 }
 
@@ -101,12 +123,13 @@ pub fn transfer(
     };
 
     let funds = vec![coin_amount.clone()];
+
     let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
         env,
         params.ucs03_relay_contract,
         params.ucs03_channel,
         Bytes::from_str(receiver.as_str()).unwrap(),
-        params.liquidstaking_denom.clone(),
+        params.cw20_address.to_string(),
         amount,
         Bytes::from_str(params.lst_quote_token.as_str()).unwrap(),
         Uint256::from(amount),

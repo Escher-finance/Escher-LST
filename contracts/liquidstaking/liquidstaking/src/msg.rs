@@ -28,8 +28,8 @@ pub struct InstantiateMsg {
     pub reward_code_id: u64,
     /// fee/revenue rate from reward
     pub fee_rate: Decimal,
-    /// cw20 contract address
-    pub cw20_address: Option<Addr>,
+    /// cw20 liquid staking denom contract address
+    pub cw20_address: Addr,
     /// salt that is used for ucs03 relayer transfer call
     pub salt: String,
     /// quote token of native token to send to other chain

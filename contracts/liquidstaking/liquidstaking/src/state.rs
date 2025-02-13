@@ -50,8 +50,8 @@ pub struct Parameters {
     pub ucs03_channel: u32,
     pub ucs03_relay_contract: String,
     pub unbonding_time: u64,
-    // cw20 contract address
-    pub cw20_address: Option<Addr>,
+    // liquid_staking denom/cw20 contract address
+    pub cw20_address: Addr,
     // reward contract address
     pub reward_address: Addr,
     // quote token

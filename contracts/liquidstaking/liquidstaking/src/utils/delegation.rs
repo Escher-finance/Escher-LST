@@ -639,14 +639,8 @@ pub fn process_unbond(
     );
     msgs.extend(undelegate_msgs);
 
-    // TODO: update to use cw20 token minter burn
-    // let burn_msg = token::burn_token(
-    //     delegator.to_string(),
-    //     unbond_amount,
-    //     liquidstaking_denom.clone(),
-    //     params.cw20_address,
-    // );
-    // msgs.push(burn_msg.into());
+    let burn_msg = token::burn_token(unbond_amount, params.cw20_address.to_string());
+    msgs.push(burn_msg.into());
 
     let unbond_coin = Coin {
         amount: unbond_amount.clone(),
