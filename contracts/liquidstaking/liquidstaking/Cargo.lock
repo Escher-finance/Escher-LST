@@ -617,6 +617,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "enumorph"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d3e2610493c0a1fc3bf33fb420650c6ebf7990c55e3d5e71a57bee374486824"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "ff"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -752,6 +763,7 @@ dependencies = [
  "cw-storage-plus",
  "cw2",
  "cw20",
+ "enumorph",
  "schemars",
  "semver",
  "serde",

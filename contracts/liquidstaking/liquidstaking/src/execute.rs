@@ -239,45 +239,23 @@ pub fn unbond(
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.to_string();
-    let liquidstaking_denom = params.liquidstaking_denom.to_string();
     let sender = info.sender.to_string();
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
     let delegator = env.contract.address.clone();
 
     let unbond_amount: Uint128;
-    if cfg!(not(nonunion)) {
-        if amount.is_none() {
-            // this will handle union chain
-            // coin must be sent along with transaction and it should be in liquid staking coin denom
-            if info.funds.len() > 1usize {
-                return Err(ContractError::InvalidAsset {});
-            }
 
-            let payment = info
-                .funds
-                .iter()
-                .find(|x| x.denom == liquidstaking_denom && x.amount > Uint128::zero())
-                .ok_or_else(|| ContractError::NoAsset {})?;
+    unbond_amount = amount.unwrap();
+    let msg = cw20::Cw20QueryMsg::Balance {
+        address: delegator.to_string(),
+    };
 
-            unbond_amount = payment.amount;
-        } else {
-            unbond_amount = amount.unwrap();
-        }
-    } else {
-        // this will handle non union chain
-        // need to find staked token balance of sender
-        unbond_amount = amount.unwrap();
-        let msg = cw20::Cw20QueryMsg::Balance {
-            address: delegator.to_string(),
-        };
+    let balance: cw20::BalanceResponse = deps
+        .querier
+        .query_wasm_smart(params.cw20_address.clone().unwrap(), &msg)?;
 
-        let balance: cw20::BalanceResponse = deps
-            .querier
-            .query_wasm_smart(params.cw20_address.clone().unwrap(), &msg)?;
-
-        if balance.balance < unbond_amount {
-            return Err(ContractError::NotEnoughAvailableFund {});
-        }
+    if balance.balance < unbond_amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
     }
 
     let (msgs, unbond_data) = utils::delegation::process_unbond(
@@ -828,7 +806,8 @@ pub fn transfer(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    amount: Coin,
+    amount: Uint128,
+    base_denom: String,
     receiver: String,
     ucs03_channel_id: u32,
     ucs03_contract: String,
@@ -836,19 +815,17 @@ pub fn transfer(
     salt: String,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    let params = PARAMETERS.load(deps.storage)?;
 
-    let funds = vec![amount.clone()];
     let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
         env,
         ucs03_contract,
         ucs03_channel_id,
         Bytes::from_str(receiver.as_str()).unwrap(),
-        params.underlying_coin_denom.clone(),
-        amount.amount,
+        base_denom.clone(),
+        amount.clone(),
         Bytes::from_str(quote_token.as_str()).unwrap(),
-        Uint256::from(amount.amount),
-        funds,
+        Uint256::from(amount),
+        vec![],
         FixedBytes::from_str(salt.as_str()).unwrap(),
     )?;
     let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
@@ -857,8 +834,8 @@ pub fn transfer(
         .add_message(msg)
         .add_attribute("action", "transfer")
         .add_attribute("receiver", receiver.to_string())
-        .add_attribute("amount", amount.amount.to_string())
-        .add_attribute("denom", amount.denom);
+        .add_attribute("amount", amount.to_string())
+        .add_attribute("denom", base_denom);
     Ok(res)
 }
 

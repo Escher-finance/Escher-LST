@@ -119,7 +119,8 @@ pub enum ExecuteMsg {
     MoveToReward {},
     /// Transfer utility (for development phase only)
     Transfer {
-        amount: Coin,
+        amount: Uint128,
+        base_denom: String,
         receiver: String,
         ucs03_channel_id: u32,
         ucs03_relay_contract: String,

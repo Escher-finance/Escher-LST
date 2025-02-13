@@ -79,13 +79,6 @@ pub fn instantiate(
     };
     PARAMETERS.save(deps.storage, &params)?;
 
-    let chain;
-    if cfg!(nonunion) {
-        chain = "nonunion".into();
-    } else {
-        chain = "union".into();
-    }
-
     let state = State {
         exchange_rate: Decimal::one(),
         total_delegated_amount: Uint128::new(0),
@@ -93,7 +86,6 @@ pub fn instantiate(
         total_supply: Uint128::new(0),
         bond_counter: 0,
         last_bond_time: 0,
-        chain,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -167,6 +159,7 @@ pub fn execute(
         ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
         ExecuteMsg::Transfer {
             amount,
+            base_denom,
             receiver,
             ucs03_channel_id,
             ucs03_relay_contract,
@@ -177,6 +170,7 @@ pub fn execute(
             env,
             info,
             amount,
+            base_denom,
             receiver,
             ucs03_channel_id,
             ucs03_relay_contract,

@@ -1,29 +1,7 @@
-use crate::reply::{MINT_CW20_TOKENS_REPLY_ID, MINT_TOKENS_REPLY_ID};
+use crate::reply::MINT_CW20_TOKENS_REPLY_ID;
 use crate::token_factory_api::TokenFactoryMsg;
-use cosmwasm_std::{Addr, Binary, CosmosMsg, SubMsg, Uint128};
+use cosmwasm_std::{to_json_binary, Addr, Binary, CosmosMsg, SubMsg, Uint128, WasmMsg};
 
-#[cfg(not(nonunion))]
-pub fn get_staked_token_submsg(
-    delegator: String,
-    _staker: String,
-    mint_amount: Uint128,
-    liquidstaking_denom: String,
-    payload_bin: Binary,
-    _cw20_address: Option<Addr>,
-) -> SubMsg<TokenFactoryMsg> {
-    let mint_msg = TokenFactoryMsg::MintTokens {
-        denom: liquidstaking_denom,
-        amount: mint_amount,
-        mint_to_address: delegator.to_string(),
-    };
-
-    let sub_msg: SubMsg<TokenFactoryMsg> = SubMsg::reply_always(mint_msg, MINT_TOKENS_REPLY_ID)
-        .with_payload(payload_bin)
-        .into();
-    sub_msg
-}
-
-#[cfg(nonunion)]
 pub fn get_staked_token_submsg(
     _delegator: String,
     staker: String,
@@ -59,20 +37,6 @@ pub fn get_burn_msg(denom: String, burn_amount: Uint128, delegator: String) -> T
     burn_msg
 }
 
-#[cfg(not(nonunion))]
-pub fn burn_token(
-    delegator: String,
-    amount: Uint128,
-    liquidstaking_denom: String,
-    _cw20_address: Option<Addr>,
-) -> CosmosMsg<TokenFactoryMsg> {
-    //let burn_amount = amount / Uint128::new(2u128);
-    let burn_msg = get_burn_msg(liquidstaking_denom.clone(), amount, delegator.to_string());
-    let msg: CosmosMsg<TokenFactoryMsg> = burn_msg.into();
-    msg
-}
-
-#[cfg(nonunion)]
 pub fn burn_token(
     _delegator: String,
     amount: Uint128,
