@@ -17,4 +17,3 @@ pub mod token_factory_api;
 pub mod utils;
 
 pub use crate::error::ContractError;
-pub mod token_minter_api;

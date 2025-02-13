@@ -816,6 +816,21 @@ pub fn transfer(
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
+    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+    let allowance_msg = cw20::Cw20ExecuteMsg::IncreaseAllowance {
+        spender: ucs03_contract.clone(),
+        amount: amount.clone(),
+        expires: None,
+    };
+
+    let allow_bin = to_json_binary(&allowance_msg).unwrap();
+    let allow_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: base_denom.to_string(),
+        msg: allow_bin,
+        funds: vec![],
+    });
+    msgs.push(allow_msg);
+
     let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
         env,
         ucs03_contract,
@@ -828,10 +843,11 @@ pub fn transfer(
         vec![],
         H256::from_str(&salt).unwrap(),
     )?;
-    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
+
+    msgs.push(CosmosMsg::Wasm(wasm_msg).into());
 
     let res: Response<TokenFactoryMsg> = Response::new()
-        .add_message(msg)
+        .add_messages(msgs)
         .add_attribute("action", "transfer")
         .add_attribute("receiver", receiver.to_string())
         .add_attribute("amount", amount.to_string())
