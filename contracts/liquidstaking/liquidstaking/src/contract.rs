@@ -10,8 +10,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
-    VALIDATORS_REGISTRY,
+    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS,
+    QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -86,6 +86,10 @@ pub fn instantiate(
         last_bond_time: 0,
     };
     STATE.save(deps.storage, &state)?;
+
+    for quote_token in msg.quote_tokens {
+        QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
+    }
 
     let set_withdraw_msg: CosmosMsg<TokenFactoryMsg> =
         CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
