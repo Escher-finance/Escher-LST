@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
-use crate::state::{Parameters, LST_QUOTE_TOKEN, PARAMETERS};
+use crate::state::{Parameters, PARAMETERS, QUOTE_TOKEN};
 use crate::utils;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
@@ -47,7 +47,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
     let mut msgs: Vec<CosmosMsg> = vec![];
 
-    let lst_quote_token = LST_QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
+    let quote_token = QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
     if payload.staker != payload.sender {
         let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
             env,
@@ -56,7 +56,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
             Bytes::from_str(payload.staker.as_str()).unwrap(),
             params.cw20_address.to_string(),
             payload.amount.clone(),
-            Bytes::from_str(lst_quote_token.as_str()).unwrap(),
+            Bytes::from_str(quote_token.lst_quote_token.as_str()).unwrap(),
             Uint256::from(payload.amount.clone()),
             vec![],
             H256::from_str(payload.salt.as_str()).unwrap(),

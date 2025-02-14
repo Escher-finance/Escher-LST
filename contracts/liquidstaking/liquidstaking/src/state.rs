@@ -9,9 +9,8 @@ pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_
 pub const BALANCE: Item<Balance> = Item::new("balance");
 pub const LOG: Item<String> = Item::new("log");
 
-// Map of channel id to the quote token of destination chain
-pub const QUOTE_TOKEN: Map<u32, String> = Map::new("quote_token");
-pub const LST_QUOTE_TOKEN: Map<u32, String> = Map::new("lst_quote_token");
+// Map of channel id to the quote token and lst quote token of destination chain
+pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 
 #[cw_serde]
 pub struct Balance {
@@ -57,10 +56,6 @@ pub struct Parameters {
     pub cw20_address: Addr,
     // reward contract address
     pub reward_address: Addr,
-    // quote token
-    pub quote_token: String,
-    // liquid staking quote token
-    pub lst_quote_token: String,
     // fee fee_rate
     pub fee_rate: Decimal,
     // fee receiver
@@ -138,4 +133,11 @@ pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<
         ),
     };
     IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
+}
+
+#[cw_serde]
+pub struct QuoteToken {
+    pub channel_id: u32,
+    pub quote_token: String,
+    pub lst_quote_token: String,
 }

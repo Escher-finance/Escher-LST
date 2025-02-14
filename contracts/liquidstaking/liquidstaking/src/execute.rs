@@ -7,7 +7,7 @@ use crate::event::{
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, Validator, LOG, PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    unbond_record, QuoteToken, Validator, LOG, PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
@@ -653,8 +653,6 @@ pub fn set_parameters(
     unbonding_time: Option<u64>,
     cw20_address: Option<Addr>,
     reward_address: Option<Addr>,
-    quote_token: Option<String>,
-    lst_quote_token: Option<String>,
     fee_receiver: Option<Addr>,
     fee_rate: Option<Decimal>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
@@ -681,10 +679,7 @@ pub fn set_parameters(
     params.reward_address = reward_address
         .clone()
         .unwrap_or_else(|| params.reward_address);
-    params.quote_token = quote_token.clone().unwrap_or_else(|| params.quote_token);
-    params.lst_quote_token = lst_quote_token
-        .clone()
-        .unwrap_or_else(|| params.lst_quote_token);
+
     params.fee_receiver = fee_receiver.clone().unwrap_or_else(|| params.fee_receiver);
     params.fee_rate = fee_rate.clone().unwrap_or_else(|| params.fee_rate);
 
@@ -789,7 +784,7 @@ pub fn process_unbonding(
                 Bytes::from_str(unbond_rec.staker.as_str()).unwrap(),
                 params.underlying_coin_denom.clone(),
                 unbond_rec.undelegate_amount,
-                Bytes::from_str(quote_token.as_str()).unwrap(),
+                Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
                 Uint256::from(unbond_rec.undelegate_amount),
                 funds,
                 H256::from_str(salt.as_str()).unwrap(),
@@ -948,6 +943,20 @@ pub fn update_validators(
     let event = UpdateValidatorsEvent(info.sender.to_string(), prev_validators, validators);
     let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_event(event);
     Ok(res)
+}
+
+/// Update the quote token of the contract for specific channel_id
+#[allow(clippy::needless_pass_by_value)]
+pub fn update_quote_token(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    channel_id: u32,
+    quote_token: QuoteToken,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    QUOTE_TOKEN.save(deps.storage, channel_id, &quote_token)?;
+    Ok(Response::default())
 }
 
 /// Migrate reward contract

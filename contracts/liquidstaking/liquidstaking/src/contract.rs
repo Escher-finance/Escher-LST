@@ -72,8 +72,6 @@ pub fn instantiate(
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
         reward_address: reward_addr.clone(),
-        quote_token: msg.quote_token,
-        lst_quote_token: msg.lst_quote_token,
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
     };
@@ -135,8 +133,6 @@ pub fn execute(
             unbonding_time,
             cw20_address,
             reward_address,
-            quote_token,
-            lst_quote_token,
             fee_receiver,
             fee_rate,
         } => execute::set_parameters(
@@ -150,11 +146,13 @@ pub fn execute(
             unbonding_time,
             cw20_address,
             reward_address,
-            quote_token,
-            lst_quote_token,
             fee_receiver,
             fee_rate,
         ),
+        ExecuteMsg::UpdateQuoteToken {
+            channel_id,
+            quote_token,
+        } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
         ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
         ExecuteMsg::Transfer {

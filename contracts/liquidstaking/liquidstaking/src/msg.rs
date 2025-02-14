@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::state::{Balance, Parameters, State, UnbondRecord, Validator, ValidatorsRegistry};
+use crate::state::{
+    Balance, Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry,
+};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
 use cw2::ContractVersion;
@@ -32,10 +34,8 @@ pub struct InstantiateMsg {
     pub cw20_address: Addr,
     /// salt that is used for ucs03 relayer transfer call
     pub salt: String,
-    /// quote token of native token to send to other chain
-    pub quote_token: String,
-    /// quote token of liquid staking token to send to other chain
-    pub lst_quote_token: String,
+    // tokens
+    pub quote_tokens: Vec<QuoteToken>,
 }
 
 #[cw_serde]
@@ -94,10 +94,13 @@ pub enum ExecuteMsg {
         unbonding_time: Option<u64>,
         cw20_address: Option<Addr>,
         reward_address: Option<Addr>,
-        quote_token: Option<String>,
-        lst_quote_token: Option<String>,
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
+    },
+    /// Update quote token
+    UpdateQuoteToken {
+        channel_id: u32,
+        quote_token: QuoteToken,
     },
     /// Update Validators
     UpdateValidators {
