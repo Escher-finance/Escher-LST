@@ -1,5 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Decimal, StdResult, Storage, Timestamp, Uint128};
+use cw_storage_plus::Map;
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
@@ -7,6 +8,10 @@ pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
 pub const BALANCE: Item<Balance> = Item::new("balance");
 pub const LOG: Item<String> = Item::new("log");
+
+// Map of channel id to the quote token of destination chain
+pub const QUOTE_TOKEN: Map<u32, String> = Map::new("quote_token");
+pub const LST_QUOTE_TOKEN: Map<u32, String> = Map::new("lst_quote_token");
 
 #[cw_serde]
 pub struct Balance {
@@ -88,6 +93,7 @@ pub struct UnbondRecord {
     pub height: u64,
     pub sender: String,
     pub staker: String,
+    pub channel_id: Option<u32>,
     pub amount: Uint128,
     pub undelegate_amount: Uint128,
     pub created: Timestamp,

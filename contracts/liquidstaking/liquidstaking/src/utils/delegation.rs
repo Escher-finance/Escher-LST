@@ -472,6 +472,7 @@ pub fn process_bond(
     params: Parameters,
     validators_reg: ValidatorsRegistry,
     salt: String,
+    channel_id: Option<u32>,
 ) -> Result<
     (
         Vec<CosmosMsg<TokenFactoryMsg>>,
@@ -542,6 +543,7 @@ pub fn process_bond(
         staker: staker.clone(),
         amount: mint_amount,
         salt,
+        channel_id,
     };
     let payload_bin = to_json_binary(&payload)?;
 
@@ -582,6 +584,7 @@ pub fn process_unbond(
     unbond_amount: Uint128,
     params: Parameters,
     validators_reg: ValidatorsRegistry,
+    channel_id: Option<u32>,
 ) -> Result<(Vec<CosmosMsg<TokenFactoryMsg>>, UnbondData), ContractError> {
     let coin_denom = params.underlying_coin_denom;
 
@@ -638,6 +641,7 @@ pub fn process_unbond(
     let history = UnbondRecord {
         id,
         height: env.block.height,
+        channel_id,
         sender: sender.clone(),
         staker: staker.clone(),
         amount: unbond_amount,

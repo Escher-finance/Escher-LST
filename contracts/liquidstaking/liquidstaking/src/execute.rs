@@ -6,7 +6,9 @@ use crate::event::{
 };
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
-use crate::state::{unbond_record, Validator, LOG, PARAMETERS, STATE, VALIDATORS_REGISTRY};
+use crate::state::{
+    unbond_record, Validator, LOG, PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+};
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     self, delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
@@ -86,6 +88,7 @@ pub fn bond(
         params,
         validators_reg,
         salt,
+        None,
     )?;
 
     // create bond event here
@@ -125,6 +128,7 @@ pub fn zkgm_unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    channel_id: u32,
     staker: String,
     amount: Uint128,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
@@ -132,6 +136,17 @@ pub fn zkgm_unbond(
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let sender = info.sender.clone();
     let delegator = env.contract.address.clone();
+
+    let msg = cw20::Cw20QueryMsg::Balance {
+        address: delegator.to_string(),
+    };
+    let balance: cw20::BalanceResponse = deps
+        .querier
+        .query_wasm_smart(params.cw20_address.clone(), &msg)?;
+
+    if balance.balance < amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
 
     let (msgs, unbond_data) = utils::delegation::process_unbond(
         env.clone(),
@@ -143,12 +158,14 @@ pub fn zkgm_unbond(
         amount,
         params,
         validators_reg,
+        Some(channel_id),
     )?;
 
     // create bond event here
     let unbond_event = UnbondEvent(
         sender.to_string(),
         staker,
+        Some(channel_id),
         amount,
         unbond_data.undelegate_amount,
         unbond_data.delegated_amount,
@@ -172,6 +189,7 @@ pub fn zkgm_bond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    channel_id: u32,
     staker: String,
     amount: Uint128,
     salt: String,
@@ -193,6 +211,7 @@ pub fn zkgm_bond(
         params,
         validators_reg,
         salt,
+        Some(channel_id),
     )?;
 
     // create bond event here
@@ -268,12 +287,14 @@ pub fn unbond(
         unbond_amount,
         params,
         validators_reg,
+        None,
     )?;
 
     // create bond event here
     let unbond_event = UnbondEvent(
         sender.to_string(),
         the_staker.clone(),
+        None,
         unbond_amount,
         unbond_data.undelegate_amount,
         unbond_data.delegated_amount,
@@ -758,6 +779,9 @@ pub fn process_unbonding(
                 denom: params.underlying_coin_denom.clone(),
                 amount: unbond_rec.undelegate_amount.clone(),
             }];
+
+            // get quote token of native base denom (muno) on specific channel id
+            let quote_token = QUOTE_TOKEN.load(deps.storage, unbond_rec.channel_id.unwrap())?;
             let wasm_msg = utils::protocol::ucs03_transfer(
                 env.clone(),
                 params.ucs03_relay_contract.as_str().into(),
@@ -765,7 +789,7 @@ pub fn process_unbonding(
                 Bytes::from_str(unbond_rec.staker.as_str()).unwrap(),
                 params.underlying_coin_denom.clone(),
                 unbond_rec.undelegate_amount,
-                Bytes::from_str(params.quote_token.as_str()).unwrap(),
+                Bytes::from_str(quote_token.as_str()).unwrap(),
                 Uint256::from(unbond_rec.undelegate_amount),
                 funds,
                 H256::from_str(salt.as_str()).unwrap(),
@@ -879,10 +903,18 @@ pub fn on_zkgm(
 
     match payload {
         ZkgmMessage::Bond { amount, salt } => {
-            return zkgm_bond(deps, env, info, format!("{}", sender), amount, salt)
+            return zkgm_bond(
+                deps,
+                env,
+                info,
+                channel_id,
+                format!("{}", sender),
+                amount,
+                salt,
+            )
         }
         ZkgmMessage::Unbond { amount } => {
-            return zkgm_unbond(deps, env, info, format!("{}", sender), amount)
+            return zkgm_unbond(deps, env, info, channel_id, format!("{}", sender), amount)
         }
     }
 }

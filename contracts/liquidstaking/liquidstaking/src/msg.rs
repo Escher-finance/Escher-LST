@@ -208,6 +208,7 @@ pub struct MintTokensPayload {
     pub staker: String,
     pub amount: Uint128,
     pub salt: String,
+    pub channel_id: Option<u32>,
 }
 
 #[cw_serde]

@@ -29,6 +29,7 @@ pub const UNBOND_EVENT: &str = "unbond";
 pub fn UnbondEvent(
     sender: String,
     staker: String,
+    channel_id: Option<u32>,
     unbond_amount: Uint128,
     undelegate_amount: Uint128,
     delegated_amount: Uint128,
@@ -36,9 +37,16 @@ pub fn UnbondEvent(
     total_supply: Uint128,
     exchange_rate: Decimal,
 ) -> Event {
+    let mut channel_id_str = "".to_string();
+
+    if channel_id.is_some() {
+        channel_id_str = format!("{}", channel_id.unwrap());
+    }
+
     Event::new(UNBOND_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", staker)
+        .add_attribute("channel_id", channel_id_str)
         .add_attribute("unbond_amount", unbond_amount)
         .add_attribute("undelegate_amount", undelegate_amount)
         .add_attribute("delegated_amount", delegated_amount)
