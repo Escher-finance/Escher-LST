@@ -27,8 +27,11 @@ export default function InstantiateCW20() {
       symbol: "FUNNY",
       initial_balances: [{
         address: userAddress,
-        amount: "10000000"
-      }]
+        amount: "1000000000"
+      }],
+      mint: {
+        minter: userAddress
+      }
     };
 
     const formJson = Object.fromEntries(formData.entries());
@@ -51,6 +54,7 @@ export default function InstantiateCW20() {
         "auto",
         instantiateOptions
       );
+      console.log(instantiateResult?.transactionHash);
       console.log(instantiateResult?.contractAddress);
       alert(instantiateResult?.contractAddress);
 

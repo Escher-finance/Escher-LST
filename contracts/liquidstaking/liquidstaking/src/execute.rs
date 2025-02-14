@@ -738,7 +738,7 @@ pub fn process_unbonding(
     let params: crate::state::Parameters = PARAMETERS.load(deps.storage)?;
     let mut unbond_rec: crate::state::UnbondRecord = unbond_record().load(deps.storage, id)?;
 
-    if unbond_rec.released == true {
+    if unbond_rec.released_height > 0 {
         return Err(ContractError::CompletedUnbondRecord {});
     }
     // query the undelegate_amount in contract balance
@@ -747,23 +747,26 @@ pub fn process_unbonding(
         .querier
         .query_balance(contract_address, params.underlying_coin_denom.clone())?;
 
-    if balance.amount < unbond_rec.undelegate_amount.amount {
+    if balance.amount < unbond_rec.undelegate_amount {
         return Err(ContractError::NotEnoughAvailableFund {});
     }
 
     // if exists, send to staker (it can be on same chain or other chain like evm/bera)
     let msg: CosmosMsg<TokenFactoryMsg> = {
         if unbond_rec.staker != unbond_rec.sender {
-            let funds = vec![unbond_rec.undelegate_amount.clone()];
+            let funds = vec![Coin {
+                denom: params.underlying_coin_denom.clone(),
+                amount: unbond_rec.undelegate_amount.clone(),
+            }];
             let wasm_msg = utils::protocol::ucs03_transfer(
                 env.clone(),
                 params.ucs03_relay_contract.as_str().into(),
                 params.ucs03_channel,
                 Bytes::from_str(unbond_rec.staker.as_str()).unwrap(),
                 params.underlying_coin_denom.clone(),
-                unbond_rec.amount.amount,
-                Bytes::from_str(params.underlying_coin_denom.as_str()).unwrap(),
-                Uint256::zero(),
+                unbond_rec.undelegate_amount,
+                Bytes::from_str(params.quote_token.as_str()).unwrap(),
+                Uint256::from(unbond_rec.undelegate_amount),
                 funds,
                 H256::from_str(salt.as_str()).unwrap(),
             )?;
@@ -772,7 +775,10 @@ pub fn process_unbonding(
         } else {
             let bank_msg = BankMsg::Send {
                 to_address: unbond_rec.staker.clone(),
-                amount: vec![unbond_rec.undelegate_amount.clone()],
+                amount: vec![Coin {
+                    denom: params.underlying_coin_denom,
+                    amount: unbond_rec.undelegate_amount.clone(),
+                }],
             };
             let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
             msg
@@ -781,13 +787,12 @@ pub fn process_unbonding(
 
     let ev = ProcessUnbondingEvent(
         unbond_rec.staker.to_string(),
-        unbond_rec.undelegate_amount.amount.clone(),
-        unbond_rec.undelegate_amount.denom.clone(),
+        unbond_rec.undelegate_amount.clone(),
+        params.liquidstaking_denom.clone(),
     );
 
     // set unbonding record to be released
-    unbond_rec.released = true;
-    unbond_rec.released_time = env.block.time;
+    unbond_rec.released_height = env.block.height;
     unbond_record().save(deps.storage, unbond_rec.id, &unbond_rec)?;
 
     let res: Response<TokenFactoryMsg> = Response::new()
@@ -795,8 +800,8 @@ pub fn process_unbonding(
         .add_event(ev)
         .add_attribute("action", "transfer_unbonding")
         .add_attribute("staker", unbond_rec.staker)
-        .add_attribute("amount", unbond_rec.undelegate_amount.amount)
-        .add_attribute("denom", unbond_rec.undelegate_amount.denom);
+        .add_attribute("unbond_amount", unbond_rec.amount)
+        .add_attribute("undelegate_amount", unbond_rec.undelegate_amount);
 
     Ok(res)
 }

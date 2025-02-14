@@ -31,16 +31,17 @@ export default function InstantiateLiquidStaking() {
       validators: [
         { weight: 1, address: "unionvaloper1qcyu42wvmw07rsnm9jn2k5dusdwvsu5g74kw54" }
       ],
-      liquidstaking_denom: "factory/union1vnglhewf3w66cquy6hr7urjv3589srheampz42/limuno",
-      ucs03_channel: 7,
-      ucs03_relay_contract: "union19hspxmypfxsdsnxttma8rxvp7dtcmzhl9my0ee64avg358vlpawsdvucqa",
+      liquidstaking_denom: "funny",
+      ucs03_channel: 1,
+      ucs03_relay_contract: "union1x2jzeup7uwfxjxxrtfna2ktcugltntgu6kvc0eeayk0d82l247cqz669ee",
       fee_rate: "0.1",
       fee_receiver: "union17z2ea0dtzkpu9lc2eh0jcwxywh40th5e0xla5q",
       reward_code_id: 171,
       unbonding_time: 60,
       salt: uuidv4(),
       quote_token: "0xf2865969cf99a28bb77e25494fe12d5180fe0efd",
-      lst_quote_token: "0x5Ab6dcad571D461b1b6562152EC8Dce51314a6D6"
+      lst_quote_token: "0x4FDFcE13ac1f6f74a8cb06EAd9a9CE1B740E53FC",
+      cw20_address: "union1d0g6z2977xa6c5eknf78urltxx3tnvtjrq4c7fh99rpd5j4ut76qwf8r20"
     };
 
 
@@ -77,7 +78,7 @@ export default function InstantiateLiquidStaking() {
               name="liquid_staking_code_id"
               label="Liquid Staking CodeID"
               className="max-w-xs"
-              defaultValue="181"
+              defaultValue="253"
             />
           </CardBody>
           <CardFooter>

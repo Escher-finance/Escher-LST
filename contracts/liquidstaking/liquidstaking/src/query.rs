@@ -27,9 +27,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Log {} => to_json_binary(&(query_log(deps.storage)?)),
         QueryMsg::UnbondRecord {
             staker,
-            sender,
-            released,
-        } => to_json_binary(&(query_unbond_record(deps.storage, staker, sender, released)?)),
+            released_height,
+        } => to_json_binary(&(query_unbond_record(deps.storage, staker, released_height)?)),
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
     }
@@ -125,10 +124,9 @@ pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
 pub fn query_unbond_record(
     storage: &dyn Storage,
     staker: Option<String>,
-    sender: Option<String>,
-    released: Option<bool>,
+    released_height: Option<u64>,
 ) -> StdResult<Vec<UnbondRecord>> {
-    if staker.is_some() && released.is_none() {
+    if staker.is_some() && released_height.is_none() {
         let unbonded_list = unbond_record()
             .idx
             .staker
@@ -140,11 +138,11 @@ pub fn query_unbond_record(
         return Ok(unbonded_list);
     }
 
-    if staker.is_some() && released.is_some() {
+    if staker.is_none() && released_height.is_some() {
         let unbonded_list = unbond_record()
             .idx
-            .staker_released
-            .prefix(format!("{}-{}", staker.unwrap(), released.unwrap()))
+            .released_height
+            .prefix(released_height.unwrap().to_string())
             .range(storage, None, None, Order::Descending)
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();
@@ -152,23 +150,11 @@ pub fn query_unbond_record(
         return Ok(unbonded_list);
     }
 
-    if staker.is_none() && sender.is_some() {
+    if staker.is_some() && released_height.is_some() {
         let unbonded_list = unbond_record()
             .idx
-            .sender
-            .prefix(sender.unwrap())
-            .range(storage, None, None, Order::Descending)
-            .map(|n| n.unwrap().1)
-            .collect::<Vec<_>>();
-
-        return Ok(unbonded_list);
-    }
-
-    if staker.is_none() && released.is_some() {
-        let unbonded_list = unbond_record()
-            .idx
-            .released
-            .prefix(released.unwrap().to_string())
+            .staker_released_height
+            .prefix(format!("{}-{}", staker.unwrap(), released_height.unwrap()))
             .range(storage, None, None, Order::Descending)
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();
