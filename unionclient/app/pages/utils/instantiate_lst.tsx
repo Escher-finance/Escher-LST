@@ -29,20 +29,27 @@ export default function InstantiateLiquidStaking() {
     const msg = {
       underlying_coin_denom: "muno",
       validators: [
-        { weight: 1, address: "unionvaloper1qcyu42wvmw07rsnm9jn2k5dusdwvsu5g74kw54" }
+        { weight: 1, address: "unionvaloper14qekdkj2nmmwea4ufg9n002a3pud23y87mnkjg" },
+        { weight: 1, address: "unionvaloper13fx29mnt2ssfae5td4t9grqmdpg6dtr8pudva7" }
       ],
-      liquidstaking_denom: "funny",
-      ucs03_channel: 1,
+      liquidstaking_denom: "emuno",
       ucs03_relay_contract: "union1x2jzeup7uwfxjxxrtfna2ktcugltntgu6kvc0eeayk0d82l247cqz669ee",
       fee_rate: "0.1",
       fee_receiver: "union17z2ea0dtzkpu9lc2eh0jcwxywh40th5e0xla5q",
       reward_code_id: 171,
       unbonding_time: 60,
       salt: uuidv4(),
-      quote_token: "0xf2865969cf99a28bb77e25494fe12d5180fe0efd",
-      lst_quote_token: "0x4FDFcE13ac1f6f74a8cb06EAd9a9CE1B740E53FC",
-      cw20_address: "union1d0g6z2977xa6c5eknf78urltxx3tnvtjrq4c7fh99rpd5j4ut76qwf8r20"
+      cw20_address: "union1njygapqdpnkaz5m64rh8038p4uh3xty78ktcunzj946hc4ft7s6qeu0u3f",
+      quote_tokens: [
+        {
+          channel_id: 1,
+          quote_token: "0x55081d42b7381033ed1408608b510649bbe7464d",
+          lst_quote_token: "0x6C709Bd3D3C27438DeE76816B42144500E75053c",
+        }]
     };
+
+
+
 
 
     console.log(JSON.stringify(msg));
@@ -78,7 +85,7 @@ export default function InstantiateLiquidStaking() {
               name="liquid_staking_code_id"
               label="Liquid Staking CodeID"
               className="max-w-xs"
-              defaultValue="253"
+              defaultValue="258"
             />
           </CardBody>
           <CardFooter>

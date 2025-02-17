@@ -35,10 +35,16 @@ export default function Assets({ stateKey }: AssetsProps) {
         if (!userAddress) {
             return;
         }
-        const bal = await client?.getBalance(userAddress, network?.stakeCurrency.liquidStakingDenom);
+
+        let msg = {
+            balance: {
+                address: userAddress
+            }
+        };
+        const bal = await client?.queryContractSmart(network?.contracts.cw20, msg);
 
         if (bal) {
-            setLstakeBalance(bal.amount);
+            setLstakeBalance(bal.balance);
         }
 
     }
@@ -83,10 +89,10 @@ export default function Assets({ stateKey }: AssetsProps) {
             <CardBody className="gap-1">
                 <div className="flex flex-col">
                     <div className="p-3 text-sm">
-                        Native: {stakeBalance} {network?.stakeCurrency.coinMinimalDenom}
+                        Native: {Intl.NumberFormat('en-US').format(Number(stakeBalance))} {network?.stakeCurrency.coinMinimalDenom}
                     </div>
                     <div className="p-3 text-sm">
-                        LSToken: {lstakeBalance} {network?.stakeCurrency.liquidStakingDenomDisplay}
+                        LSToken: {Intl.NumberFormat('en-US').format(Number(lstakeBalance))} {network?.stakeCurrency.liquidStakingDenomDisplay}
                     </div>
                 </div>
             </CardBody>

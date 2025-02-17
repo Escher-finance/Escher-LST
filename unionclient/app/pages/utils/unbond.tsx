@@ -61,22 +61,18 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
           amount
         },
       };
-      const funds = [
-        {
-          denom: network?.stakeCurrency.liquidStakingDenom,
-          amount
-        }
-      ];
+      const executeTransferCW20 = getExecuteContractMessage(userAddress, network?.contracts.cw20, transferCW20TokenMsg, []);
       const unbondingMsg = {
         unbond: {
           staker: userAddress,
+          amount
         }
       };
       console.log(JSON.stringify(unbondingMsg));
-      const executeUnbondingMsg = getExecuteContractMessage(userAddress, network?.contracts.lst, unbondingMsg, funds);
+      const executeUnbondingMsg = getExecuteContractMessage(userAddress, network?.contracts.lst, unbondingMsg, []);
 
 
-      let msgs = [executeUnbondingMsg];
+      let msgs = [executeTransferCW20, executeUnbondingMsg];
       const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "");
       alert(res?.transactionHash);
       console.log(res?.transactionHash);

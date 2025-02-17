@@ -31,6 +31,7 @@ export default function UnbondingRecords() {
                 msg
             );
 
+            console.log("unreleased", JSON.stringify(records));
             setUnreleasedUnbondingRecords(records);
 
 
@@ -45,6 +46,8 @@ export default function UnbondingRecords() {
                 network?.contracts.lst,
                 releasedMsg
             );
+
+            console.log("released", JSON.stringify(releasedRecords));
 
             setReleasedUnbondingRecords(releasedRecords);
         }
@@ -64,7 +67,6 @@ export default function UnbondingRecords() {
                                 <tr>
                                     <th>Unbond Amount</th>
                                     <th>Received Amount</th>
-                                    <th>Rate</th>
                                     <th>Started</th>
                                     <th>Complete Estimation</th>
                                 </tr>
@@ -74,19 +76,16 @@ export default function UnbondingRecords() {
                                     return (
                                         <><tr key={"unreleased" + idx}>
                                             <td>
-                                                {record.amount.amount} limuno
+                                                {record.amount} {network?.stakeCurrency.liquidStakingDenomDisplay}
                                             </td>
                                             <td>
-                                                {record.undelegate_amount.amount} muno
-                                            </td>
-                                            <td>
-                                                {parseFloat(record.exchange_rate).toFixed(2)}
+                                                {record.undelegate_amount} muno
                                             </td>
                                             <td>
                                                 {new Date(Number(record.created / 1000000)).toLocaleString()}
                                             </td>
                                             <td>
-                                                {new Date(Number(record.completion / 1000000) + 120000).toLocaleString()}
+                                                {new Date(Number(record.created / 1000000) + 180000).toLocaleString()}
                                             </td>
                                         </tr></>
                                     )
@@ -103,7 +102,6 @@ export default function UnbondingRecords() {
                                 <tr>
                                     <th>Unbond Amount</th>
                                     <th>Received Amount</th>
-                                    <th>Rate</th>
                                     <th>Started</th>
                                     <th>Released</th>
                                 </tr>
@@ -113,19 +111,16 @@ export default function UnbondingRecords() {
                                     return (
                                         <><tr key={idx}>
                                             <td>
-                                                {record.amount.amount} limuno
+                                                {record.amount} {network?.stakeCurrency.liquidStakingDenomDisplay}
                                             </td>
                                             <td>
-                                                {record.undelegate_amount.amount} muno
-                                            </td>
-                                            <td>
-                                                {parseFloat(record.exchange_rate).toFixed(2)}
+                                                {record.undelegate_amount} muno
                                             </td>
                                             <td>
                                                 {new Date(Number(record.created / 1000000)).toLocaleString()}
                                             </td>
                                             <td>
-                                                {new Date(Number(record.completion / 1000000) + 120000).toLocaleString()}
+                                                {new Date(Number(record.created / 1000000) + 180000).toLocaleString()}
                                             </td>
                                         </tr></>
                                     )

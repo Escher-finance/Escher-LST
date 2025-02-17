@@ -111,12 +111,6 @@ export default function Liquidity({ stateKey }: AssetsProps) {
                                 <div>
                                     {(new Date(Number(liquidity?.time / 1000000)).toString())}
                                 </div>
-                                <div>
-                                    Chain:
-                                </div>
-                                <div>
-                                    {state?.chain}
-                                </div>
                             </>
                         }
                     </div>

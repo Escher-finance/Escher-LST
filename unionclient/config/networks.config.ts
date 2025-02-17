@@ -46,8 +46,8 @@ const currency: Record<SupportedNetworks, Currency> = {
     coinDenom: "UNO",
     coinMinimalDenom: "muno",
     coinDecimals: 6,
-    liquidStakingDenom: "factory/union1vnglhewf3w66cquy6hr7urjv3589srheampz42/limuno",
-    liquidStakingDenomDisplay: "limuno"
+    liquidStakingDenom: "emuno",
+    liquidStakingDenomDisplay: "eMUNO"
   },
 };
 
@@ -73,9 +73,9 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     currencies: [currency["uniontestnet"]],
     feeCurrencies: [currency["uniontestnet"]],
     contracts: {
-      lst: "union133syr5c6czxmfg4qvd4je5rgs5cvparuems6hknw3unk0934tgdq4529n8",
-      cw20: "",
-      reward: "union1uey97a7mhdxf75cxxp7tfale38sdrq8vjf03qg5al80tfqwm6e0qfdfqyf",
+      lst: "union1mdsv9vd9f0gjte83vauwjqsahxg4gte2mdkcxxex68p97h8a4txqq0k5ct",
+      cw20: "union1njygapqdpnkaz5m64rh8038p4uh3xty78ktcunzj946hc4ft7s6qeu0u3f",
+      reward: "union14nt98pl3edsgd4lu56m3yndervtp9z3qvyp0wmqkx6tmmse5ufnsrct8pc",
     },
     gasPrice: "0.0025muno",
     connectionID: "connection-26",
@@ -90,5 +90,3 @@ export const BaseNetworks: Record<SupportedNetworks, ChainConfig> = {
 
 export default Networks;
 
-//factory/union1vnglhewf3w66cquy6hr7urjv3589srheampz42/limuno
-// 108

@@ -31,17 +31,21 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
 
     }
 
+
     const getBalance = async () => {
-        const msg: any = {
+        if (!userAddress) {
+            return;
+        }
+
+        let msg = {
             balance: {
                 address: receiver
             }
         };
-
-        const bal = await client?.getBalance(receiver, network?.stakeCurrency.liquidStakingDenom);
+        const bal = await client?.queryContractSmart(network?.contracts.cw20, msg);
 
         if (bal) {
-            setLstakeBalance(bal.amount);
+            setLstakeBalance(bal.balance);
         }
 
     }
@@ -85,10 +89,10 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
             <CardBody className="gap-1">
                 <div className="flex flex-col">
                     <div className="p-3 text-sm">
-                        Native: {stakeBalance} muno
+                        Native: {Intl.NumberFormat('en-US').format(Number(stakeBalance))} muno
                     </div>
                     <div className="p-3 text-sm">
-                        LSToken: {lstakeBalance} limuno
+                        LSToken: {lstakeBalance} {network?.stakeCurrency.liquidStakingDenomDisplay}
                     </div>
                 </div>
             </CardBody>

@@ -23,12 +23,9 @@ export default function InstantiateCW20() {
     const formData = new FormData(form);
     const msg = {
       decimals: 6,
-      name: "funny",
-      symbol: "FUNNY",
-      initial_balances: [{
-        address: userAddress,
-        amount: "1000000000"
-      }],
+      name: "emuno",
+      symbol: "eUNO",
+      initial_balances: [],
       mint: {
         minter: userAddress
       }
