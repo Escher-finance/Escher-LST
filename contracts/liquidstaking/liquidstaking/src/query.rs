@@ -124,9 +124,9 @@ pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
 pub fn query_unbond_record(
     storage: &dyn Storage,
     staker: Option<String>,
-    released_height: Option<u64>,
+    released: Option<u64>,
 ) -> StdResult<Vec<UnbondRecord>> {
-    if staker.is_some() && released_height.is_none() {
+    if staker.is_some() && released.is_none() {
         let unbonded_list = unbond_record()
             .idx
             .staker
@@ -138,11 +138,11 @@ pub fn query_unbond_record(
         return Ok(unbonded_list);
     }
 
-    if staker.is_none() && released_height.is_some() {
+    if staker.is_none() && released.is_some() {
         let unbonded_list = unbond_record()
             .idx
-            .released_height
-            .prefix(released_height.unwrap().to_string())
+            .released
+            .prefix(released.unwrap().to_string())
             .range(storage, None, None, Order::Descending)
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();
@@ -150,11 +150,11 @@ pub fn query_unbond_record(
         return Ok(unbonded_list);
     }
 
-    if staker.is_some() && released_height.is_some() {
+    if staker.is_some() && released.is_some() {
         let unbonded_list = unbond_record()
             .idx
-            .staker_released_height
-            .prefix(format!("{}-{}", staker.unwrap(), released_height.unwrap()))
+            .staker_released
+            .prefix(format!("{}-{}", staker.unwrap(), released.unwrap()))
             .range(storage, None, None, Order::Descending)
             .map(|n| n.unwrap().1)
             .collect::<Vec<_>>();

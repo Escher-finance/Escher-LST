@@ -648,7 +648,6 @@ pub fn set_parameters(
     info: MessageInfo,
     underlying_coin_denom: Option<String>,
     liquidstaking_denom: Option<String>,
-    ucs03_channel: Option<u32>,
     ucs03_relay_contract: Option<String>,
     unbonding_time: Option<u64>,
     cw20_address: Option<Addr>,
@@ -666,9 +665,6 @@ pub fn set_parameters(
     params.liquidstaking_denom = liquidstaking_denom
         .clone()
         .unwrap_or_else(|| params.liquidstaking_denom);
-    params.ucs03_channel = ucs03_channel
-        .clone()
-        .unwrap_or_else(|| params.ucs03_channel);
     params.ucs03_relay_contract = ucs03_relay_contract
         .clone()
         .unwrap_or_else(|| params.ucs03_relay_contract);
@@ -728,10 +724,6 @@ pub fn set_parameters(
             underlying_coin_denom.unwrap_or_else(|| "".to_string()),
         )
         .add_attribute(
-            "ucs03_channel",
-            ucs03_channel.unwrap_or_else(|| 0).to_string(),
-        )
-        .add_attribute(
             "ucs03_relay_contract",
             ucs03_relay_contract.unwrap_or_else(|| "".to_string()),
         )
@@ -769,7 +761,7 @@ pub fn process_unbonding(
 
     // if exists, send to staker (it can be on same chain or other chain like evm/bera)
     let msg: CosmosMsg<TokenFactoryMsg> = {
-        if unbond_rec.staker != unbond_rec.sender {
+        if unbond_rec.staker != unbond_rec.sender && unbond_rec.channel_id.is_some() {
             let funds = vec![Coin {
                 denom: params.underlying_coin_denom.clone(),
                 amount: unbond_rec.undelegate_amount.clone(),
@@ -780,7 +772,7 @@ pub fn process_unbonding(
             let wasm_msg = utils::protocol::ucs03_transfer(
                 env.clone(),
                 params.ucs03_relay_contract.as_str().into(),
-                params.ucs03_channel,
+                unbond_rec.channel_id.unwrap(),
                 Bytes::from_str(unbond_rec.staker.as_str()).unwrap(),
                 params.underlying_coin_denom.clone(),
                 unbond_rec.undelegate_amount,

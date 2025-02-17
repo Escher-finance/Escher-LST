@@ -49,7 +49,6 @@ pub struct ValidatorsRegistry {
 pub struct Parameters {
     pub underlying_coin_denom: String,
     pub liquidstaking_denom: String,
-    pub ucs03_channel: u32,
     pub ucs03_relay_contract: String,
     pub unbonding_time: u64,
     // liquid_staking denom/cw20 contract address
@@ -93,21 +92,18 @@ pub struct UnbondRecord {
     pub undelegate_amount: Uint128,
     pub created: Timestamp,
     pub released_height: u64,
+    pub released: bool,
 }
-
 pub struct UnbondRecordIndexes<'a> {
     pub staker: MultiIndex<'a, String, UnbondRecord, u64>,
-    pub released_height: MultiIndex<'a, String, UnbondRecord, u64>,
-    pub staker_released_height: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub released: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub staker_released: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
-        let v: Vec<&dyn Index<UnbondRecord>> = vec![
-            &self.staker,
-            &self.released_height,
-            &self.staker_released_height,
-        ];
+        let v: Vec<&dyn Index<UnbondRecord>> =
+            vec![&self.staker, &self.released, &self.staker_released];
         Box::new(v.into_iter())
     }
 }
@@ -121,15 +117,15 @@ pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<
             UNBOND_RECORD_NAMESPACE,
             "unbond_record__staker",
         ),
-        released_height: MultiIndex::new(
-            |_pk, d: &UnbondRecord| d.released_height.to_string(),
+        released: MultiIndex::new(
+            |_pk, d: &UnbondRecord| d.released.to_string(),
             UNBOND_RECORD_NAMESPACE,
-            "unbond_record__released_height",
+            "unbond_record__released",
         ),
-        staker_released_height: MultiIndex::new(
-            |_pk, d: &UnbondRecord| format!("{}-{}", d.staker, d.released_height),
+        staker_released: MultiIndex::new(
+            |_pk, d: &UnbondRecord| format!("{}-{}", d.staker, d.released),
             UNBOND_RECORD_NAMESPACE,
-            "unbond_record__staker_released_height",
+            "unbond_record__staker_released",
         ),
     };
     IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)

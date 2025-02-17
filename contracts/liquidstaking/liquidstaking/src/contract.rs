@@ -67,7 +67,6 @@ pub fn instantiate(
     let params = Parameters {
         underlying_coin_denom: msg.underlying_coin_denom,
         liquidstaking_denom: msg.liquidstaking_denom,
-        ucs03_channel: msg.ucs03_channel,
         ucs03_relay_contract: msg.ucs03_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
@@ -132,7 +131,6 @@ pub fn execute(
         ExecuteMsg::SetParameters {
             underlying_coin_denom,
             liquidstaking_denom,
-            ucs03_channel,
             ucs03_relay_contract,
             unbonding_time,
             cw20_address,
@@ -145,7 +143,6 @@ pub fn execute(
             info,
             underlying_coin_denom,
             liquidstaking_denom,
-            ucs03_channel,
             ucs03_relay_contract,
             unbonding_time,
             cw20_address,

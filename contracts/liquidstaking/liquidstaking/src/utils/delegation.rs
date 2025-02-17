@@ -551,7 +551,7 @@ pub fn process_bond(
         // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg<TokenFactoryMsg> = token::get_staked_token_submsg(
             delegator.to_string(),
-            staker.to_string(),
+            delegator.to_string(),
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,
@@ -648,6 +648,7 @@ pub fn process_unbond(
         undelegate_amount: undelegate_amount,
         created: env.block.time,
         released_height: 0,
+        released: false,
     };
     unbond_record().save(storage, id, &history)?;
 
