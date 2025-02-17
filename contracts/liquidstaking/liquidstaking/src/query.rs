@@ -25,10 +25,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         )?),
         QueryMsg::Balance {} => to_json_binary(&(query_balance(deps.storage)?)),
         QueryMsg::Log {} => to_json_binary(&(query_log(deps.storage)?)),
-        QueryMsg::UnbondRecord {
-            staker,
-            released_height,
-        } => to_json_binary(&(query_unbond_record(deps.storage, staker, released_height)?)),
+        QueryMsg::UnbondRecord { staker, released } => {
+            to_json_binary(&(query_unbond_record(deps.storage, staker, released)?))
+        }
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
     }
@@ -124,7 +123,7 @@ pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
 pub fn query_unbond_record(
     storage: &dyn Storage,
     staker: Option<String>,
-    released: Option<u64>,
+    released: Option<bool>,
 ) -> StdResult<Vec<UnbondRecord>> {
     if staker.is_some() && released.is_none() {
         let unbonded_list = unbond_record()

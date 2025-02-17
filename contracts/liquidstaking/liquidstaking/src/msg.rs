@@ -162,7 +162,7 @@ pub enum QueryMsg {
     #[returns(Vec<UnbondRecord>)]
     UnbondRecord {
         staker: Option<String>,
-        released_height: Option<u64>,
+        released: Option<bool>,
     },
     #[returns(ContractVersion)]
     Version {},
