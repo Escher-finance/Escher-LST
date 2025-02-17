@@ -8,7 +8,7 @@ const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
 
 /// return how much staking token from underlying native coin denom
 pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
-    (Decimal::from_ratio(stake_amount, Uint128::one()) / exchange_rate).to_uint_ceil()
+    (Decimal::from_ratio(stake_amount, Uint128::one()) / exchange_rate).to_uint_floor()
 }
 
 /// return how much underlying native coin denom from staking token base on exchange rate

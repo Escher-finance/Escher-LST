@@ -174,10 +174,10 @@ pub fn zkgm_unbond(
         unbond_data.exchange_rate,
     );
 
-    LOG.save(
-        deps.storage,
-        &format!("{}: {:?}", env.block.time, unbond_event),
-    )?;
+    // LOG.save(
+    //     deps.storage,
+    //     &format!("{}: {:?}", env.block.time, unbond_event),
+    // )?;
 
     let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_event(unbond_event);
 
@@ -303,10 +303,10 @@ pub fn unbond(
         unbond_data.exchange_rate,
     );
 
-    LOG.save(
-        deps.storage,
-        &format!("{}: {:?}", env.block.time, unbond_event),
-    )?;
+    // LOG.save(
+    //     deps.storage,
+    //     &format!("{}: {:?}", env.block.time, unbond_event),
+    //)?;
 
     let attrs = get_unbond_attrs(
         sender,
@@ -804,6 +804,7 @@ pub fn process_unbonding(
 
     // set unbonding record to be released
     unbond_rec.released_height = env.block.height;
+    unbond_rec.released = true;
     unbond_record().save(deps.storage, unbond_rec.id, &unbond_rec)?;
 
     let res: Response<TokenFactoryMsg> = Response::new()

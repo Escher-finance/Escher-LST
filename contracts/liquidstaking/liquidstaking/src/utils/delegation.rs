@@ -8,8 +8,8 @@ use crate::ContractError;
 use crate::{
     msg::{BondData, DelegationDiff, MintTokensPayload, UnbondData},
     state::{
-        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, PARAMETERS, STATE,
-        VALIDATORS_REGISTRY,
+        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, LOG, PARAMETERS,
+        STATE, VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::{
@@ -632,8 +632,15 @@ pub fn process_unbond(
         coin_denom.clone(),
         validators_reg.validators,
     );
-    msgs.extend(undelegate_msgs);
+    msgs.extend(undelegate_msgs.clone());
 
+    LOG.save(
+        storage,
+        &format!(
+            "undelegate_amount: {}, {:?}",
+            undelegate_amount, undelegate_msgs
+        ),
+    )?;
     let burn_msg = token::burn_token(unbond_amount, params.cw20_address.to_string());
     msgs.push(burn_msg.into());
 
@@ -669,4 +676,25 @@ pub fn process_unbond(
             total_supply: state.total_supply,
         },
     ))
+}
+
+#[test]
+fn test_get_undelegate_messages() {
+    let undelegate_amount = Uint128::from(999995u32);
+    let coin_denom = "muno".to_string();
+
+    let validators = vec![
+        Validator {
+            address: "abc".to_string(),
+            weight: 1,
+        },
+        Validator {
+            address: "bcd".to_string(),
+            weight: 1,
+        },
+    ];
+    let undelegate_msgs =
+        get_undelegate_from_validator_msgs(undelegate_amount, coin_denom.clone(), validators);
+    println!("undelegate amount: {}", 999995);
+    println!("undelegate_msgs: {:?}", undelegate_msgs);
 }

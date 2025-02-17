@@ -2,7 +2,7 @@ use crate::instantiate::create_reward;
 use crate::token_factory_api::TokenFactoryMsg;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
+    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Order, Response, Uint128,
 };
 use cw2::set_contract_version;
 
@@ -10,8 +10,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS,
-    QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    unbond_record, Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG,
+    PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -202,6 +202,21 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
             expected: format!("> {prev_version}"),
             actual: CONTRACT_VERSION.to_string(),
         });
+    }
+
+    let mut unbonded_list = unbond_record()
+        .idx
+        .released
+        .prefix("false".to_string())
+        .range(deps.storage, None, None, Order::Descending)
+        .map(|n| n.unwrap().1)
+        .collect::<Vec<_>>();
+
+    for unbonded in unbonded_list.iter_mut() {
+        if unbonded.released_height > 0 {
+            unbonded.released = true;
+            unbond_record().save(deps.storage, unbonded.id, &unbonded)?;
+        }
     }
 
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
