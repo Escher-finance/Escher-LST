@@ -1,0 +1,7 @@
+/Users/ohadbachner/Documents/cw-liquid-staking/test/calc_test_project/target/debug/deps/libsubtle-8c7498c7a6c43070.rmeta: /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/subtle-2.6.1/src/lib.rs
+
+/Users/ohadbachner/Documents/cw-liquid-staking/test/calc_test_project/target/debug/deps/libsubtle-8c7498c7a6c43070.rlib: /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/subtle-2.6.1/src/lib.rs
+
+/Users/ohadbachner/Documents/cw-liquid-staking/test/calc_test_project/target/debug/deps/subtle-8c7498c7a6c43070.d: /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/subtle-2.6.1/src/lib.rs
+
+/Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/subtle-2.6.1/src/lib.rs:

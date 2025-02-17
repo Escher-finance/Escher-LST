@@ -1,0 +1,10 @@
+/Users/ohadbachner/Documents/cw-liquid-staking/contracts/liquidstaking/liquidstaking/target/debug/deps/libppv_lite86-0b81d14bd2817114.rmeta: /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/lib.rs /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/soft.rs /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/types.rs /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/generic.rs
+
+/Users/ohadbachner/Documents/cw-liquid-staking/contracts/liquidstaking/liquidstaking/target/debug/deps/libppv_lite86-0b81d14bd2817114.rlib: /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/lib.rs /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/soft.rs /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/types.rs /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/generic.rs
+
+/Users/ohadbachner/Documents/cw-liquid-staking/contracts/liquidstaking/liquidstaking/target/debug/deps/ppv_lite86-0b81d14bd2817114.d: /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/lib.rs /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/soft.rs /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/types.rs /Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/generic.rs
+
+/Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/lib.rs:
+/Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/soft.rs:
+/Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/types.rs:
+/Users/ohadbachner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ppv-lite86-0.2.20/src/generic.rs:
