@@ -47,8 +47,8 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
     let mut msgs: Vec<CosmosMsg> = vec![];
 
-    let quote_token = QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
     if payload.staker != payload.sender && payload.channel_id.is_some() {
+        let quote_token = QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
         let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
             env,
             params.ucs03_relay_contract,
