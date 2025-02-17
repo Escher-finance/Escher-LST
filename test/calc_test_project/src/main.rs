@@ -1,144 +1,206 @@
-use cosmwasm_std::{Decimal, StdResult, Uint128, Uint256};
-use std::str::FromStr;
+use cosmwasm_std::{Decimal, Uint128};
+use std::fmt;
 
-// ----------------------------------------
-// Your calculation functions
-// ----------------------------------------
-const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
+/// In this example:
+/// - We assume a "base APR" of 10% per year.
+/// - Of that 10%, the validator charges a 5% commission on *the rewards*, not on the entire stake.
+///   So effectively, the user sees ~9.5% net if the entire year passes.
+/// - We'll store a "time factor" to simulate partial-year or multi-year progression.
 
-/// Returns how many *staking tokens* correspond to a given `stake_amount`
-/// of the underlying token, given an `exchange_rate`.
-pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
-    // Let's add some print statements to see what's happening:
-    println!(
-        "[calculate_staking_token_from_rate] stake_amount = {}, exchange_rate = {}",
-        stake_amount, exchange_rate
-    );
-
-    // Convert stake_amount to a Decimal, then divide by exchange_rate, then floor.
-    let stake_decimal = Decimal::from_ratio(stake_amount, Uint128::one());
-    println!("[calculate_staking_token_from_rate] stake_decimal = {}", stake_decimal);
-
-    let result = (stake_decimal / exchange_rate).to_uint_floor();
-    println!("[calculate_staking_token_from_rate] result (floored) = {}", result);
-
-    result
+/// State tracks:
+/// - total_bond_amount: total underlying tokens staked
+/// - total_supply: total minted staking tokens
+/// - exchange_rate: ratio = total_bond_amount / total_supply
+/// - annual_apr: e.g., Decimal("0.10") for 10%
+/// - validator_commission: e.g., Decimal("0.05") for 5%
+#[derive(Clone)]
+pub struct State {
+    pub total_bond_amount: Uint128,
+    pub total_supply: Uint128,
+    pub exchange_rate: Decimal,
+    pub annual_apr: Decimal,
+    pub validator_commission: Decimal,
 }
 
-/// Returns how many *underlying native tokens* correspond to a given `staking_token`
-/// amount, based on the current `exchange_rate`.
-pub fn calculate_native_token_from_staking_token(
-    staking_token: Uint128,
-    exchange_rate: Decimal,
-) -> Uint128 {
-    println!(
-        "[calculate_native_token_from_staking_token] staking_token = {}, exchange_rate = {}",
-        staking_token, exchange_rate
-    );
-
-    // Multiply exchange_rate by a high-precision factor
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL));
-    println!("[calculate_native_token_from_staking_token] decimal_fract = {}", decimal_fract);
-
-    let scaled_rate = exchange_rate * decimal_fract;
-    println!("[calculate_native_token_from_staking_token] scaled_rate = {}", scaled_rate);
-
-    let staking_decimal = Decimal::from_ratio(staking_token, Uint128::one());
-    println!("[calculate_native_token_from_staking_token] staking_decimal = {}", staking_decimal);
-
-    let output = scaled_rate * staking_decimal;
-    println!("[calculate_native_token_from_staking_token] output (Decimal) = {}", output);
-
-    let floored = output.to_uint_floor();
-    println!("[calculate_native_token_from_staking_token] floored = {}", floored);
-
-    floored
+impl fmt::Debug for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "State {{ total_bond_amount: {}, total_supply: {}, exchange_rate: {}, annual_apr: {}, validator_commission: {} }}",
+            self.total_bond_amount, self.total_supply, self.exchange_rate,
+            self.annual_apr, self.validator_commission
+        )
+    }
 }
 
-/// Converts `Uint256` to `Uint128`, returning an error if it doesn't fit.
-pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
-    println!("[to_uint128] input Uint256 = {}", v);
-    let text = v.to_string();
-    println!("[to_uint128] as string = {}", text);
+impl State {
+    /// Create a new state with no tokens, an exchange rate of 1.0,
+    /// a default 10% APR, and a 5% validator commission
+    pub fn new() -> Self {
+        Self {
+            total_bond_amount: Uint128::zero(),
+            total_supply: Uint128::zero(),
+            exchange_rate: Decimal::one(),
+            annual_apr: Decimal::from_ratio(1u128, 10u128),  // 0.10
+            validator_commission: Decimal::from_ratio(1u128, 20u128), // 0.05
+        }
+    }
 
-    let converted = Uint128::from_str(&text)?;
-    println!("[to_uint128] converted to Uint128 = {}", converted);
+    /// Recompute the exchange_rate = total_bond_amount / total_supply,
+    /// except if total_supply == 0 or total_bond_amount == 0, then use 1.0
+    pub fn update_exchange_rate(&mut self) {
+        if self.total_bond_amount.is_zero() || self.total_supply.is_zero() {
+            self.exchange_rate = Decimal::one();
+        } else {
+            self.exchange_rate =
+                Decimal::from_ratio(self.total_bond_amount, self.total_supply);
+        }
+    }
 
-    Ok(converted)
+    /// Simulate "deposit" of some underlying tokens.
+    /// minted = floor( deposit / exchange_rate )
+    pub fn deposit(&mut self, native_amount: Uint128) -> Uint128 {
+        println!(
+            "\n[deposit] user depositing {} underlying tokens...",
+            native_amount
+        );
+        println!("[deposit] old state: {:?}", self);
+
+        let deposit_dec = Decimal::from_ratio(native_amount, Uint128::one());
+        // minted = deposit / exchange_rate
+        let minted_dec = deposit_dec / self.exchange_rate;
+        let minted = minted_dec.to_uint_floor();
+
+        // Update state
+        self.total_bond_amount += native_amount;
+        self.total_supply += minted;
+
+        self.update_exchange_rate();
+
+        println!("[deposit] minted: {}", minted);
+        println!("[deposit] new state: {:?}", self);
+
+        minted
+    }
+
+    /// Simulate "withdraw" of some staking tokens.
+    /// underlying = floor( staking_tokens * exchange_rate )
+    pub fn withdraw(&mut self, staking_amount: Uint128) -> Uint128 {
+        println!(
+            "\n[withdraw] user withdrawing {} staking tokens...",
+            staking_amount
+        );
+        println!("[withdraw] old state: {:?}", self);
+
+        let st_dec = Decimal::from_ratio(staking_amount, Uint128::one());
+        let underlying_dec = st_dec * self.exchange_rate;
+        let underlying = underlying_dec.to_uint_floor();
+
+        // Update state
+        self.total_supply = self.total_supply.saturating_sub(staking_amount);
+        self.total_bond_amount = self.total_bond_amount.saturating_sub(underlying);
+
+        self.update_exchange_rate();
+
+        println!("[withdraw] underlying redeemed: {}", underlying);
+        println!("[withdraw] new state: {:?}", self);
+
+        underlying
+    }
+
+    /// Simulate time passing, applying the annual APR for a fraction of a year.
+    /// e.g., if time_factor=1.0 => a whole year => 10% reward, minus 5% commission on that reward => net 9.5%ish
+    ///
+    /// formula: net_reward = total_bond_amount * annual_apr * time_factor
+    /// commission = net_reward * validator_commission
+    /// final_reward = net_reward - commission
+    /// total_bond_amount += final_reward
+    pub fn apply_apr(&mut self, time_factor: Decimal) {
+        println!(
+            "\n[apply_apr] time_factor={} (1.0 means 1 year)",
+            time_factor
+        );
+        println!("[apply_apr] old state: {:?}", self);
+
+        // 1) gross_reward = total_bond_amount * annual_apr * time_factor
+        let bond_amount_dec = Decimal::from_ratio(self.total_bond_amount, Uint128::one());
+        let gross_reward = bond_amount_dec * self.annual_apr * time_factor;
+
+        // 2) commission = gross_reward * validator_commission
+        let commission = gross_reward * self.validator_commission;
+
+        // 3) net_reward = gross_reward - commission
+        let net_reward = gross_reward - commission;
+
+        // Convert net_reward to integer
+        let net_reward_int = net_reward.to_uint_floor();
+
+        // 4) total_bond_amount += net_reward_int
+        self.total_bond_amount += net_reward_int;
+
+        // 5) update exchange rate
+        self.update_exchange_rate();
+
+        println!(
+            "[apply_apr] gross_reward={} commission={} net_reward={} => net_reward_int={}",
+            gross_reward, commission, net_reward, net_reward_int
+        );
+        println!("[apply_apr] new state: {:?}", self);
+    }
 }
 
-// ----------------------------------------
-// Example unit tests
-// ----------------------------------------
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::Decimal;
+    use cosmwasm_std::Uint128;
 
     #[test]
-    fn test_calculate_staking_token_from_rate() {
-        println!("--- test_calculate_staking_token_from_rate START ---");
-        // 1) exchange_rate = 1.0 => 1:1
-        let stake_amount = Uint128::from(1000u128);
-        let exchange_rate = Decimal::one();
-        let staking_tokens = calculate_staking_token_from_rate(stake_amount, exchange_rate);
-        assert_eq!(staking_tokens, Uint128::from(1000u128));
+    fn test_apr_flow() {
+        // Start a new state: 10% APR, 5% commission
+        let mut state = State::new();
+        // By default:
+        // annual_apr = 0.10
+        // validator_commission = 0.05
 
-        // 2) exchange_rate = 2.0 => 1000 natives => 500 staking tokens
-        let stake_amount = Uint128::from(1000u128);
-        let exchange_rate = Decimal::from_ratio(2u128, 1u128); // 2.0
-        let staking_tokens = calculate_staking_token_from_rate(stake_amount, exchange_rate);
-        assert_eq!(staking_tokens, Uint128::from(500u128));
+        // 1) user deposits 100 underlying
+        let minted1 = state.deposit(Uint128::new(100));
+        // => minted ~100, exchange_rate=1.0
+        assert_eq!(minted1, Uint128::new(100));
 
-        // 3) exchange_rate = 1.3333... => 1000 / 1.3333... ~ 750
-        let stake_amount = Uint128::from(1000u128);
-        let exchange_rate = Decimal::from_ratio(4u128, 3u128); // 1.3333...
-        let staking_tokens = calculate_staking_token_from_rate(stake_amount, exchange_rate);
-        assert_eq!(staking_tokens, Uint128::from(750u128));
-        println!("--- test_calculate_staking_token_from_rate END ---\n");
+        // 2) user deposits another 100
+        // => minted ~100, total_bond_amount=200
+        let minted2 = state.deposit(Uint128::new(100));
+        assert_eq!(minted2, Uint128::new(100));
+        // total_bond_amount=200, total_supply=200 => exchange_rate=1.0
+
+        // 3) simulate 1 year passing
+        // => 10% reward on 200=20, commission=1 => net=19
+        state.apply_apr(Decimal::one()); // time_factor=1.0 => 1 year
+        // total_bond_amount=219, total_supply=200 => exchange_rate=1.095
+        // (since 219 / 200 = 1.095)
+
+        // 4) user withdraws 100 staking tokens
+        // => user should get floor(100 * 1.095)=109 underlying
+        let redeemed = state.withdraw(Uint128::new(100));
+        assert_eq!(redeemed, Uint128::new(109));
+        // left in the pool: total_bond_amount=110, total_supply=100 => rate=1.1
+
+        // 5) simulate half a year passing => time_factor=0.5
+        // gross_reward=110 * 0.10 * 0.5=5.5 => commission=5.5 * 0.05=0.275 => net=5.225 => floor=5
+        state.apply_apr(Decimal::from_ratio(1u128, 2u128)); // 0.5
+        // => total_bond_amount=115 => total_supply=100 => exchange_rate=1.15
+        assert_eq!(state.total_bond_amount, Uint128::new(115));
+
+        // 6) final withdraw of 100 staking tokens => ~ 115
+        let final_redeem = state.withdraw(Uint128::new(100));
+        // => user gets 115
+        assert_eq!(final_redeem, Uint128::new(115));
+        // => total_bond_amount=0, total_supply=0 => exchange_rate=1.0
+
+        println!("\nAll done, final state: {:?}", state);
     }
+}
 
-    #[test]
-    fn test_calculate_native_token_from_staking_token() {
-        println!("--- test_calculate_native_token_from_staking_token START ---");
-        // 1) exchange_rate = 1.0 => 1000 staking => 1000 natives
-        let staking_token = Uint128::from(1000u128);
-        let exchange_rate = Decimal::one();
-        let natives = calculate_native_token_from_staking_token(staking_token, exchange_rate);
-        assert_eq!(natives, Uint128::from(1000u128));
-
-        // 2) exchange_rate = 0.5 => 1000 staking => 500 natives
-        let staking_token = Uint128::from(1000u128);
-        let exchange_rate = Decimal::from_ratio(1u128, 2u128); // 0.5
-        let natives = calculate_native_token_from_staking_token(staking_token, exchange_rate);
-        assert_eq!(natives, Uint128::from(500u128));
-
-        // 3) exchange_rate = 1.5 => 1000 staking => 1500 natives
-        let staking_token = Uint128::from(1000u128);
-        let exchange_rate = Decimal::from_ratio(3u128, 2u128); // 1.5
-        let natives = calculate_native_token_from_staking_token(staking_token, exchange_rate);
-        assert_eq!(natives, Uint128::from(1500u128));
-        println!("--- test_calculate_native_token_from_staking_token END ---\n");
-    }
-
-    #[test]
-    fn test_to_uint128() {
-        println!("--- test_to_uint128 START ---");
-        // 1) normal conversion
-        let v_256 = Uint256::from(12345u128);
-        let v_128 = to_uint128(v_256).unwrap();
-        assert_eq!(v_128, Uint128::from(12345u128));
-
-        // 2) largest possible 128-bit value
-        let max_128 = Uint256::from(u128::MAX);
-        let converted = to_uint128(max_128).unwrap();
-        assert_eq!(converted.u128(), u128::MAX);
-
-        // 3) if the number is bigger than 2^128 - 1, it should fail
-        // (Uncomment to test overflow behavior)
-        // let too_large = Uint256::from_str("340282366920938463463374607431768211456").unwrap(); // 2^128
-        // assert!(to_uint128(too_large).is_err());
-
-        println!("--- test_to_uint128 END ---\n");
-    }
+fn main() {
+    println!("Run: cargo test -- --nocapture --test-threads=1");
 }
