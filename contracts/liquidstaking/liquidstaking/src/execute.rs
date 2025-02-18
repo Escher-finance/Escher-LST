@@ -755,7 +755,8 @@ pub fn process_unbonding(
         .querier
         .query_balance(contract_address, params.underlying_coin_denom.clone())?;
 
-    if balance.amount < (unbond_rec.undelegate_amount - Uint128::one()) {
+    let transfer_amount = balance.amount;
+    if transfer_amount < (unbond_rec.undelegate_amount - Uint128::one()) {
         return Err(ContractError::NotEnoughAvailableFund {});
     }
 
@@ -764,7 +765,7 @@ pub fn process_unbonding(
         if unbond_rec.staker != unbond_rec.sender && unbond_rec.channel_id.is_some() {
             let funds = vec![Coin {
                 denom: params.underlying_coin_denom.clone(),
-                amount: unbond_rec.undelegate_amount.clone(),
+                amount: transfer_amount.clone(),
             }];
 
             // get quote token of native base denom (muno) on specific channel id
@@ -775,9 +776,9 @@ pub fn process_unbonding(
                 unbond_rec.channel_id.unwrap(),
                 Bytes::from_str(unbond_rec.staker.as_str()).unwrap(),
                 params.underlying_coin_denom.clone(),
-                unbond_rec.undelegate_amount,
+                transfer_amount,
                 Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
-                Uint256::from(unbond_rec.undelegate_amount),
+                Uint256::from(transfer_amount),
                 funds,
                 H256::from_str(salt.as_str()).unwrap(),
             )?;
@@ -788,7 +789,7 @@ pub fn process_unbonding(
                 to_address: unbond_rec.staker.clone(),
                 amount: vec![Coin {
                     denom: params.underlying_coin_denom,
-                    amount: unbond_rec.undelegate_amount.clone(),
+                    amount: transfer_amount.clone(),
                 }],
             };
             let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
@@ -798,7 +799,7 @@ pub fn process_unbonding(
 
     let ev = ProcessUnbondingEvent(
         unbond_rec.staker.to_string(),
-        unbond_rec.undelegate_amount.clone(),
+        transfer_amount.clone(),
         params.liquidstaking_denom.clone(),
     );
 
@@ -813,7 +814,7 @@ pub fn process_unbonding(
         .add_attribute("action", "transfer_unbonding")
         .add_attribute("staker", unbond_rec.staker)
         .add_attribute("unbond_amount", unbond_rec.amount)
-        .add_attribute("undelegate_amount", unbond_rec.undelegate_amount);
+        .add_attribute("undelegate_amount", transfer_amount);
 
     Ok(res)
 }
