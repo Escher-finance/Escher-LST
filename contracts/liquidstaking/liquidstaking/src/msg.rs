@@ -166,6 +166,8 @@ pub enum QueryMsg {
     },
     #[returns(ContractVersion)]
     Version {},
+    #[returns(QuoteToken)]
+    QuoteToken { channel_id: u32 },
 }
 
 pub type Fees = BTreeMap<String, Coin>;

@@ -1,8 +1,8 @@
 use crate::msg::{Log, QueryMsg, StakingLiquidity};
 use crate::state::unbond_record;
 use crate::state::{
-    Balance, Parameters, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
-    VALIDATORS_REGISTRY,
+    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG,
+    PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::delegation::{get_actual_total_delegated, get_actual_total_reward};
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
@@ -28,9 +28,17 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::UnbondRecord { staker, released } => {
             to_json_binary(&(query_unbond_record(deps.storage, staker, released)?))
         }
+        QueryMsg::QuoteToken { channel_id } => {
+            to_json_binary(&query_quote_token(deps.storage, channel_id)?)
+        }
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
     }
+}
+
+pub fn query_quote_token(storage: &dyn Storage, channel_id: u32) -> StdResult<QuoteToken> {
+    let token = QUOTE_TOKEN.load(storage, channel_id)?;
+    Ok(token)
 }
 
 pub fn query_version(storage: &dyn Storage) -> StdResult<ContractVersion> {
