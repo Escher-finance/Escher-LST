@@ -680,7 +680,7 @@ pub fn process_unbond(
 
 #[test]
 fn test_get_undelegate_messages() {
-    let undelegate_amount = Uint128::from(999995u32);
+    let undelegate_amount = Uint128::from(500642u32);
     let coin_denom = "muno".to_string();
 
     let validators = vec![

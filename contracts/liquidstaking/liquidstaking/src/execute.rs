@@ -755,7 +755,7 @@ pub fn process_unbonding(
         .querier
         .query_balance(contract_address, params.underlying_coin_denom.clone())?;
 
-    if balance.amount < unbond_rec.undelegate_amount {
+    if balance.amount < (unbond_rec.undelegate_amount - Uint128::one()) {
         return Err(ContractError::NotEnoughAvailableFund {});
     }
 
