@@ -2,14 +2,14 @@ use std::str::FromStr;
 
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
-use crate::state::{Balance, Parameters, BALANCE, LOG, PARAMETERS};
+use crate::state::{Parameters, PARAMETERS, QUOTE_TOKEN};
 use crate::utils;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
     Env, Reply, Response, Uint128, Uint256, WasmMsg,
 };
 use unionlabs_primitives::{Bytes, H256};
-pub const MINT_TOKENS_REPLY_ID: u64 = 123;
+
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 
@@ -23,105 +23,63 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     }
 
     match msg.id {
-        MINT_TOKENS_REPLY_ID => on_mint_tokens(deps, env, msg),
         MINT_CW20_TOKENS_REPLY_ID => on_mint_cw20_tokens(deps, env, msg),
         PROCESS_WITHDRAW_REWARD_REPLY_ID => on_process_rewards(deps, env, msg),
         _ => Ok(Response::new()),
     }
 }
 
-fn on_mint_cw20_tokens(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
     let params: Parameters = PARAMETERS.load(deps.storage)?;
     let payload: MintTokensPayload = from_json(msg.payload)?;
 
-    let staker_balance = deps.querier.query_balance(
-        payload.staker.to_string(),
-        params.liquidstaking_denom.clone(),
-    )?;
+    let msg = cw20::Cw20QueryMsg::Balance {
+        address: env.contract.address.to_string(),
+    };
+
+    let balance: cw20::BalanceResponse = deps
+        .querier
+        .query_wasm_smart(params.cw20_address.clone(), &msg)?;
+
+    if balance.balance < payload.amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let mut msgs: Vec<CosmosMsg> = vec![];
+
+    if payload.staker != payload.sender && payload.channel_id.is_some() {
+        let quote_token = QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
+        let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
+            env,
+            params.ucs03_relay_contract,
+            payload.channel_id.unwrap(),
+            Bytes::from_str(payload.staker.as_str()).unwrap(),
+            params.cw20_address.to_string(),
+            payload.amount.clone(),
+            Bytes::from_str(quote_token.lst_quote_token.as_str()).unwrap(),
+            Uint256::from(payload.amount.clone()),
+            vec![],
+            H256::from_str(payload.salt.as_str()).unwrap(),
+        )?;
+        msgs.push(wasm_msg.into());
+    } else {
+        let msg = send_cw20(
+            deps,
+            payload.amount,
+            params.cw20_address.to_string(),
+            payload.staker.clone(),
+        )?;
+        msgs.push(msg);
+    }
 
     let res: Response = Response::new()
+        .add_messages(msgs)
         .add_attribute("action", "mint_cw20")
         .add_attribute("receiver", payload.staker.to_string())
         .add_attribute("amount", payload.amount.to_string())
         .add_attribute("denom", params.liquidstaking_denom)
-        .add_attribute("staked_token_balance", staker_balance.amount.to_string());
-    Ok(res)
-}
-
-fn on_mint_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
-    let params: Parameters = PARAMETERS.load(deps.storage)?;
-    let lst_balance = deps.querier.query_balance(
-        env.contract.address.to_string(),
-        params.liquidstaking_denom.clone(),
-    )?;
-
-    let balance = Balance {
-        amount: lst_balance.amount,
-        last_updated: env.block.time.nanos(),
-    };
-    BALANCE.save(deps.storage, &balance)?;
-
-    let responses = msg.result.unwrap().msg_responses;
-    let mut log = format!("responses_count: {} ", responses.len());
-    for response in responses {
-        log += format!("{} ", &response.type_url).as_str();
-    }
-
-    let payload: MintTokensPayload = from_json(msg.payload)?;
-    log += format!("transfer to: {} amount: {}", payload.staker, payload.amount).as_str();
-    LOG.save(deps.storage, &log)?;
-
-    let coin = Coin {
-        amount: payload.amount,
-        denom: params.liquidstaking_denom,
-    };
-
-    // if the sender is not equal as the staker, means it is from other chain
-    if payload.sender == payload.staker {
-        return send(deps, coin, payload.staker);
-    }
-
-    // transfer to evm/bera
-    return transfer(deps, env, payload.amount, payload.staker, payload.salt);
-}
-
-/// Transfer token to other chain via ucs03 relayer
-pub fn transfer(
-    deps: DepsMut,
-    env: Env,
-    amount: Uint128,
-    receiver: String,
-    salt: String,
-) -> Result<Response, ContractError> {
-    let params = PARAMETERS.load(deps.storage)?;
-
-    let coin_amount = Coin {
-        amount,
-        denom: params.liquidstaking_denom.clone(),
-    };
-
-    let funds = vec![coin_amount.clone()];
-    let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
-        env,
-        params.ucs03_relay_contract,
-        params.ucs03_channel,
-        Bytes::from_str(receiver.as_str()).unwrap(),
-        params.liquidstaking_denom.clone(),
-        amount,
-        Bytes::from_str(params.lst_quote_token.as_str()).unwrap(),
-        Uint256::from(amount),
-        funds,
-        H256::from_str(&salt).unwrap(),
-    )?;
-
-    let msg: CosmosMsg = CosmosMsg::Wasm(wasm_msg);
-
-    let res: Response = Response::new()
-        .add_message(msg)
-        .add_attribute("action", "transfer")
-        .add_attribute("receiver", receiver.to_string())
-        .add_attribute("amount", coin_amount.amount.to_string())
-        .add_attribute("denom", coin_amount.denom);
+        .add_attribute("base_denom", params.cw20_address)
+        .add_attribute("staked_token_balance", balance.balance.to_string());
     Ok(res)
 }
 
@@ -169,4 +127,21 @@ pub fn send(_deps: DepsMut, amount: Coin, receiver: String) -> Result<Response, 
         .add_attribute("amount", amount.amount.to_string())
         .add_attribute("denom", amount.denom);
     Ok(res)
+}
+
+/// Send or transfer cw20 token on same chain
+pub fn send_cw20(
+    _deps: DepsMut,
+    amount: Uint128,
+    cw20_address: String,
+    recipient: String,
+) -> Result<CosmosMsg, ContractError> {
+    let execute_burn = cw20::Cw20ExecuteMsg::Transfer { recipient, amount };
+    let the_bin = to_json_binary(&execute_burn).unwrap();
+    let transfer_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: cw20_address,
+        msg: the_bin,
+        funds: vec![],
+    });
+    Ok(transfer_msg)
 }

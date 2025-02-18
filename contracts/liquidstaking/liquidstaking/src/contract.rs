@@ -2,7 +2,7 @@ use crate::instantiate::create_reward;
 use crate::token_factory_api::TokenFactoryMsg;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
+    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Order, Response, Uint128,
 };
 use cw2::set_contract_version;
 
@@ -10,8 +10,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, STATE,
-    VALIDATORS_REGISTRY,
+    unbond_record, Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG,
+    PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -67,24 +67,14 @@ pub fn instantiate(
     let params = Parameters {
         underlying_coin_denom: msg.underlying_coin_denom,
         liquidstaking_denom: msg.liquidstaking_denom,
-        ucs03_channel: msg.ucs03_channel,
         ucs03_relay_contract: msg.ucs03_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
         reward_address: reward_addr.clone(),
-        quote_token: msg.quote_token,
-        lst_quote_token: msg.lst_quote_token,
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
     };
     PARAMETERS.save(deps.storage, &params)?;
-
-    let chain;
-    if cfg!(nonunion) {
-        chain = "nonunion".into();
-    } else {
-        chain = "union".into();
-    }
 
     let state = State {
         exchange_rate: Decimal::one(),
@@ -93,9 +83,12 @@ pub fn instantiate(
         total_supply: Uint128::new(0),
         bond_counter: 0,
         last_bond_time: 0,
-        chain,
     };
     STATE.save(deps.storage, &state)?;
+
+    for quote_token in msg.quote_tokens {
+        QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
+    }
 
     let set_withdraw_msg: CosmosMsg<TokenFactoryMsg> =
         CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
@@ -138,13 +131,10 @@ pub fn execute(
         ExecuteMsg::SetParameters {
             underlying_coin_denom,
             liquidstaking_denom,
-            ucs03_channel,
             ucs03_relay_contract,
             unbonding_time,
             cw20_address,
             reward_address,
-            quote_token,
-            lst_quote_token,
             fee_receiver,
             fee_rate,
         } => execute::set_parameters(
@@ -153,20 +143,22 @@ pub fn execute(
             info,
             underlying_coin_denom,
             liquidstaking_denom,
-            ucs03_channel,
             ucs03_relay_contract,
             unbonding_time,
             cw20_address,
             reward_address,
-            quote_token,
-            lst_quote_token,
             fee_receiver,
             fee_rate,
         ),
+        ExecuteMsg::UpdateQuoteToken {
+            channel_id,
+            quote_token,
+        } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
         ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
         ExecuteMsg::Transfer {
             amount,
+            base_denom,
             receiver,
             ucs03_channel_id,
             ucs03_relay_contract,
@@ -177,6 +169,7 @@ pub fn execute(
             env,
             info,
             amount,
+            base_denom,
             receiver,
             ucs03_channel_id,
             ucs03_relay_contract,
@@ -209,6 +202,21 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
             expected: format!("> {prev_version}"),
             actual: CONTRACT_VERSION.to_string(),
         });
+    }
+
+    let mut unbonded_list = unbond_record()
+        .idx
+        .released
+        .prefix("false".to_string())
+        .range(deps.storage, None, None, Order::Descending)
+        .map(|n| n.unwrap().1)
+        .collect::<Vec<_>>();
+
+    for unbonded in unbonded_list.iter_mut() {
+        if unbonded.released_height > 0 {
+            unbonded.released = true;
+            unbond_record().save(deps.storage, unbonded.id, &unbonded)?;
+        }
     }
 
     cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;

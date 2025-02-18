@@ -38,8 +38,8 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
       }
     };
 
-    if (Number(amount) < 2000000) {
-      alert("Sorry, minimal bond amount is 2000000");
+    if (Number(amount) < 1000000) {
+      alert("Sorry, minimal bond amount is 1000000");
       return;
     }
 

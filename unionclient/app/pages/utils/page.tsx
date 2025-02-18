@@ -4,28 +4,89 @@ import { useState } from "react";
 import InstantiateCW20 from "./instantiate_cw20";
 import ContractUpload from "./upload";
 import InstantiateLiquidStaking from "./instantiate_lst";
-import ExecuteBond from "./execute_bond";
-import { Accordion, AccordionItem } from "@nextui-org/react";
-import QueryTotalBond from "./query_total_bond";
-import QueryConfig from "./query_config";
-import SetAdmin from "./set_admin";
-import Mint from "./mint";
-import TransferEVM from "./transfer_evm";
-import Migrate from "./migrate";
-import Unbond from "./unbond";
-import BondRewards from "./bond_rewards";
-import DecodePacket from "./decode";
-import InstantiateAuthz from "./instantiate_authz";
+import { Accordion, Button, AccordionItem } from "@nextui-org/react";
+import { useGlobalContext } from "@/app/core/context";
 import SetParams from "./set_params";
 import SetMinter from "./set_minter";
-import InstantiateReward from "./instantiate_reward";
-import SetReward from "./set_reward";
-import MoveToReward from "./move_to_reward";
-import TransferBack from "./transfer_back";
+// import ExecuteBond from "./execute_bond";
+// import QueryTotalBond from "./query_total_bond";
+// import QueryConfig from "./query_config";
+// import SetAdmin from "./set_admin";
+// import Mint from "./mint";
+// import TransferEVM from "./transfer_evm";
+// import Migrate from "./migrate";
+// import Unbond from "./unbond";
+// import BondRewards from "./bond_rewards";
+// import DecodePacket from "./decode";
+// import InstantiateAuthz from "./instantiate_authz";
+// import SetParams from "./set_params";
+// import SetMinter from "./set_minter";
+// import InstantiateReward from "./instantiate_reward";
+// import SetReward from "./set_reward";
+// import MoveToReward from "./move_to_reward";
+// import TransferBack from "./transfer_back";
 
 export default function Utils() {
-
+  const { userAddress, client, network } = useGlobalContext();
   const [stateKey, setStateKey] = useState(1);
+
+  const reset = async () => {
+    const msg = {
+      reset: {}
+    };
+
+    console.log(JSON.stringify(msg));
+    try {
+      if (!userAddress) {
+        alert("no user");
+        return;
+      }
+      const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto");
+      alert(res?.transactionHash);
+
+    } catch (err) {
+      console.log(err);
+    }
+  }
+
+  const transferReward = async () => {
+    const msg = {
+      transfer_reward: {}
+    };
+
+    console.log(JSON.stringify(msg));
+    try {
+      if (!userAddress) {
+        alert("no user");
+        return;
+      }
+      const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto");
+      alert(res?.transactionHash);
+
+    } catch (err) {
+      console.log(err);
+    }
+  }
+
+  const transferToOwner = async () => {
+    const msg = {
+      transfer_to_owner: {}
+    };
+
+    console.log(JSON.stringify(msg));
+    try {
+      if (!userAddress) {
+        alert("no user");
+        return;
+      }
+      const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto");
+      alert(res?.transactionHash);
+
+    } catch (err) {
+      console.log(err);
+    }
+  }
+
 
 
   return (
@@ -33,7 +94,13 @@ export default function Utils() {
       <div className="w-full">
         <h1>Utilities</h1>
       </div>
-      <div className="w-full flex flex-row gap-4">
+      <div className="w-full flex flex-col gap-4">
+
+        <div className="w-full flex flex-row gap-4">
+          <Button color="primary" onPress={reset}>RESET</Button>
+          <Button color="primary" onPress={transferReward}>Transfer Reward</Button>
+          <Button color="primary" onPress={transferToOwner}>Transfer to Owner</Button>
+        </div>
         <div className="w-full flex flex-col">
           <Accordion variant="splitted">
             <AccordionItem
@@ -50,6 +117,14 @@ export default function Utils() {
               title="Instantiate CW20"
             >
               <InstantiateCW20 />
+            </AccordionItem>
+
+            <AccordionItem
+              key="4"
+              aria-label="Set Minter"
+              title="Set Minter"
+            >
+              <SetMinter />
             </AccordionItem>
             {/* 
             <AccordionItem
@@ -137,13 +212,6 @@ export default function Utils() {
               <InstantiateAuthz />
             </AccordionItem>
 
-            <AccordionItem
-              key="16"
-              aria-label="Set Parameters"
-              title="Set Parameters"
-            >
-              <SetParams />
-            </AccordionItem>
             <AccordionItem
               key="17"
               aria-label="Set Minter"

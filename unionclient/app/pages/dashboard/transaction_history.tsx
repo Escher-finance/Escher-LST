@@ -79,7 +79,7 @@ export default function TransactionHistory() {
             <Divider />
             <CardBody className="gap-4">
                 {records && records.map((r: any) => {
-                    return <div>{r.type.toUpperCase()} {r.amount} {r.type == "bond" ? "muno" : "limuno"} at height: {r.height} <a href={`${union_tx_url}${r.hash}`} target="_blank"> [Explorer]</a></div>
+                    return <div>{r.type.toUpperCase()} {r.amount} {r.type == "bond" ? "muno" : "emuno"} at height: {r.height} <a href={`${union_tx_url}${r.hash}`} target="_blank"> [Explorer]</a></div>
                 })
                 }
             </CardBody>

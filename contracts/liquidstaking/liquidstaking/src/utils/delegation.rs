@@ -6,16 +6,15 @@ use crate::utils::delegation;
 use crate::utils::token;
 use crate::ContractError;
 use crate::{
-    msg::UndelegationRecord,
     msg::{BondData, DelegationDiff, MintTokensPayload, UnbondData},
     state::{
-        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, PARAMETERS, STATE,
-        VALIDATORS_REGISTRY,
+        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, LOG, PARAMETERS,
+        STATE, VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::{
     to_json_binary, Addr, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
-    QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Timestamp, Uint128, Uint256,
+    QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
 };
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -118,9 +117,8 @@ pub fn get_undelegate_from_validator_msgs(
     undelegate_amount: Uint128,
     coin_denom: String,
     validators: Vec<Validator>,
-) -> (Vec<CosmosMsg<TokenFactoryMsg>>, Vec<UndelegationRecord>) {
+) -> Vec<CosmosMsg<TokenFactoryMsg>> {
     let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
-    let mut undelegations: Vec<UndelegationRecord> = vec![];
 
     let total_weight = Uint128::from(
         validators
@@ -156,14 +154,9 @@ pub fn get_undelegate_from_validator_msgs(
                 amount,
             });
         msgs.push(undelegate_staking_msg);
-
-        undelegations.push(UndelegationRecord {
-            amount: undelegate_amount_for_validator,
-            validator,
-        })
     }
 
-    (msgs, undelegations)
+    msgs
 }
 
 pub fn get_validator_delegation_map_with_total_bond(
@@ -479,6 +472,7 @@ pub fn process_bond(
     params: Parameters,
     validators_reg: ValidatorsRegistry,
     salt: String,
+    channel_id: Option<u32>,
 ) -> Result<
     (
         Vec<CosmosMsg<TokenFactoryMsg>>,
@@ -549,6 +543,7 @@ pub fn process_bond(
         staker: staker.clone(),
         amount: mint_amount,
         salt,
+        channel_id,
     };
     let payload_bin = to_json_binary(&payload)?;
 
@@ -556,7 +551,7 @@ pub fn process_bond(
         // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg<TokenFactoryMsg> = token::get_staked_token_submsg(
             delegator.to_string(),
-            staker.to_string(),
+            delegator.to_string(),
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,
@@ -589,9 +584,9 @@ pub fn process_unbond(
     unbond_amount: Uint128,
     params: Parameters,
     validators_reg: ValidatorsRegistry,
+    channel_id: Option<u32>,
 ) -> Result<(Vec<CosmosMsg<TokenFactoryMsg>>, UnbondData), ContractError> {
     let coin_denom = params.underlying_coin_denom;
-    let liquidstaking_denom = params.liquidstaking_denom;
 
     let validators_list: Vec<String> = validators_reg
         .validators
@@ -632,43 +627,35 @@ pub fn process_unbond(
     if delegated_amount < undelegate_amount {
         return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker and if process rewards not happen yet
     }
-    let (undelegate_msgs, undelegations) = get_undelegate_from_validator_msgs(
+    let undelegate_msgs = get_undelegate_from_validator_msgs(
         undelegate_amount,
         coin_denom.clone(),
         validators_reg.validators,
     );
-    msgs.extend(undelegate_msgs);
+    msgs.extend(undelegate_msgs.clone());
 
-    // TODO: update to use cw20 token minter burn
-    // let burn_msg = token::burn_token(
-    //     delegator.to_string(),
-    //     unbond_amount,
-    //     liquidstaking_denom.clone(),
-    //     params.cw20_address,
-    // );
-    // msgs.push(burn_msg.into());
+    LOG.save(
+        storage,
+        &format!(
+            "undelegate_amount: {}, {:?}",
+            undelegate_amount, undelegate_msgs
+        ),
+    )?;
+    let burn_msg = token::burn_token(unbond_amount, params.cw20_address.to_string());
+    msgs.push(burn_msg.into());
 
-    let unbond_coin = Coin {
-        amount: unbond_amount.clone(),
-        denom: liquidstaking_denom.clone(),
-    };
     let id: u64 = increment_tokens(storage).unwrap();
     let history = UnbondRecord {
         id,
         height: env.block.height,
+        channel_id,
         sender: sender.clone(),
         staker: staker.clone(),
-        amount: unbond_coin,
-        exchange_rate: current_exchange_rate,
-        undelegate_amount: Coin {
-            denom: coin_denom.clone(),
-            amount: undelegate_amount,
-        },
-        undelegations,
+        amount: unbond_amount,
+        undelegate_amount: undelegate_amount,
         created: env.block.time,
-        completion: env.block.time.plus_seconds(params.unbonding_time),
+        released_height: 0,
         released: false,
-        released_time: Timestamp::from_nanos(000_000_000),
     };
     unbond_record().save(storage, id, &history)?;
 
@@ -689,4 +676,25 @@ pub fn process_unbond(
             total_supply: state.total_supply,
         },
     ))
+}
+
+#[test]
+fn test_get_undelegate_messages() {
+    let undelegate_amount = Uint128::from(500642u32);
+    let coin_denom = "muno".to_string();
+
+    let validators = vec![
+        Validator {
+            address: "abc".to_string(),
+            weight: 1,
+        },
+        Validator {
+            address: "bcd".to_string(),
+            weight: 1,
+        },
+    ];
+    let undelegate_msgs =
+        get_undelegate_from_validator_msgs(undelegate_amount, coin_denom.clone(), validators);
+    println!("undelegate amount: {}", 999995);
+    println!("undelegate_msgs: {:?}", undelegate_msgs);
 }

@@ -1,14 +1,16 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Coin, Decimal, StdResult, Storage, Timestamp, Uint128};
+use cosmwasm_std::{Addr, Decimal, StdResult, Storage, Timestamp, Uint128};
+use cw_storage_plus::Map;
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
-
-use crate::msg::UndelegationRecord;
 
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
 pub const BALANCE: Item<Balance> = Item::new("balance");
 pub const LOG: Item<String> = Item::new("log");
+
+// Map of channel id to the quote token and lst quote token of destination chain
+pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 
 #[cw_serde]
 pub struct Balance {
@@ -29,8 +31,6 @@ pub struct State {
     pub bond_counter: u64,
     // last_bond_time
     pub last_bond_time: u64,
-    // is union chain
-    pub chain: String,
 }
 
 #[cw_serde]
@@ -49,17 +49,12 @@ pub struct ValidatorsRegistry {
 pub struct Parameters {
     pub underlying_coin_denom: String,
     pub liquidstaking_denom: String,
-    pub ucs03_channel: u32,
     pub ucs03_relay_contract: String,
     pub unbonding_time: u64,
-    // cw20 contract address
-    pub cw20_address: Option<Addr>,
+    // liquid_staking denom/cw20 contract address
+    pub cw20_address: Addr,
     // reward contract address
     pub reward_address: Addr,
-    // quote token
-    pub quote_token: String,
-    // liquid staking quote token
-    pub lst_quote_token: String,
     // fee fee_rate
     pub fee_rate: Decimal,
     // fee receiver
@@ -92,31 +87,23 @@ pub struct UnbondRecord {
     pub height: u64,
     pub sender: String,
     pub staker: String,
-    pub amount: Coin,
-    pub undelegate_amount: Coin,
-    pub exchange_rate: Decimal,
-    pub undelegations: Vec<UndelegationRecord>,
+    pub channel_id: Option<u32>,
+    pub amount: Uint128,
+    pub undelegate_amount: Uint128,
     pub created: Timestamp,
-    pub completion: Timestamp,
+    pub released_height: u64,
     pub released: bool,
-    pub released_time: Timestamp,
 }
-
 pub struct UnbondRecordIndexes<'a> {
     pub staker: MultiIndex<'a, String, UnbondRecord, u64>,
-    pub sender: MultiIndex<'a, String, UnbondRecord, u64>,
     pub released: MultiIndex<'a, String, UnbondRecord, u64>,
     pub staker_released: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
-        let v: Vec<&dyn Index<UnbondRecord>> = vec![
-            &self.staker,
-            &self.sender,
-            &self.released,
-            &self.staker_released,
-        ];
+        let v: Vec<&dyn Index<UnbondRecord>> =
+            vec![&self.staker, &self.released, &self.staker_released];
         Box::new(v.into_iter())
     }
 }
@@ -130,11 +117,6 @@ pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<
             UNBOND_RECORD_NAMESPACE,
             "unbond_record__staker",
         ),
-        sender: MultiIndex::new(
-            |_pk, d: &UnbondRecord| d.sender.clone(),
-            UNBOND_RECORD_NAMESPACE,
-            "unbond_record__sender",
-        ),
         released: MultiIndex::new(
             |_pk, d: &UnbondRecord| d.released.to_string(),
             UNBOND_RECORD_NAMESPACE,
@@ -147,4 +129,11 @@ pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<
         ),
     };
     IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
+}
+
+#[cw_serde]
+pub struct QuoteToken {
+    pub channel_id: u32,
+    pub quote_token: String,
+    pub lst_quote_token: String,
 }

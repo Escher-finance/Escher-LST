@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::state::{Balance, Parameters, State, UnbondRecord, Validator, ValidatorsRegistry};
+use crate::state::{
+    Balance, Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry,
+};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
 use cw2::ContractVersion;
@@ -16,8 +18,6 @@ pub struct InstantiateMsg {
     pub validators: Vec<Validator>,
     /// liquid staking denom name
     pub liquidstaking_denom: String,
-    /// source channel for ucs03 relayer
-    pub ucs03_channel: u32,
     /// ucs03 relay contract address
     pub ucs03_relay_contract: String,
     /// fee/revenue receiver address
@@ -28,14 +28,12 @@ pub struct InstantiateMsg {
     pub reward_code_id: u64,
     /// fee/revenue rate from reward
     pub fee_rate: Decimal,
-    /// cw20 contract address
-    pub cw20_address: Option<Addr>,
+    /// cw20 liquid staking denom contract address
+    pub cw20_address: Addr,
     /// salt that is used for ucs03 relayer transfer call
     pub salt: String,
-    /// quote token of native token to send to other chain
-    pub quote_token: String,
-    /// quote token of liquid staking token to send to other chain
-    pub lst_quote_token: String,
+    // tokens
+    pub quote_tokens: Vec<QuoteToken>,
 }
 
 #[cw_serde]
@@ -89,15 +87,17 @@ pub enum ExecuteMsg {
     SetParameters {
         underlying_coin_denom: Option<String>,
         liquidstaking_denom: Option<String>,
-        ucs03_channel: Option<u32>,
         ucs03_relay_contract: Option<String>,
         unbonding_time: Option<u64>,
         cw20_address: Option<Addr>,
         reward_address: Option<Addr>,
-        quote_token: Option<String>,
-        lst_quote_token: Option<String>,
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
+    },
+    /// Update quote token
+    UpdateQuoteToken {
+        channel_id: u32,
+        quote_token: QuoteToken,
     },
     /// Update Validators
     UpdateValidators {
@@ -119,7 +119,8 @@ pub enum ExecuteMsg {
     MoveToReward {},
     /// Transfer utility (for development phase only)
     Transfer {
-        amount: Coin,
+        amount: Uint128,
+        base_denom: String,
         receiver: String,
         ucs03_channel_id: u32,
         ucs03_relay_contract: String,
@@ -161,7 +162,6 @@ pub enum QueryMsg {
     #[returns(Vec<UnbondRecord>)]
     UnbondRecord {
         staker: Option<String>,
-        sender: Option<String>,
         released: Option<bool>,
     },
     #[returns(ContractVersion)]
@@ -208,6 +208,7 @@ pub struct MintTokensPayload {
     pub staker: String,
     pub amount: Uint128,
     pub salt: String,
+    pub channel_id: Option<u32>,
 }
 
 #[cw_serde]

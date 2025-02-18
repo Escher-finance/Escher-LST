@@ -12,9 +12,12 @@ const chains = [
     { key: "bbn-test-5", label: "Babylon" },
 ];
 
-const CW20_BASE_TOKEN = "union17pvq26l890sy4uwxhgxykewkvd75vvk0fx6gys6ah77n063v9rssryh3ej"; // thisis CW20 base token for denom "funny"
+const CW20_BASE_TOKEN = "union1d0g6z2977xa6c5eknf78urltxx3tnvtjrq4c7fh99rpd5j4ut76qwf8r20"; // thisis CW20 base token for denom "funny"
 const SOURCE_CHAIN_ID = "union-testnet-9";
-const TOKEN_MINTER = "union16ex34xjzhv729ygw2hyhdjdseemujesw2d73xgey3wc3mm36mc6s6ehah7";
+
+function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export default function TransferCW20() {
 
@@ -31,11 +34,11 @@ export default function TransferCW20() {
         }
 
         let allowance_msg = {
-            increase_allowance: { spender: TOKEN_MINTER, amount: amount.toString() }
+            increase_allowance: { spender: ucs03Address, amount: amount.toString() }
         };
 
-        let result1 = await client?.execute(userAddress, CW20_BASE_TOKEN, allowance_msg, "auto");
-        console.log(result1?.transactionHash);
+        // let result1 = await client?.execute(userAddress, CW20_BASE_TOKEN, allowance_msg, "auto");
+        // console.log(result1?.transactionHash);
 
         const msg = {
             transfer: {
@@ -45,16 +48,17 @@ export default function TransferCW20() {
                 base_amount: amount,
                 quote_token: quoteToken,
                 quote_amount: amount,
-                timeout_height: 0,
-                timeout_timestamp: getTimestamp(),
+                timeout_height: 1000000000,
+                timeout_timestamp: 0,
                 salt: getSalt(),
             }
         };
         console.log(JSON.stringify(msg));
 
+        sleep(5);
 
         let result2 = await client?.execute(userAddress, ucs03Address, msg, "auto", `send ${amount} ${CW20_BASE_TOKEN} to ${receiver}`, [{ amount: amount.toString(), denom: CW20_BASE_TOKEN }]);
-        console.log(result2?.transactionHash);
+
         return result2
     }
 
@@ -74,6 +78,7 @@ export default function TransferCW20() {
         }
         console.log(JSON.stringify(channel));
 
+        //const baseToken = toHex(CW20_BASE_TOKEN)
         const baseToken = toHex(CW20_BASE_TOKEN)
         let recipient = toHex(data.receiver.toString());
         const quoteToken = await getQuoteToken(SOURCE_CHAIN_ID, baseToken, channel)
@@ -91,7 +96,7 @@ export default function TransferCW20() {
 
         const ucs03Address = fromHex(`0x${channel.source_port_id}`, "string");
         console.log("ucs03Address", ucs03Address);
-        let result = await transfer(ucs03Address, channel.source_channel_id, data.amount.toString(), baseToken, recipient, quoteToken.value.quote_token);
+        let result = await transfer(ucs03Address, channel.source_channel_id, data.amount.toString(), CW20_BASE_TOKEN, recipient, quoteToken.value.quote_token);
         setAction(`Transfer is successful, Transaction hash: ${result?.transactionHash}`);
     }
 

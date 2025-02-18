@@ -23,12 +23,12 @@ export default function InstantiateCW20() {
     const formData = new FormData(form);
     const msg = {
       decimals: 6,
-      name: "funny",
-      symbol: "FUNNY",
-      initial_balances: [{
-        address: userAddress,
-        amount: "10000000"
-      }]
+      name: "emuno",
+      symbol: "eUNO",
+      initial_balances: [],
+      mint: {
+        minter: userAddress
+      }
     };
 
     const formJson = Object.fromEntries(formData.entries());
@@ -51,6 +51,7 @@ export default function InstantiateCW20() {
         "auto",
         instantiateOptions
       );
+      console.log(instantiateResult?.transactionHash);
       console.log(instantiateResult?.contractAddress);
       alert(instantiateResult?.contractAddress);
 
