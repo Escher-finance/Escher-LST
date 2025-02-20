@@ -48,6 +48,20 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     if payload.staker != payload.sender && payload.channel_id.is_some() {
+        let allowance_msg = cw20::Cw20ExecuteMsg::IncreaseAllowance {
+            spender: params.ucs03_relay_contract.clone(),
+            amount: payload.amount.clone(),
+            expires: None,
+        };
+
+        let allow_bin = to_json_binary(&allowance_msg).unwrap();
+        let allow_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: params.cw20_address.to_string(),
+            msg: allow_bin,
+            funds: vec![],
+        });
+        msgs.push(allow_msg);
+
         let quote_token = QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
         let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
             env,
