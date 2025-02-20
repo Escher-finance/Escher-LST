@@ -100,6 +100,7 @@ pub fn bond(
         bond_data.total_bond_amount.clone(),
         bond_data.total_supply,
         bond_data.exchange_rate,
+        "".to_string(),
     );
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -114,6 +115,7 @@ pub fn bond(
             attr("action", "bond"),
             attr("from", sender),
             attr("staker", the_staker.to_string()),
+            attr("channel_id", "".to_string()),
             attr("bond_amount", payment.amount.to_string()),
             attr("denom", coin_denom.to_string()),
             attr("minted", bond_data.mint_amount),
@@ -156,7 +158,7 @@ pub fn zkgm_unbond(
         staker.clone(),
         delegator,
         amount,
-        params,
+        params.clone(),
         validators_reg,
         Some(channel_id),
     )?;
@@ -164,7 +166,7 @@ pub fn zkgm_unbond(
     // create bond event here
     let unbond_event = UnbondEvent(
         sender.to_string(),
-        staker,
+        staker.clone(),
         Some(channel_id),
         amount,
         unbond_data.undelegate_amount,
@@ -174,12 +176,28 @@ pub fn zkgm_unbond(
         unbond_data.exchange_rate,
     );
 
+    let attrs = get_unbond_attrs(
+        sender.to_string(),
+        staker,
+        unbond_data.exchange_rate.to_string(),
+        amount.to_string(),
+        unbond_data.undelegate_amount.to_string(),
+        unbond_data.delegated_amount.to_string(),
+        (unbond_data.delegated_amount + unbond_data.reward).to_string(),
+        unbond_data.total_supply.to_string(),
+        params.underlying_coin_denom.clone(),
+        format!("{}", channel_id),
+    );
+
     // LOG.save(
     //     deps.storage,
     //     &format!("{}: {:?}", env.block.time, unbond_event),
     // )?;
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_event(unbond_event);
+    let res: Response<TokenFactoryMsg> = Response::new()
+        .add_messages(msgs)
+        .add_event(unbond_event)
+        .add_attributes(attrs);
 
     Ok(res)
 }
@@ -223,6 +241,7 @@ pub fn zkgm_bond(
         bond_data.total_bond_amount.clone(),
         bond_data.total_supply,
         bond_data.exchange_rate,
+        format!("{}", channel_id),
     );
 
     LOG.save(
@@ -238,6 +257,7 @@ pub fn zkgm_bond(
             attr("action", "bond"),
             attr("from", sender),
             attr("staker", staker.to_string()),
+            attr("channel_id", format!("{}", channel_id)),
             attr("bond_amount", amount.to_string()),
             attr("denom", coin_denom.to_string()),
             attr("minted", bond_data.mint_amount),
@@ -318,6 +338,7 @@ pub fn unbond(
         (unbond_data.delegated_amount + unbond_data.reward).to_string(),
         unbond_data.total_supply.to_string(),
         coin_denom.clone(),
+        "".to_string(),
     );
 
     let res: Response<TokenFactoryMsg> = Response::new()
@@ -428,6 +449,7 @@ fn get_unbond_attrs(
     total_bond_amount: String,
     total_lst_supply: String,
     coin_denom: String,
+    channel_id: String,
 ) -> Vec<Attribute> {
     return vec![
         attr("action", "unbond"),
@@ -440,6 +462,7 @@ fn get_unbond_attrs(
         attr("total_bond_amount", total_bond_amount),
         attr("total_lst_supply", total_lst_supply),
         attr("denom", coin_denom),
+        attr("channel_id", channel_id),
     ];
 }
 
