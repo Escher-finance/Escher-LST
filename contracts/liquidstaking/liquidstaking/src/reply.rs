@@ -55,7 +55,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         };
 
         let allow_bin = to_json_binary(&allowance_msg).unwrap();
-        let allow_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Execute {
+        let allow_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: params.cw20_address.to_string(),
             msg: allow_bin,
             funds: vec![],
