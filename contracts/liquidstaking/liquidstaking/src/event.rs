@@ -12,10 +12,12 @@ pub fn BondEvent(
     total_bond_amount: Uint128,
     total_supply: Uint128,
     exchange_rate: Decimal,
+    channel_id: String,
 ) -> Event {
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", sender)
-        .add_attribute("staker", staker)
+        .add_attribute("staker", format!("{}", staker))
+        .add_attribute("channel_id", channel_id)
         .add_attribute("bond_amount", bond_amount)
         .add_attribute("delegated_amount", delegated_amount)
         .add_attribute("total_bond_amount", total_bond_amount)
