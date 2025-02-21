@@ -133,12 +133,6 @@ pub enum ExecuteMsg {
     TransferToOwner {},
     // Utilities to transfer reward to this contract (for development only)
     TransferReward {},
-    ZkgmBond {
-        channel_id: u32,
-        staker: String,
-        amount: Uint128,
-        salt: String,
-    },
 }
 
 #[cw_ownable_query]

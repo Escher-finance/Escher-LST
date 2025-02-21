@@ -184,12 +184,6 @@ pub fn execute(
         } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::TransferReward {} => execute::transfer_reward(deps),
-        ExecuteMsg::ZkgmBond {
-            channel_id,
-            staker,
-            amount,
-            salt,
-        } => execute::zkgm_bond(deps, env, info, channel_id, staker, amount, salt),
     }
 }
 

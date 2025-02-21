@@ -908,10 +908,20 @@ pub fn on_zkgm(
     let msg_bytes = message.as_ref();
     let payload: ZkgmMessage = from_json(msg_bytes)?;
     let msg = format!(
-        "onzgkm time:{} channel_id:{} sender:{} message:{:?}",
-        env.block.time, channel_id, sender, payload
+        "on zgkm time:{} info sender :{}, channel_id:{}, source sender:{} payload:{:?}",
+        env.block.time,
+        info.sender.to_string(),
+        channel_id,
+        sender,
+        payload
     );
     LOG.save(deps.storage, &msg)?;
+
+    // only ucs03 relayer contract can call this callback function
+    let params = PARAMETERS.load(deps.storage)?;
+    if info.sender.to_string() != params.ucs03_relay_contract {
+        return Err(ContractError::Unauthorized {});
+    }
 
     match payload {
         ZkgmMessage::Bond { amount, salt } => {
