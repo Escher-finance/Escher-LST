@@ -13,7 +13,6 @@ interface KeyProps {
 export default function RevenueAssets({ stateKey }: KeyProps) {
 
     const [stakeBalance, setStakeBalance] = useState("");
-    const [lstakeBalance, setLstakeBalance] = useState("0");
     const faucetURL = "http://lstfaucet.rickyanto.com/";
 
     const receiver = "union17z2ea0dtzkpu9lc2eh0jcwxywh40th5e0xla5q";
@@ -32,55 +31,16 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
     }
 
 
-    const getBalance = async () => {
-        if (!userAddress) {
-            return;
-        }
-
-        let msg = {
-            balance: {
-                address: receiver
-            }
-        };
-        const bal = await client?.queryContractSmart(network?.contracts.cw20, msg);
-
-        if (bal) {
-            setLstakeBalance(bal.balance);
-        }
-
-    }
-
-    const loadBalance = async () => {
-        getNativeBalance();
-        getBalance();
-    }
-
     useEffect(() => {
-        loadBalance();
+        getNativeBalance();
     }, [stateKey]);
 
     useEffect(() => {
-        loadBalance();
+        getNativeBalance();
     }, [userAddress]);
 
 
-    const faucetRequest = async () => {
-        const msg = {
-            address: userAddress,
-            coins: ["100000stake"]
-        };
-        console.log(msg);
-        const response = await fetch(faucetURL, {
-            method: "POST",
-            body: JSON.stringify(msg),
-            headers: {
-                "Content-type": "application/json; charset=UTF-8",
-            },
-        });
 
-        console.log(JSON.stringify(response.body));
-        getNativeBalance();
-    }
 
     return (
         <Card className="w-full flex">
@@ -91,9 +51,7 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
                     <div className="p-3 text-sm">
                         Native: {Intl.NumberFormat('en-US').format(Number(stakeBalance))} muno
                     </div>
-                    <div className="p-3 text-sm">
-                        LSToken: {lstakeBalance} {network?.stakeCurrency.liquidStakingDenomDisplay}
-                    </div>
+
                 </div>
             </CardBody>
         </Card>

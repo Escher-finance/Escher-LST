@@ -1,7 +1,7 @@
 "use client";
 
 
-import { Button, Card, CardBody, CardHeader, Divider } from "@nextui-org/react";
+import { Button, Card, CardBody, CardHeader, Chip, Divider, Tooltip } from "@nextui-org/react";
 import { useState, useEffect } from "react";
 import { useGlobalContext } from "@/app/core/context";
 
@@ -12,7 +12,14 @@ interface AssetsProps {
 export default function Assets({ stateKey }: AssetsProps) {
 
     const [stakeBalance, setStakeBalance] = useState("");
+
+    const [ustakeBalance, setUStakeBalance] = useState("");
+
     const [lstakeBalance, setLstakeBalance] = useState("0");
+
+    const [ulstakeBalance, setULStakeBalance] = useState("");
+
+
     const faucetURL = "http://lstfaucet.rickyanto.com/";
 
     const {
@@ -28,6 +35,8 @@ export default function Assets({ stateKey }: AssetsProps) {
         let bal = await client?.getBalance(userAddress, network?.stakeCurrency.coinMinimalDenom);
         if (bal) {
             setStakeBalance(bal.amount);
+
+            setUStakeBalance((Number(bal.amount) / 1000000).toFixed(3))
         }
     }
 
@@ -45,6 +54,8 @@ export default function Assets({ stateKey }: AssetsProps) {
 
         if (bal) {
             setLstakeBalance(bal.balance);
+
+            setULStakeBalance((Number(bal.balance) / 1000000).toFixed(3));
         }
 
     }
@@ -89,13 +100,63 @@ export default function Assets({ stateKey }: AssetsProps) {
             <CardBody className="gap-1">
                 <div className="flex flex-col">
                     <div className="p-3 text-sm">
-                        Native: {Intl.NumberFormat('en-US').format(Number(stakeBalance))} {network?.stakeCurrency.coinMinimalDenom}
+
+                        <span className="pr-3">Balance:</span>
+                        <Tooltip
+                            closeDelay={0}
+                            content={Intl.NumberFormat('en-US').format(Number(stakeBalance)) + " " + network?.stakeCurrency.coinMinimalDenom}
+                            delay={0}
+                            motionProps={{
+                                variants: {
+                                    exit: {
+                                        opacity: 0,
+                                        transition: {
+                                            duration: 0.1,
+                                            ease: "easeIn",
+                                        },
+                                    },
+                                    enter: {
+                                        opacity: 1,
+                                        transition: {
+                                            duration: 0.15,
+                                            ease: "easeOut",
+                                        },
+                                    },
+                                },
+                            }}
+                        ><Chip>{Intl.NumberFormat('en-US').format(Number(ustakeBalance))} U</Chip></Tooltip>
+                        <br />
+
                     </div>
                     <div className="p-3 text-sm">
-                        LSToken: {Intl.NumberFormat('en-US').format(Number(lstakeBalance))} {network?.stakeCurrency.liquidStakingDenomDisplay}
+                        <span className="pr-3">LSToken:</span>
+                        <Tooltip
+                            closeDelay={0}
+                            content={Intl.NumberFormat('en-US').format(Number(lstakeBalance)) + " " + network?.stakeCurrency.liquidStakingDenom}
+                            delay={0}
+                            motionProps={{
+                                variants: {
+                                    exit: {
+                                        opacity: 0,
+                                        transition: {
+                                            duration: 0.1,
+                                            ease: "easeIn",
+                                        },
+                                    },
+                                    enter: {
+                                        opacity: 1,
+                                        transition: {
+                                            duration: 0.15,
+                                            ease: "easeOut",
+                                        },
+                                    },
+                                },
+                            }}
+                        ><Chip>{Intl.NumberFormat('en-US').format(Number(ulstakeBalance))} eU</Chip></Tooltip>
+
                     </div>
                 </div>
             </CardBody>
-        </Card>
+        </Card >
     );
 }
