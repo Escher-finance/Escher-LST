@@ -3,7 +3,7 @@
 import ExecuteBond from "../utils/execute_bond";
 import Unbond from "../utils/unbond";
 import Assets from "./assets";
-import { Tabs, Tab } from "@nextui-org/react";
+import { Tabs, Tab, Chip, Link } from "@nextui-org/react";
 import UnbondingRecords from "./unbonding_records";
 import RewardAsset from "./reward_asset";
 import RevenueAssets from "./revenue_assets";
@@ -16,24 +16,27 @@ export default function Dashboard() {
 
   const [stateKey, setStateKey] = useState(1);
 
+  const refresh = async () => {
+    let newKey = stateKey + 1;
+    setStateKey(newKey);
+  }
+
   return (
     <div className="w-full flex flex-col gap-2">
-      <div className="w-full mt-2">
-        <h1 className="p-3 text-2xl mb-5">Escher Liquid Staking</h1>
+      <div className="w-full mt-2 ">
+        <div className="flex flex-row items-center pb-2">
+          <h1 className="p-3 text-2xl">Escher Liquid Staking</h1>
+          <Chip><Link color="warning" onPress={refresh}>Refresh</Link></Chip>
+        </div>
+
         <div className="flex flex-col">
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-row gap-4">
-                <Assets stateKey={stateKey} />
-                <RevenueAssets stateKey={stateKey} />
-              </div>
-              <div className="flex flex-row gap-4">
-                <RewardAsset stateKey={stateKey} />
-              </div>
-
+            <div className="flex flex-col gap-2">
+              <Assets stateKey={stateKey} />
+              <RevenueAssets stateKey={stateKey} />
+              <RewardAsset stateKey={stateKey} />
             </div>
-
             <Liquidity stateKey={stateKey} />
           </div>
 

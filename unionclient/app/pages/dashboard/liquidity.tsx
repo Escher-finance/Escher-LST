@@ -14,6 +14,7 @@ export default function Liquidity({ stateKey }: AssetsProps) {
 
     const [liquidity, setLiquidity] = useState<any>(null);
     const [state, setState] = useState<any>(null);
+    const [totalSupply, setTotalSupply] = useState(0);
 
     const {
         client,
@@ -48,15 +49,26 @@ export default function Liquidity({ stateKey }: AssetsProps) {
         setState(state);
     }
 
+    const getTotalSupply = async () => {
+        const msg: any = {
+            token_info: {}
+        };
+        const balance = await client?.queryContractSmart(network?.contracts.cw20, msg);
+        setTotalSupply(balance.total_supply);
+
+    }
+
 
     useEffect(() => {
         getLiquidity();
         getState();
+        getTotalSupply();
     }, []);
 
     useEffect(() => {
         getLiquidity();
         getState();
+        getTotalSupply();
     }, [stateKey]);
 
 
@@ -79,25 +91,27 @@ export default function Liquidity({ stateKey }: AssetsProps) {
                                     Total Value:
                                 </div>
                                 <div>
-                                    {liquidity.amount} {network?.stakeCurrency.coinMinimalDenom}
+                                    {Intl.NumberFormat('en-US').format(Number(liquidity.amount))} {network?.stakeCurrency.coinMinimalDenom}
                                 </div>
                                 <div>
                                     Delegated:
                                 </div>
                                 <div>
-                                    {liquidity.delegated} {network?.stakeCurrency.coinMinimalDenom}
+                                    {Intl.NumberFormat('en-US').format(Number(liquidity.delegated))} {network?.stakeCurrency.coinMinimalDenom}
                                 </div>
                                 <div>
                                     Reward:
                                 </div>
                                 <div>
-                                    {liquidity.reward} {network?.stakeCurrency.coinMinimalDenom}
+                                    {Intl.NumberFormat('en-US').format(Number(liquidity.reward))}  {network?.stakeCurrency.coinMinimalDenom}
                                 </div>
                                 <div>
                                     Total Supply (Liquid Staking Token):
                                 </div>
                                 <div>
-                                    {state?.total_supply} {network?.stakeCurrency.liquidStakingDenomDisplay} (lst contract) <br />
+                                    {Intl.NumberFormat('en-US').format(totalSupply)}  {network?.stakeCurrency.liquidStakingDenomDisplay}   (cw20) <br />
+                                    {Intl.NumberFormat('en-US').format(Number(state?.total_supply))}  {network?.stakeCurrency.liquidStakingDenomDisplay} (lst contract)
+
                                 </div>
                                 <div>
                                     Bond counter:
