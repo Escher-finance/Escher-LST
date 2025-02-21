@@ -133,9 +133,6 @@ pub enum ExecuteMsg {
     TransferToOwner {},
     // Utilities to transfer reward to this contract (for development only)
     TransferReward {},
-    // Burn {
-    //     amount: Uint128,
-    // },
 }
 
 #[cw_ownable_query]
