@@ -16,7 +16,7 @@ export default function Dashboard() {
 
   const [stateKey, setStateKey] = useState(1);
 
-  const reload = async () => {
+  const refresh = async () => {
     let newKey = stateKey + 1;
     setStateKey(newKey);
   }
@@ -26,7 +26,7 @@ export default function Dashboard() {
       <div className="w-full mt-2 ">
         <div className="flex flex-row items-center pb-2">
           <h1 className="p-3 text-2xl">Escher Liquid Staking</h1>
-          <Chip><Link color="warning" onPress={reload}>Reload</Link></Chip>
+          <Chip><Link color="warning" onPress={refresh}>Refresh</Link></Chip>
         </div>
 
         <div className="flex flex-col">
