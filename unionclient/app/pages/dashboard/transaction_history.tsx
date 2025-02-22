@@ -56,7 +56,7 @@ export default function TransactionHistory() {
                     unbond_results[i].events.filter((r: any) => r.type == "wasm").forEach((ev: any) => {
                         let unbond_amount = ev.attributes.find((e: any) => e.key == "unbond_amount");
                         if (unbond_amount) {
-                            recs.push({ "hash": results[i].hash, "height": results[i].height, "type": "unbond", "amount": unbond_amount.value });
+                            recs.push({ "hash": unbond_results[i].hash, "height": unbond_results[i].height, "type": "unbond", "amount": unbond_amount.value });
                         }
                     });
                 }
