@@ -189,11 +189,6 @@ pub fn zkgm_unbond(
         format!("{}", channel_id),
     );
 
-    // LOG.save(
-    //     deps.storage,
-    //     &format!("{}: {:?}", env.block.time, unbond_event),
-    // )?;
-
     let res: Response<TokenFactoryMsg> = Response::new()
         .add_messages(msgs)
         .add_event(unbond_event)
@@ -412,6 +407,7 @@ pub fn redelegate(
             delegator.to_string(),
             coin_denom.clone(),
             validators_list,
+            params.reward_address.into(),
         )?;
 
         total_bond_amount = delegated_amount + reward;

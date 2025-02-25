@@ -99,11 +99,18 @@ export default function Liquidity({ stateKey }: AssetsProps) {
                                 <div>
                                     {Intl.NumberFormat('en-US').format(Number(liquidity.delegated))} {network?.stakeCurrency.coinMinimalDenom}
                                 </div>
-                                <div>
-                                    Reward:
+                                <div className="text-lg">
+                                    <span>Reward</span>
+                                    <span className="px-2 text-xs">(Unclaimed + Reward Contract)</span>
                                 </div>
                                 <div>
                                     {Intl.NumberFormat('en-US').format(Number(liquidity.reward))}  {network?.stakeCurrency.coinMinimalDenom}
+                                </div>
+                                <div>
+                                    Unclaimed Reward
+                                </div>
+                                <div>
+                                    {Intl.NumberFormat('en-US').format(Number(liquidity.unclaimed_reward))} {network?.stakeCurrency.coinMinimalDenom}
                                 </div>
                                 <div>
                                     Total Supply (Liquid Staking Token):
