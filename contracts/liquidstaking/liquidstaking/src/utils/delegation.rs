@@ -54,6 +54,7 @@ pub fn get_actual_total_reward(
     delegator: String,
     denom: String,
     validators: Vec<String>,
+    reward_contract: String,
 ) -> StdResult<Uint128> {
     let mut total_rewards = Uint128::new(0);
     let result: StdResult<DelegationTotalRewardsResponse> =
@@ -72,6 +73,36 @@ pub fn get_actual_total_reward(
         }
     }
 
+    let reward_balance = querier.query_balance(reward_contract, denom)?;
+    total_rewards += reward_balance.amount;
+    // add query reward contract balance
+    Ok(total_rewards)
+}
+
+pub fn get_unclaimed_reward(
+    querier: QuerierWrapper,
+    delegator: String,
+    denom: String,
+    validators: Vec<String>,
+) -> StdResult<Uint128> {
+    let mut total_rewards = Uint128::new(0);
+    let result: StdResult<DelegationTotalRewardsResponse> =
+        querier.query_delegation_total_rewards(delegator);
+
+    if result.is_ok() {
+        for delegator_reward in result.unwrap().rewards {
+            if validators.contains(&delegator_reward.validator_address) {
+                for reward in delegator_reward.reward {
+                    if reward.denom == denom {
+                        let reward_val = to_uint128(reward.amount.to_uint_floor())?;
+                        total_rewards += reward_val;
+                    }
+                }
+            }
+        }
+    }
+
+    // add query reward contract balance
     Ok(total_rewards)
 }
 
@@ -428,38 +459,6 @@ pub fn adjust_validators_delegation(
     Ok(msgs)
 }
 
-pub fn get_liquidity_data(
-    querier: QuerierWrapper,
-    delegator: String,
-    coin_denom: String,
-    validators_list: Vec<String>,
-    total_lst_supply: Uint128,
-) -> Result<(Uint128, Uint128, Decimal), ContractError> {
-    let delegated_amount = get_actual_total_delegated(
-        querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list.clone(),
-    );
-
-    let reward = get_actual_total_reward(
-        querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list,
-    )?;
-
-    let mut current_exchange_rate = Decimal::one();
-
-    let total_bond_amount = delegated_amount + reward;
-
-    if !delegated_amount.is_zero() && total_lst_supply.is_zero() {
-        current_exchange_rate = Decimal::from_ratio(total_bond_amount, total_lst_supply);
-    }
-
-    Ok((delegated_amount, reward, current_exchange_rate))
-}
-
 /// Process bond call to mint liquid staking token, delegate/stake base on the bond amount and exchange rate
 pub fn process_bond(
     storage: &mut dyn Storage,
@@ -512,6 +511,7 @@ pub fn process_bond(
             delegator.to_string(),
             coin_denom.clone(),
             validators_list,
+            params.reward_address.into(),
         )?;
 
         total_bond_amount = delegated_amount + reward;
@@ -608,6 +608,7 @@ pub fn process_unbond(
         delegator.to_string(),
         coin_denom.clone(),
         validators_list,
+        params.reward_address.into(),
     )?;
 
     let total_bond_amount = delegated_amount + reward;
@@ -672,7 +673,7 @@ pub fn process_unbond(
             undelegate_amount: undelegate_amount,
             delegated_amount: state.total_delegated_amount,
             reward: reward,
-            exchange_rate: state.exchange_rate,
+            exchange_rate: current_exchange_rate,
             total_supply: state.total_supply,
         },
     ))
@@ -697,4 +698,21 @@ fn test_get_undelegate_messages() {
         get_undelegate_from_validator_msgs(undelegate_amount, coin_denom.clone(), validators);
     println!("undelegate amount: {}", 999995);
     println!("undelegate_msgs: {:?}", undelegate_msgs);
+}
+
+#[test]
+fn test_unbond_calc() {
+    let unbond_amount = Uint128::from(1000000u128);
+    let exchange_rate = Decimal::from_str("0.99771671118504649").expect("invalid decimal string");
+    let native_amount =
+        calc::calculate_native_token_from_staking_token(unbond_amount, exchange_rate);
+    println!("native amount: {}", native_amount);
+}
+
+#[test]
+fn test_bond_calc() {
+    let bond_amount = Uint128::from(1000000000u128);
+    let exchange_rate = Decimal::from_str("0.99771671118504649").expect("invalid decimal string");
+    let staking_amount = calc::calculate_staking_token_from_rate(bond_amount, exchange_rate);
+    println!("staking amount: {}", staking_amount);
 }
