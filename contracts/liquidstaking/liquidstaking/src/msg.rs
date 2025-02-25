@@ -191,6 +191,7 @@ pub struct StakingLiquidity {
     pub amount: Uint128,
     pub delegated: Uint128,
     pub reward: Uint128,
+    pub unclaimed_reward: Uint128,
     pub exchange_rate: Decimal,
     pub time: Timestamp,
     pub total_supply: Uint128,

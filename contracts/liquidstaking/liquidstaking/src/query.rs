@@ -4,7 +4,7 @@ use crate::state::{
     Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG,
     PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
-use crate::utils::delegation::{get_actual_total_delegated, get_actual_total_reward};
+use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
 use cw2::ContractVersion;
@@ -98,12 +98,18 @@ pub fn query_staking_liquidity(
         validators.clone(),
     );
 
-    let total_reward = get_actual_total_reward(
+    let unclaimed_reward = get_unclaimed_reward(
         deps.querier,
         the_delegator.to_string(),
         denom.clone(),
         validators,
     )?;
+
+    let reward_contract_balance = deps
+        .querier
+        .query_balance(params.reward_address.to_string(), denom)?;
+
+    let total_reward = unclaimed_reward + reward_contract_balance.amount;
 
     let total_bond_amount = delegated_amount + total_reward;
 
@@ -117,6 +123,7 @@ pub fn query_staking_liquidity(
         amount: total_bond_amount,
         delegated: delegated_amount,
         reward: total_reward,
+        unclaimed_reward: unclaimed_reward,
         exchange_rate,
         time: env.block.time,
         total_supply: state.total_supply,
