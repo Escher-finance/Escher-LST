@@ -11,14 +11,6 @@ export const siteConfig = {
     {
       label: "Utils",
       href: "/pages/utils",
-    },
-    {
-      label: "Transfer",
-      href: "/pages/transfer",
-    },
-    {
-      label: "Transfer CW20",
-      href: "/pages/transfer_cw20",
     }
   ],
   navMenuItems: [
@@ -29,15 +21,7 @@ export const siteConfig = {
     {
       label: "Utils",
       href: "/pages/utils",
-    },
-    {
-      label: "Transfer",
-      href: "/pages/transfer",
-    },
-    {
-      label: "Transfer CW20",
-      href: "/pages/transfer_cw20",
-    },
+    }
   ],
   links: {
     docs: "https://docs.nomos.ms",

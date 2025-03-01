@@ -74,7 +74,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     feeCurrencies: [currency["uniontestnet"]],
     contracts: {
       lst: "union1mdsv9vd9f0gjte83vauwjqsahxg4gte2mdkcxxex68p97h8a4txqq0k5ct",
-      cw20: "union1njygapqdpnkaz5m64rh8038p4uh3xty78ktcunzj946hc4ft7s6qeu0u3f",
+      cw20: "union1mdsv9vd9f0gjte83vauwjqsahxg4gte2mdkcxxex68p97h8a4txqq0k5ct",
       reward: "union14nt98pl3edsgd4lu56m3yndervtp9z3qvyp0wmqkx6tmmse5ufnsrct8pc",
     },
     gasPrice: "0.0025muno",

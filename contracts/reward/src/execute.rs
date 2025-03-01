@@ -34,6 +34,7 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         attr("fee_rate", format!("{:?}", config.fee_rate)),
         attr("amount", balance.amount.to_string()),
         attr("fee_receiver", config.fee_receiver.to_string()),
+        attr("time", format!("{}", env.block.time.nanos())),
     ];
     let (redelegate, fee) =
         helpers::split_revenue(balance.amount, config.fee_rate, config.coin_denom);
@@ -60,10 +61,14 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         balance.amount,
         redelegate.amount,
         fee.amount,
+        env.block.time,
     );
 
     // transfer the fee to revenue receiver
-    Ok(Response::new().add_messages(msgs).add_event(event))
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_event(event)
+        .add_attributes(attrs))
 }
 
 pub fn set_config(

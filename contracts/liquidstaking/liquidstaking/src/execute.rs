@@ -97,10 +97,13 @@ pub fn bond(
         the_staker.clone(),
         payment.amount.clone(),
         bond_data.delegated_amount.clone(),
+        bond_data.mint_amount,
         bond_data.total_bond_amount.clone(),
         bond_data.total_supply,
         bond_data.exchange_rate,
         "".to_string(),
+        env.block.time,
+        coin_denom.clone(),
     );
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -174,6 +177,8 @@ pub fn zkgm_unbond(
         unbond_data.delegated_amount + unbond_data.reward,
         unbond_data.total_supply,
         unbond_data.exchange_rate,
+        env.block.time,
+        params.liquidstaking_denom.clone(),
     );
 
     let attrs = get_unbond_attrs(
@@ -185,7 +190,7 @@ pub fn zkgm_unbond(
         unbond_data.delegated_amount.to_string(),
         (unbond_data.delegated_amount + unbond_data.reward).to_string(),
         unbond_data.total_supply.to_string(),
-        params.underlying_coin_denom.clone(),
+        params.liquidstaking_denom.clone(),
         format!("{}", channel_id),
     );
 
@@ -233,10 +238,13 @@ pub fn zkgm_bond(
         staker.clone(),
         amount.clone(),
         bond_data.delegated_amount.clone(),
+        bond_data.mint_amount,
         bond_data.total_bond_amount.clone(),
         bond_data.total_supply,
         bond_data.exchange_rate,
         format!("{}", channel_id),
+        env.block.time,
+        coin_denom.clone(),
     );
 
     LOG.save(
@@ -272,7 +280,7 @@ pub fn unbond(
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
-    let coin_denom = params.underlying_coin_denom.to_string();
+    let lst_denom = params.liquidstaking_denom.to_string();
     let sender = info.sender.to_string();
     let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
     let delegator = env.contract.address.clone();
@@ -316,6 +324,8 @@ pub fn unbond(
         unbond_data.delegated_amount + unbond_data.reward,
         unbond_data.total_supply,
         unbond_data.exchange_rate,
+        env.block.time,
+        lst_denom.clone(),
     );
 
     // LOG.save(
@@ -332,7 +342,7 @@ pub fn unbond(
         unbond_data.delegated_amount.to_string(),
         (unbond_data.delegated_amount + unbond_data.reward).to_string(),
         unbond_data.total_supply.to_string(),
-        coin_denom.clone(),
+        lst_denom.clone(),
         "".to_string(),
     );
 
@@ -451,7 +461,7 @@ fn get_unbond_attrs(
         attr("action", "unbond"),
         attr("sender", sender),
         attr("staker", the_staker),
-        attr("current_exchange_rate", current_exchange_rate),
+        attr("exchange_rate", current_exchange_rate),
         attr("unbond_amount", unbond_amount),
         attr("undelegate_amount", undelegate_amount),
         attr("total_delegated_amount", total_delegated_amount),

@@ -1,5 +1,5 @@
 use crate::state::Validator;
-use cosmwasm_std::{attr, Attribute, Decimal, Event, Uint128};
+use cosmwasm_std::{attr, Attribute, Decimal, Event, Timestamp, Uint128};
 
 pub const BOND_EVENT: &str = "bond";
 
@@ -9,20 +9,26 @@ pub fn BondEvent(
     staker: String,
     bond_amount: Uint128,
     delegated_amount: Uint128,
+    minted_amount: Uint128,
     total_bond_amount: Uint128,
     total_supply: Uint128,
     exchange_rate: Decimal,
     channel_id: String,
+    time: Timestamp,
+    denom: String,
 ) -> Event {
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", format!("{}", staker))
         .add_attribute("channel_id", channel_id)
         .add_attribute("bond_amount", bond_amount)
+        .add_attribute("output_amount", minted_amount)
         .add_attribute("delegated_amount", delegated_amount)
         .add_attribute("total_bond_amount", total_bond_amount)
         .add_attribute("total_supply", total_supply)
         .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
+        .add_attribute("time", format!("{}", time.nanos()))
+        .add_attribute("denom", denom)
 }
 
 pub const UNBOND_EVENT: &str = "unbond";
@@ -38,6 +44,8 @@ pub fn UnbondEvent(
     total_bond_amount: Uint128,
     total_supply: Uint128,
     exchange_rate: Decimal,
+    time: Timestamp,
+    denom: String,
 ) -> Event {
     let mut channel_id_str = "".to_string();
 
@@ -50,11 +58,13 @@ pub fn UnbondEvent(
         .add_attribute("staker", staker)
         .add_attribute("channel_id", channel_id_str)
         .add_attribute("unbond_amount", unbond_amount)
-        .add_attribute("undelegate_amount", undelegate_amount)
+        .add_attribute("output_amount", undelegate_amount)
         .add_attribute("delegated_amount", delegated_amount)
         .add_attribute("total_bond_amount", total_bond_amount)
         .add_attribute("total_supply", total_supply)
         .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
+        .add_attribute("time", format!("{}", time.nanos()))
+        .add_attribute("denom", denom)
 }
 
 pub const UPDATE_VALIDATORS_EVENT: &str = "update_validators";
