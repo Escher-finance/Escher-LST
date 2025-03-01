@@ -61,6 +61,7 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         balance.amount,
         redelegate.amount,
         fee.amount,
+        env.block.time,
     );
 
     // transfer the fee to revenue receiver

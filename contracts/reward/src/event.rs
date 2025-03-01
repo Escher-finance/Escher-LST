@@ -1,4 +1,4 @@
-use cosmwasm_std::{Decimal, Event, Uint128};
+use cosmwasm_std::{Decimal, Event, Timestamp, Uint128};
 
 pub const SPLIT_REWARD_EVENT: &str = "split_reward";
 
@@ -8,10 +8,12 @@ pub fn SplitRewardEvent(
     split_amount: Uint128,
     redelegate_amount: Uint128,
     fee_amount: Uint128,
+    time: Timestamp,
 ) -> Event {
     Event::new(SPLIT_REWARD_EVENT.to_string())
         .add_attribute("fee_rate", fee_rate.to_string())
         .add_attribute("split_amount", split_amount.to_string())
         .add_attribute("redelegate_amount", redelegate_amount.to_string())
         .add_attribute("fee_amount", fee_amount.to_string())
+        .add_attribute("time", format!("{}", time.nanos()))
 }
