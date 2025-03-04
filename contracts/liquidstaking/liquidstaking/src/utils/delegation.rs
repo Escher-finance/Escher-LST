@@ -670,6 +670,7 @@ pub fn process_unbond(
     Ok((
         msgs,
         UnbondData {
+            record_id: id,
             undelegate_amount: undelegate_amount,
             delegated_amount: state.total_delegated_amount,
             reward: reward,
