@@ -104,9 +104,17 @@ pub fn ProcessRewardsEvent(total_amount: Uint128) -> Event {
 pub const PROCESS_UNBONDING_EVENT: &str = "process_unbonding";
 
 #[allow(non_snake_case)]
-pub fn ProcessUnbondingEvent(staker: String, amount: Uint128, denom: String) -> Event {
+pub fn ProcessUnbondingEvent(
+    staker: String,
+    amount: Uint128,
+    denom: String,
+    record_id: u64,
+    time: Timestamp,
+) -> Event {
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
         .add_attribute("staker", staker)
         .add_attribute("amount", amount.to_string())
         .add_attribute("denom", denom)
+        .add_attribute("time", format!("{}", time.nanos()))
+        .add_attribute("record_id", format!("{}", record_id))
 }

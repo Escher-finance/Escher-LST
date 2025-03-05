@@ -839,6 +839,8 @@ pub fn process_unbonding(
         unbond_rec.staker.to_string(),
         undelegate_amount.clone(),
         params.liquidstaking_denom.clone(),
+        unbond_rec.id,
+        env.block.time,
     );
 
     // set unbonding record to be released
