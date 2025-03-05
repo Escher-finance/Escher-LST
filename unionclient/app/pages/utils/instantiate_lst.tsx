@@ -13,6 +13,9 @@ import { useGlobalContext } from "@/app/core/context";
 export default function InstantiateLiquidStaking() {
   const { userAddress, client, network } = useGlobalContext();
 
+  const lstCodeId = network.toString() === "uniontestnet" ? 258 : 193;
+  const rewardCodeId = network.toString() === "uniontestnet" ? 171 : 194;
+
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
     e.preventDefault();
@@ -26,7 +29,7 @@ export default function InstantiateLiquidStaking() {
     const liquid_staking_code_id = Number(formEntries.liquid_staking_code_id);
 
 
-    const msg = {
+    const unionMsg = {
       underlying_coin_denom: "muno",
       validators: [
         { weight: 1, address: "unionvaloper14qekdkj2nmmwea4ufg9n002a3pud23y87mnkjg" },
@@ -50,7 +53,24 @@ export default function InstantiateLiquidStaking() {
 
 
 
+    const babyMsg = {
+      underlying_coin_denom: "ubbn",
+      validators: [
+        { weight: 1, address: "bbnvaloper109x4ruspxarwt62puwcenhclw36l9v7j92f0ex" },
+      ],
+      liquidstaking_denom: "ebbn",
+      ucs03_relay_contract: "bbn144hnwjtykzje3r4eccszq33fegycymh680huylagm3tqrwxhjrjqvkul3y",
+      fee_rate: "0.1",
+      fee_receiver: "bbn17z2ea0dtzkpu9lc2eh0jcwxywh40th5ej00y9g",
+      reward_code_id: rewardCodeId,
+      unbonding_time: 1944000,
+      salt: uuidv4(),
+      cw20_address: "bbn144hnwjtykzje3r4eccszq33fegycymh680huylagm3tqrwxhjrjqvkul3y",
+      quote_tokens: []
+    };
 
+
+    const msg = network.toString() === "uniontestnet" ? unionMsg : babyMsg;
 
     console.log(JSON.stringify(msg));
     try {
@@ -85,7 +105,7 @@ export default function InstantiateLiquidStaking() {
               name="liquid_staking_code_id"
               label="Liquid Staking CodeID"
               className="max-w-xs"
-              defaultValue="258"
+              defaultValue={lstCodeId.toString()}
             />
           </CardBody>
           <CardFooter>
