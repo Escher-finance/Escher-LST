@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::msg::{Log, QueryMsg, StakingLiquidity};
 use crate::state::unbond_record;
 use crate::state::{
@@ -25,9 +27,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         )?),
         QueryMsg::Balance {} => to_json_binary(&(query_balance(deps.storage)?)),
         QueryMsg::Log {} => to_json_binary(&(query_log(deps.storage)?)),
-        QueryMsg::UnbondRecord { staker, released } => {
-            to_json_binary(&(query_unbond_record(deps.storage, staker, released)?))
-        }
+        QueryMsg::UnbondRecord {
+            staker,
+            released,
+            id,
+            min,
+            max,
+        } => to_json_binary(&(query_unbond_record(deps.storage, staker, released, id, min, max)?)),
         QueryMsg::QuoteToken { channel_id } => {
             to_json_binary(&query_quote_token(deps.storage, channel_id)?)
         }
@@ -139,39 +145,83 @@ pub fn query_unbond_record(
     storage: &dyn Storage,
     staker: Option<String>,
     released: Option<bool>,
+    id: Option<u64>,
+    min: Option<u64>,
+    max: Option<u64>,
 ) -> StdResult<Vec<UnbondRecord>> {
+    if id.is_some() {
+        let unbonded_list = vec![unbond_record().load(storage, id.unwrap())?];
+        return Ok(unbonded_list);
+    }
+
+    let min_bound = match min {
+        Some(min) => Some(cw_storage_plus::Bound::Inclusive((min, PhantomData))),
+        None => Some(cw_storage_plus::Bound::Inclusive((1, PhantomData))),
+    };
+
+    let max_bound = match max {
+        Some(max) => {
+            let max_id = if min.is_some() && max > min.unwrap() + 50 {
+                min.unwrap() + 50
+            } else {
+                max
+            };
+            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
+        }
+        None => {
+            let max_id = if min.is_some() { min.unwrap() + 50 } else { 50 };
+            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
+        }
+    };
+
     if staker.is_some() && released.is_none() {
-        let unbonded_list = unbond_record()
-            .idx
-            .staker
-            .prefix(staker.unwrap())
-            .range(storage, None, None, Order::Descending)
-            .map(|n| n.unwrap().1)
-            .collect::<Vec<_>>();
+        let mut unbonded_list: Vec<UnbondRecord> = vec![];
+        let unbonded_range = unbond_record().idx.staker.prefix(staker.unwrap()).range(
+            storage,
+            min_bound,
+            None,
+            Order::Ascending,
+        );
+
+        for unbonded in unbonded_range {
+            if unbonded.is_ok() {
+                unbonded_list.push(unbonded.unwrap().1);
+            }
+        }
 
         return Ok(unbonded_list);
     }
 
     if staker.is_none() && released.is_some() {
-        let unbonded_list = unbond_record()
+        let mut unbonded_list: Vec<UnbondRecord> = vec![];
+        let unbonded_range = unbond_record()
             .idx
             .released
             .prefix(released.unwrap().to_string())
-            .range(storage, None, None, Order::Descending)
-            .map(|n| n.unwrap().1)
-            .collect::<Vec<_>>();
+            .range(storage, min_bound, max_bound, Order::Ascending);
+
+        for unbonded in unbonded_range {
+            if unbonded.is_ok() {
+                unbonded_list.push(unbonded.unwrap().1);
+            }
+        }
 
         return Ok(unbonded_list);
     }
 
     if staker.is_some() && released.is_some() {
-        let unbonded_list = unbond_record()
+        let mut unbonded_list: Vec<UnbondRecord> = vec![];
+        let unbonded_range = unbond_record()
             .idx
             .staker_released
             .prefix(format!("{}-{}", staker.unwrap(), released.unwrap()))
-            .range(storage, None, None, Order::Descending)
-            .map(|n| n.unwrap().1)
-            .collect::<Vec<_>>();
+            .range(storage, min_bound, max_bound, Order::Ascending);
+
+        for unbonded in unbonded_range {
+            if unbonded.is_ok() {
+                unbonded_list.push(unbonded.unwrap().1);
+            }
+        }
 
         return Ok(unbonded_list);
     }

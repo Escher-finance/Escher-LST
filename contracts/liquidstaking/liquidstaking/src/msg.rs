@@ -65,11 +65,13 @@ pub enum ExecuteMsg {
         staker: Option<String>,
         amount: Option<Uint128>,
         salt: String,
+        slippage: Option<Decimal>,
     },
     /// Send liquid staking denom then undelegate native denom according exchange rate from validator
     Unbond {
         staker: Option<String>,
         amount: Option<Uint128>,
+        slippage: Option<Decimal>,
     },
     // Withdraw staking rewards and call split reward to reward contract
     ProcessRewards {},
@@ -160,6 +162,9 @@ pub enum QueryMsg {
     UnbondRecord {
         staker: Option<String>,
         released: Option<bool>,
+        id: Option<u64>,
+        min: Option<u64>,
+        max: Option<u64>,
     },
     #[returns(ContractVersion)]
     Version {},
@@ -258,6 +263,7 @@ pub struct UnbondData {
     pub reward: Uint128,
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
+    pub record_id: u64,
 }
 
 #[cw_serde]

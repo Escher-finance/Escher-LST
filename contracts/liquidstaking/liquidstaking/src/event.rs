@@ -46,6 +46,7 @@ pub fn UnbondEvent(
     exchange_rate: Decimal,
     time: Timestamp,
     denom: String,
+    record_id: u64,
 ) -> Event {
     let mut channel_id_str = "".to_string();
 
@@ -65,6 +66,7 @@ pub fn UnbondEvent(
         .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("denom", denom)
+        .add_attribute("record_id", format!("{}", record_id))
 }
 
 pub const UPDATE_VALIDATORS_EVENT: &str = "update_validators";
@@ -102,9 +104,17 @@ pub fn ProcessRewardsEvent(total_amount: Uint128) -> Event {
 pub const PROCESS_UNBONDING_EVENT: &str = "process_unbonding";
 
 #[allow(non_snake_case)]
-pub fn ProcessUnbondingEvent(staker: String, amount: Uint128, denom: String) -> Event {
+pub fn ProcessUnbondingEvent(
+    staker: String,
+    amount: Uint128,
+    denom: String,
+    record_id: u64,
+    time: Timestamp,
+) -> Event {
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
         .add_attribute("staker", staker)
         .add_attribute("amount", amount.to_string())
         .add_attribute("denom", denom)
+        .add_attribute("time", format!("{}", time.nanos()))
+        .add_attribute("record_id", format!("{}", record_id))
 }
