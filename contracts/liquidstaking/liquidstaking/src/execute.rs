@@ -137,7 +137,7 @@ pub fn zkgm_unbond(
     staker: String,
     amount: Uint128,
     slippage: Option<Decimal>,
-    expected: Option<Uint128>,
+    expected: Uint128,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -189,13 +189,7 @@ pub fn zkgm_unbond(
         unbond_data.record_id,
     );
 
-    if expected.is_some() {
-        check_slippage(
-            unbond_data.undelegate_amount,
-            expected.unwrap(),
-            slippage_rate,
-        )?;
-    }
+    check_slippage(unbond_data.undelegate_amount, expected, slippage_rate)?;
 
     let attrs = get_unbond_attrs(
         sender.to_string(),
@@ -228,7 +222,7 @@ pub fn zkgm_bond(
     amount: Uint128,
     salt: String,
     slippage: Option<Decimal>,
-    expected: Option<Uint128>,
+    expected: Uint128,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -270,9 +264,7 @@ pub fn zkgm_bond(
         coin_denom.clone(),
     );
 
-    if expected.is_some() {
-        check_slippage(bond_data.mint_amount, expected.unwrap(), slippage_rate)?;
-    }
+    check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
     LOG.save(
         deps.storage,
@@ -1255,15 +1247,29 @@ fn exchange_rate_calculation() {
     println!("mint_amount: {:?}", mint_amount);
 }
 
-// #[test]
-// fn exchange_unbond_rate_calculation() {
-//     let staking_token = Uint128::new(100);
+#[test]
+fn exchange_unbond_rate_calculation() {
+    let staking_token = Uint128::new(100);
 
-//     let a = Uint128::new(110);
-//     let b = Uint128::new(100);
-//     let exchange_rate = Decimal::from_ratio(a, b);
+    let a = Uint128::new(110);
+    let b = Uint128::new(100);
+    let exchange_rate = Decimal::from_ratio(a, b);
 
-//     let token =
-//         utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
-//     assert_eq!(token, Uint128::new(110));
-// }
+    let token =
+        utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
+    assert_eq!(token, Uint128::new(110));
+}
+
+#[test]
+fn slippage_calculation() {
+    let expected = Uint128::new(10000);
+    let slippage = Decimal::from_str("0.01").unwrap();
+    let output = Uint128::new(10140);
+
+    let result = utils::calc::check_slippage(output, expected, slippage);
+    assert_eq!(result.is_err(), true);
+
+    let output = Uint128::new(10100);
+    let result = utils::calc::check_slippage(output, expected, slippage);
+    assert_eq!(result.is_ok(), true);
+}

@@ -245,12 +245,12 @@ pub enum ZkgmMessage {
         amount: Uint128,
         salt: String,
         slippage: Option<Decimal>,
-        expected: Option<Uint128>,
+        expected: Uint128,
     },
     Unbond {
         amount: Uint128,
         slippage: Option<Decimal>,
-        expected: Option<Uint128>,
+        expected: Uint128,
     },
 }
 
