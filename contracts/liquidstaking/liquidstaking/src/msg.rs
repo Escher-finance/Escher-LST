@@ -65,13 +65,11 @@ pub enum ExecuteMsg {
         staker: Option<String>,
         amount: Option<Uint128>,
         salt: String,
-        slippage: Option<Decimal>,
     },
     /// Send liquid staking denom then undelegate native denom according exchange rate from validator
     Unbond {
         staker: Option<String>,
         amount: Option<Uint128>,
-        slippage: Option<Decimal>,
     },
     // Withdraw staking rewards and call split reward to reward contract
     ProcessRewards {},
@@ -243,8 +241,17 @@ pub struct ValidatorDelegation {
 
 #[cw_serde]
 pub enum ZkgmMessage {
-    Bond { amount: Uint128, salt: String },
-    Unbond { amount: Uint128 },
+    Bond {
+        amount: Uint128,
+        salt: String,
+        slippage: Option<Decimal>,
+        expected: Uint128,
+    },
+    Unbond {
+        amount: Uint128,
+        slippage: Option<Decimal>,
+        expected: Uint128,
+    },
 }
 
 #[cw_serde]

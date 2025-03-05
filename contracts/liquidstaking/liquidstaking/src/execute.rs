@@ -11,8 +11,8 @@ use crate::state::{
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
-    self, delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
-    delegation::get_mock_total_reward, delegation::to_uint128,
+    self, calc::check_slippage, delegation::get_actual_total_delegated,
+    delegation::get_actual_total_reward, delegation::get_mock_total_reward, delegation::to_uint128,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
@@ -29,7 +29,6 @@ pub fn bond(
     staker: Option<String>,
     amount: Option<Uint128>,
     salt: String,
-    _slippage: Option<Decimal>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -137,11 +136,18 @@ pub fn zkgm_unbond(
     channel_id: u32,
     staker: String,
     amount: Uint128,
+    slippage: Option<Decimal>,
+    expected: Uint128,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let sender = info.sender.clone();
     let delegator = env.contract.address.clone();
+
+    let slippage_rate = match slippage {
+        Some(rate) => rate,
+        None => Decimal::from_str("0.01").unwrap(),
+    };
 
     let msg = cw20::Cw20QueryMsg::Balance {
         address: delegator.to_string(),
@@ -183,6 +189,8 @@ pub fn zkgm_unbond(
         unbond_data.record_id,
     );
 
+    check_slippage(unbond_data.undelegate_amount, expected, slippage_rate)?;
+
     let attrs = get_unbond_attrs(
         sender.to_string(),
         staker,
@@ -213,12 +221,19 @@ pub fn zkgm_bond(
     staker: String,
     amount: Uint128,
     salt: String,
+    slippage: Option<Decimal>,
+    expected: Uint128,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
     let delegator = env.contract.address;
+
+    let slippage_rate = match slippage {
+        Some(rate) => rate,
+        None => Decimal::from_str("0.01").unwrap(),
+    };
 
     let (msgs, sub_msgs, bond_data) = utils::delegation::process_bond(
         deps.storage,
@@ -248,6 +263,8 @@ pub fn zkgm_bond(
         env.block.time,
         coin_denom.clone(),
     );
+
+    check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
     LOG.save(
         deps.storage,
@@ -279,7 +296,6 @@ pub fn unbond(
     info: MessageInfo,
     staker: Option<String>,
     amount: Option<Uint128>,
-    _slippage: Option<Decimal>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -941,7 +957,12 @@ pub fn on_zkgm(
     }
 
     match payload {
-        ZkgmMessage::Bond { amount, salt } => {
+        ZkgmMessage::Bond {
+            amount,
+            salt,
+            slippage,
+            expected,
+        } => {
             return zkgm_bond(
                 deps,
                 env,
@@ -950,10 +971,25 @@ pub fn on_zkgm(
                 format!("{}", sender),
                 amount,
                 salt,
+                slippage,
+                expected,
             )
         }
-        ZkgmMessage::Unbond { amount } => {
-            return zkgm_unbond(deps, env, info, channel_id, format!("{}", sender), amount)
+        ZkgmMessage::Unbond {
+            amount,
+            slippage,
+            expected,
+        } => {
+            return zkgm_unbond(
+                deps,
+                env,
+                info,
+                channel_id,
+                format!("{}", sender),
+                amount,
+                slippage,
+                expected,
+            )
         }
     }
 }
@@ -1211,15 +1247,29 @@ fn exchange_rate_calculation() {
     println!("mint_amount: {:?}", mint_amount);
 }
 
-// #[test]
-// fn exchange_unbond_rate_calculation() {
-//     let staking_token = Uint128::new(100);
+#[test]
+fn exchange_unbond_rate_calculation() {
+    let staking_token = Uint128::new(100);
 
-//     let a = Uint128::new(110);
-//     let b = Uint128::new(100);
-//     let exchange_rate = Decimal::from_ratio(a, b);
+    let a = Uint128::new(110);
+    let b = Uint128::new(100);
+    let exchange_rate = Decimal::from_ratio(a, b);
 
-//     let token =
-//         utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
-//     assert_eq!(token, Uint128::new(110));
-// }
+    let token =
+        utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
+    assert_eq!(token, Uint128::new(110));
+}
+
+#[test]
+fn slippage_calculation() {
+    let expected = Uint128::new(10000);
+    let slippage = Decimal::from_str("0.01").unwrap();
+    let output = Uint128::new(10140);
+
+    let result = utils::calc::check_slippage(output, expected, slippage);
+    assert_eq!(result.is_err(), true);
+
+    let output = Uint128::new(10100);
+    let result = utils::calc::check_slippage(output, expected, slippage);
+    assert_eq!(result.is_ok(), true);
+}
