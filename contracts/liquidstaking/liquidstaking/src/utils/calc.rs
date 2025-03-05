@@ -34,3 +34,24 @@ pub fn total_lst_supply(
         querier.query_wasm_smart(cw20_address, &cw20::Cw20QueryMsg::TokenInfo {})?;
     Ok(resp.total_supply)
 }
+
+pub fn check_slippage(
+    output_amount: Uint128,
+    expected_amount: Uint128,
+    slippage: Decimal,
+) -> Result<(), ContractError> {
+    let slippage_amount =
+        (Decimal::from_ratio(expected_amount, Uint128::one()) * slippage).to_uint_floor();
+
+    let min_amount = expected_amount - slippage_amount;
+    let max_amount = expected_amount + slippage_amount;
+    if output_amount < min_amount || output_amount > max_amount {
+        return Err(ContractError::SlippageError {
+            output_amount,
+            min_amount,
+            max_amount,
+        });
+    }
+
+    Ok(())
+}

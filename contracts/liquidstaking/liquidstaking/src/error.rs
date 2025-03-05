@@ -60,6 +60,13 @@ pub enum ContractError {
     #[error("InvalidMintAmount")]
     InvalidMintAmount {},
 
+    #[error("slippage error: got {output_amount}, expected not smaller than {min_amount} or more than {max_amount}")]
+    SlippageError {
+        output_amount: cosmwasm_std::Uint128,
+        min_amount: cosmwasm_std::Uint128,
+        max_amount: cosmwasm_std::Uint128,
+    },
+
     #[error("error when computing the instantiate2 address: {0}")]
     Instantiate2AddressError(#[from] cosmwasm_std::Instantiate2AddressError),
 }

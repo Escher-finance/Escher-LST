@@ -11,8 +11,8 @@ use crate::state::{
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
-    self, delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
-    delegation::get_mock_total_reward, delegation::to_uint128,
+    self, calc::check_slippage, delegation::get_actual_total_delegated,
+    delegation::get_actual_total_reward, delegation::get_mock_total_reward, delegation::to_uint128,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
@@ -144,6 +144,11 @@ pub fn zkgm_unbond(
     let sender = info.sender.clone();
     let delegator = env.contract.address.clone();
 
+    let slippage_rate = match slippage {
+        Some(rate) => rate,
+        None => Decimal::from_str("0.01").unwrap(),
+    };
+
     let msg = cw20::Cw20QueryMsg::Balance {
         address: delegator.to_string(),
     };
@@ -184,6 +189,14 @@ pub fn zkgm_unbond(
         unbond_data.record_id,
     );
 
+    if expected.is_some() {
+        check_slippage(
+            unbond_data.undelegate_amount,
+            expected.unwrap(),
+            slippage_rate,
+        )?;
+    }
+
     let attrs = get_unbond_attrs(
         sender.to_string(),
         staker,
@@ -223,6 +236,11 @@ pub fn zkgm_bond(
     let sender = info.sender;
     let delegator = env.contract.address;
 
+    let slippage_rate = match slippage {
+        Some(rate) => rate,
+        None => Decimal::from_str("0.01").unwrap(),
+    };
+
     let (msgs, sub_msgs, bond_data) = utils::delegation::process_bond(
         deps.storage,
         deps.querier,
@@ -251,6 +269,10 @@ pub fn zkgm_bond(
         env.block.time,
         coin_denom.clone(),
     );
+
+    if expected.is_some() {
+        check_slippage(bond_data.mint_amount, expected.unwrap(), slippage_rate)?;
+    }
 
     LOG.save(
         deps.storage,
