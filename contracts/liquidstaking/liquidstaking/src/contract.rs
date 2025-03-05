@@ -114,13 +114,8 @@ pub fn execute(
             staker,
             amount,
             salt,
-            slippage,
-        } => execute::bond(deps, env, info, staker, amount, salt, slippage),
-        ExecuteMsg::Unbond {
-            staker,
-            amount,
-            slippage,
-        } => execute::unbond(deps, env, info, staker, amount, slippage),
+        } => execute::bond(deps, env, info, staker, amount, salt),
+        ExecuteMsg::Unbond { staker, amount } => execute::unbond(deps, env, info, staker, amount),
         ExecuteMsg::SetTokenAdmin { denom, new_admin } => {
             execute::set_token_admin(deps, info, denom, new_admin)
         }

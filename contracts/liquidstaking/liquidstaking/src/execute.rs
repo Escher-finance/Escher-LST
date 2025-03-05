@@ -29,7 +29,6 @@ pub fn bond(
     staker: Option<String>,
     amount: Option<Uint128>,
     salt: String,
-    _slippage: Option<Decimal>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -137,6 +136,8 @@ pub fn zkgm_unbond(
     channel_id: u32,
     staker: String,
     amount: Uint128,
+    slippage: Option<Decimal>,
+    expected: Option<Uint128>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -213,6 +214,8 @@ pub fn zkgm_bond(
     staker: String,
     amount: Uint128,
     salt: String,
+    slippage: Option<Decimal>,
+    expected: Option<Uint128>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -279,7 +282,6 @@ pub fn unbond(
     info: MessageInfo,
     staker: Option<String>,
     amount: Option<Uint128>,
-    _slippage: Option<Decimal>,
 ) -> Result<Response<TokenFactoryMsg>, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -941,7 +943,12 @@ pub fn on_zkgm(
     }
 
     match payload {
-        ZkgmMessage::Bond { amount, salt } => {
+        ZkgmMessage::Bond {
+            amount,
+            salt,
+            slippage,
+            expected,
+        } => {
             return zkgm_bond(
                 deps,
                 env,
@@ -950,10 +957,25 @@ pub fn on_zkgm(
                 format!("{}", sender),
                 amount,
                 salt,
+                slippage,
+                expected,
             )
         }
-        ZkgmMessage::Unbond { amount } => {
-            return zkgm_unbond(deps, env, info, channel_id, format!("{}", sender), amount)
+        ZkgmMessage::Unbond {
+            amount,
+            slippage,
+            expected,
+        } => {
+            return zkgm_unbond(
+                deps,
+                env,
+                info,
+                channel_id,
+                format!("{}", sender),
+                amount,
+                slippage,
+                expected,
+            )
         }
     }
 }
