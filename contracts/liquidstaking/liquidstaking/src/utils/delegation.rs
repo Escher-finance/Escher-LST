@@ -538,7 +538,6 @@ pub fn process_bond(
         // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg = token::get_staked_token_submsg(
             delegator.to_string(),
-            delegator.to_string(),
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,

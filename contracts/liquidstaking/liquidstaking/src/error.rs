@@ -13,36 +13,36 @@ pub enum ContractError {
     #[error("semver parse error: {0}")]
     SemverError(#[from] semver::Error),
 
-    #[error("Unauthorized")]
+    #[error("unauthorized")]
     Unauthorized {},
 
     // Add any other custom errors you like here.
     // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
-    #[error("InvalidAsset")]
+    #[error("invalid assset")]
     InvalidAsset {},
 
-    #[error("NoAsset")]
+    #[error("no asset")]
     NoAsset {},
 
-    #[error("NotEnoughFund")]
+    #[error("not enough fund")]
     NotEnoughFund {},
 
     #[error("requires at least one validator")]
     EmptyValidator {},
 
-    #[error("NotEnoughAvailableFund")]
+    #[error("not enough available fund")]
     NotEnoughAvailableFund {},
 
-    #[error("ReplyError")]
+    #[error("reply error: {message}")]
     ReplyError { message: String },
 
-    #[error("InvalidContractName")]
+    #[error("invalid contract name")]
     InvalidContractName {},
 
     #[error("invalid migration version: expected {expected}, got {actual}")]
     InvalidMigrationVersion { expected: String, actual: String },
 
-    #[error("ZeroSupplyOrDelegatedAmount")]
+    #[error("zero supply or delegated amount")]
     ZeroSupplyOrDelegatedAmount {},
 
     #[error("this contract must have an owner")]
@@ -51,13 +51,13 @@ pub enum ContractError {
     #[error("withdraw contract address is not set")]
     NoRewardAddress,
 
-    #[error("InvalidCodeID")]
+    #[error("invalid code id: {message}")]
     InvalidCodeID { message: String },
 
-    #[error("CompletedUnbondRecord")]
+    #[error("completed unbond record")]
     CompletedUnbondRecord {},
 
-    #[error("InvalidMintAmount")]
+    #[error("invalid mint amount")]
     InvalidMintAmount {},
 
     #[error("slippage error: got {output_amount}, expected not smaller than {min_amount} or more than {max_amount}")]
@@ -69,4 +69,7 @@ pub enum ContractError {
 
     #[error("error when computing the instantiate2 address: {0}")]
     Instantiate2AddressError(#[from] cosmwasm_std::Instantiate2AddressError),
+
+    #[error("not enough reward balance")]
+    NotEnoughRewardBalance {},
 }

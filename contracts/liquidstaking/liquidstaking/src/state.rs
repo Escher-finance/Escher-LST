@@ -9,16 +9,10 @@ pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_
 pub const LOG: Item<String> = Item::new("log");
 pub const CONFIG: Item<Config> = Item::new("config");
 
-pub const REWARD_BALANCE: Item<RewardBalance> = Item::new("reward_balance");
+pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
 
 // Map of channel id to the quote token and lst quote token of destination chain
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
-
-#[cw_serde]
-pub struct RewardBalance {
-    pub amount: Uint128,
-    pub rewards: Vec<Uint128>,
-}
 
 #[cw_serde]
 pub struct State {

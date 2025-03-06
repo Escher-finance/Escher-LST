@@ -3,6 +3,7 @@ mod error;
 pub mod execute;
 
 pub mod event;
+pub mod helpers;
 pub mod instantiate;
 #[allow(unused_imports)]
 pub mod msg;

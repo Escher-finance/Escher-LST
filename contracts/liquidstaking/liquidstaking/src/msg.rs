@@ -60,13 +60,11 @@ pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
     Bond {
-        staker: Option<String>,
         amount: Option<Uint128>,
         salt: String,
     },
     /// Send liquid staking denom then undelegate native denom according exchange rate from validator
     Unbond {
-        staker: Option<String>,
         amount: Option<Uint128>,
     },
     // Withdraw staking rewards and call split reward to reward contract
@@ -137,6 +135,11 @@ pub enum ExecuteMsg {
     },
 }
 
+#[cw_serde]
+pub struct Balance {
+    pub amount: Uint128,
+}
+
 #[cw_ownable_query]
 #[non_exhaustive]
 #[cw_serde]
@@ -154,6 +157,8 @@ pub enum QueryMsg {
         denom: Option<String>,
         validators: Option<Vec<String>>,
     },
+    #[returns(Balance)]
+    Balance {},
     #[returns(Log)]
     Log {},
     #[returns(Vec<UnbondRecord>)]
