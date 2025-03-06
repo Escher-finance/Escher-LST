@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::state::{
-    Balance, Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry,
-};
+use crate::state::{Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
 use cw2::ContractVersion;
@@ -133,6 +131,15 @@ pub enum ExecuteMsg {
     TransferToOwner {},
     // Utilities to transfer reward to this contract (for development only)
     TransferReward {},
+
+    // Below are utilities for handling reward
+    // SplitReward {},
+    SetConfig {
+        lst_contract_address: Option<Addr>,
+        fee_receiver: Option<Addr>,
+        fee_rate: Option<Decimal>,
+        coin_denom: Option<String>,
+    },
 }
 
 #[cw_ownable_query]
@@ -152,8 +159,6 @@ pub enum QueryMsg {
         denom: Option<String>,
         validators: Option<Vec<String>>,
     },
-    #[returns(Balance)]
-    Balance {},
     #[returns(Log)]
     Log {},
     #[returns(Vec<UnbondRecord>)]

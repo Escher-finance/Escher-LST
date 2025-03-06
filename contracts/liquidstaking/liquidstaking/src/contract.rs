@@ -1,17 +1,14 @@
-use crate::instantiate::create_reward;
 use crate::token_factory_api::TokenFactoryMsg;
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{
-    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
-};
+use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS,
-    QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    Config, Parameters, State, Validator, ValidatorsRegistry, CONFIG, LOG, PARAMETERS, QUOTE_TOKEN,
+    STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -33,12 +30,6 @@ pub fn instantiate(
 
     LOG.save(deps.storage, &"".into())?;
 
-    let balance = Balance {
-        amount: Uint128::new(0),
-        last_updated: 0,
-    };
-    BALANCE.save(deps.storage, &balance)?;
-
     let mut validators: Vec<Validator> = vec![];
     for validator in msg.validators {
         validators.push({
@@ -52,17 +43,25 @@ pub fn instantiate(
     let reg = ValidatorsRegistry { validators };
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
 
-    // create reward contract message to instantiate reward contract that will receive staking reward
-    let (reward_msg, reward_addr) = create_reward(
-        &deps,
-        &env,
-        msg.salt,
-        msg.reward_code_id,
-        env.clone().contract.address,
-        msg.fee_receiver.clone(),
-        msg.fee_rate.clone(),
-        msg.underlying_coin_denom.clone(),
-    )?;
+    // // create reward contract message to instantiate reward contract that will receive staking reward
+    // let (reward_msg, reward_addr) = create_reward(
+    //     &deps,
+    //     &env,
+    //     msg.salt,
+    //     msg.reward_code_id,
+    //     env.clone().contract.address,
+    //     msg.fee_receiver.clone(),
+    //     msg.fee_rate.clone(),
+    //     msg.underlying_coin_denom.clone(),
+    // )?;
+
+    let reward_config = Config {
+        lst_contract_address: env.clone().contract.address,
+        fee_receiver: msg.fee_receiver.clone(),
+        fee_rate: msg.fee_rate.clone(),
+        coin_denom: msg.underlying_coin_denom.clone(),
+    };
+    CONFIG.save(deps.storage, &reward_config)?;
 
     let params = Parameters {
         underlying_coin_denom: msg.underlying_coin_denom,
@@ -70,7 +69,7 @@ pub fn instantiate(
         ucs03_relay_contract: msg.ucs03_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
-        reward_address: reward_addr.clone(),
+        reward_address: env.clone().contract.address.clone(),
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
     };
@@ -90,16 +89,7 @@ pub fn instantiate(
         QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
     }
 
-    let set_withdraw_msg: CosmosMsg<TokenFactoryMsg> =
-        CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
-            address: reward_addr.to_string(),
-        });
-
-    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![reward_msg, set_withdraw_msg];
-
-    Ok(Response::new()
-        .add_attribute("action", "instantiate")
-        .add_messages(msgs))
+    Ok(Response::new().add_attribute("action", "instantiate"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -184,6 +174,20 @@ pub fn execute(
         } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::TransferReward {} => execute::transfer_reward(deps),
+        ExecuteMsg::SetConfig {
+            lst_contract_address,
+            fee_receiver,
+            fee_rate,
+            coin_denom,
+        } => execute::set_config(
+            deps,
+            env,
+            info,
+            lst_contract_address,
+            fee_receiver,
+            fee_rate,
+            coin_denom,
+        ),
     }
 }
 

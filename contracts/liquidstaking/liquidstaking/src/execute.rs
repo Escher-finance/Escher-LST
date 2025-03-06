@@ -7,7 +7,8 @@ use crate::event::{
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, LOG, PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    unbond_record, QuoteToken, Validator, CONFIG, LOG, PARAMETERS, QUOTE_TOKEN, STATE,
+    VALIDATORS_REGISTRY,
 };
 use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
@@ -1092,6 +1093,29 @@ pub fn burn(
         .add_attribute("denom", params.liquidstaking_denom)
         .add_attribute("amount", amount.to_string());
     Ok(res)
+}
+
+pub fn set_config(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    lst_contract_address: Option<Addr>,
+    fee_receiver: Option<Addr>,
+    fee_rate: Option<Decimal>,
+    coin_denom: Option<String>,
+) -> Result<Response<TokenFactoryMsg>, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let mut config = CONFIG.load(deps.storage)?;
+
+    config.lst_contract_address = lst_contract_address
+        .clone()
+        .unwrap_or_else(|| config.lst_contract_address);
+    config.fee_receiver = fee_receiver.clone().unwrap_or_else(|| config.fee_receiver);
+    config.fee_rate = fee_rate.clone().unwrap_or_else(|| config.fee_rate);
+    config.coin_denom = coin_denom.clone().unwrap_or_else(|| config.coin_denom);
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::default())
 }
 
 #[cfg(test)]

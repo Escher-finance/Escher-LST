@@ -6,16 +6,18 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
-pub const BALANCE: Item<Balance> = Item::new("balance");
 pub const LOG: Item<String> = Item::new("log");
+pub const CONFIG: Item<Config> = Item::new("config");
+
+pub const REWARD_BALANCE: Item<RewardBalance> = Item::new("reward_balance");
 
 // Map of channel id to the quote token and lst quote token of destination chain
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 
 #[cw_serde]
-pub struct Balance {
+pub struct RewardBalance {
     pub amount: Uint128,
-    pub last_updated: u64,
+    pub rewards: Vec<Uint128>,
 }
 
 #[cw_serde]
@@ -136,4 +138,12 @@ pub struct QuoteToken {
     pub channel_id: u32,
     pub quote_token: String,
     pub lst_quote_token: String,
+}
+
+#[cw_serde]
+pub struct Config {
+    pub lst_contract_address: Addr,
+    pub fee_receiver: Addr,
+    pub fee_rate: Decimal,
+    pub coin_denom: String,
 }
