@@ -33,12 +33,9 @@ export type ChainConfig = {
     reward: string;
   };
   gasPrice: string;
-  connectionID: string;
-  counterPartyConnectionID: string;
-  counterpartyPortID: string;
 };
 
-type SupportedNetworks = "uniontestnet";
+type SupportedNetworks = "uniontestnet" | "babylontestnet";
 
 
 const currency: Record<SupportedNetworks, Currency> = {
@@ -48,6 +45,13 @@ const currency: Record<SupportedNetworks, Currency> = {
     coinDecimals: 6,
     liquidStakingDenom: "emuno",
     liquidStakingDenomDisplay: "eMUNO"
+  },
+  "babylontestnet": {
+    coinDenom: "BABY",
+    coinMinimalDenom: "ubbn",
+    coinDecimals: 6,
+    liquidStakingDenom: "ubbn",
+    liquidStakingDenomDisplay: "eBABY"
   },
 };
 
@@ -77,15 +81,39 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
       cw20: "union1uf2jmjgaxwdxl5ttnwcef829lm2hgcxcxczyn93leuuhs4jrtm8sgse85m",
       reward: "union14nt98pl3edsgd4lu56m3yndervtp9z3qvyp0wmqkx6tmmse5ufnsrct8pc",
     },
-    gasPrice: "0.0025muno",
-    connectionID: "connection-26",
-    counterPartyConnectionID: "connection-5",
-    counterpartyPortID: "0x9f48D6e0Ab40dF6FB0bE0e96e80971441CEf3787"
+    gasPrice: "0.0025muno"
+  },
+  "babylontestnet": {
+    chainId: "bbn-test-5",
+    chainName: "babylontestnet",
+    rest: "https://babylon-testnet-api.nodes.guru",
+    rpc: "https://babylon-testnet-rpc.nodes.guru",
+    stakeCurrency: currency["babylontestnet"],
+    bip44: {
+      coinType: 118
+    },
+    bech32Config: {
+      bech32PrefixAccAddr: "bbn",
+      bech32PrefixAccPub: "bbnpub",
+      bech32PrefixValAddr: "bbnvaloper",
+      bech32PrefixValPub: "bbnvaloperpub",
+      bech32PrefixConsAddr: "bbnvalcons",
+      bech32PrefixConsPub: "bbnvalconspub",
+    },
+    currencies: [currency["babylontestnet"]],
+    feeCurrencies: [currency["babylontestnet"]],
+    contracts: {
+      lst: "union1mdsv9vd9f0gjte83vauwjqsahxg4gte2mdkcxxex68p97h8a4txqq0k5ct",
+      cw20: "bbn144hnwjtykzje3r4eccszq33fegycymh680huylagm3tqrwxhjrjqvkul3y",
+      reward: "union14nt98pl3edsgd4lu56m3yndervtp9z3qvyp0wmqkx6tmmse5ufnsrct8pc",
+    },
+    gasPrice: "0.0025ubbn",
   },
 };
 
 export const BaseNetworks: Record<SupportedNetworks, ChainConfig> = {
   "uniontestnet": Networks["uniontestnet"],
+  "babylontestnet": Networks["babylontestnet"],
 };
 
 export default Networks;
