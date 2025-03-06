@@ -10,7 +10,6 @@ use crate::state::{
     unbond_record, QuoteToken, Validator, CONFIG, LOG, PARAMETERS, QUOTE_TOKEN, STATE,
     VALIDATORS_REGISTRY,
 };
-use crate::token_factory_api::TokenFactoryMsg;
 use crate::utils::{
     self, calc::check_slippage, delegation::get_actual_total_delegated,
     delegation::get_actual_total_reward, delegation::get_mock_total_reward, delegation::to_uint128,
@@ -30,7 +29,7 @@ pub fn bond(
     staker: Option<String>,
     amount: Option<Uint128>,
     salt: String,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
@@ -111,7 +110,7 @@ pub fn bond(
         return Err(ContractError::InvalidMintAmount {});
     }
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_messages(msgs)
         .add_submessages(sub_msgs)
         .add_event(bond_event)
@@ -139,7 +138,7 @@ pub fn zkgm_unbond(
     amount: Uint128,
     slippage: Option<Decimal>,
     expected: Uint128,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let sender = info.sender.clone();
@@ -205,7 +204,7 @@ pub fn zkgm_unbond(
         format!("{}", channel_id),
     );
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_messages(msgs)
         .add_event(unbond_event)
         .add_attributes(attrs);
@@ -224,7 +223,7 @@ pub fn zkgm_bond(
     salt: String,
     slippage: Option<Decimal>,
     expected: Uint128,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
@@ -272,7 +271,7 @@ pub fn zkgm_bond(
         &format!("{}: {:?}", env.block.time, bond_event),
     )?;
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_messages(msgs)
         .add_submessages(sub_msgs)
         .add_event(bond_event)
@@ -297,7 +296,7 @@ pub fn unbond(
     info: MessageInfo,
     staker: Option<String>,
     amount: Option<Uint128>,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let lst_denom = params.liquidstaking_denom.to_string();
@@ -367,7 +366,7 @@ pub fn unbond(
         "".to_string(),
     );
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_messages(msgs)
         .add_event(unbond_event)
         .add_attributes(attrs);
@@ -376,11 +375,7 @@ pub fn unbond(
 }
 
 /// Redelegate some amount that is called from reward contract as result of split reward call to reward contract
-pub fn redelegate(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
 
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -455,7 +450,7 @@ pub fn redelegate(
 
     STATE.save(deps.storage, &state)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_attributes(vec![
+    let res: Response = Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "redelegate"),
         attr("from", info.sender.to_string()),
         attr("payment_amount", payment.amount.to_string()),
@@ -493,34 +488,12 @@ fn get_unbond_attrs(
     ];
 }
 
-/// DEPRECATED
-pub fn set_token_admin(
-    deps: DepsMut,
-    info: MessageInfo,
-    denom: String,
-    new_admin: Addr,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-
-    let msg = TokenFactoryMsg::ChangeAdmin {
-        denom: denom.clone(),
-        new_admin_address: new_admin.to_string(),
-    };
-
-    let res: Response<TokenFactoryMsg> = Response::new()
-        .add_message(msg)
-        .add_attribute("action", "set_token_admin")
-        .add_attribute("denom", denom)
-        .add_attribute("admin", new_admin.to_string());
-    Ok(res)
-}
-
 /// Process rewards by withdraw delegator reward then call redelegate to reward contract on reply
 pub fn process_rewards(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -528,7 +501,7 @@ pub fn process_rewards(
     let coin_denom = params.underlying_coin_denom;
     let sender = info.sender;
     let delegator = env.contract.address;
-    let mut sub_msgs: Vec<SubMsg<TokenFactoryMsg>> = vec![];
+    let mut sub_msgs: Vec<SubMsg> = vec![];
 
     let mut attrs = vec![attr("action", "process_rewards"), attr("from", sender)];
 
@@ -553,7 +526,7 @@ pub fn process_rewards(
             }
         }
 
-        let withdraw_reward_msg: CosmosMsg<TokenFactoryMsg> =
+        let withdraw_reward_msg: CosmosMsg =
             CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
                 validator: validator.address.to_string(),
             });
@@ -561,7 +534,7 @@ pub fn process_rewards(
         if payload.amount != Uint128::zero() {
             let payload_bin = to_json_binary(&payload)?;
 
-            let sub_msg: SubMsg<TokenFactoryMsg> =
+            let sub_msg: SubMsg =
                 SubMsg::reply_always(withdraw_reward_msg, PROCESS_WITHDRAW_REWARD_REPLY_ID)
                     .with_payload(payload_bin)
                     .into();
@@ -571,7 +544,7 @@ pub fn process_rewards(
     }
 
     let ev = ProcessRewardsEvent(total_amount);
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_attributes(attrs)
         .add_event(ev)
         .add_submessages(sub_msgs);
@@ -580,11 +553,7 @@ pub fn process_rewards(
 }
 
 /// Reset to default state, undelegate all and set state to default
-pub fn reset(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+pub fn reset(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let mut state = STATE.load(deps.storage)?;
@@ -599,7 +568,7 @@ pub fn reset(
     unbond_record().clear(deps.storage);
     let msgs = utils::delegation::get_unbond_all_messages(deps, env.contract.address)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "reset");
 
@@ -611,7 +580,7 @@ pub fn transfer_to_owner(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let params = PARAMETERS.load(deps.storage)?;
 
@@ -629,9 +598,9 @@ pub fn transfer_to_owner(
         to_address: owner.owner.unwrap().to_string(),
         amount: vec![balance.clone()],
     };
-    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
+    let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_message(msg)
         .add_attribute("action", "transfer_to_owner")
         .add_attribute("amount", balance.amount.to_string());
@@ -644,7 +613,7 @@ pub fn move_to_reward(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let params = PARAMETERS.load(deps.storage)?;
 
@@ -660,9 +629,9 @@ pub fn move_to_reward(
         to_address: params.reward_address.to_string(),
         amount: vec![balance.clone()],
     };
-    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
+    let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_message(msg)
         .add_attribute("action", "move_to_reward_contract")
         .add_attribute("amount", balance.amount.to_string());
@@ -677,7 +646,7 @@ pub fn update_ownership(
     env: Env,
     info: MessageInfo,
     action: cw_ownable::Action,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     if action == cw_ownable::Action::RenounceOwnership {
         return Err(ContractError::OwnershipCannotBeRenounced);
@@ -685,8 +654,7 @@ pub fn update_ownership(
 
     cw_ownable::update_ownership(deps, &env.block, &info.sender, action)?;
 
-    let res: Response<TokenFactoryMsg> =
-        Response::new().add_attribute("action", "update_ownership");
+    let res: Response = Response::new().add_attribute("action", "update_ownership");
 
     Ok(res)
 }
@@ -704,7 +672,7 @@ pub fn set_parameters(
     reward_address: Option<Addr>,
     fee_receiver: Option<Addr>,
     fee_rate: Option<Decimal>,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let mut params = PARAMETERS.load(deps.storage)?;
@@ -735,13 +703,12 @@ pub fn set_parameters(
     };
     let mut reward_address_str = "".to_string();
 
-    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+    let mut msgs: Vec<CosmosMsg> = vec![];
 
     if reward_address.is_some() {
-        let msg: CosmosMsg<TokenFactoryMsg> =
-            CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
-                address: reward_address.clone().unwrap().to_string(),
-            });
+        let msg: CosmosMsg = CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+            address: reward_address.clone().unwrap().to_string(),
+        });
         msgs.push(msg);
         reward_address_str = reward_address.unwrap().to_string();
     }
@@ -754,7 +721,7 @@ pub fn set_parameters(
             fee_rate: fee_rate,
         };
         let msg_bin = to_json_binary(&msg)?;
-        let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Execute {
+        let msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: params.reward_address.to_string(),
             msg: msg_bin,
             funds: vec![],
@@ -762,7 +729,7 @@ pub fn set_parameters(
         msgs.push(msg);
     }
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "set_parameters")
         .add_attribute(
@@ -790,7 +757,7 @@ pub fn process_unbonding(
     info: MessageInfo,
     id: u64,
     salt: String,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let params: crate::state::Parameters = PARAMETERS.load(deps.storage)?;
@@ -816,7 +783,7 @@ pub fn process_unbonding(
     }
 
     // if exists, send to staker (it can be on same chain or other chain like evm/bera)
-    let msg: CosmosMsg<TokenFactoryMsg> = {
+    let msg: CosmosMsg = {
         if unbond_rec.staker != unbond_rec.sender && unbond_rec.channel_id.is_some() {
             let funds = vec![Coin {
                 denom: params.underlying_coin_denom.clone(),
@@ -837,7 +804,7 @@ pub fn process_unbonding(
                 funds,
                 H256::from_str(salt.as_str()).unwrap(),
             )?;
-            let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(wasm_msg);
+            let msg: CosmosMsg = CosmosMsg::Wasm(wasm_msg);
             msg
         } else {
             let bank_msg = BankMsg::Send {
@@ -847,7 +814,7 @@ pub fn process_unbonding(
                     amount: undelegate_amount,
                 }],
             };
-            let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Bank(bank_msg);
+            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
             msg
         }
     };
@@ -865,7 +832,7 @@ pub fn process_unbonding(
     unbond_rec.released = true;
     unbond_record().save(deps.storage, unbond_rec.id, &unbond_rec)?;
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_message(msg)
         .add_event(ev)
         .add_attribute("action", "transfer_unbonding")
@@ -888,10 +855,10 @@ pub fn transfer(
     ucs03_contract: String,
     quote_token: String,
     salt: String,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
-    let mut msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![];
+    let mut msgs: Vec<CosmosMsg> = vec![];
     let allowance_msg = cw20::Cw20ExecuteMsg::IncreaseAllowance {
         spender: ucs03_contract.clone(),
         amount: amount.clone(),
@@ -899,7 +866,7 @@ pub fn transfer(
     };
 
     let allow_bin = to_json_binary(&allowance_msg).unwrap();
-    let allow_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Execute {
+    let allow_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: base_denom.to_string(),
         msg: allow_bin,
         funds: vec![],
@@ -921,7 +888,7 @@ pub fn transfer(
 
     msgs.push(CosmosMsg::Wasm(wasm_msg).into());
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "transfer")
         .add_attribute("receiver", receiver.to_string())
@@ -938,7 +905,7 @@ pub fn on_zkgm(
     channel_id: u32,
     sender: Bytes,
     message: Bytes,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     let msg_bytes = message.as_ref();
     let payload: ZkgmMessage = from_json(msg_bytes)?;
     let msg = format!(
@@ -1002,7 +969,7 @@ pub fn update_validators(
     env: Env,
     info: MessageInfo,
     validators: Vec<Validator>,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     if validators.len() < 1 {
@@ -1014,7 +981,7 @@ pub fn update_validators(
     validators_reg.validators = validators.clone();
     VALIDATORS_REGISTRY.save(deps.storage, &validators_reg)?;
 
-    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = utils::delegation::adjust_validators_delegation(
+    let msgs: Vec<CosmosMsg> = utils::delegation::adjust_validators_delegation(
         deps,
         env.contract.address,
         prev_validators.clone(),
@@ -1022,7 +989,7 @@ pub fn update_validators(
     )?;
 
     let event = UpdateValidatorsEvent(info.sender.to_string(), prev_validators, validators);
-    let res: Response<TokenFactoryMsg> = Response::new().add_messages(msgs).add_event(event);
+    let res: Response = Response::new().add_messages(msgs).add_event(event);
     Ok(res)
 }
 
@@ -1034,7 +1001,7 @@ pub fn update_quote_token(
     info: MessageInfo,
     channel_id: u32,
     quote_token: QuoteToken,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     QUOTE_TOKEN.save(deps.storage, channel_id, &quote_token)?;
     Ok(Response::default())
@@ -1046,32 +1013,32 @@ pub fn migrate_reward(
     _env: Env,
     _info: MessageInfo,
     code_id: u64,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let migrate = MigrateMsg {};
     let msg_bin = to_json_binary(&migrate)?;
-    let migrate_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Migrate {
+    let migrate_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Migrate {
         contract_addr: params.reward_address.to_string(),
         new_code_id: code_id,
         msg: msg_bin,
     });
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_message(migrate_msg);
+    let res: Response = Response::new().add_message(migrate_msg);
     Ok(res)
 }
 
 /// Transfer all balance in reward contract to this contract
-pub fn transfer_reward(deps: DepsMut) -> Result<Response<TokenFactoryMsg>, ContractError> {
+pub fn transfer_reward(deps: DepsMut) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let msg = ExecuteRewardMsg::TransferToOwner {};
     let msg_bin = to_json_binary(&msg)?;
-    let msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Execute {
+    let msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: params.reward_address.to_string(),
         msg: msg_bin,
         funds: vec![],
     });
 
-    let res: Response<TokenFactoryMsg> = Response::new().add_message(msg);
+    let res: Response = Response::new().add_message(msg);
     Ok(res)
 }
 
@@ -1081,13 +1048,13 @@ pub fn burn(
     _env: Env,
     info: MessageInfo,
     amount: Uint128,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let params = PARAMETERS.load(deps.storage)?;
 
     let msg = utils::token::burn_token(amount, params.cw20_address.to_string());
 
-    let res: Response<TokenFactoryMsg> = Response::new()
+    let res: Response = Response::new()
         .add_message(msg)
         .add_attribute("action", "burn")
         .add_attribute("denom", params.liquidstaking_denom)

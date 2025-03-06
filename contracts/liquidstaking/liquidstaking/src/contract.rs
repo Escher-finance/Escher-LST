@@ -1,4 +1,3 @@
-use crate::token_factory_api::TokenFactoryMsg;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
 use cw2::set_contract_version;
@@ -21,7 +20,7 @@ pub fn instantiate(
     env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let binding = info.sender.to_string();
@@ -42,18 +41,6 @@ pub fn instantiate(
 
     let reg = ValidatorsRegistry { validators };
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
-
-    // // create reward contract message to instantiate reward contract that will receive staking reward
-    // let (reward_msg, reward_addr) = create_reward(
-    //     &deps,
-    //     &env,
-    //     msg.salt,
-    //     msg.reward_code_id,
-    //     env.clone().contract.address,
-    //     msg.fee_receiver.clone(),
-    //     msg.fee_rate.clone(),
-    //     msg.underlying_coin_denom.clone(),
-    // )?;
 
     let reward_config = Config {
         lst_contract_address: env.clone().contract.address,
@@ -98,7 +85,7 @@ pub fn execute(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Bond {
             staker,
@@ -106,9 +93,7 @@ pub fn execute(
             salt,
         } => execute::bond(deps, env, info, staker, amount, salt),
         ExecuteMsg::Unbond { staker, amount } => execute::unbond(deps, env, info, staker, amount),
-        ExecuteMsg::SetTokenAdmin { denom, new_admin } => {
-            execute::set_token_admin(deps, info, denom, new_admin)
-        }
+
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
         ExecuteMsg::ProcessUnbonding { id, salt } => {
             execute::process_unbonding(deps, env, info, id, salt)
