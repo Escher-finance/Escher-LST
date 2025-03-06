@@ -1,5 +1,4 @@
 use crate::instantiate::create_reward;
-use crate::token_factory_api::TokenFactoryMsg;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
@@ -24,7 +23,7 @@ pub fn instantiate(
     env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let binding = info.sender.to_string();
@@ -90,12 +89,12 @@ pub fn instantiate(
         QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
     }
 
-    let set_withdraw_msg: CosmosMsg<TokenFactoryMsg> =
+    let set_withdraw_msg: CosmosMsg =
         CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
             address: reward_addr.to_string(),
         });
 
-    let msgs: Vec<CosmosMsg<TokenFactoryMsg>> = vec![reward_msg, set_withdraw_msg];
+    let msgs: Vec<CosmosMsg> = vec![reward_msg, set_withdraw_msg];
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
@@ -108,7 +107,7 @@ pub fn execute(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<Response<TokenFactoryMsg>, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Bond {
             staker,
@@ -116,9 +115,7 @@ pub fn execute(
             salt,
         } => execute::bond(deps, env, info, staker, amount, salt),
         ExecuteMsg::Unbond { staker, amount } => execute::unbond(deps, env, info, staker, amount),
-        ExecuteMsg::SetTokenAdmin { denom, new_admin } => {
-            execute::set_token_admin(deps, info, denom, new_admin)
-        }
+
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
         ExecuteMsg::ProcessUnbonding { id, salt } => {
             execute::process_unbonding(deps, env, info, id, salt)

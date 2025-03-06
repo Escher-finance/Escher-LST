@@ -78,11 +78,6 @@ pub enum ExecuteMsg {
         id: u64,
         salt: String,
     },
-    /// DEPRECATED:: Set new token factory denom admin
-    SetTokenAdmin {
-        denom: String,
-        new_admin: Addr,
-    },
     /// Change parameters, only owner can do this
     SetParameters {
         underlying_coin_denom: Option<String>,

@@ -1,4 +1,4 @@
-use crate::{error::ContractError, msg::InstantiateRewardMsg, token_factory_api::TokenFactoryMsg};
+use crate::{error::ContractError, msg::InstantiateRewardMsg};
 use cosmwasm_std::{
     instantiate2_address, to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, WasmMsg,
 };
@@ -12,7 +12,7 @@ pub fn instantiate2(
     label: impl Into<String>,
     instantiate_msg: Binary,
     admin: Option<String>,
-) -> Result<(CosmosMsg<TokenFactoryMsg>, Addr), ContractError> {
+) -> Result<(CosmosMsg, Addr), ContractError> {
     let salt = salt.into();
     let code_info = deps.querier.query_wasm_code_info(code_id)?;
     let creator_cannonical = deps.api.addr_canonicalize(env.contract.address.as_str())?;
@@ -34,7 +34,7 @@ pub fn instantiate2(
         });
     }
 
-    let instantiate_msg: CosmosMsg<TokenFactoryMsg> = CosmosMsg::Wasm(WasmMsg::Instantiate2 {
+    let instantiate_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Instantiate2 {
         code_id,
         msg: instantiate_msg,
         funds: vec![],
@@ -55,7 +55,7 @@ pub fn create_reward(
     revenue_receiver: Addr,
     fee_rate: Decimal,
     coin_denom: String,
-) -> Result<(CosmosMsg<TokenFactoryMsg>, Addr), ContractError> {
+) -> Result<(CosmosMsg, Addr), ContractError> {
     let reward_label: String = format!("reward-instance-{}", salt);
     let instantiate_msg = InstantiateRewardMsg {
         lst_contract: lst_contract.clone(),
