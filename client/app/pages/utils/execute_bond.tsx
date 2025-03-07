@@ -33,12 +33,11 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
     const amount = formEntries.amount.toString();
     const msg = {
       bond: {
-        staker: userAddress,
         salt: getSalt()
       }
     };
 
-    if (Number(amount) < 1000000) {
+    if (Number(amount) < 1000) {
       alert("Sorry, minimal bond amount is 1000000");
       return;
     }

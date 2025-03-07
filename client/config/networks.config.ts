@@ -103,9 +103,9 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     currencies: [currency["babylontestnet"]],
     feeCurrencies: [currency["babylontestnet"]],
     contracts: {
-      lst: "union1mdsv9vd9f0gjte83vauwjqsahxg4gte2mdkcxxex68p97h8a4txqq0k5ct",
+      lst: "bbn18ed0qdj7nvytfvc6rftgryk4krxxw4k2ql7e7f7z3t747828czrs52vxaa",
       cw20: "bbn144hnwjtykzje3r4eccszq33fegycymh680huylagm3tqrwxhjrjqvkul3y",
-      reward: "union14nt98pl3edsgd4lu56m3yndervtp9z3qvyp0wmqkx6tmmse5ufnsrct8pc",
+      reward: "bbn18ed0qdj7nvytfvc6rftgryk4krxxw4k2ql7e7f7z3t747828czrs52vxaa",
     },
     gasPrice: "0.0025ubbn",
   },

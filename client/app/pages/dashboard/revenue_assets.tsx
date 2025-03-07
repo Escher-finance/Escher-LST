@@ -15,12 +15,12 @@ export default function RevenueAssets({ stateKey }: KeyProps) {
     const [stakeBalance, setStakeBalance] = useState("");
     const faucetURL = "http://lstfaucet.rickyanto.com/";
 
-    const receiver = "union17z2ea0dtzkpu9lc2eh0jcwxywh40th5e0xla5q";
     const {
         client,
         userAddress,
         network
     } = useGlobalContext();
+    const receiver = network?.chainName == "uniontestnet" ? "union17z2ea0dtzkpu9lc2eh0jcwxywh40th5e0xla5q" : "bbn17z2ea0dtzkpu9lc2eh0jcwxywh40th5ej00y9g";
 
     const getNativeBalance = async () => {
         let bal = await client?.getBalance(receiver, network?.stakeCurrency.coinMinimalDenom);

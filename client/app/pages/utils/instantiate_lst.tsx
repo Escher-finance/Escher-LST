@@ -13,7 +13,7 @@ import { useGlobalContext } from "@/app/core/context";
 export default function InstantiateLiquidStaking() {
   const { userAddress, client, network } = useGlobalContext();
 
-  const lstCodeId = network.toString() === "uniontestnet" ? 258 : 193;
+  const lstCodeId = network.toString() === "uniontestnet" ? 258 : 196;
   const rewardCodeId = network.toString() === "uniontestnet" ? 171 : 194;
 
   const handleSubmit = async (e: any) => {
@@ -89,6 +89,8 @@ export default function InstantiateLiquidStaking() {
         instantiateOptions
       );
       console.log(instantiateResult);
+
+      alert(instantiateResult?.contractAddress)
 
     } catch (err) {
       console.log(err);
