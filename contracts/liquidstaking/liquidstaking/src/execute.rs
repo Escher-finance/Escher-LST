@@ -25,7 +25,6 @@ pub fn bond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    staker: Option<String>,
     amount: Option<Uint128>,
     salt: String,
 ) -> Result<Response, ContractError> {
@@ -33,7 +32,7 @@ pub fn bond(
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
-    let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
+    let the_staker: String = sender.to_string();
     let delegator = env.contract.address;
 
     let payment: Coin;
@@ -293,14 +292,13 @@ pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    staker: Option<String>,
     amount: Option<Uint128>,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let lst_denom = params.liquidstaking_denom.to_string();
     let sender = info.sender.to_string();
-    let the_staker: String = staker.unwrap_or_else(|| sender.to_string());
+    let the_staker: String = sender.to_string();
     let delegator = env.contract.address.clone();
 
     let unbond_amount: Uint128;

@@ -109,12 +109,8 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Bond {
-            staker,
-            amount,
-            salt,
-        } => execute::bond(deps, env, info, staker, amount, salt),
-        ExecuteMsg::Unbond { staker, amount } => execute::unbond(deps, env, info, staker, amount),
+        ExecuteMsg::Bond { amount, salt } => execute::bond(deps, env, info, amount, salt),
+        ExecuteMsg::Unbond { amount } => execute::unbond(deps, env, info, amount),
 
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
         ExecuteMsg::ProcessUnbonding { id, salt } => {
