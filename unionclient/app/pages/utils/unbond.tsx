@@ -64,7 +64,6 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
       const executeTransferCW20 = getExecuteContractMessage(userAddress, network?.contracts.cw20, transferCW20TokenMsg, []);
       const unbondingMsg = {
         unbond: {
-          staker: userAddress,
           amount
         }
       };

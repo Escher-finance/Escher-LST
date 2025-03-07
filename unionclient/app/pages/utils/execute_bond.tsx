@@ -33,7 +33,6 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
     const amount = formEntries.amount.toString();
     const msg = {
       bond: {
-        staker: userAddress,
         salt: getSalt()
       }
     };
