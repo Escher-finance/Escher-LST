@@ -6,7 +6,7 @@ use crate::utils::delegation;
 use crate::utils::token;
 use crate::ContractError;
 use crate::{
-    msg::{BondData, DelegationDiff, MintTokensPayload, UnbondData},
+    msg::{Balance, BondData, DelegationDiff, MintTokensPayload, QueryMsg, UnbondData},
     state::{
         increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, LOG, PARAMETERS,
         STATE, VALIDATORS_REGISTRY,
@@ -74,7 +74,9 @@ pub fn get_actual_total_reward(
         }
     }
 
-    let reward_balance = querier.query_balance(reward_contract, denom)?;
+    let reward_balance: Balance =
+        querier.query_wasm_smart(reward_contract, &QueryMsg::Balance {})?;
+
     total_rewards += reward_balance.amount;
     // add query reward contract balance
     Ok(total_rewards)
