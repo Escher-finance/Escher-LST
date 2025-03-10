@@ -585,6 +585,8 @@ pub fn reset(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
     state.exchange_rate = Decimal::one();
     STATE.save(deps.storage, &state)?;
 
+    REWARD_BALANCE.save(deps.storage, &Uint128::zero())?;
+
     unbond_record().clear(deps.storage);
     let msgs = utils::delegation::get_unbond_all_messages(deps, env.contract.address)?;
 
