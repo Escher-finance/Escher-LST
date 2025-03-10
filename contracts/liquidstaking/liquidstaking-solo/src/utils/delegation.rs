@@ -457,7 +457,7 @@ pub fn get_unbond_all_messages(
             };
 
         let msg = CosmosMsg::Stargate {
-            type_url: "/babylon.epoching.v1.MsgWrappedDelegate".to_string(),
+            type_url: "/babylon.epoching.v1.MsgWrappedUndelegate".to_string(),
             value: Binary::from(wrapped_msg.encode_to_vec()),
         };
 
