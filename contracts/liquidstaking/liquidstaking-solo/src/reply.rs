@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
-use crate::state::{Parameters, PARAMETERS, QUOTE_TOKEN};
+use crate::state::{Parameters, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE};
 use crate::utils;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
@@ -101,6 +101,11 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let payload: BondRewardsPayload = from_json(msg.payload)?;
+    // increment the reward balance on this contract as result of withdraw reward
+    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    reward_balance += payload.amount;
+    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
+
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     let attrs: Vec<Attribute> = vec![

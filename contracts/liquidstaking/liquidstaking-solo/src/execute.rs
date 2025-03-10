@@ -104,6 +104,7 @@ pub fn bond(
             .collect(),
     )?;
     reward_balance += total_reward;
+    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     // create bond event here
     let bond_event = BondEvent(
@@ -374,6 +375,7 @@ pub fn unbond(
             .collect(),
     )?;
     reward_balance += total_reward;
+    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     let attrs = get_unbond_attrs(
         sender,
