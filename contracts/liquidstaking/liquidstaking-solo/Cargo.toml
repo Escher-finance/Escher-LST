@@ -42,6 +42,7 @@ semver = "1.0"
 cw2 = "2.0.0"
 cw20 = "2.0.0"
 enumorph = "0.1.2"
+prost = { version = "0.13", features = ["derive"] }
 
 [dependencies.unionlabs_primitives]
 path = "../unionlabs-primitives"
