@@ -17,3 +17,7 @@ pub mod state;
 pub mod utils;
 
 pub use crate::error::ContractError;
+// Include the generated code
+pub mod proto {
+    include!("gen/mod.rs");
+}

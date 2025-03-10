@@ -1,4 +1,5 @@
 use crate::msg::ValidatorDelegation;
+use crate::proto;
 use crate::state::ValidatorsRegistry;
 use crate::utils::calc;
 use crate::utils::delegation;
@@ -12,9 +13,10 @@ use crate::{
     },
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
-    QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
+    to_json_binary, Addr, Binary, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse,
+    DepsMut, Env, QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
 };
+use prost::Message;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -338,6 +340,7 @@ pub fn get_restaking_msgs(
 }
 
 pub fn get_delegate_to_validator_msgs(
+    delegator: String,
     delegate_amount: Uint128,
     coin_denom: String,
     validators: Vec<Validator>,
@@ -359,16 +362,26 @@ pub fn get_delegate_to_validator_msgs(
 
         let delegate_amount = calculate_delegated_amount(delegate_amount, ratio);
         total_delegated += delegate_amount;
-        let amount = Coin {
-            amount: delegate_amount.clone(),
-            denom: coin_denom.to_string(),
-        };
-        let staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Delegate {
-            validator: validator.address.to_string(),
-            amount,
-        });
 
-        msgs.push(staking_msg.into());
+        let delegate_msg = proto::cosmos::staking::v1beta1::MsgDelegate {
+            delegator_address: delegator.clone(),
+            validator_address: validator.address.to_string(),
+            amount: Some(proto::cosmos::base::v1beta1::Coin {
+                denom: coin_denom.clone(),
+                amount: delegate_amount.into(),
+            }),
+        };
+
+        let staking_msg: proto::babylon::epoching::v1::MsgWrappedDelegate =
+            proto::babylon::epoching::v1::MsgWrappedDelegate {
+                msg: Some(delegate_msg),
+            };
+
+        let star_msg = CosmosMsg::Stargate {
+            type_url: "/babylon.epoching.v1.MsgWrappedDelegate".to_string(),
+            value: Binary::from(staking_msg.encode_to_vec()),
+        };
+        msgs.push(star_msg);
 
         if pos == 0 {
             first_validator = validator.address.to_string();
@@ -469,6 +482,7 @@ pub fn process_bond(
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     let coin_denom = params.underlying_coin_denom.to_string();
     let msgs = delegation::get_delegate_to_validator_msgs(
+        delegator.to_string(),
         amount,
         coin_denom.to_string(),
         validators_reg.validators.clone(),

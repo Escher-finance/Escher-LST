@@ -426,6 +426,7 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     };
 
     let msgs = utils::delegation::get_delegate_to_validator_msgs(
+        delegator.to_string(),
         payment.amount,
         params.underlying_coin_denom.to_string(),
         validators_reg.validators.clone(),
