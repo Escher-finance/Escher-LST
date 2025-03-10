@@ -171,6 +171,7 @@ pub fn execute(
             fee_rate,
             coin_denom,
         ),
+        ExecuteMsg::Burn { amount } => execute::burn(deps, env, info, amount),
     }
 }
 

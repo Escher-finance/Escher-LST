@@ -125,13 +125,14 @@ pub enum ExecuteMsg {
     // Utilities to transfer reward to this contract (for development only)
     TransferReward {},
 
-    // Below are utilities for handling reward
-    // SplitReward {},
     SetConfig {
         lst_contract_address: Option<Addr>,
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
         coin_denom: Option<String>,
+    },
+    Burn {
+        amount: Uint128,
     },
 }
 
