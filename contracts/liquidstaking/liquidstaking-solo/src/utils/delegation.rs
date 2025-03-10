@@ -392,13 +392,24 @@ pub fn get_delegate_to_validator_msgs(
 
     let remaining_amount = delegate_amount - total_delegated;
     if !remaining_amount.is_zero() {
-        let remaining_staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Delegate {
-            validator: first_validator,
-            amount: Coin {
+        let delegate_msg = proto::cosmos::staking::v1beta1::MsgDelegate {
+            delegator_address: delegator.clone(),
+            validator_address: first_validator.to_string(),
+            amount: Some(proto::cosmos::base::v1beta1::Coin {
                 denom: coin_denom.clone(),
-                amount: remaining_amount,
-            },
-        });
+                amount: remaining_amount.into(),
+            }),
+        };
+
+        let staking_msg: proto::babylon::epoching::v1::MsgWrappedDelegate =
+            proto::babylon::epoching::v1::MsgWrappedDelegate {
+                msg: Some(delegate_msg),
+            };
+
+        let remaining_staking_msg = CosmosMsg::Stargate {
+            type_url: "/babylon.epoching.v1.MsgWrappedDelegate".to_string(),
+            value: Binary::from(staking_msg.encode_to_vec()),
+        };
 
         msgs.push(remaining_staking_msg.into());
     }
@@ -409,7 +420,7 @@ pub fn get_unbond_all_messages(
     deps: DepsMut,
     delegator: Addr,
 ) -> Result<Vec<CosmosMsg>, ContractError> {
-    let delegations_resp = deps.querier.query_all_delegations(delegator);
+    let delegations_resp = deps.querier.query_all_delegations(delegator.to_string());
     let params = PARAMETERS.load(deps.storage)?;
     let denom = params.underlying_coin_denom;
 
@@ -428,16 +439,27 @@ pub fn get_unbond_all_messages(
             .map(|d| d.amount.amount)
             .sum();
 
-        let amount = Coin {
-            amount: undelegate_amount.clone(),
-            denom: denom.to_string(),
-        };
-        let undelegate_staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Undelegate {
-            validator: validator.address.to_string(),
-            amount,
-        });
+        let undelegate_msg: proto::cosmos::staking::v1beta1::MsgUndelegate =
+            proto::cosmos::staking::v1beta1::MsgUndelegate {
+                delegator_address: delegator.to_string(),
+                validator_address: validator.address.to_string(),
+                amount: Some(proto::cosmos::base::v1beta1::Coin {
+                    denom: denom.clone(),
+                    amount: undelegate_amount.into(),
+                }),
+            };
 
-        msgs.push(undelegate_staking_msg.into());
+        let wrapped_msg: proto::babylon::epoching::v1::MsgWrappedUndelegate =
+            proto::babylon::epoching::v1::MsgWrappedUndelegate {
+                msg: Some(undelegate_msg),
+            };
+
+        let msg = CosmosMsg::Stargate {
+            type_url: "/babylon.epoching.v1.MsgWrappedDelegate".to_string(),
+            value: Binary::from(wrapped_msg.encode_to_vec()),
+        };
+
+        msgs.push(msg.into());
     }
 
     Ok(msgs)
