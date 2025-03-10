@@ -111,9 +111,9 @@ pub fn query_staking_liquidity(
         validators,
     )?;
 
-    let reward_contract_balance = deps
+    let reward_contract_balance: Balance = deps
         .querier
-        .query_balance(params.reward_address.to_string(), denom)?;
+        .query_wasm_smart(params.reward_address.to_string(), &QueryMsg::Balance {})?;
 
     let total_reward = unclaimed_reward + reward_contract_balance.amount;
 
