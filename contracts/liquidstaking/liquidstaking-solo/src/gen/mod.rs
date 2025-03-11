@@ -17,8 +17,3 @@ pub mod cosmos {
         }
     }
 }
-pub mod google {
-    pub mod api {
-        include!("google.api.rs");
-    }
-}
