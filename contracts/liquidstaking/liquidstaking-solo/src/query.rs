@@ -123,9 +123,10 @@ pub fn query_staking_liquidity(
     let state: State = STATE.load(deps.storage)?;
     let mut exchange_rate: Decimal = Decimal::one();
     if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        let supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
+        let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
+        calc::normalize_supply_queue(&mut supply_queue, env.block.time.clone());
         exchange_rate =
-            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, supply_queue);
+            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
     }
 
     Ok(StakingLiquidity {
