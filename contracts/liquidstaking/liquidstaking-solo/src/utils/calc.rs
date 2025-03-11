@@ -61,27 +61,24 @@ pub fn get_last_epoch_in_seconds(time_in_secs: u64, epoch_period: u64) -> u64 {
     time_in_secs - remainder
 }
 
-fn grab_by_indices<T>(vec: &mut Vec<T>, indices: Vec<usize>) -> Vec<T> {
-    // Collect removed elements
-    let mut grabbed = Vec::with_capacity(indices.len());
+fn get_elements_by_indices<T: Clone>(vec: &Vec<T>, indices: &[usize]) -> Vec<T> {
+    let mut result = Vec::with_capacity(indices.len());
 
-    // Remove elements at the specified indices
-    for &index in &indices {
+    for &index in indices {
         if index < vec.len() {
-            grabbed.push(vec.remove(index));
+            result.push(vec[index].clone());
         }
     }
 
-    // Reverse the grabbed elements to maintain original order
-    grabbed.reverse();
-
-    grabbed
+    result
 }
 
 pub fn normalize_supply_queue(supply_queue: &mut SupplyQueue, current_time: Timestamp) {
     let current_time_in_secs = current_time.seconds();
     let last_epoch_time_in_secs =
         get_last_epoch_in_seconds(current_time_in_secs, supply_queue.epoch_period);
+
+    println!("last_epoch_time_in_secs :{}", last_epoch_time_in_secs);
 
     let mut mint_retain: Vec<usize> = vec![];
     for (pos, mint) in supply_queue.mint.iter().enumerate() {
@@ -90,6 +87,8 @@ pub fn normalize_supply_queue(supply_queue: &mut SupplyQueue, current_time: Time
         }
     }
 
+    println!("mint_retain :{:?}", mint_retain);
+
     let mut burn_retain: Vec<usize> = vec![];
     for (pos, burn) in supply_queue.burn.iter().enumerate() {
         if burn.time.seconds() > last_epoch_time_in_secs {
@@ -97,16 +96,18 @@ pub fn normalize_supply_queue(supply_queue: &mut SupplyQueue, current_time: Time
         }
     }
 
-    supply_queue.mint = grab_by_indices(&mut supply_queue.mint, mint_retain);
-    supply_queue.burn = grab_by_indices(&mut supply_queue.burn, burn_retain);
+    println!("burn_retain :{:?}", burn_retain);
+
+    supply_queue.mint = get_elements_by_indices(&mut supply_queue.mint, &mint_retain);
+    supply_queue.burn = get_elements_by_indices(&mut supply_queue.burn, &burn_retain);
 }
 
 pub fn normalized_total_supply(
-    supply: Uint128,
+    current_supply: Uint128,
     mint_queue: &Vec<MintQueue>,
     burn_queue: &Vec<BurnQueue>,
 ) -> Uint128 {
-    let mut new_supply = supply;
+    let mut new_supply = current_supply;
     for mint in mint_queue {
         new_supply -= mint.amount;
     }
@@ -120,7 +121,7 @@ pub fn normalized_total_supply(
 pub fn calculate_exchange_rate(
     total_bond_amount: Uint128,
     total_supply: Uint128,
-    queue: SupplyQueue,
+    queue: &SupplyQueue,
 ) -> Decimal {
     let mut exchange_rate: Decimal = Decimal::one();
     if total_bond_amount != Uint128::zero() && total_supply != Uint128::zero() {
@@ -130,4 +131,99 @@ pub fn calculate_exchange_rate(
         exchange_rate = Decimal::from_ratio(total_bond_amount, normalized_total_supply);
     }
     exchange_rate
+}
+
+#[cfg(test)]
+#[test]
+fn test_normalized_supply_queue() {
+    let mint_queue = vec![
+        MintQueue {
+            amount: Uint128::new(400),
+            time: Timestamp::from_seconds(1741685408),
+        },
+        MintQueue {
+            amount: Uint128::new(500),
+            time: Timestamp::from_seconds(1711685410),
+        },
+        MintQueue {
+            amount: Uint128::new(200),
+            time: Timestamp::from_seconds(1741685408),
+        },
+    ];
+
+    let burn_queue = vec![
+        BurnQueue {
+            amount: Uint128::new(100),
+            time: Timestamp::from_seconds(1741685408),
+        },
+        BurnQueue {
+            amount: Uint128::new(200),
+            time: Timestamp::from_seconds(1711685410),
+        },
+        BurnQueue {
+            amount: Uint128::new(300),
+            time: Timestamp::from_seconds(1741685408),
+        },
+    ];
+
+    let mut supply_queue = SupplyQueue {
+        mint: mint_queue,
+        burn: burn_queue,
+        epoch_period: 3600,
+    };
+
+    let current_time = Timestamp::from_seconds(1741685410);
+    normalize_supply_queue(&mut supply_queue, current_time);
+    println!(">> new_supply_queue::: {:?} ", supply_queue);
+}
+
+#[test]
+fn test_normalized_total_supply() {
+    let mint_queue = vec![
+        MintQueue {
+            amount: Uint128::new(400),
+            time: Timestamp::from_seconds(1741685408),
+        },
+        MintQueue {
+            amount: Uint128::new(500),
+            time: Timestamp::from_seconds(1711685410),
+        },
+        MintQueue {
+            amount: Uint128::new(200),
+            time: Timestamp::from_seconds(1741685408),
+        },
+    ];
+
+    let burn_queue = vec![
+        BurnQueue {
+            amount: Uint128::new(100),
+            time: Timestamp::from_seconds(1741685408),
+        },
+        BurnQueue {
+            amount: Uint128::new(200),
+            time: Timestamp::from_seconds(1711685410),
+        },
+        BurnQueue {
+            amount: Uint128::new(300),
+            time: Timestamp::from_seconds(1741685408),
+        },
+    ];
+
+    let mut supply_queue = SupplyQueue {
+        mint: mint_queue,
+        burn: burn_queue,
+        epoch_period: 3600,
+    };
+
+    let current_supply = Uint128::from(10000u128);
+    let current_time = Timestamp::from_seconds(1741685410);
+
+    normalize_supply_queue(&mut supply_queue, current_time);
+
+    let new_supply =
+        normalized_total_supply(current_supply, &supply_queue.mint, &supply_queue.burn);
+    println!(
+        "current_supply :{} >> new_supply::: {} ",
+        current_supply, new_supply
+    );
 }
