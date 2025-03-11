@@ -14,6 +14,9 @@ pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
 // Map of channel id to the quote token and lst quote token of destination chain
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 
+// mint and burn queue of staking token
+pub const SUPPLY_QUEUE: Item<SupplyQueue> = Item::new("supply_queue");
+
 #[cw_serde]
 pub struct State {
     pub exchange_rate: Decimal,
@@ -140,4 +143,31 @@ pub struct Config {
     pub fee_receiver: Addr,
     pub fee_rate: Decimal,
     pub coin_denom: String,
+}
+
+/// the queued staking token mint amount
+#[cw_serde]
+pub struct MintQueue {
+    pub amount: Uint128,
+    pub time: Timestamp,
+}
+
+/// the queued staking token burn amount
+#[cw_serde]
+pub struct BurnQueue {
+    pub amount: Uint128,
+    pub time: Timestamp,
+}
+
+/// the minted and burned amount that is not counted yet for exchange rate calculation that will be reset to zero every hour
+#[cw_serde]
+pub struct SupplyQueue {
+    /// the mint amount that is not added for total supply, so total supply should be substracted with this mint amount value
+    /// to get the total supply calculation for exchange rate
+    pub mint: Vec<MintQueue>,
+    /// the burn amount that is not substracted from real total supply, so total supply should be added with this burn amount value
+    /// to get the total supply calculation for exchange rate
+    pub burn: Vec<BurnQueue>,
+    /// epooch period in seconds
+    pub epoch_period: u64,
 }

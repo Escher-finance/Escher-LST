@@ -8,8 +8,8 @@ use crate::ContractError;
 use crate::{
     msg::{Balance, BondData, DelegationDiff, MintTokensPayload, QueryMsg, UnbondData},
     state::{
-        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, LOG, PARAMETERS,
-        STATE, VALIDATORS_REGISTRY,
+        increment_tokens, unbond_record, Parameters, SupplyQueue, UnbondRecord, Validator, LOG,
+        PARAMETERS, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::{
@@ -546,8 +546,10 @@ pub fn process_bond(
 
     let mut exchange_rate = state.exchange_rate;
 
-    if !total_bond_amount.is_zero() && !state.total_supply.is_zero() {
-        exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
+    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+        let supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
+        exchange_rate =
+            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, supply_queue);
     }
 
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
@@ -558,7 +560,7 @@ pub fn process_bond(
     state.total_supply += mint_amount;
     state.total_delegated_amount += amount;
     state.last_bond_time = bond_time;
-    state.update_exchange_rate();
+    state.exchange_rate = exchange_rate;
 
     STATE.save(storage, &state)?;
 
@@ -640,7 +642,14 @@ pub fn process_unbond(
     if total_bond_amount.is_zero() || state.total_supply.is_zero() {
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
     }
-    let current_exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
+
+    let mut current_exchange_rate = state.exchange_rate;
+
+    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+        let supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
+        current_exchange_rate =
+            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, supply_queue);
+    }
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
     let undelegate_amount: Uint128 = calc::calculate_native_token_from_staking_token(
@@ -688,7 +697,7 @@ pub fn process_unbond(
     state.total_bond_amount = total_bond_amount - undelegate_amount;
     state.total_supply = state.total_supply - unbond_amount;
     state.total_delegated_amount = delegated_amount - undelegate_amount;
-    state.update_exchange_rate();
+    state.exchange_rate = current_exchange_rate;
     STATE.save(storage, &state)?;
 
     Ok((

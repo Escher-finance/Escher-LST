@@ -1,8 +1,8 @@
-use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
+use crate::state::{BurnQueue, MintQueue, SupplyQueue};
+use crate::ContractError;
+use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Timestamp, Uint128, Uint256};
 use cw20::TokenInfoResponse;
 use std::str::FromStr;
-
-use crate::ContractError;
 
 const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
 
@@ -54,4 +54,80 @@ pub fn check_slippage(
     }
 
     Ok(())
+}
+
+pub fn get_last_epoch_in_seconds(time_in_secs: u64, epoch_period: u64) -> u64 {
+    let remainder = time_in_secs % epoch_period;
+    time_in_secs - remainder
+}
+
+fn grab_by_indices<T>(vec: &mut Vec<T>, indices: Vec<usize>) -> Vec<T> {
+    // Collect removed elements
+    let mut grabbed = Vec::with_capacity(indices.len());
+
+    // Remove elements at the specified indices
+    for &index in &indices {
+        if index < vec.len() {
+            grabbed.push(vec.remove(index));
+        }
+    }
+
+    // Reverse the grabbed elements to maintain original order
+    grabbed.reverse();
+
+    grabbed
+}
+
+pub fn normalize_supply_queue(supply_queue: &mut SupplyQueue, current_time: Timestamp) {
+    let current_time_in_secs = current_time.seconds();
+    let last_epoch_time_in_secs =
+        get_last_epoch_in_seconds(current_time_in_secs, supply_queue.epoch_period);
+
+    let mut mint_retain: Vec<usize> = vec![];
+    for (pos, mint) in supply_queue.mint.iter().enumerate() {
+        if mint.time.seconds() > last_epoch_time_in_secs {
+            mint_retain.push(pos);
+        }
+    }
+
+    let mut burn_retain: Vec<usize> = vec![];
+    for (pos, burn) in supply_queue.burn.iter().enumerate() {
+        if burn.time.seconds() > last_epoch_time_in_secs {
+            burn_retain.push(pos)
+        }
+    }
+
+    supply_queue.mint = grab_by_indices(&mut supply_queue.mint, mint_retain);
+    supply_queue.burn = grab_by_indices(&mut supply_queue.burn, burn_retain);
+}
+
+pub fn normalized_total_supply(
+    supply: Uint128,
+    mint_queue: &Vec<MintQueue>,
+    burn_queue: &Vec<BurnQueue>,
+) -> Uint128 {
+    let mut new_supply = supply;
+    for mint in mint_queue {
+        new_supply -= mint.amount;
+    }
+    for burn in burn_queue {
+        new_supply += burn.amount;
+    }
+    new_supply
+}
+
+/// return how much is the exchange rate
+pub fn calculate_exchange_rate(
+    total_bond_amount: Uint128,
+    total_supply: Uint128,
+    queue: SupplyQueue,
+) -> Decimal {
+    let mut exchange_rate: Decimal = Decimal::one();
+    if total_bond_amount != Uint128::zero() && total_supply != Uint128::zero() {
+        let normalized_total_supply =
+            normalized_total_supply(total_supply, &queue.mint, &queue.burn);
+
+        exchange_rate = Decimal::from_ratio(total_bond_amount, normalized_total_supply);
+    }
+    exchange_rate
 }

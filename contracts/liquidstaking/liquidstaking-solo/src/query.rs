@@ -3,9 +3,10 @@ use std::marker::PhantomData;
 use crate::msg::{Balance, Log, QueryMsg, StakingLiquidity};
 use crate::state::unbond_record;
 use crate::state::{
-    Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, LOG, PARAMETERS, QUOTE_TOKEN,
-    REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
+    Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, ValidatorsRegistry, LOG, PARAMETERS,
+    QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
+use crate::utils::calc;
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
@@ -122,7 +123,9 @@ pub fn query_staking_liquidity(
     let state: State = STATE.load(deps.storage)?;
     let mut exchange_rate: Decimal = Decimal::one();
     if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
+        let supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
+        exchange_rate =
+            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, supply_queue);
     }
 
     Ok(StakingLiquidity {

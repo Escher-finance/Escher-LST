@@ -172,6 +172,7 @@ pub fn execute(
             coin_denom,
         ),
         ExecuteMsg::Burn { amount } => execute::burn(deps, env, info, amount),
+        ExecuteMsg::NormalizeSupply {} => execute::normalize_supply(deps, env),
     }
 }
 

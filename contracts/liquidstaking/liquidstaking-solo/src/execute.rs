@@ -10,11 +10,12 @@ use crate::msg::{BondRewardsPayload, ExecuteMsg, ExecuteRewardMsg, MigrateMsg, Z
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
     unbond_record, QuoteToken, Validator, CONFIG, LOG, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE,
-    STATE, VALIDATORS_REGISTRY,
+    STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use crate::utils::{
-    self, calc::check_slippage, delegation::get_actual_total_delegated,
-    delegation::get_actual_total_reward, delegation::to_uint128,
+    self, calc::check_slippage, calc::normalize_supply_queue,
+    delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
+    delegation::to_uint128,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
@@ -1181,6 +1182,14 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         .add_messages(msgs)
         .add_event(event)
         .add_attributes(attrs))
+}
+
+pub fn normalize_supply(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
+    let mut supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
+
+    normalize_supply_queue(&mut supply_queue, env.block.time);
+    SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
+    Ok(Response::default())
 }
 
 #[cfg(test)]
