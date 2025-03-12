@@ -90,6 +90,7 @@ pub fn bond(
         validators_reg.clone(),
         salt,
         None,
+        env.block.height,
     )?;
 
     // increment the reward balance on this contract
@@ -263,6 +264,7 @@ pub fn zkgm_bond(
         validators_reg,
         salt,
         Some(channel_id),
+        env.block.height,
     )?;
 
     // create bond event here
@@ -1187,7 +1189,7 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
 pub fn normalize_supply(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
     let mut supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
 
-    normalize_supply_queue(&mut supply_queue, env.block.time);
+    normalize_supply_queue(&mut supply_queue, env.block.height);
     SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
     Ok(Response::default())
 }

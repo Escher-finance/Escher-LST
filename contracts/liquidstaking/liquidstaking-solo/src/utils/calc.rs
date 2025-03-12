@@ -1,6 +1,6 @@
 use crate::state::{BurnQueue, MintQueue, SupplyQueue};
 use crate::ContractError;
-use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Timestamp, Uint128, Uint256};
+use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
 use cw20::TokenInfoResponse;
 use std::str::FromStr;
 
@@ -56,9 +56,9 @@ pub fn check_slippage(
     Ok(())
 }
 
-pub fn get_last_epoch_in_seconds(time_in_secs: u64, epoch_period: u64) -> u64 {
-    let remainder = time_in_secs % epoch_period;
-    time_in_secs - remainder
+pub fn get_last_epoch_block(block: u64, epoch_period: u32) -> u64 {
+    let remainder: u64 = block % epoch_period as u64;
+    block - remainder
 }
 
 fn get_elements_by_indices<T: Clone>(vec: &Vec<T>, indices: &[usize]) -> Vec<T> {
@@ -73,36 +73,25 @@ fn get_elements_by_indices<T: Clone>(vec: &Vec<T>, indices: &[usize]) -> Vec<T> 
     result
 }
 
-pub fn normalize_supply_queue(supply_queue: &mut SupplyQueue, current_time: Timestamp) {
-    let current_time_in_secs = current_time.seconds();
-    let last_epoch_time_in_secs =
-        get_last_epoch_in_seconds(current_time_in_secs, supply_queue.epoch_period);
-
-    println!("last_epoch_time_in_secs :{}", last_epoch_time_in_secs);
-
+pub fn normalize_supply_queue(supply_queue: &mut SupplyQueue, current_block: u64) {
+    let last_epoch_block = get_last_epoch_block(current_block, supply_queue.epoch_period);
     let mut mint_retain: Vec<usize> = vec![];
     for (pos, mint) in supply_queue.mint.iter().enumerate() {
-        if mint.time.seconds() > last_epoch_time_in_secs {
+        if mint.block > last_epoch_block {
             mint_retain.push(pos);
         }
     }
-
-    println!("mint_retain :{:?}", mint_retain);
-
     let mut burn_retain: Vec<usize> = vec![];
     for (pos, burn) in supply_queue.burn.iter().enumerate() {
-        if burn.time.seconds() > last_epoch_time_in_secs {
+        if burn.block > last_epoch_block {
             burn_retain.push(pos)
         }
     }
-
-    println!("burn_retain :{:?}", burn_retain);
-
     supply_queue.mint = get_elements_by_indices(&mut supply_queue.mint, &mint_retain);
     supply_queue.burn = get_elements_by_indices(&mut supply_queue.burn, &burn_retain);
 }
 
-pub fn normalized_total_supply(
+pub fn normalize_total_supply(
     current_supply: Uint128,
     mint_queue: &Vec<MintQueue>,
     burn_queue: &Vec<BurnQueue>,
@@ -125,44 +114,43 @@ pub fn calculate_exchange_rate(
 ) -> Decimal {
     let mut exchange_rate: Decimal = Decimal::one();
     if total_bond_amount != Uint128::zero() && total_supply != Uint128::zero() {
-        let normalized_total_supply =
-            normalized_total_supply(total_supply, &queue.mint, &queue.burn);
+        let normalize_total_supply = normalize_total_supply(total_supply, &queue.mint, &queue.burn);
 
-        exchange_rate = Decimal::from_ratio(total_bond_amount, normalized_total_supply);
+        exchange_rate = Decimal::from_ratio(total_bond_amount, normalize_total_supply);
     }
     exchange_rate
 }
 
 #[cfg(test)]
 #[test]
-fn test_normalized_supply_queue() {
+fn test_normalize_supply_queue() {
     let mint_queue = vec![
         MintQueue {
-            amount: Uint128::new(400),
-            time: Timestamp::from_seconds(1741685408),
+            amount: Uint128::new(40),
+            block: 700,
         },
         MintQueue {
-            amount: Uint128::new(500),
-            time: Timestamp::from_seconds(1711685410),
+            amount: Uint128::new(50),
+            time: 650,
         },
         MintQueue {
-            amount: Uint128::new(200),
-            time: Timestamp::from_seconds(1741685408),
+            amount: Uint128::new(20),
+            time: 730,
         },
     ];
 
     let burn_queue = vec![
         BurnQueue {
-            amount: Uint128::new(100),
-            time: Timestamp::from_seconds(1741685408),
+            amount: Uint128::new(10),
+            time: 700,
         },
         BurnQueue {
-            amount: Uint128::new(200),
-            time: Timestamp::from_seconds(1711685410),
+            amount: Uint128::new(20),
+            time: 730,
         },
         BurnQueue {
-            amount: Uint128::new(300),
-            time: Timestamp::from_seconds(1741685408),
+            amount: Uint128::new(30),
+            time: 650,
         },
     ];
 
@@ -172,56 +160,55 @@ fn test_normalized_supply_queue() {
         epoch_period: 3600,
     };
 
-    let current_time = Timestamp::from_seconds(1741685410);
+    let current_block = 740;
     normalize_supply_queue(&mut supply_queue, current_time);
     println!(">> new_supply_queue::: {:?} ", supply_queue);
 }
 
 #[test]
-fn test_normalized_total_supply() {
+fn test_normalize_total_supply() {
     let mint_queue = vec![
         MintQueue {
-            amount: Uint128::new(400),
-            time: Timestamp::from_seconds(1741685408),
+            amount: Uint128::new(40),
+            time: 700,
         },
         MintQueue {
-            amount: Uint128::new(500),
-            time: Timestamp::from_seconds(1711685410),
+            amount: Uint128::new(50),
+            time: 171168541,
         },
         MintQueue {
-            amount: Uint128::new(200),
-            time: Timestamp::from_seconds(1741685408),
+            amount: Uint128::new(20),
+            time: 700,
         },
     ];
 
     let burn_queue = vec![
         BurnQueue {
-            amount: Uint128::new(100),
-            time: Timestamp::from_seconds(1741685408),
+            amount: Uint128::new(10),
+            time: 700,
         },
         BurnQueue {
-            amount: Uint128::new(200),
-            time: Timestamp::from_seconds(1711685410),
+            amount: Uint128::new(20),
+            time: 171168541,
         },
         BurnQueue {
-            amount: Uint128::new(300),
-            time: Timestamp::from_seconds(1741685408),
+            amount: Uint128::new(30),
+            time: 700,
         },
     ];
 
     let mut supply_queue = SupplyQueue {
         mint: mint_queue,
         burn: burn_queue,
-        epoch_period: 3600,
+        epoch_period: 360,
     };
 
-    let current_supply = Uint128::from(10000u128);
-    let current_time = Timestamp::from_seconds(1741685410);
+    let current_supply = Uint128::from(20000u128);
+    let current_block = 1000;
 
     normalize_supply_queue(&mut supply_queue, current_time);
 
-    let new_supply =
-        normalized_total_supply(current_supply, &supply_queue.mint, &supply_queue.burn);
+    let new_supply = normalize_total_supply(current_supply, &supply_queue.mint, &supply_queue.burn);
     println!(
         "current_supply :{} >> new_supply::: {} ",
         current_supply, new_supply

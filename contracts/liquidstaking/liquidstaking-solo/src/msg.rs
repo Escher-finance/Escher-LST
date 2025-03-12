@@ -30,8 +30,10 @@ pub struct InstantiateMsg {
     pub cw20_address: Addr,
     /// salt that is used for ucs03 relayer transfer call
     pub salt: String,
-    // tokens
+    /// tokens
     pub quote_tokens: Vec<QuoteToken>,
+    /// epoch period
+    pub epoch_period: Option<u32>,
 }
 
 #[cw_serde]
@@ -205,6 +207,7 @@ pub struct StakingLiquidity {
     pub exchange_rate: Decimal,
     pub time: Timestamp,
     pub total_supply: Uint128,
+    pub adjusted_supply: Uint128,
 }
 
 #[cw_serde]

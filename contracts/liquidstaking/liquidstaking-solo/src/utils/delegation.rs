@@ -8,14 +8,13 @@ use crate::ContractError;
 use crate::{
     msg::{Balance, BondData, DelegationDiff, MintTokensPayload, QueryMsg, UnbondData},
     state::{
-        increment_tokens, unbond_record, Parameters, SupplyQueue, UnbondRecord, Validator, LOG,
-        PARAMETERS, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+        increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
+        UnbondRecord, Validator, LOG, PARAMETERS, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::{
     to_json_binary, Addr, Binary, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse,
-    DepsMut, Env, QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Timestamp, Uint128,
-    Uint256,
+    DepsMut, Env, QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
 };
 use prost::Message;
 use std::collections::HashMap;
@@ -504,6 +503,7 @@ pub fn process_bond(
     validators_reg: ValidatorsRegistry,
     salt: String,
     channel_id: Option<u32>,
+    block_height: u64,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     let coin_denom = params.underlying_coin_denom.to_string();
     let msgs = delegation::get_delegate_to_validator_msgs(
@@ -546,13 +546,11 @@ pub fn process_bond(
     }
 
     let mut exchange_rate = state.exchange_rate;
-
+    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
     if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
-        calc::normalize_supply_queue(&mut supply_queue, Timestamp::from_nanos(bond_time));
+        calc::normalize_supply_queue(&mut supply_queue, block_height);
         exchange_rate =
             calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
-        SUPPLY_QUEUE.save(storage, &supply_queue)?;
     }
 
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
@@ -576,6 +574,12 @@ pub fn process_bond(
         channel_id,
     };
     let payload_bin = to_json_binary(&payload)?;
+
+    supply_queue.mint.push(MintQueue {
+        block: block_height,
+        amount: mint_amount,
+    });
+    SUPPLY_QUEUE.save(storage, &supply_queue)?;
 
     if !cfg!(test) {
         // Start to mint according to staked token only if it is not test
@@ -647,14 +651,12 @@ pub fn process_unbond(
     }
 
     let mut current_exchange_rate = state.exchange_rate;
+    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
 
     if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
-        calc::normalize_supply_queue(&mut supply_queue, env.block.time.clone());
-
+        calc::normalize_supply_queue(&mut supply_queue, env.block.height);
         current_exchange_rate =
             calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
-        SUPPLY_QUEUE.save(storage, &supply_queue)?;
     }
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
@@ -683,6 +685,12 @@ pub fn process_unbond(
     )?;
     let burn_msg = token::burn_token(unbond_amount, params.cw20_address.to_string());
     msgs.push(burn_msg.into());
+
+    supply_queue.burn.push(BurnQueue {
+        block: env.block.height,
+        amount: unbond_amount,
+    });
+    SUPPLY_QUEUE.save(storage, &supply_queue)?;
 
     let id: u64 = increment_tokens(storage).unwrap();
     let history = UnbondRecord {

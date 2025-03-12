@@ -6,8 +6,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, Parameters, State, Validator, ValidatorsRegistry, CONFIG, LOG, PARAMETERS, QUOTE_TOKEN,
-    REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
+    Config, Parameters, State, SupplyQueue, Validator, ValidatorsRegistry, CONFIG, LOG, PARAMETERS,
+    QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -77,6 +77,14 @@ pub fn instantiate(
     for quote_token in msg.quote_tokens {
         QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
     }
+
+    // set the supply queue
+    let supply_queue = SupplyQueue {
+        mint: vec![],
+        burn: vec![],
+        epoch_period: msg.epoch_period.unwrap_or(360),
+    };
+    SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
 
     Ok(Response::new().add_attribute("action", "instantiate"))
 }

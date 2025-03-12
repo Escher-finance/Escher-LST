@@ -149,14 +149,14 @@ pub struct Config {
 #[cw_serde]
 pub struct MintQueue {
     pub amount: Uint128,
-    pub time: Timestamp,
+    pub block: u64,
 }
 
 /// the queued staking token burn amount
 #[cw_serde]
 pub struct BurnQueue {
     pub amount: Uint128,
-    pub time: Timestamp,
+    pub block: u64,
 }
 
 /// the minted and burned amount that is not counted yet for exchange rate calculation that will be reset to zero every hour
@@ -169,5 +169,5 @@ pub struct SupplyQueue {
     /// to get the total supply calculation for exchange rate
     pub burn: Vec<BurnQueue>,
     /// epooch period in seconds
-    pub epoch_period: u64,
+    pub epoch_period: u32,
 }
