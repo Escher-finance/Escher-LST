@@ -13,8 +13,8 @@ import { useGlobalContext } from "@/app/core/context";
 export default function InstantiateLiquidStaking() {
   const { userAddress, client, network } = useGlobalContext();
 
-  const lstCodeId = network.toString() === "uniontestnet" ? 258 : 196;
-  const rewardCodeId = network.toString() === "uniontestnet" ? 171 : 194;
+  const lstCodeId = network.toString() === "uniontestnet" ? 258 : 235;
+  const rewardCodeId = network.toString() === "uniontestnet" ? 171 : 235;
 
   const handleSubmit = async (e: any) => {
     // Prevent the browser from reloading the page
@@ -51,21 +51,19 @@ export default function InstantiateLiquidStaking() {
         }]
     };
 
-
-
     const babyMsg = {
       underlying_coin_denom: "ubbn",
       validators: [
-        { weight: 1, address: "bbnvaloper109x4ruspxarwt62puwcenhclw36l9v7j92f0ex" },
+        { weight: 1, address: "bbnvaloper1z4ycjc5jykran5kxjjw90pxk6sx8w7fr2zxg93" },
       ],
       liquidstaking_denom: "ebbn",
-      ucs03_relay_contract: "bbn144hnwjtykzje3r4eccszq33fegycymh680huylagm3tqrwxhjrjqvkul3y",
-      fee_rate: "0.1",
+      ucs03_relay_contract: "bbn1s5qwgvzzvs5h2wurz7mjwmc4n650g3207caddlz35fay8cl5ay6ss86ejy",
+      fee_rate: "0.05",
       fee_receiver: "bbn17z2ea0dtzkpu9lc2eh0jcwxywh40th5ej00y9g",
       reward_code_id: rewardCodeId,
       unbonding_time: 1944000,
       salt: uuidv4(),
-      cw20_address: "bbn144hnwjtykzje3r4eccszq33fegycymh680huylagm3tqrwxhjrjqvkul3y",
+      cw20_address: "bbn1s5qwgvzzvs5h2wurz7mjwmc4n650g3207caddlz35fay8cl5ay6ss86ejy",
       quote_tokens: []
     };
 

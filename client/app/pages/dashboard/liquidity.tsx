@@ -116,9 +116,8 @@ export default function Liquidity({ stateKey }: AssetsProps) {
                                     Total Supply (Liquid Staking Token):
                                 </div>
                                 <div>
-                                    {Intl.NumberFormat('en-US').format(totalSupply)}  {network?.stakeCurrency.liquidStakingDenomDisplay}   (cw20) <br />
-                                    {Intl.NumberFormat('en-US').format(Number(state?.total_supply))}  {network?.stakeCurrency.liquidStakingDenomDisplay} (lst contract)
-
+                                    {Intl.NumberFormat('en-US').format(totalSupply)}  {network?.stakeCurrency.liquidStakingDenom}   (cw20) <br />
+                                    {Intl.NumberFormat('en-US').format(Number(liquidity.adjusted_supply))} {network?.stakeCurrency.liquidStakingDenom} (adjusted)
                                 </div>
                                 <div>
                                     Bond counter:

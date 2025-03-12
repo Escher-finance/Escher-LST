@@ -60,7 +60,7 @@ export default function InstantiateCW20() {
         userAddress,
         Number(code_id),
         msg,
-        "cw20",
+        "ebaby",
         "auto",
         instantiateOptions
       );

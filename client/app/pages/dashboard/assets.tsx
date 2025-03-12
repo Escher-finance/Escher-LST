@@ -124,7 +124,7 @@ export default function Assets({ stateKey }: AssetsProps) {
                                     },
                                 },
                             }}
-                        ><Chip>{Intl.NumberFormat('en-US').format(Number(ustakeBalance))} U</Chip></Tooltip>
+                        ><Chip>{Intl.NumberFormat('en-US').format(Number(ustakeBalance))} {network?.stakeCurrency.coinDenom}</Chip></Tooltip>
                         <br />
 
                     </div>
@@ -152,7 +152,7 @@ export default function Assets({ stateKey }: AssetsProps) {
                                     },
                                 },
                             }}
-                        ><Chip>{Intl.NumberFormat('en-US').format(Number(ulstakeBalance))} eU</Chip></Tooltip>
+                        ><Chip>{Intl.NumberFormat('en-US').format(Number(ulstakeBalance))}  {network?.stakeCurrency.liquidStakingDenomDisplay}</Chip></Tooltip>
 
                     </div>
                 </div>

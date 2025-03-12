@@ -50,7 +50,7 @@ const currency: Record<SupportedNetworks, Currency> = {
     coinDenom: "BABY",
     coinMinimalDenom: "ubbn",
     coinDecimals: 6,
-    liquidStakingDenom: "ubbn",
+    liquidStakingDenom: "ebbn",
     liquidStakingDenomDisplay: "eBABY"
   },
 };
@@ -103,9 +103,9 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     currencies: [currency["babylontestnet"]],
     feeCurrencies: [currency["babylontestnet"]],
     contracts: {
-      lst: "bbn18ed0qdj7nvytfvc6rftgryk4krxxw4k2ql7e7f7z3t747828czrs52vxaa",
-      cw20: "bbn144hnwjtykzje3r4eccszq33fegycymh680huylagm3tqrwxhjrjqvkul3y",
-      reward: "bbn18ed0qdj7nvytfvc6rftgryk4krxxw4k2ql7e7f7z3t747828czrs52vxaa",
+      lst: "bbn1qmayg959zunza00s040ppqesf7qnvusys3r2m9vw35ry28x9sncq84jphy",
+      cw20: "bbn1s5qwgvzzvs5h2wurz7mjwmc4n650g3207caddlz35fay8cl5ay6ss86ejy",
+      reward: "bbn1qmayg959zunza00s040ppqesf7qnvusys3r2m9vw35ry28x9sncq84jphy",
     },
     gasPrice: "0.0025ubbn",
   },

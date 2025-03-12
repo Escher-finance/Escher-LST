@@ -8,6 +8,7 @@ import { Accordion, Button, AccordionItem } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
 import SetParams from "./set_params";
 import SetMinter from "./set_minter";
+import Burn from "./burn";
 // import ExecuteBond from "./execute_bond";
 // import QueryTotalBond from "./query_total_bond";
 // import QueryConfig from "./query_config";
@@ -87,8 +88,6 @@ export default function Utils() {
     }
   }
 
-
-
   return (
     <div className="w-full flex flex-col gap-4">
       <div className="w-full">
@@ -125,6 +124,14 @@ export default function Utils() {
               title="Set Minter"
             >
               <SetMinter />
+            </AccordionItem>
+
+            <AccordionItem
+              key="5"
+              aria-label="Burn"
+              title="Burn"
+            >
+              <Burn />
             </AccordionItem>
             {/* 
             <AccordionItem

@@ -45,7 +45,7 @@ export default function RevenueAssets({ stateKey }: AssetsProps) {
             <CardBody className="gap-1">
                 <div className="flex flex-col">
                     <div className="p-3 text-sm">
-                        Native: {Intl.NumberFormat('en-US').format(Number(stakeBalance))} muno
+                        Native: {Intl.NumberFormat('en-US').format(Number(stakeBalance))} {network?.stakeCurrency.coinMinimalDenom}
                     </div>
                 </div>
             </CardBody>
