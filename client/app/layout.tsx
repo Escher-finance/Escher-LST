@@ -37,7 +37,7 @@ export default function RootLayout({
                   title="nextui.org homepage"
                 >
                   <span className="text-default-600">Powered by</span>
-                  <p className="text-primary">NOMOS</p>
+                  <p className="text-primary">Escher</p>
                 </Link>
               </footer>
             </div>

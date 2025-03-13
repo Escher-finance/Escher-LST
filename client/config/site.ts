@@ -1,8 +1,8 @@
 export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
-  name: "Nomos",
-  description: "Multisig for cosmosverse",
+  name: "Escher",
+  description: "Liquid Staking without boundary",
   navItems: [
     {
       label: "Home",
