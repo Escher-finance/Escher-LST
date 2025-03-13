@@ -121,6 +121,7 @@ pub enum ExecuteMsg {
         salt: String,
     },
     NormalizeSupply {},
+    SplitReward {},
     /// Reset will set state to initial state and unbond all delegations (for development phase only)
     Reset {},
     /// Transfer all native balance of this contract to owner (for development purpose only)

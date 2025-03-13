@@ -164,6 +164,7 @@ pub fn execute(
             message,
         } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
+        ExecuteMsg::SplitReward {} => execute::split_reward(deps, env, info),
         ExecuteMsg::TransferReward {} => execute::transfer_reward(deps),
         ExecuteMsg::SetConfig {
             lst_contract_address,
