@@ -13,8 +13,8 @@ use crate::{
     },
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse,
-    DepsMut, Env, QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
+    to_json_binary, Addr, Binary, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
+    QuerierWrapper, StdResult, Storage, SubMsg, Uint128, Uint256,
 };
 use prost::Message;
 use std::collections::HashMap;
@@ -148,6 +148,7 @@ pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
 }
 
 pub fn get_undelegate_from_validator_msgs(
+    delegator: String,
     undelegate_amount: Uint128,
     coin_denom: String,
     validators: Vec<Validator>,
@@ -178,14 +179,26 @@ pub fn get_undelegate_from_validator_msgs(
             undelegate_amount_for_validator += remaining;
         }
 
-        let amount = Coin {
-            amount: undelegate_amount_for_validator.clone(),
-            denom: coin_denom.to_string(),
+        let undelegate_msg: proto::cosmos::staking::v1beta1::MsgUndelegate =
+            proto::cosmos::staking::v1beta1::MsgUndelegate {
+                delegator_address: delegator.to_string(),
+                validator_address: validator.address.to_string(),
+                amount: Some(proto::cosmos::base::v1beta1::Coin {
+                    denom: coin_denom.clone(),
+                    amount: undelegate_amount_for_validator.into(),
+                }),
+            };
+
+        let wrapped_msg: proto::babylon::epoching::v1::MsgWrappedUndelegate =
+            proto::babylon::epoching::v1::MsgWrappedUndelegate {
+                msg: Some(undelegate_msg),
+            };
+
+        let undelegate_staking_msg = CosmosMsg::Stargate {
+            type_url: "/babylon.epoching.v1.MsgWrappedUndelegate".to_string(),
+            value: Binary::from(wrapped_msg.encode_to_vec()),
         };
-        let undelegate_staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Undelegate {
-            validator: validator.address.to_string(),
-            amount,
-        });
+
         msgs.push(undelegate_staking_msg);
     }
 
@@ -287,6 +300,7 @@ pub fn get_surplus_deficit_validators(
 }
 
 pub fn get_restaking_msgs(
+    delegator: String,
     mut surplus_validators: Vec<ValidatorDelegation>,
     mut deficient_validators: Vec<ValidatorDelegation>,
     denom: String,
@@ -303,37 +317,58 @@ pub fn get_restaking_msgs(
                     break;
                 }
 
-                // the deficit amount higher than surplus amount so we can restake all surplus amount
-                let undelegate_msg = CosmosMsg::Staking(StakingMsg::Redelegate {
-                    src_validator: surplus_validator.address.clone(),
-                    dst_validator: deficient_validator.address.clone(),
-                    amount: Coin {
-                        amount: surplus_validator.diff_amount,
+                let redelegate_msg = proto::cosmos::staking::v1beta1::MsgBeginRedelegate {
+                    delegator_address: delegator.clone(),
+                    validator_src_address: surplus_validator.address.to_string(),
+                    validator_dst_address: deficient_validator.address.clone(),
+                    amount: Some(proto::cosmos::base::v1beta1::Coin {
                         denom: denom.clone(),
-                    },
-                });
+                        amount: surplus_validator.diff_amount.into(),
+                    }),
+                };
+
+                let restaking_msg: proto::babylon::epoching::v1::MsgWrappedBeginRedelegate =
+                    proto::babylon::epoching::v1::MsgWrappedBeginRedelegate {
+                        msg: Some(redelegate_msg),
+                    };
+
+                let redelegate = CosmosMsg::Stargate {
+                    type_url: "/babylon.epoching.v1.MsgWrappedBeginRedelegate".to_string(),
+                    value: Binary::from(restaking_msg.encode_to_vec()),
+                };
                 surplus_validator.diff_amount = Uint128::from(0u32);
                 deficient_validator.diff_amount =
                     deficient_validator.diff_amount - surplus_validator.diff_amount;
 
-                msgs.push(undelegate_msg);
+                msgs.push(redelegate);
                 //
             } else {
                 println!("{:?} <> {:?}", surplus_validator, deficient_validator);
 
-                let undelegate_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Redelegate {
-                    src_validator: surplus_validator.address.clone(),
-                    dst_validator: deficient_validator.address.clone(),
-                    amount: Coin {
-                        amount: deficient_validator.diff_amount,
+                let redelegate_msg = proto::cosmos::staking::v1beta1::MsgBeginRedelegate {
+                    delegator_address: delegator.clone(),
+                    validator_src_address: surplus_validator.address.to_string(),
+                    validator_dst_address: deficient_validator.address.clone(),
+                    amount: Some(proto::cosmos::base::v1beta1::Coin {
                         denom: denom.clone(),
-                    },
-                });
+                        amount: deficient_validator.diff_amount.into(),
+                    }),
+                };
+
+                let restaking_msg: proto::babylon::epoching::v1::MsgWrappedBeginRedelegate =
+                    proto::babylon::epoching::v1::MsgWrappedBeginRedelegate {
+                        msg: Some(redelegate_msg),
+                    };
+
+                let redelegate = CosmosMsg::Stargate {
+                    type_url: "/babylon.epoching.v1.MsgWrappedBeginRedelegate".to_string(),
+                    value: Binary::from(restaking_msg.encode_to_vec()),
+                };
 
                 surplus_validator.diff_amount =
                     surplus_validator.diff_amount - deficient_validator.diff_amount;
                 deficient_validator.diff_amount = Uint128::from(0u32);
-                msgs.push(undelegate_msg);
+                msgs.push(redelegate);
             }
         }
     }
@@ -485,7 +520,12 @@ pub fn adjust_validators_delegation(
     let (surplus_validators, deficient_validators) =
         get_surplus_deficit_validators(validator_delegation_map, correct_validator_delegation_map);
 
-    let msgs: Vec<CosmosMsg> = get_restaking_msgs(surplus_validators, deficient_validators, denom);
+    let msgs: Vec<CosmosMsg> = get_restaking_msgs(
+        delegator.to_string(),
+        surplus_validators,
+        deficient_validators,
+        denom,
+    );
 
     Ok(msgs)
 }
@@ -670,6 +710,7 @@ pub fn process_unbond(
         return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker and if process rewards not happen yet
     }
     let undelegate_msgs = get_undelegate_from_validator_msgs(
+        delegator.to_string(),
         undelegate_amount,
         coin_denom.clone(),
         validators_reg.validators,

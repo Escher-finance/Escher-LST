@@ -23,3 +23,15 @@ pub struct MsgUndelegate {
     #[prost(message, optional, tag = "3")]
     pub amount: ::core::option::Option<super::super::base::v1beta1::Coin>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MsgBeginRedelegate {
+    #[prost(string, tag = "1")]
+    pub delegator_address: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub validator_src_address: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub validator_dst_address: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "4")]
+    pub amount: ::core::option::Option<super::super::base::v1beta1::Coin>,
+}
