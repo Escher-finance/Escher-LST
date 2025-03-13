@@ -79,13 +79,13 @@ export default function UnbondingRecords() {
                                                 {record.amount} {network?.stakeCurrency.liquidStakingDenomDisplay}
                                             </td>
                                             <td>
-                                                {record.undelegate_amount} muno
+                                                {record.undelegate_amount} {network?.stakeCurrency.coinMinimalDenom}
                                             </td>
                                             <td>
                                                 {new Date(Number(record.created / 1000000)).toLocaleString()}
                                             </td>
                                             <td>
-                                                {new Date(Number(record.created / 1000000) + 180000).toLocaleString()}
+                                                {new Date(Number(record.created / 1000000) + 64800000).toLocaleString()}
                                             </td>
                                         </tr></>
                                     )
@@ -114,13 +114,13 @@ export default function UnbondingRecords() {
                                                 {record.amount} {network?.stakeCurrency.liquidStakingDenomDisplay}
                                             </td>
                                             <td>
-                                                {record.undelegate_amount} muno
+                                                {record.undelegate_amount} {network?.stakeCurrency.coinMinimalDenom}
                                             </td>
                                             <td>
                                                 {new Date(Number(record.created / 1000000)).toLocaleString()}
                                             </td>
                                             <td>
-                                                {new Date(Number(record.created / 1000000) + 180000).toLocaleString()}
+                                                {new Date(Number(record.created / 1000000) + (network?.chainName == "uniontestnet" ? 180000 : 64800000)).toLocaleString()}
                                             </td>
                                         </tr></>
                                     )
