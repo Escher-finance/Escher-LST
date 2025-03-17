@@ -1,24 +1,21 @@
-## EVM Union Liquid Staking
+## Escher Union Liquid Staking
 
 Liquid staking components for Cosmos/Cosmwasm based contract.
 
 ### Architecture
 
-Please see this [Architecture](docs/architecture.md)
+This liquid staking contract utilize other contracts like Reward contract to handle redelegate, split reward and also CW20 Contract for liquid staking token. In order to transfer to other chain, getting token from other chain and call from other chain, Escher utilizes UC03 relayer from Union.
+
+For understanding the liquid staking flow, please see this [Architecture](docs/architecture.md)
+
+For Babylon chain version without Reward Contract:
+Please check [Babylon](https://github.com/Escher-finance/cw-liquid-staking/tree/babylon)
 
 ## Components:
 
 ### EVM/Bera (Solidity)
 
-| Component                                   | Description                                          | Language(s)           |
-| ------------------------------------------- | ---------------------------------------------------- | --------------------- |
-| [ICA Controller Factory](https://github.com/Escher-finance/evm-ibc-apps/blob/main/contracts/ica/src/ICAControllerFactory.sol)                       | Solidity Factory contract to create new ICA Controller contract  | Solidity                  |
-| [ICA Controller Contract](https://github.com/Escher-finance/evm-ibc-apps/blob/main/contracts/ica/src/ICAController.sol)                      | Solidity Factory contract to create new ICA and send messages to ICA  | Solidity                  |
-
-
-
 ### Cosmos/Cosmwasm
-
 
 | Component                                   | Description                                                          | Language(s)                                         |
 | ------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------|
@@ -34,7 +31,3 @@ Please see this [Architecture](docs/architecture.md)
 | ------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------|
 | [Liquid Staking Backend service](https://github.com/Escher-finance/liquid-staking-service)     | Cosmwasm Liquid Staking Contract           | Node/TS   |
 
-
-#### Create Denom
-
-TODO
