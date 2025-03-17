@@ -16,7 +16,7 @@ Please see this [Architecture](docs/architecture.md)
 | [Liquid Staking](https://github.com/Escher-finance/evm-union-liquid-staking/tree/main/contracts/liquidstaking)     | Cosmwasm Liquid Staking Contract           | Rust   |
 | [Reward Contract](https://github.com/Escher-finance/evm-union-liquid-staking/tree/main/contracts/rewards)          | Reward contract to receive & split reward  | Rust    |
 | [CW20 Token Minter](https://github.com/unionlabs/union/tree/main/cosmwasm/cw20-token-minter)         | CW20 Contract to handle cw20 token mint and burn  | Rust    |
-| [UCS30 Contract](https://github.com/unionlabs/union/tree/main/cosmwasm/ibc-union/app/ucs03-zkgm)         | UCS30 Contract to transfer token | Rust    |
+| [UCS30 Contract](https://github.com/unionlabs/union/tree/main/cosmwasm/ibc-union/app/ucs03-zkgm)         | UCS30 Contract to transfer token to other chain | Rust    |
 
 ### Backend
 
