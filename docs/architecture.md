@@ -13,4 +13,4 @@
 
 ###  Union to Union Liquid Flow without Reward Contract
 
-![User Flow](./images/user-liquid-staking-flow-no-reward-contract.png)
+![User Flow](./images/liquid-staking-flow-no-reward-contract.png)
