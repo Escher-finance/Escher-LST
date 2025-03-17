@@ -10,6 +10,7 @@
 
 ![Backend Flow](./images/backend-liquid-staking-flow.png)
 
+## NO REWARD CONTRACT
 
 ###  Union to Union Liquid Flow without Reward Contract
 
