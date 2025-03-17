@@ -8,8 +8,9 @@ This liquid staking contract utilize other contracts like Reward contract to han
 
 For understanding the liquid staking flow, please see this [Architecture](docs/architecture.md)
 
-For Babylon chain version without Reward Contract:
-Please check [Babylon](https://github.com/Escher-finance/cw-liquid-staking/tree/babylon)
+### BABYLON version
+
+To support [Babylon chain](https://babylonlabs.io/), we have another version without Reward Contract as Babylon chain doesn't support custom withdrawal address. Please check [Babylon](https://github.com/Escher-finance/cw-liquid-staking/tree/babylon)
 
 ## Components:
 
