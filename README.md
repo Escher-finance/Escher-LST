@@ -13,8 +13,6 @@ Please check [Babylon](https://github.com/Escher-finance/cw-liquid-staking/tree/
 
 ## Components:
 
-### EVM/Bera (Solidity)
-
 ### Cosmos/Cosmwasm
 
 | Component                                   | Description                                                          | Language(s)                                         |
@@ -30,4 +28,4 @@ Please check [Babylon](https://github.com/Escher-finance/cw-liquid-staking/tree/
 | Component                                   | Description                                                          | Language(s)                                         |
 | ------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------|
 | [Liquid Staking Backend service](https://github.com/Escher-finance/liquid-staking-service)     | Cosmwasm Liquid Staking Contract           | Node/TS   |
-
+| [Indexer](https://github.com/Escher-finance/escher-indexer)     | Union Escher Indexer       | Rust   |
