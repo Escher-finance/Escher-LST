@@ -1,4 +1,4 @@
-## EVM Union Liquid Staking
+## Escher Liquid Staking
 
 Liquid staking components for Cosmos/Cosmwasm based contract.
 
