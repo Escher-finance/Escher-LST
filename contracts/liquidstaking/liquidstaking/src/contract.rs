@@ -171,7 +171,9 @@ pub fn execute(
         ),
         ExecuteMsg::TransferToOwner {} => execute::transfer_to_owner(deps, env, info),
         ExecuteMsg::OnZkgm {
-            channel_id,
+            path: _,
+            source_channel_id: _,
+            destination_channel_id: channel_id,
             sender,
             message,
         } => execute::on_zkgm(deps, env, info, channel_id, sender, message),

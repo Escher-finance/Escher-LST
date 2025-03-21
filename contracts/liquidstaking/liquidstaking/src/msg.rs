@@ -97,7 +97,9 @@ pub enum ExecuteMsg {
         validators: Vec<Validator>,
     },
     OnZkgm {
-        channel_id: u32,
+        path: Uint256,
+        source_channel_id: u32,
+        destination_channel_id: u32,
         sender: Bytes,
         message: Bytes,
     },
