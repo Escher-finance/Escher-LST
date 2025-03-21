@@ -137,7 +137,7 @@ pub fn calculate_undelegate_amount(
 }
 pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
     let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (ratio * decimal_fract).to_uint_ceil();
+    let fract = (ratio * decimal_fract).to_uint_floor();
     let delegate_amount =
         Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
     delegate_amount
