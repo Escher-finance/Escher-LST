@@ -11,7 +11,6 @@ use crate::{
         STATE, VALIDATORS_REGISTRY,
     },
 };
-use cosmwasm_std::StdError;
 use cosmwasm_std::{
     to_json_binary, Addr, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
     QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
@@ -28,7 +27,7 @@ pub fn get_actual_total_delegated(
     delegator: String,
     denom: String,
     validators: Vec<String>,
-) -> Result<Uint128, StdError> {
+) -> StdResult<Uint128> {
     let delegations_resp = querier.query_all_delegations(delegator)?;
 
     Ok(delegations_resp
@@ -51,17 +50,14 @@ pub fn get_actual_total_reward(
     reward_contract: String,
 ) -> StdResult<Uint128> {
     let mut total_rewards = Uint128::new(0);
-    let result: StdResult<DelegationTotalRewardsResponse> =
-        querier.query_delegation_total_rewards(delegator);
+    let result = querier.query_delegation_total_rewards(delegator)?;
 
-    if result.is_ok() {
-        for delegator_reward in result.unwrap().rewards {
-            if validators.contains(&delegator_reward.validator_address) {
-                for reward in delegator_reward.reward {
-                    if reward.denom == denom {
-                        let reward_val = to_uint128(reward.amount.to_uint_floor())?;
-                        total_rewards += reward_val;
-                    }
+    for delegator_reward in result.rewards {
+        if validators.contains(&delegator_reward.validator_address) {
+            for reward in delegator_reward.reward {
+                if reward.denom == denom {
+                    let reward_val = to_uint128(reward.amount.to_uint_floor())?;
+                    total_rewards += reward_val;
                 }
             }
         }
