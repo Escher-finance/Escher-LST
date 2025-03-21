@@ -1008,9 +1008,11 @@ pub fn update_quote_token(
 pub fn migrate_reward(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     code_id: u64,
 ) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
     let params = PARAMETERS.load(deps.storage)?;
     let migrate = MigrateMsg {};
     let msg_bin = to_json_binary(&migrate)?;
