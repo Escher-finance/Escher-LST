@@ -351,13 +351,18 @@ pub fn get_delegate_to_validator_msgs(
     let mut total_delegated: Uint128 = Uint128::from(0u32);
 
     let mut msgs: Vec<CosmosMsg> = vec![];
-    let mut first_validator: String = "".to_string();
+    let mut first_validator = String::new();
 
-    for (pos, validator) in validators.into_iter().enumerate() {
+    for validator in validators {
         let ratio =
             Decimal::from_ratio(Uint128::from(validator.weight), Uint128::from(total_weight));
 
         let delegate_amount = calculate_delegated_amount(delegate_amount, ratio);
+
+        if delegate_amount == Uint128::zero() {
+            continue;
+        }
+
         total_delegated += delegate_amount;
         let amount = Coin {
             amount: delegate_amount.clone(),
@@ -370,7 +375,7 @@ pub fn get_delegate_to_validator_msgs(
 
         msgs.push(staking_msg.into());
 
-        if pos == 0 {
+        if first_validator.is_empty() {
             first_validator = validator.address.to_string();
         }
     }
