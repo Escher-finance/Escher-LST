@@ -67,7 +67,7 @@ pub enum ExecuteMsg {
     },
     /// Send liquid staking denom then undelegate native denom according exchange rate from validator
     Unbond {
-        amount: Option<Uint128>,
+        amount: Uint128,
     },
     // Withdraw staking rewards and call split reward to reward contract
     ProcessRewards {},

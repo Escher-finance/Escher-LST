@@ -292,7 +292,7 @@ pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    amount: Option<Uint128>,
+    unbond_amount: Uint128,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -301,9 +301,6 @@ pub fn unbond(
     let the_staker: String = sender.to_string();
     let delegator = env.contract.address.clone();
 
-    let unbond_amount: Uint128;
-
-    unbond_amount = amount.unwrap();
     let msg = cw20::Cw20QueryMsg::Balance {
         address: delegator.to_string(),
     };
