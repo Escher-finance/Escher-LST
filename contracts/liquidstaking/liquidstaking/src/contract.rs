@@ -9,8 +9,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS,
-    QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, PARAMETERS, QUOTE_TOKEN,
+    STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -29,8 +29,6 @@ pub fn instantiate(
     let binding = info.sender.to_string();
     let owner = Some(binding.as_ref());
     cw_ownable::initialize_owner(deps.storage, deps.api, owner)?;
-
-    LOG.save(deps.storage, &"".into())?;
 
     let balance = Balance {
         amount: Uint128::new(0),

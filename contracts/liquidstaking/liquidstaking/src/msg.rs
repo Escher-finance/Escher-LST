@@ -147,8 +147,6 @@ pub enum QueryMsg {
     },
     #[returns(Balance)]
     Balance {},
-    #[returns(Log)]
-    Log {},
     #[returns(Vec<UnbondRecord>)]
     UnbondRecord {
         staker: Option<String>,

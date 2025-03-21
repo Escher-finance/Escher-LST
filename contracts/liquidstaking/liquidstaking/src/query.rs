@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-use crate::msg::{Log, QueryMsg, StakingLiquidity};
+use crate::msg::{QueryMsg, StakingLiquidity};
 use crate::state::unbond_record;
 use crate::state::{
-    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG,
-    PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, BALANCE, PARAMETERS,
+    QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
@@ -26,7 +26,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             deps, env, delegator, denom, validators,
         )?),
         QueryMsg::Balance {} => to_json_binary(&(query_balance(deps.storage)?)),
-        QueryMsg::Log {} => to_json_binary(&(query_log(deps.storage)?)),
         QueryMsg::UnbondRecord {
             staker,
             released,
@@ -134,11 +133,6 @@ pub fn query_staking_liquidity(
         time: env.block.time,
         total_supply: state.total_supply,
     })
-}
-
-pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
-    let log = LOG.load(storage)?;
-    Ok(Log { message: log })
 }
 
 pub fn query_unbond_record(

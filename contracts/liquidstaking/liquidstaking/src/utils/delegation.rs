@@ -7,8 +7,8 @@ use crate::ContractError;
 use crate::{
     msg::{BondData, DelegationDiff, MintTokensPayload, UnbondData},
     state::{
-        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, LOG, PARAMETERS,
-        STATE, VALIDATORS_REGISTRY,
+        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, PARAMETERS, STATE,
+        VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::{
@@ -126,12 +126,6 @@ pub fn calculate_undelegate_amount(
     let native_token_undelegate_decimal =
         Decimal::new(native_token_amount * Uint128::from(DECIMAL_FRACTIONAL));
     let ratio = Decimal::from_ratio(delegated_amount, total_bonded_amount);
-
-    println!(
-        "native_token_undelegate_decimal: {:?}",
-        native_token_undelegate_decimal
-    );
-    println!("ratio: {:?}", ratio);
 
     let undelegate_native_decimal = native_token_undelegate_decimal * ratio;
     undelegate_native_decimal.to_uint_floor()
@@ -619,13 +613,6 @@ pub fn process_unbond(
     );
     msgs.extend(undelegate_msgs.clone());
 
-    LOG.save(
-        storage,
-        &format!(
-            "undelegate_amount: {}, {:?}",
-            undelegate_amount, undelegate_msgs
-        ),
-    )?;
     let burn_msg = token::burn_token(unbond_amount, params.cw20_address.to_string());
     msgs.push(burn_msg.into());
 
