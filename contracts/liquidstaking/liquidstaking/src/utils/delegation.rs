@@ -295,7 +295,7 @@ pub fn get_restaking_msgs(
     for surplus_validator in surplus_validators.iter_mut() {
         for deficient_validator in deficient_validators.iter_mut() {
             if surplus_validator.diff_amount < deficient_validator.diff_amount {
-                if surplus_validator.diff_amount == Uint128::from(0u32) {
+                if surplus_validator.diff_amount.is_zero() {
                     break;
                 }
 
@@ -313,8 +313,11 @@ pub fn get_restaking_msgs(
                     deficient_validator.diff_amount - surplus_validator.diff_amount;
 
                 msgs.push(undelegate_msg);
-                //
             } else {
+                if deficient_validator.diff_amount.is_zero() {
+                    break;
+                }
+
                 println!("{:?} <> {:?}", surplus_validator, deficient_validator);
 
                 let undelegate_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Redelegate {
