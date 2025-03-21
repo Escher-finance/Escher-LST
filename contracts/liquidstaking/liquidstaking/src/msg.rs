@@ -46,11 +46,12 @@ pub struct InstantiateRewardMsg {
 
 #[cw_serde]
 pub enum ExecuteRewardMsg {
-    MigrateMsg {},
     SplitReward {},
     SetConfig {
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
+        lst_contract_address: Option<Addr>,
+        coin_denom: Option<String>,
     },
     TransferToOwner {},
 }
