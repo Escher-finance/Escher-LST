@@ -63,9 +63,12 @@ pub struct Parameters {
 
 impl State {
     pub fn update_exchange_rate(&mut self) {
-        if self.total_bond_amount != Uint128::new(0) && self.total_supply != Uint128::new(0) {
-            self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_supply);
-        }
+        let zero = Uint128::zero();
+        self.exchange_rate = if self.total_bond_amount != zero && self.total_supply != zero {
+            Decimal::from_ratio(self.total_bond_amount, self.total_supply)
+        } else {
+            Decimal::one()
+        };
     }
 }
 
