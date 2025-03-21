@@ -12,8 +12,8 @@ use crate::{
     },
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
-    QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
+    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, QuerierWrapper, StakingMsg,
+    StdResult, Storage, SubMsg, Uint128, Uint256,
 };
 use std::collections::HashMap;
 use std::str::FromStr;
