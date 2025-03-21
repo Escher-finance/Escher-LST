@@ -420,7 +420,7 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
         delegator.to_string(),
         coin_denom.clone(),
         validators_list.clone(),
-    );
+    )?;
 
     let total_bond_amount: Uint128;
     if !cfg!(test) {

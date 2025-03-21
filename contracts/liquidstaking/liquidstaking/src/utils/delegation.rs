@@ -11,6 +11,7 @@ use crate::{
         STATE, VALIDATORS_REGISTRY,
     },
 };
+use cosmwasm_std::StdError;
 use cosmwasm_std::{
     to_json_binary, Addr, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
     QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
@@ -27,24 +28,18 @@ pub fn get_actual_total_delegated(
     delegator: String,
     denom: String,
     validators: Vec<String>,
-) -> Uint128 {
-    let delegations_resp = querier.query_all_delegations(delegator);
-    let mut total: Uint128 = Uint128::new(0);
+) -> Result<Uint128, StdError> {
+    let delegations_resp = querier.query_all_delegations(delegator)?;
 
-    if delegations_resp.is_ok() {
-        total = delegations_resp
-            .unwrap()
-            .into_iter()
-            .filter(|d| {
-                d.amount.denom == denom
-                    && !d.amount.amount.is_zero()
-                    && validators.contains(&d.validator)
-            })
-            .map(|d| d.amount.amount)
-            .sum();
-    }
-
-    total
+    Ok(delegations_resp
+        .into_iter()
+        .filter(|d| {
+            d.amount.denom == denom
+                && !d.amount.amount.is_zero()
+                && validators.contains(&d.validator)
+        })
+        .map(|d| d.amount.amount)
+        .sum())
 }
 
 /// get total delegated token value from validators in native token
@@ -488,7 +483,7 @@ pub fn process_bond(
         delegator.to_string(),
         coin_denom.clone(),
         validators_list.clone(),
-    );
+    )?;
 
     let total_bond_amount: Uint128;
     if !cfg!(test) {
@@ -588,7 +583,7 @@ pub fn process_unbond(
         delegator.to_string(),
         coin_denom.clone(),
         validators_list.clone(),
-    );
+    )?;
     state.total_delegated_amount = delegated_amount;
     let reward = get_actual_total_reward(
         querier,

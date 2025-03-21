@@ -102,7 +102,7 @@ pub fn query_staking_liquidity(
         the_delegator.to_string(),
         denom.clone(),
         validators.clone(),
-    );
+    )?;
 
     let unclaimed_reward = get_unclaimed_reward(
         deps.querier,
