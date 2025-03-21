@@ -150,12 +150,12 @@ pub fn send_cw20(
     cw20_address: String,
     recipient: String,
 ) -> Result<CosmosMsg, ContractError> {
-    let execute_burn = cw20::Cw20ExecuteMsg::Transfer { recipient, amount };
-    let the_bin = to_json_binary(&execute_burn).unwrap();
-    let transfer_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+    let cw20_execute_transfer_msg = cw20::Cw20ExecuteMsg::Transfer { recipient, amount };
+    let msg_bin = to_json_binary(&cw20_execute_transfer_msg).unwrap();
+    let cw20_transfer_msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: cw20_address,
-        msg: the_bin,
+        msg: msg_bin,
         funds: vec![],
     });
-    Ok(transfer_msg)
+    Ok(cw20_transfer_msg)
 }
