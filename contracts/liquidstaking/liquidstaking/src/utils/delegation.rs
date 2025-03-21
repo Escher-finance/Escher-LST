@@ -76,17 +76,14 @@ pub fn get_unclaimed_reward(
     validators: Vec<String>,
 ) -> StdResult<Uint128> {
     let mut total_rewards = Uint128::new(0);
-    let result: StdResult<DelegationTotalRewardsResponse> =
-        querier.query_delegation_total_rewards(delegator);
+    let result = querier.query_delegation_total_rewards(delegator)?;
 
-    if result.is_ok() {
-        for delegator_reward in result.unwrap().rewards {
-            if validators.contains(&delegator_reward.validator_address) {
-                for reward in delegator_reward.reward {
-                    if reward.denom == denom {
-                        let reward_val = to_uint128(reward.amount.to_uint_floor())?;
-                        total_rewards += reward_val;
-                    }
+    for delegator_reward in result.rewards {
+        if validators.contains(&delegator_reward.validator_address) {
+            for reward in delegator_reward.reward {
+                if reward.denom == denom {
+                    let reward_val = to_uint128(reward.amount.to_uint_floor())?;
+                    total_rewards += reward_val;
                 }
             }
         }
