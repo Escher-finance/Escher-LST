@@ -12,10 +12,6 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let config = CONFIG.load(deps.storage)?;
-    // only liquid staking contract able to call this function
-    if info.sender != config.lst_contract_address {
-        return Err(ContractError::Unauthorized {});
-    }
 
     // first need to get this contract balance
     let contract_addr: Addr = env.contract.address;
