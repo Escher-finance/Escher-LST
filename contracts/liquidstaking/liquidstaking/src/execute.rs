@@ -769,22 +769,20 @@ pub fn process_unbonding(
         .querier
         .query_balance(contract_address, params.underlying_coin_denom.clone())?;
 
-    let transfer_amount = balance.amount;
-    if transfer_amount < (unbond_rec.undelegate_amount - Uint128::one()) {
+    let undelegate_amount = unbond_rec.undelegate_amount;
+    let contract_balance = balance.amount;
+
+    // One token is the undelegate amount tolerance as there is case when the real undelegated amount can be 1 token smaller than the unbond_rec undelegate amount
+    if contract_balance < undelegate_amount {
         return Err(ContractError::NotEnoughAvailableFund {});
     }
 
-    let mut undelegate_amount = unbond_rec.undelegate_amount;
-    if transfer_amount < undelegate_amount {
-        undelegate_amount = transfer_amount;
-    }
-
-    // if exists, send to staker (it can be on same chain or other chain like evm/bera)
+    // if balance exists, send to staker (it can be on same chain or other chain like evm/bera)
     let msg: CosmosMsg = {
         if unbond_rec.staker != unbond_rec.sender && unbond_rec.channel_id.is_some() {
             let funds = vec![Coin {
                 denom: params.underlying_coin_denom.clone(),
-                amount: transfer_amount.clone(),
+                amount: undelegate_amount.clone(),
             }];
 
             // get quote token of native base denom (muno) on specific channel id
