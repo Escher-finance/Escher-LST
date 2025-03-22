@@ -772,7 +772,6 @@ pub fn process_unbonding(
     let undelegate_amount = unbond_rec.undelegate_amount;
     let contract_balance = balance.amount;
 
-    // One token is the undelegate amount tolerance as there is case when the real undelegated amount can be 1 token smaller than the unbond_rec undelegate amount
     if contract_balance < undelegate_amount {
         return Err(ContractError::NotEnoughAvailableFund {});
     }
