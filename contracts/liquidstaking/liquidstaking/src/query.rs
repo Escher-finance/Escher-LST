@@ -179,7 +179,7 @@ pub fn query_unbond_record(
         let unbonded_range = unbond_record().idx.staker.prefix(staker.unwrap()).range(
             storage,
             min_bound,
-            None,
+            max_bound,
             Order::Ascending,
         );
 
