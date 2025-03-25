@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use crate::instantiate::create_reward;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -9,8 +11,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS,
-    QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, State, ValidatorsRegistry, BALANCE, LOG, PARAMETERS, QUOTE_TOKEN, STATE,
+    VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -38,14 +40,25 @@ pub fn instantiate(
     };
     BALANCE.save(deps.storage, &balance)?;
 
-    let mut validators: Vec<Validator> = vec![];
-    for validator in msg.validators {
-        validators.push({
-            Validator {
-                address: validator.address,
-                weight: validator.weight,
-            }
-        })
+    let unique_validators_len = msg
+        .validators
+        .iter()
+        .cloned()
+        .map(|validator| validator.address)
+        .collect::<HashSet<_>>()
+        .len();
+
+    if unique_validators_len != msg.validators.len() {
+        return Err(ContractError::InvalidValidators {});
+    }
+
+    let validators = msg.validators.clone();
+
+    for validator in &validators {
+        deps.api.addr_validate(&validator.address)?;
+        if validator.weight == 0 {
+            return Err(ContractError::InvalidValidators {});
+        }
     }
 
     let reg = ValidatorsRegistry { validators };
@@ -84,6 +97,18 @@ pub fn instantiate(
         last_bond_time: 0,
     };
     STATE.save(deps.storage, &state)?;
+
+    let unique_quote_tokens_len = msg
+        .quote_tokens
+        .iter()
+        .cloned()
+        .map(|quote_token| quote_token.channel_id)
+        .collect::<HashSet<_>>()
+        .len();
+
+    if unique_quote_tokens_len != msg.quote_tokens.len() {
+        return Err(ContractError::InvalidQuoteTokens {});
+    }
 
     for quote_token in msg.quote_tokens {
         QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;

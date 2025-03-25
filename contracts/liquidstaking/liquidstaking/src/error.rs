@@ -69,4 +69,10 @@ pub enum ContractError {
 
     #[error("error when computing the instantiate2 address: {0}")]
     Instantiate2AddressError(#[from] cosmwasm_std::Instantiate2AddressError),
+
+    #[error("Validators must be unique by address and have non-zero weight")]
+    InvalidValidators {},
+
+    #[error("Quote tokens must be unique by channel_id")]
+    InvalidQuoteTokens {},
 }
