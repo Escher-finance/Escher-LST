@@ -9,6 +9,7 @@ use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
     unbond_record, QuoteToken, Validator, LOG, PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
+use crate::utils::validation::validate_validators;
 use crate::utils::{
     self, calc::check_slippage, delegation::get_actual_total_delegated,
     delegation::get_actual_total_reward, delegation::get_mock_total_reward, delegation::to_uint128,
@@ -973,6 +974,8 @@ pub fn update_validators(
         return Err(ContractError::EmptyValidator {});
     }
 
+    validate_validators(&deps, &validators)?;
+
     let mut validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let prev_validators = validators_reg.validators.clone();
     validators_reg.validators = validators.clone();
@@ -1000,6 +1003,9 @@ pub fn update_quote_token(
     quote_token: QuoteToken,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    if channel_id != quote_token.channel_id {
+        return Err(ContractError::InvalidQuoteTokens {});
+    }
     QUOTE_TOKEN.save(deps.storage, channel_id, &quote_token)?;
     Ok(Response::default())
 }
