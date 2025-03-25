@@ -1,6 +1,5 @@
-use std::collections::{HashMap, HashSet};
-
 use crate::instantiate::create_reward;
+use crate::utils::validation::{validate_quote_tokens, validate_validators};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
@@ -40,28 +39,12 @@ pub fn instantiate(
     };
     BALANCE.save(deps.storage, &balance)?;
 
-    let unique_validators_len = msg
-        .validators
-        .iter()
-        .cloned()
-        .map(|validator| validator.address)
-        .collect::<HashSet<_>>()
-        .len();
+    validate_validators(&deps, &msg.validators)?;
 
-    if unique_validators_len != msg.validators.len() {
-        return Err(ContractError::InvalidValidators {});
-    }
+    let reg = ValidatorsRegistry {
+        validators: msg.validators,
+    };
 
-    let validators = msg.validators.clone();
-
-    for validator in &validators {
-        deps.api.addr_validate(&validator.address)?;
-        if validator.weight == 0 {
-            return Err(ContractError::InvalidValidators {});
-        }
-    }
-
-    let reg = ValidatorsRegistry { validators };
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
 
     // create reward contract message to instantiate reward contract that will receive staking reward
@@ -98,17 +81,7 @@ pub fn instantiate(
     };
     STATE.save(deps.storage, &state)?;
 
-    let unique_quote_tokens_len = msg
-        .quote_tokens
-        .iter()
-        .cloned()
-        .map(|quote_token| quote_token.channel_id)
-        .collect::<HashSet<_>>()
-        .len();
-
-    if unique_quote_tokens_len != msg.quote_tokens.len() {
-        return Err(ContractError::InvalidQuoteTokens {});
-    }
+    validate_quote_tokens(&msg.quote_tokens)?;
 
     for quote_token in msg.quote_tokens {
         QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
