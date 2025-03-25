@@ -224,6 +224,21 @@ pub fn query_unbond_record(
 
             return Ok(unbonded_list);
         }
-        (None, None) => Ok(vec![]),
+        (None, None) => {
+            let mut unbonded_list: Vec<UnbondRecord> = vec![];
+            let unbonded_range = unbond_record()
+                .idx
+                .staker
+                // FIXME: needs pagination
+                .range(storage, None, None, Order::Ascending);
+
+            for unbonded in unbonded_range {
+                if unbonded.is_ok() {
+                    unbonded_list.push(unbonded.unwrap().1);
+                }
+            }
+
+            return Ok(unbonded_list);
+        }
     }
 }
