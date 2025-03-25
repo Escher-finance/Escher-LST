@@ -164,7 +164,7 @@ pub fn query_unbond_record(
             let max_id = if min.is_some() && max > min.unwrap() + 50 {
                 min.unwrap() + 50
             } else {
-                max
+                max.min(50)
             };
             Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
         }
