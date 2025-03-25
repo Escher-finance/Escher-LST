@@ -60,7 +60,6 @@ pub fn execute(
             fee_rate,
             coin_denom,
         ),
-        ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::TransferToOwner {} => execute::transfer_to_owner(deps, env, info),
     }
 }
