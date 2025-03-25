@@ -174,57 +174,56 @@ pub fn query_unbond_record(
         }
     };
 
-    if staker.is_some() && released.is_none() {
-        let mut unbonded_list: Vec<UnbondRecord> = vec![];
-        let unbonded_range = unbond_record().idx.staker.prefix(staker.unwrap()).range(
-            storage,
-            min_bound,
-            None,
-            Order::Ascending,
-        );
+    match (staker, released) {
+        (Some(staker), None) => {
+            let mut unbonded_list: Vec<UnbondRecord> = vec![];
+            let unbonded_range = unbond_record().idx.staker.prefix(staker).range(
+                storage,
+                min_bound,
+                None,
+                Order::Ascending,
+            );
 
-        for unbonded in unbonded_range {
-            if unbonded.is_ok() {
-                unbonded_list.push(unbonded.unwrap().1);
+            for unbonded in unbonded_range {
+                if unbonded.is_ok() {
+                    unbonded_list.push(unbonded.unwrap().1);
+                }
             }
+
+            return Ok(unbonded_list);
         }
+        (None, Some(released)) => {
+            let mut unbonded_list: Vec<UnbondRecord> = vec![];
+            let unbonded_range = unbond_record()
+                .idx
+                .released
+                .prefix(released.to_string())
+                .range(storage, min_bound, max_bound, Order::Ascending);
 
-        return Ok(unbonded_list);
-    }
-
-    if staker.is_none() && released.is_some() {
-        let mut unbonded_list: Vec<UnbondRecord> = vec![];
-        let unbonded_range = unbond_record()
-            .idx
-            .released
-            .prefix(released.unwrap().to_string())
-            .range(storage, min_bound, max_bound, Order::Ascending);
-
-        for unbonded in unbonded_range {
-            if unbonded.is_ok() {
-                unbonded_list.push(unbonded.unwrap().1);
+            for unbonded in unbonded_range {
+                if unbonded.is_ok() {
+                    unbonded_list.push(unbonded.unwrap().1);
+                }
             }
+
+            return Ok(unbonded_list);
         }
+        (Some(staker), Some(released)) => {
+            let mut unbonded_list: Vec<UnbondRecord> = vec![];
+            let unbonded_range = unbond_record()
+                .idx
+                .staker_released
+                .prefix(format!("{}-{}", staker, released))
+                .range(storage, min_bound, max_bound, Order::Ascending);
 
-        return Ok(unbonded_list);
-    }
-
-    if staker.is_some() && released.is_some() {
-        let mut unbonded_list: Vec<UnbondRecord> = vec![];
-        let unbonded_range = unbond_record()
-            .idx
-            .staker_released
-            .prefix(format!("{}-{}", staker.unwrap(), released.unwrap()))
-            .range(storage, min_bound, max_bound, Order::Ascending);
-
-        for unbonded in unbonded_range {
-            if unbonded.is_ok() {
-                unbonded_list.push(unbonded.unwrap().1);
+            for unbonded in unbonded_range {
+                if unbonded.is_ok() {
+                    unbonded_list.push(unbonded.unwrap().1);
+                }
             }
+
+            return Ok(unbonded_list);
         }
-
-        return Ok(unbonded_list);
+        (None, None) => Ok(vec![]),
     }
-
-    Ok(vec![])
 }
