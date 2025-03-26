@@ -2,6 +2,8 @@ use cosmwasm_std::StdError;
 use cw_ownable::OwnershipError;
 use thiserror::Error;
 
+use crate::utils::batch::BatchStatus;
+
 #[derive(Error, Debug)]
 pub enum ContractError {
     #[error("{0}")]
@@ -69,4 +71,19 @@ pub enum ContractError {
 
     #[error("error when computing the instantiate2 address: {0}")]
     Instantiate2AddressError(#[from] cosmwasm_std::Instantiate2AddressError),
+
+    #[error("no pending batch is available")]
+    EmptyBatch {},
+
+    #[error("bath status is incorrect, actual: {actual}, expected: {expected}")]
+    BatchStatusIncorrect {
+        actual: BatchStatus,
+        expected: BatchStatus,
+    },
+
+    #[error("batch is not ready to be executed")]
+    BatchNotReady { actual: u64, expected: u64 },
+
+    #[error("batch unbonding not yet complete")]
+    BatchIncompleteUnbonding {},
 }

@@ -1,4 +1,5 @@
 use crate::instantiate::create_reward;
+use crate::utils::batch::{batches, Batch};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
@@ -10,7 +11,7 @@ use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
     Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS,
-    QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    PENDING_BATCH_ID, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -72,6 +73,7 @@ pub fn instantiate(
         reward_address: reward_addr.clone(),
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
+        batch_period: msg.batch_period,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -96,6 +98,14 @@ pub fn instantiate(
 
     let msgs: Vec<CosmosMsg> = vec![reward_msg, set_withdraw_msg];
 
+    let pending_batch = Batch::new(
+        1,
+        Uint128::zero(),
+        env.block.time.seconds() + params.batch_period,
+    );
+    batches().save(deps.storage, pending_batch.id, &pending_batch)?;
+    PENDING_BATCH_ID.save(deps.storage, &pending_batch.id)?;
+
     Ok(Response::new()
         .add_attribute("action", "instantiate")
         .add_messages(msgs))
@@ -111,10 +121,13 @@ pub fn execute(
     match msg {
         ExecuteMsg::Bond { amount, salt } => execute::bond(deps, env, info, amount, salt),
         ExecuteMsg::Unbond { amount } => execute::unbond(deps, env, info, amount),
-
+        ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
-        ExecuteMsg::ProcessUnbonding { id, salt } => {
-            execute::process_unbonding(deps, env, info, id, salt)
+        ExecuteMsg::ProcessBatchWithdrawal { id, salt } => {
+            execute::process_batch_withdrawal(deps, env, info, id, salt)
+        }
+        ExecuteMsg::SetBatchReceivedAmount { id, amount } => {
+            execute::set_batch_received_amount(deps, env, info, id, amount)
         }
         ExecuteMsg::Reset {} => execute::reset(deps, env, info),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),

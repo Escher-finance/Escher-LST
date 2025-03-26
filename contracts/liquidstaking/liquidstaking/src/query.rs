@@ -6,6 +6,7 @@ use crate::state::{
     Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG,
     PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
+use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
 use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
@@ -39,6 +40,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
+        QueryMsg::Batch { status, min, max } => {
+            to_json_binary(&query_batch(deps.storage, status, min, max)?)
+        }
     }
 }
 
@@ -227,4 +231,67 @@ pub fn query_unbond_record(
     }
 
     Ok(vec![])
+}
+
+pub fn query_unbond_record_from_batch(storage: &dyn Storage, batch_id: u64) -> Vec<UnbondRecord> {
+    let mut unbonded_list: Vec<UnbondRecord> = vec![];
+    let unbonded_range = unbond_record()
+        .idx
+        .released
+        .prefix(batch_id.to_string())
+        .range(storage, None, None, Order::Ascending);
+
+    for unbonded in unbonded_range {
+        if unbonded.is_ok() {
+            unbonded_list.push(unbonded.unwrap().1);
+        }
+    }
+    unbonded_list
+}
+
+pub fn query_batch(
+    storage: &dyn Storage,
+    status: Option<BatchStatus>,
+    min: Option<u64>,
+    max: Option<u64>,
+) -> StdResult<Vec<Batch>> {
+    // if batch status parameter is none, set to pending as default
+    let batch_status = match status {
+        Some(status) => status,
+        None => BatchStatus::Pending,
+    };
+
+    let min_bound = match min {
+        Some(min) => Some(cw_storage_plus::Bound::Inclusive((min, PhantomData))),
+        None => Some(cw_storage_plus::Bound::Inclusive((1, PhantomData))),
+    };
+    let max_bound = match max {
+        Some(max) => {
+            let max_id = if min.is_some() && max > min.unwrap() + 50 {
+                min.unwrap() + 50
+            } else {
+                max
+            };
+            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
+        }
+        None => {
+            let max_id = if min.is_some() { min.unwrap() + 50 } else { 50 };
+            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
+        }
+    };
+
+    let mut batch_list: Vec<Batch> = vec![];
+    let batches = batches().idx.status.prefix(batch_status.to_string()).range(
+        storage,
+        min_bound,
+        max_bound,
+        Order::Ascending,
+    );
+
+    for batch in batches {
+        if batch.is_ok() {
+            batch_list.push(batch.unwrap().1);
+        }
+    }
+    Ok(batch_list)
 }

@@ -1,11 +1,11 @@
 use crate::msg::Ucs03ExecuteMsg;
 use crate::utils::delegation::DEFAULT_TIMEOUT_TIMESTAMP_OFFSET;
 use crate::ContractError;
-use cosmwasm_std::{to_json_binary, Coin, Env, Uint128, Uint256, WasmMsg};
+use cosmwasm_std::{to_json_binary, Coin, Env, Timestamp, Uint128, Uint256, WasmMsg};
 use unionlabs_primitives::{Bytes, H256};
 
 pub fn ucs03_transfer(
-    env: Env,
+    time: Timestamp,
     ucs03_contract_addr: String,
     channel_id: u32,
     receiver: Bytes,
@@ -16,11 +16,7 @@ pub fn ucs03_transfer(
     funds: Vec<Coin>,
     salt: H256,
 ) -> Result<WasmMsg, ContractError> {
-    let timeout = env
-        .block
-        .time
-        .plus_seconds(DEFAULT_TIMEOUT_TIMESTAMP_OFFSET)
-        .nanos();
+    let timeout = time.plus_seconds(DEFAULT_TIMEOUT_TIMESTAMP_OFFSET).nanos();
 
     let relay_transfer_msg: Ucs03ExecuteMsg = Ucs03ExecuteMsg::Transfer {
         channel_id,

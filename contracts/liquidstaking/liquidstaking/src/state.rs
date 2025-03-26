@@ -11,6 +11,7 @@ pub const LOG: Item<String> = Item::new("log");
 
 // Map of channel id to the quote token and lst quote token of destination chain
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
+pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 
 #[cw_serde]
 pub struct Balance {
@@ -59,6 +60,8 @@ pub struct Parameters {
     pub fee_rate: Decimal,
     // fee receiver
     pub fee_receiver: Addr,
+    // batch period range in seconds to execute batch
+    pub batch_period: u64,
 }
 
 impl State {
@@ -89,15 +92,16 @@ pub struct UnbondRecord {
     pub staker: String,
     pub channel_id: Option<u32>,
     pub amount: Uint128,
-    pub undelegate_amount: Uint128,
-    pub created: Timestamp,
     pub released_height: u64,
     pub released: bool,
+    pub batch_id: u64,
 }
+
 pub struct UnbondRecordIndexes<'a> {
     pub staker: MultiIndex<'a, String, UnbondRecord, u64>,
     pub released: MultiIndex<'a, String, UnbondRecord, u64>,
     pub staker_released: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub batch: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
@@ -126,6 +130,11 @@ pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<
             |_pk, d: &UnbondRecord| format!("{}-{}", d.staker, d.released),
             UNBOND_RECORD_NAMESPACE,
             "unbond_record__staker_released",
+        ),
+        batch: MultiIndex::new(
+            |_pk, d: &UnbondRecord| d.batch_id.to_string(),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__batch",
         ),
     };
     IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
