@@ -225,10 +225,27 @@ pub fn get_validator_delegation_map_base_on_weight(
 
     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
 
+    let mut total_delegation_amount = Uint128::zero();
+    let mut first_validator = String::new();
     for validator in validators {
         let ratio = Decimal::from_ratio(validator.weight, total_weight);
+
         let delegation_amount = calculate_delegated_amount(total_delegated_amount, ratio);
-        correct_validator_delegation_map.insert(validator.address.to_string(), delegation_amount);
+        total_delegation_amount += delegation_amount;
+
+        let validator_address = validator.address.to_string();
+        if first_validator.is_empty() {
+            first_validator = validator_address.clone();
+        }
+
+        correct_validator_delegation_map.insert(validator_address, delegation_amount);
+    }
+
+    let remaining_amount = total_delegated_amount - total_delegation_amount;
+    if !remaining_amount.is_zero() {
+        correct_validator_delegation_map
+            .entry(first_validator)
+            .and_modify(|amount| *amount += remaining_amount);
     }
 
     Ok(correct_validator_delegation_map)
