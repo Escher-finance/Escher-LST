@@ -1244,3 +1244,46 @@ fn slippage_calculation() {
     let result = utils::calc::check_slippage(output, expected, slippage);
     assert_eq!(result.is_ok(), true);
 }
+
+#[test]
+fn test_update_quote_token_channel_id_should_match() {
+    use cosmwasm_std::testing::{mock_dependencies, mock_env};
+
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    let owner = deps.api.addr_make("owner");
+
+    let info = MessageInfo {
+        sender: owner.clone(),
+        funds: vec![],
+    };
+    let mut channel_id = 10;
+    let quote_token = QuoteToken {
+        channel_id,
+        quote_token: "a".to_string(),
+        lst_quote_token: "b".to_string(),
+    };
+
+    cw_ownable::initialize_owner(&mut deps.storage, &deps.api, Some(owner.as_str())).unwrap();
+
+    // Good
+    update_quote_token(
+        deps.as_mut(),
+        env.clone(),
+        info.clone(),
+        channel_id,
+        quote_token.clone(),
+    )
+    .unwrap();
+
+    channel_id += 1;
+
+    // Fails - channel_id doesn't match
+    let err = update_quote_token(deps.as_mut(), env, info, channel_id, quote_token).unwrap_err();
+    assert!(if let ContractError::InvalidQuoteTokens {} = err {
+        true
+    } else {
+        false
+    });
+}
