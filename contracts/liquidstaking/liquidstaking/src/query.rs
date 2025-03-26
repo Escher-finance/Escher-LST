@@ -7,14 +7,15 @@ use crate::state::{
     PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
+use crate::ContractError;
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
-use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
+use cosmwasm_std::{Binary, Deps, Env, Storage};
 use cw2::ContractVersion;
 use cw_ownable::get_ownership;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
+    Ok(match msg {
         QueryMsg::State {} => to_json_binary(&query_state(deps.storage)?),
         QueryMsg::Parameters {} => to_json_binary(&query_params(deps.storage)?),
         QueryMsg::Validators {} => to_json_binary(&query_validators(deps.storage)?),
@@ -39,35 +40,38 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
-    }
+    }?)
 }
 
-pub fn query_quote_token(storage: &dyn Storage, channel_id: u32) -> StdResult<QuoteToken> {
+pub fn query_quote_token(
+    storage: &dyn Storage,
+    channel_id: u32,
+) -> Result<QuoteToken, ContractError> {
     let token = QUOTE_TOKEN.load(storage, channel_id)?;
     Ok(token)
 }
 
-pub fn query_version(storage: &dyn Storage) -> StdResult<ContractVersion> {
+pub fn query_version(storage: &dyn Storage) -> Result<ContractVersion, ContractError> {
     let ver = cw2::get_contract_version(storage)?;
     Ok(ver)
 }
 
-pub fn query_state(storage: &dyn Storage) -> StdResult<State> {
+pub fn query_state(storage: &dyn Storage) -> Result<State, ContractError> {
     let state = STATE.load(storage)?;
     Ok(state)
 }
 
-pub fn query_params(storage: &dyn Storage) -> StdResult<Parameters> {
+pub fn query_params(storage: &dyn Storage) -> Result<Parameters, ContractError> {
     let params = PARAMETERS.load(storage)?;
     Ok(params)
 }
 
-pub fn query_validators(storage: &dyn Storage) -> StdResult<ValidatorsRegistry> {
+pub fn query_validators(storage: &dyn Storage) -> Result<ValidatorsRegistry, ContractError> {
     let validators = VALIDATORS_REGISTRY.load(storage)?;
     Ok(validators)
 }
 
-pub fn query_balance(storage: &dyn Storage) -> StdResult<Balance> {
+pub fn query_balance(storage: &dyn Storage) -> Result<Balance, ContractError> {
     let balance = BALANCE.load(storage)?;
     Ok(balance)
 }
@@ -78,7 +82,7 @@ pub fn query_staking_liquidity(
     delegator: Option<String>,
     coin_denom: Option<String>,
     validators_list: Option<Vec<String>>,
-) -> StdResult<StakingLiquidity> {
+) -> Result<StakingLiquidity, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let the_delegator = delegator
         .clone()
@@ -136,7 +140,7 @@ pub fn query_staking_liquidity(
     })
 }
 
-pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
+pub fn query_log(storage: &dyn Storage) -> Result<Log, ContractError> {
     let log = LOG.load(storage)?;
     Ok(Log { message: log })
 }
@@ -148,7 +152,7 @@ pub fn query_unbond_record(
     id: Option<u64>,
     min: Option<u64>,
     max: Option<u64>,
-) -> StdResult<Vec<UnbondRecord>> {
+) -> Result<Vec<UnbondRecord>, ContractError> {
     if id.is_some() {
         let unbonded_list = vec![unbond_record().load(storage, id.unwrap())?];
         return Ok(unbonded_list);
@@ -190,7 +194,7 @@ pub fn query_unbond_record(
                 }
             }
 
-            return Ok(unbonded_list);
+            Ok(unbonded_list)
         }
         (None, Some(released)) => {
             let mut unbonded_list: Vec<UnbondRecord> = vec![];
@@ -206,7 +210,7 @@ pub fn query_unbond_record(
                 }
             }
 
-            return Ok(unbonded_list);
+            Ok(unbonded_list)
         }
         (Some(staker), Some(released)) => {
             let mut unbonded_list: Vec<UnbondRecord> = vec![];
@@ -222,23 +226,8 @@ pub fn query_unbond_record(
                 }
             }
 
-            return Ok(unbonded_list);
+            Ok(unbonded_list)
         }
-        (None, None) => {
-            let mut unbonded_list: Vec<UnbondRecord> = vec![];
-            let unbonded_range = unbond_record()
-                .idx
-                .staker
-                // FIXME: needs pagination
-                .range(storage, None, None, Order::Ascending);
-
-            for unbonded in unbonded_range {
-                if unbonded.is_ok() {
-                    unbonded_list.push(unbonded.unwrap().1);
-                }
-            }
-
-            return Ok(unbonded_list);
-        }
+        (None, None) => Err(ContractError::InvalidUnbondRecordQuery {}),
     }
 }

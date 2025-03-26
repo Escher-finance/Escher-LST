@@ -69,4 +69,7 @@ pub enum ContractError {
 
     #[error("error when computing the instantiate2 address: {0}")]
     Instantiate2AddressError(#[from] cosmwasm_std::Instantiate2AddressError),
+
+    #[error("Unbond record query needs at least staker or released")]
+    InvalidUnbondRecordQuery {},
 }
