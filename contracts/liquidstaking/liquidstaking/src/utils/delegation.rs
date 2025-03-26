@@ -709,3 +709,37 @@ fn test_bond_calc() {
     let staking_amount = calc::calculate_staking_token_from_rate(bond_amount, exchange_rate);
     println!("staking amount: {}", staking_amount);
 }
+
+#[test]
+fn test_get_delegate_to_validator_msgs_should_skip_zero_delegate_amount() {
+    let validators = Vec::from([
+        Validator {
+            address: "a".to_string(),
+            weight: 0,
+        },
+        Validator {
+            address: "b".to_string(),
+            weight: 9,
+        },
+        Validator {
+            address: "c".to_string(),
+            weight: 1,
+        },
+    ]);
+    let msgs =
+        get_delegate_to_validator_msgs(Uint128::from(100_u128), "denom".to_string(), validators);
+
+    let zero_amount_msg = msgs.iter().find(|msg| {
+        if let CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: _,
+            amount,
+        }) = msg
+        {
+            if amount.amount == Uint128::zero() {
+                return true;
+            }
+        }
+        false
+    });
+    assert!(zero_amount_msg.is_none());
+}
