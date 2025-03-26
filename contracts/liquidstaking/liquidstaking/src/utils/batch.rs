@@ -2,7 +2,7 @@ use core::fmt;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Uint128;
-use cw_storage_plus::{Index, IndexList, IndexedMap, Map, MultiIndex};
+use cw_storage_plus::{Index, IndexList, IndexedMap, MultiIndex};
 
 #[cw_serde]
 pub enum BatchStatus {

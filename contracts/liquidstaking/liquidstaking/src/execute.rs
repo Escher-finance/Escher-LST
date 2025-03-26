@@ -6,7 +6,7 @@ use crate::event::{
     BatchReceivedEvent, BondEvent, ProcessBatchUnbondingEvent, ProcessRewardsEvent,
     ProcessUnbondingEvent, UpdateValidatorsEvent,
 };
-use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
+use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
 use crate::query::query_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
@@ -21,13 +21,14 @@ use crate::utils::{
     delegation::submit_pending_batch, delegation::to_uint128,
 };
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
-    DepsMut, DistributionMsg, Env, Event, MessageInfo, Response, StdResult, SubMsg, Uint128,
-    Uint256, WasmMsg,
+    attr, from_json, to_json_binary, Addr, BankMsg, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,
+    DistributionMsg, Env, Event, MessageInfo, Response, StdResult, SubMsg, Uint128, Uint256,
+    WasmMsg,
 };
+use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::{Bytes, H256};
 
-/// process bond call to contract
+/// process bond/stake to contract
 pub fn bond(
     deps: DepsMut,
     env: Env,
@@ -249,21 +250,27 @@ pub fn zkgm_bond(
     Ok(res)
 }
 
-/// Process unbond call to contract
-pub fn unbond(
+/// Process receive msg from liquid stoken cw20 contract with embedded unbond payload msg to do unbond/unstake
+pub fn receive(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    amount: Option<Uint128>,
+    cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let sender = info.sender.to_string();
     let the_staker: String = sender.to_string();
     let delegator = env.contract.address.clone();
 
-    let unbond_amount: Uint128;
+    let payload_msg: Cw20PayloadMsg = from_json(cw20_msg.msg)?;
 
-    unbond_amount = amount.unwrap();
+    // make sure the payload is Unstake
+    if !matches!(payload_msg, Cw20PayloadMsg::Unstake {}) {
+        return Err(ContractError::InvalidPayload {});
+    }
+
+    let unbond_amount = cw20_msg.amount;
+
     let msg = cw20::Cw20QueryMsg::Balance {
         address: delegator.to_string(),
     };
@@ -457,33 +464,6 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     ]);
 
     Ok(res)
-}
-
-fn get_unbond_attrs(
-    sender: String,
-    the_staker: String,
-    current_exchange_rate: String,
-    unbond_amount: String,
-    undelegate_amount: String,
-    total_delegated_amount: String,
-    total_bond_amount: String,
-    total_lst_supply: String,
-    coin_denom: String,
-    channel_id: String,
-) -> Vec<Attribute> {
-    return vec![
-        attr("action", "unbond"),
-        attr("sender", sender),
-        attr("staker", the_staker),
-        attr("exchange_rate", current_exchange_rate),
-        attr("unbond_amount", unbond_amount),
-        attr("undelegate_amount", undelegate_amount),
-        attr("total_delegated_amount", total_delegated_amount),
-        attr("total_bond_amount", total_bond_amount),
-        attr("total_lst_supply", total_lst_supply),
-        attr("denom", coin_denom),
-        attr("channel_id", channel_id),
-    ];
 }
 
 /// Process rewards by withdraw delegator reward then call redelegate to reward contract on reply
