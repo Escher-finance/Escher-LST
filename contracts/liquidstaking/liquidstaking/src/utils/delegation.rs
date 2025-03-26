@@ -150,6 +150,7 @@ pub fn calculate_undelegate_amount(
     let undelegate_native_decimal = native_token_undelegate_decimal * ratio;
     undelegate_native_decimal.to_uint_floor()
 }
+
 pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
     let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
     let fract = (ratio * decimal_fract).to_uint_ceil();
@@ -173,23 +174,14 @@ pub fn get_undelegate_from_validator_msgs(
             .unwrap_or(0),
     );
 
-    let total_validators = validators.len();
-    let mut total_undelegated: Uint128 = Uint128::from(0u32);
-
     let mut atts = vec![];
 
-    for (pos, validator) in validators.into_iter().enumerate() {
+    for validator in validators.into_iter() {
         let ratio = Decimal::from_ratio(Uint128::from(validator.weight), total_weight);
 
         let undelegate_amount_dec =
             Decimal::new(undelegate_amount * Uint128::from(DECIMAL_FRACTIONAL));
-        let mut undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
-        total_undelegated += undelegate_amount_for_validator;
-
-        if pos == (total_validators - 1) {
-            let remaining = undelegate_amount - total_undelegated;
-            undelegate_amount_for_validator += remaining;
-        }
+        let undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
 
         let amount = Coin {
             amount: undelegate_amount_for_validator.clone(),
