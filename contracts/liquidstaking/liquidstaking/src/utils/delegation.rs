@@ -721,3 +721,31 @@ fn test_bond_calc() {
     let staking_amount = calc::calculate_staking_token_from_rate(bond_amount, exchange_rate);
     println!("staking amount: {}", staking_amount);
 }
+
+#[test]
+fn test_get_validator_delegation_map_base_on_weight_should_delegate_remaining_amount() {
+    let validators = Vec::from([
+        Validator {
+            address: "a".to_string(),
+            weight: 1,
+        },
+        Validator {
+            address: "b".to_string(),
+            weight: 100,
+        },
+        Validator {
+            address: "c".to_string(),
+            weight: 1000,
+        },
+    ]);
+    let total_delegated_amount = Uint128::from(500000_u128);
+
+    assert_eq!(
+        get_validator_delegation_map_base_on_weight(validators, total_delegated_amount)
+            .unwrap()
+            .iter()
+            .map(|(_addr, amount)| amount)
+            .sum::<Uint128>(),
+        total_delegated_amount
+    )
+}
