@@ -549,93 +549,6 @@ pub fn process_rewards(
     Ok(res)
 }
 
-/// Reset to default state, undelegate all and set state to default
-pub fn reset(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-
-    let mut state = STATE.load(deps.storage)?;
-    state.bond_counter = 0;
-    state.total_bond_amount = Uint128::new(0);
-    state.total_supply = Uint128::new(0);
-    state.total_delegated_amount = Uint128::new(0);
-    state.last_bond_time = 0;
-    state.exchange_rate = Decimal::one();
-    STATE.save(deps.storage, &state)?;
-
-    unbond_record().clear(deps.storage);
-    let msgs = utils::delegation::get_unbond_all_messages(deps, env.contract.address)?;
-
-    let res: Response = Response::new()
-        .add_messages(msgs)
-        .add_attribute("action", "reset");
-
-    Ok(res)
-}
-
-/// Transfer all native balance of this contract to owner (for development purpose only)
-pub fn transfer_to_owner(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    let params = PARAMETERS.load(deps.storage)?;
-
-    let balance = deps
-        .querier
-        .query_balance(env.contract.address, params.underlying_coin_denom)?;
-
-    if balance.amount < Uint128::one() {
-        return Err(ContractError::NotEnoughAvailableFund {});
-    }
-
-    let owner = cw_ownable::get_ownership(deps.storage)?;
-
-    let bank_msg = BankMsg::Send {
-        to_address: owner.owner.unwrap().to_string(),
-        amount: vec![balance.clone()],
-    };
-    let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-
-    let res: Response = Response::new()
-        .add_message(msg)
-        .add_attribute("action", "transfer_to_owner")
-        .add_attribute("amount", balance.amount.to_string());
-
-    Ok(res)
-}
-
-/// Move all native balance to reward contract (for development only)
-pub fn move_to_reward(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    let params = PARAMETERS.load(deps.storage)?;
-
-    let balance = deps
-        .querier
-        .query_balance(env.contract.address, params.underlying_coin_denom)?;
-
-    if balance.amount < Uint128::one() {
-        return Err(ContractError::NotEnoughAvailableFund {});
-    }
-
-    let bank_msg = BankMsg::Send {
-        to_address: params.reward_address.to_string(),
-        amount: vec![balance.clone()],
-    };
-    let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-
-    let res: Response = Response::new()
-        .add_message(msg)
-        .add_attribute("action", "move_to_reward_contract")
-        .add_attribute("amount", balance.amount.to_string());
-
-    Ok(res)
-}
-
 /// Update the ownership of the contract.
 #[allow(clippy::needless_pass_by_value)]
 pub fn update_ownership(
@@ -840,60 +753,6 @@ pub fn process_unbonding(
     Ok(res)
 }
 
-/// Transfer token via ucs03 contract
-pub fn transfer(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    amount: Uint128,
-    base_denom: String,
-    receiver: String,
-    ucs03_channel_id: u32,
-    ucs03_contract: String,
-    quote_token: String,
-    salt: String,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-
-    let mut msgs: Vec<CosmosMsg> = vec![];
-    let allowance_msg = cw20::Cw20ExecuteMsg::IncreaseAllowance {
-        spender: ucs03_contract.clone(),
-        amount: amount.clone(),
-        expires: None,
-    };
-
-    let allow_bin = to_json_binary(&allowance_msg).unwrap();
-    let allow_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: base_denom.to_string(),
-        msg: allow_bin,
-        funds: vec![],
-    });
-    msgs.push(allow_msg);
-
-    let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
-        env,
-        ucs03_contract,
-        ucs03_channel_id,
-        Bytes::from_str(receiver.as_str()).unwrap(),
-        base_denom.clone(),
-        amount.clone(),
-        Bytes::from_str(quote_token.as_str()).unwrap(),
-        Uint256::from(amount),
-        vec![],
-        H256::from_str(&salt).unwrap(),
-    )?;
-
-    msgs.push(CosmosMsg::Wasm(wasm_msg).into());
-
-    let res: Response = Response::new()
-        .add_messages(msgs)
-        .add_attribute("action", "transfer")
-        .add_attribute("receiver", receiver.to_string())
-        .add_attribute("amount", amount.to_string())
-        .add_attribute("denom", base_denom);
-    Ok(res)
-}
-
 /// Zkgm callback function to process bond and unbond from another chain
 pub fn on_zkgm(
     deps: DepsMut,
@@ -1021,41 +880,6 @@ pub fn migrate_reward(
     });
 
     let res: Response = Response::new().add_message(migrate_msg);
-    Ok(res)
-}
-
-/// Transfer all balance in reward contract to this contract
-pub fn transfer_reward(deps: DepsMut) -> Result<Response, ContractError> {
-    let params = PARAMETERS.load(deps.storage)?;
-    let msg = ExecuteRewardMsg::TransferToOwner {};
-    let msg_bin = to_json_binary(&msg)?;
-    let msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: params.reward_address.to_string(),
-        msg: msg_bin,
-        funds: vec![],
-    });
-
-    let res: Response = Response::new().add_message(msg);
-    Ok(res)
-}
-
-/// Burn cw20 token
-pub fn burn(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    amount: Uint128,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    let params = PARAMETERS.load(deps.storage)?;
-
-    let msg = utils::token::burn_token(amount, params.cw20_address.to_string());
-
-    let res: Response = Response::new()
-        .add_message(msg)
-        .add_attribute("action", "burn")
-        .add_attribute("denom", params.liquidstaking_denom)
-        .add_attribute("amount", amount.to_string());
     Ok(res)
 }
 
