@@ -22,7 +22,13 @@ use unionlabs_primitives::{Bytes, H256};
 
 /// process bond to stake user fund
 /// this function assume staker always equals to sender
-pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+pub fn bond(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    slippage: Option<Decimal>,
+    expected: Uint128,
+) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
@@ -46,6 +52,11 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Cont
         denom: coin_denom.clone(),
     };
 
+    let slippage_rate = match slippage {
+        Some(rate) => rate,
+        None => Decimal::from_str("0.01").unwrap(),
+    };
+
     // get cosmos messages to delegate and mint liquid staking token
     let (msgs, sub_msgs, bond_data) = utils::delegation::process_bond(
         deps.storage,
@@ -60,6 +71,8 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Cont
         "".to_string(),
         None,
     )?;
+
+    check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
     // create bond event here
     let bond_event = BondEvent(
@@ -106,18 +119,11 @@ pub fn zkgm_unbond(
     channel_id: u32,
     staker: String,
     amount: Uint128,
-    slippage: Option<Decimal>,
-    expected: Uint128,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let sender = info.sender.clone();
     let delegator = env.contract.address.clone();
-
-    let slippage_rate = match slippage {
-        Some(rate) => rate,
-        None => Decimal::from_str("0.01").unwrap(),
-    };
 
     let msg = cw20::Cw20QueryMsg::Balance {
         address: delegator.to_string(),
@@ -158,8 +164,6 @@ pub fn zkgm_unbond(
         params.liquidstaking_denom.clone(),
         unbond_data.record_id,
     );
-
-    check_slippage(unbond_data.undelegate_amount, expected, slippage_rate)?;
 
     let attrs = get_unbond_attrs(
         sender.to_string(),
@@ -912,21 +916,8 @@ pub fn on_zkgm(
                 expected,
             )
         }
-        ZkgmMessage::Unbond {
-            amount,
-            slippage,
-            expected,
-        } => {
-            return zkgm_unbond(
-                deps,
-                env,
-                info,
-                channel_id,
-                format!("{}", sender),
-                amount,
-                slippage,
-                expected,
-            )
+        ZkgmMessage::Unbond { amount } => {
+            return zkgm_unbond(deps, env, info, channel_id, format!("{}", sender), amount)
         }
     }
 }

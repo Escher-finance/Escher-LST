@@ -109,7 +109,9 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Bond {} => execute::bond(deps, env, info),
+        ExecuteMsg::Bond { slippage, expected } => {
+            execute::bond(deps, env, info, slippage, expected)
+        }
         ExecuteMsg::Unbond { amount } => execute::unbond(deps, env, info, amount),
 
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
