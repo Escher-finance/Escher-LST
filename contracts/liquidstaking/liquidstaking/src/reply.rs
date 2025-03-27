@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
-use crate::state::{Parameters, PARAMETERS, QUOTE_TOKEN};
+use crate::state::{Parameters, PARAMETERS, QUOTE_TOKEN, SPLIT_REWARD_QUEUE, VALIDATORS_REGISTRY};
 use crate::utils;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
@@ -102,26 +102,34 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
     let params = PARAMETERS.load(deps.storage)?;
     let payload: BondRewardsPayload = from_json(msg.payload)?;
     let mut msgs: Vec<CosmosMsg> = vec![];
+    let mut attrs: Vec<Attribute> = vec![];
 
-    let attrs: Vec<Attribute> = vec![
-        attr("action", "execute_split_reward"),
-        attr("reward_contract", params.reward_address.clone().to_string()),
-    ];
+    let validator_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let total_validators = validator_reg.validators.len();
+    let mut split_reward_queue = SPLIT_REWARD_QUEUE.load(deps.storage)?;
 
-    if payload.amount != Uint128::zero() {
+    split_reward_queue.push(payload.validator);
+
+    if split_reward_queue.len() == total_validators {
         let msg = ExecuteRewardMsg::SplitReward {};
         let msg_bin = to_json_binary(&msg)?;
-        let redelegate_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
+        let split_reward_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: params.reward_address.to_string(),
             msg: msg_bin,
             funds: vec![],
         });
 
-        msgs.push(redelegate_msg);
+        msgs.push(split_reward_msg);
+        attrs = vec![
+            attr("action", "execute_split_reward"),
+            attr("reward_contract", params.reward_address.clone().to_string()),
+        ];
+
+        // reset SPLIT_REWARD_QUEUE as all validators already put in batch
+        SPLIT_REWARD_QUEUE.save(deps.storage, &vec![])?;
     }
 
     let res: Response = Response::new().add_messages(msgs).add_attributes(attrs);
-
     Ok(res)
 }
 

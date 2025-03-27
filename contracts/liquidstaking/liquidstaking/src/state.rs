@@ -12,6 +12,9 @@ pub const LOG: Item<String> = Item::new("log");
 // Map of channel id to the quote token and lst quote token of destination chain
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 
+// Queue of validator reward for executing split reward
+pub const SPLIT_REWARD_QUEUE: Item<Vec<String>> = Item::new("redelegate_batch");
+
 #[cw_serde]
 pub struct Balance {
     pub amount: Uint128,
