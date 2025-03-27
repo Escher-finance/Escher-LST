@@ -101,4 +101,20 @@ mod tests {
             Uint128::zero() // Not enough precision
         );
     }
+
+    #[test]
+    fn test_check_slippage() {
+        // Same value
+        assert!(check_slippage(Uint128::new(10), Uint128::new(10), Decimal::zero()).is_ok());
+
+        // Good - lower bound
+        assert!(check_slippage(Uint128::new(98), Uint128::new(100), Decimal::percent(2)).is_ok());
+        // Fails - lower bound
+        assert!(check_slippage(Uint128::new(98), Uint128::new(100), Decimal::percent(1)).is_err());
+
+        // Good - upper bound
+        assert!(check_slippage(Uint128::new(100), Uint128::new(105), Decimal::percent(5)).is_ok());
+        // Fails - upper bound
+        assert!(check_slippage(Uint128::new(100), Uint128::new(105), Decimal::percent(4)).is_err());
+    }
 }
