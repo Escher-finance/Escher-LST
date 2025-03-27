@@ -643,7 +643,7 @@ pub fn process_unbond(
         sender: sender.clone(),
         staker: staker.clone(),
         amount: unbond_amount,
-        undelegate_amount: undelegate_amount,
+        undelegate_amount,
         created: env.block.time,
         released_height: 0,
         released: false,
@@ -661,9 +661,9 @@ pub fn process_unbond(
         msgs,
         UnbondData {
             record_id: id,
-            undelegate_amount: undelegate_amount,
+            undelegate_amount,
             delegated_amount: state.total_delegated_amount,
-            reward: reward,
+            reward,
             exchange_rate: current_exchange_rate,
             total_supply: state.total_supply,
         },
@@ -714,29 +714,29 @@ mod tests {
     }
 
     #[test]
-    fn test_get_restaking_msgs_amount_cannot_be_zero() {
+    fn test_get_restaking_msgs() {
         let surplus_validators = Vec::from([
             ValidatorDelegation {
                 address: "a".to_string(),
                 delegation_diff: DelegationDiff::Surplus,
-                diff_amount: Uint128::from(200_u128),
+                diff_amount: Uint128::new(200),
             },
             ValidatorDelegation {
                 address: "b".to_string(),
                 delegation_diff: DelegationDiff::Surplus,
-                diff_amount: Uint128::from(900_u128),
+                diff_amount: Uint128::new(900),
             },
         ]);
         let deficient_validators = vec![
             ValidatorDelegation {
                 address: "c".to_string(),
                 delegation_diff: DelegationDiff::Deficit,
-                diff_amount: Uint128::from(1000_u128),
+                diff_amount: Uint128::new(1000),
             },
             ValidatorDelegation {
                 address: "d".to_string(),
                 delegation_diff: DelegationDiff::Deficit,
-                diff_amount: Uint128::from(500_u128),
+                diff_amount: Uint128::new(500),
             },
         ];
         let msgs = get_restaking_msgs(
@@ -756,6 +756,58 @@ mod tests {
             }
             false
         });
+        // Amount cannot be zero
         assert!(zero_redelegate.is_none());
+
+        let surplus_validators = Vec::from([
+            ValidatorDelegation {
+                address: "a".to_string(),
+                delegation_diff: DelegationDiff::Surplus,
+                diff_amount: Uint128::new(5000),
+            },
+            ValidatorDelegation {
+                address: "b".to_string(),
+                delegation_diff: DelegationDiff::Surplus,
+                diff_amount: Uint128::new(5000),
+            },
+        ]);
+        let deficient_validators = vec![
+            ValidatorDelegation {
+                address: "c".to_string(),
+                delegation_diff: DelegationDiff::Deficit,
+                diff_amount: Uint128::new(7500),
+            },
+            ValidatorDelegation {
+                address: "d".to_string(),
+                delegation_diff: DelegationDiff::Deficit,
+                diff_amount: Uint128::new(2500),
+            },
+        ];
+        let msgs = get_restaking_msgs(
+            surplus_validators,
+            deficient_validators,
+            "denom".to_string(),
+        );
+        let mut amounts = msgs
+            .iter()
+            .cloned()
+            .filter_map(|msg| {
+                if let CosmosMsg::Staking(StakingMsg::Redelegate {
+                    src_validator: _,
+                    dst_validator,
+                    amount,
+                }) = msg
+                {
+                    return Some((dst_validator, amount.amount.u128()));
+                }
+                None
+            })
+            .collect::<Vec<_>>();
+        amounts.sort_by_key(|a| a.1);
+        // Should redelegate in totality
+        assert_eq!(
+            amounts,
+            vec![("d".to_string(), 2500_u128), ("c".to_string(), 7500_u128)]
+        );
     }
 }
