@@ -296,7 +296,7 @@ pub fn get_restaking_msgs(
         for deficient_validator in deficient_validators.iter_mut() {
             if surplus_validator.diff_amount < deficient_validator.diff_amount {
                 if surplus_validator.diff_amount.is_zero() {
-                    break;
+                    continue;
                 }
 
                 // the deficit amount higher than surplus amount so we can restake all surplus amount
@@ -315,7 +315,7 @@ pub fn get_restaking_msgs(
                 msgs.push(undelegate_msg);
             } else {
                 if deficient_validator.diff_amount.is_zero() {
-                    break;
+                    continue;
                 }
 
                 println!("{:?} <> {:?}", surplus_validator, deficient_validator);
