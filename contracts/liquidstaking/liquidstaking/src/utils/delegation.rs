@@ -788,9 +788,8 @@ mod tests {
             deficient_validators,
             "denom".to_string(),
         );
-        let mut amounts = msgs
-            .iter()
-            .cloned()
+        let mut net_amounts = msgs
+            .into_iter()
             .filter_map(|msg| {
                 if let CosmosMsg::Staking(StakingMsg::Redelegate {
                     src_validator: _,
@@ -802,11 +801,18 @@ mod tests {
                 }
                 None
             })
+            .fold(HashMap::new(), |mut h, pair| {
+                h.entry(pair.0)
+                    .and_modify(|amount| *amount += pair.1)
+                    .or_insert(pair.1);
+                h
+            })
+            .into_iter()
             .collect::<Vec<_>>();
-        amounts.sort_by_key(|a| a.1);
+        net_amounts.sort_by_key(|a| a.1);
         // Should redelegate in totality
         assert_eq!(
-            amounts,
+            net_amounts,
             vec![("d".to_string(), 2500_u128), ("c".to_string(), 7500_u128)]
         );
     }
