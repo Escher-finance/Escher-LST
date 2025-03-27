@@ -672,6 +672,8 @@ pub fn process_unbond(
 
 #[cfg(test)]
 mod tests {
+    use cosmwasm_std::assert_approx_eq;
+
     use super::*;
 
     #[test]
@@ -682,17 +684,34 @@ mod tests {
         let validators = vec![
             Validator {
                 address: "abc".to_string(),
-                weight: 1,
+                weight: 10,
             },
             Validator {
                 address: "bcd".to_string(),
-                weight: 1,
+                weight: 20,
             },
         ];
         let undelegate_msgs =
             get_undelegate_from_validator_msgs(undelegate_amount, coin_denom.clone(), validators);
-        println!("undelegate amount: {}", 999995);
-        println!("undelegate_msgs: {:?}", undelegate_msgs);
+        let undelegate_msgs_unwrapped = undelegate_msgs
+            .iter()
+            .filter_map(|msg| {
+                if let CosmosMsg::Staking(StakingMsg::Undelegate { validator, amount }) = msg {
+                    return Some((validator, amount.amount));
+                }
+                return None;
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(undelegate_msgs_unwrapped.len(), 2);
+        assert_eq!(
+            undelegate_msgs_unwrapped[0].1 + undelegate_msgs_unwrapped[1].1,
+            undelegate_amount
+        );
+        assert_approx_eq!(
+            undelegate_msgs_unwrapped[0].1 * Uint128::from(2_u128),
+            undelegate_msgs_unwrapped[1].1,
+            "0.001"
+        );
     }
 
     #[test]
