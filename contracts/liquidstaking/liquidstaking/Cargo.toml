@@ -7,6 +7,17 @@ version      = "0.1.71"
 lto = "thin"
 strip = true
 
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(nonunion)'] }
 
