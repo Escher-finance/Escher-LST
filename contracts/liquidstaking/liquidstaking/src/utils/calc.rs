@@ -55,3 +55,50 @@ pub fn check_slippage(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_staking_token_from_rate() {
+        let stake_amount = Uint128::new(112382);
+        assert_eq!(
+            calculate_staking_token_from_rate(stake_amount, Decimal::from_ratio(1_u128, 2_u128)),
+            stake_amount * Uint128::new(2)
+        );
+        assert_eq!(
+            calculate_staking_token_from_rate(stake_amount, Decimal::from_str("1.0").unwrap()),
+            stake_amount
+        );
+    }
+
+    #[test]
+    fn test_calculate_native_token_from_staking_token() {
+        let staking_token = Uint128::new(112382);
+        assert_eq!(
+            calculate_native_token_from_staking_token(
+                staking_token,
+                Decimal::from_ratio(1_u128, 2_u128)
+            ),
+            staking_token / Uint128::new(2)
+        );
+
+        let staking_token = Uint128::new(DECIMAL_FRACTIONAL);
+        assert_eq!(
+            calculate_native_token_from_staking_token(
+                staking_token,
+                Decimal::from_ratio(1u128, staking_token)
+            ),
+            Uint128::one()
+        );
+        let staking_token = Uint128::new(DECIMAL_FRACTIONAL + 1);
+        assert_eq!(
+            calculate_native_token_from_staking_token(
+                staking_token,
+                Decimal::from_ratio(1u128, staking_token)
+            ),
+            Uint128::zero() // Not enough precision
+        );
+    }
+}

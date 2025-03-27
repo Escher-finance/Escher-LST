@@ -672,9 +672,8 @@ pub fn process_unbond(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::assert_approx_eq;
-
     use super::*;
+    use cosmwasm_std::assert_approx_eq;
 
     #[test]
     fn test_get_undelegate_messages() {
@@ -712,25 +711,6 @@ mod tests {
             undelegate_msgs_unwrapped[1].1,
             "0.001"
         );
-    }
-
-    #[test]
-    fn test_unbond_calc() {
-        let unbond_amount = Uint128::from(1000000u128);
-        let exchange_rate =
-            Decimal::from_str("0.99771671118504649").expect("invalid decimal string");
-        let native_amount =
-            calc::calculate_native_token_from_staking_token(unbond_amount, exchange_rate);
-        println!("native amount: {}", native_amount);
-    }
-
-    #[test]
-    fn test_bond_calc() {
-        let bond_amount = Uint128::from(1000000000u128);
-        let exchange_rate =
-            Decimal::from_str("0.99771671118504649").expect("invalid decimal string");
-        let staking_amount = calc::calculate_staking_token_from_rate(bond_amount, exchange_rate);
-        println!("staking amount: {}", staking_amount);
     }
 
     #[test]
