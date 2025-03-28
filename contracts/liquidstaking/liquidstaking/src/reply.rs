@@ -2,16 +2,17 @@ use std::str::FromStr;
 
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
-use crate::state::{Parameters, PARAMETERS, QUOTE_TOKEN};
+use crate::state::{Parameters, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE};
 use crate::utils;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, Uint128, Uint256, WasmMsg,
+    Env, Reply, Response, SubMsg, Uint128, Uint256, WasmMsg,
 };
 use unionlabs_primitives::{Bytes, H256};
 
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
+pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
@@ -25,6 +26,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     match msg.id {
         MINT_CW20_TOKENS_REPLY_ID => on_mint_cw20_tokens(deps, env, msg),
         PROCESS_WITHDRAW_REWARD_REPLY_ID => on_process_rewards(deps, env, msg),
+        SPLIT_REWARD_REPLY_ID => on_split_reward(deps, env, msg),
         _ => Ok(Response::new()),
     }
 }
@@ -97,11 +99,16 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     Ok(res)
 }
 
-/// Call redelegate to reward contract after withdraw reward
+/// Call split reward to reward contract after withdraw reward
 fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let payload: BondRewardsPayload = from_json(msg.payload)?;
-    let mut msgs: Vec<CosmosMsg> = vec![];
+    // increment the reward balance on this contract as result of withdraw reward
+    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    reward_balance += payload.amount;
+    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
+
+    let mut msgs: Vec<SubMsg> = vec![];
 
     let attrs: Vec<Attribute> = vec![
         attr("action", "execute_split_reward"),
@@ -111,16 +118,28 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
     if payload.amount != Uint128::zero() {
         let msg = ExecuteRewardMsg::SplitReward {};
         let msg_bin = to_json_binary(&msg)?;
-        let redelegate_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
+        let split_reward_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: params.reward_address.to_string(),
             msg: msg_bin,
             funds: vec![],
         });
 
-        msgs.push(redelegate_msg);
+        let sub_msg: SubMsg = SubMsg::reply_always(split_reward_msg, SPLIT_REWARD_REPLY_ID);
+
+        msgs.push(sub_msg);
     }
 
-    let res: Response = Response::new().add_messages(msgs).add_attributes(attrs);
+    let res: Response = Response::new().add_submessages(msgs).add_attributes(attrs);
+
+    Ok(res)
+}
+
+/// Handle split reward call to reward contract reply
+fn on_split_reward(deps: DepsMut, _env: Env, _msg: Reply) -> Result<Response, ContractError> {
+    // reset reward balance after split reward call success
+    REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
+
+    let res: Response = Response::new().add_attribute("action", "on_split_reward");
 
     Ok(res)
 }

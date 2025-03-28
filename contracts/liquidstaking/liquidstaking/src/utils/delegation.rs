@@ -2,9 +2,6 @@ use crate::event::SubmitBatchEvent;
 use crate::event::UnbondEventsFromAtts;
 use crate::event::UnstakeRequestEvent;
 use crate::msg::ValidatorDelegation;
-use crate::state::ValidatorsRegistry;
-use crate::state::PENDING_BATCH_ID;
-use crate::state::QUOTE_TOKEN;
 use crate::utils::calc;
 use crate::utils::delegation;
 use crate::utils::token;
@@ -12,8 +9,8 @@ use crate::ContractError;
 use crate::{
     msg::{BondData, DelegationDiff, MintTokensPayload},
     state::{
-        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, PARAMETERS, STATE,
-        VALIDATORS_REGISTRY,
+        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, ValidatorsRegistry,
+        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::Attribute;
@@ -60,37 +57,6 @@ pub fn get_actual_total_delegated(
     }
 
     total
-}
-
-/// get total delegated token value from validators in native token
-pub fn get_actual_total_reward(
-    querier: QuerierWrapper,
-    delegator: String,
-    denom: String,
-    validators: Vec<String>,
-    reward_contract: String,
-) -> StdResult<Uint128> {
-    let mut total_rewards = Uint128::new(0);
-    let result: StdResult<DelegationTotalRewardsResponse> =
-        querier.query_delegation_total_rewards(delegator);
-
-    if result.is_ok() {
-        for delegator_reward in result.unwrap().rewards {
-            if validators.contains(&delegator_reward.validator_address) {
-                for reward in delegator_reward.reward {
-                    if reward.denom == denom {
-                        let reward_val = to_uint128(reward.amount.to_uint_floor())?;
-                        total_rewards += reward_val;
-                    }
-                }
-            }
-        }
-    }
-
-    let reward_balance = querier.query_balance(reward_contract, denom)?;
-    total_rewards += reward_balance.amount;
-    // add query reward contract balance
-    Ok(total_rewards)
 }
 
 pub fn get_unclaimed_reward(
@@ -514,13 +480,16 @@ pub fn process_bond(
     let total_bond_amount: Uint128;
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
-        let reward = get_actual_total_reward(
+        // query the total reward from this contract
+        let unclaimed_reward = get_unclaimed_reward(
             querier,
             delegator.to_string(),
             coin_denom.clone(),
             validators_list,
-            params.reward_address.into(),
         )?;
+
+        let contract_reward_balance = REWARD_BALANCE.load(storage)?;
+        let reward = unclaimed_reward + contract_reward_balance;
 
         total_bond_amount = delegated_amount + reward;
     } else {
@@ -713,13 +682,16 @@ pub fn submit_pending_batch(
         validators_list.clone(),
     );
     state.total_delegated_amount = delegated_amount;
-    let reward = get_actual_total_reward(
+    // query the total reward from this contract
+    let unclaimed_reward = get_unclaimed_reward(
         querier,
         delegator.to_string(),
         coin_denom.clone(),
         validators_list,
-        params.reward_address.into(),
     )?;
+
+    let contract_reward_balance = REWARD_BALANCE.load(storage)?;
+    let reward = unclaimed_reward + contract_reward_balance;
 
     let total_bond_amount = delegated_amount + reward;
 

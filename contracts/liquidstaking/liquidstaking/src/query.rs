@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use crate::msg::{Log, QueryMsg, StakingLiquidity};
 use crate::state::unbond_record;
 use crate::state::{
-    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, BALANCE, LOG,
-    PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, LOG, PARAMETERS,
+    QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
@@ -26,7 +26,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         } => to_json_binary(&query_staking_liquidity(
             deps, env, delegator, denom, validators,
         )?),
-        QueryMsg::Balance {} => to_json_binary(&(query_balance(deps.storage)?)),
+        QueryMsg::RewardBalance {} => to_json_binary(&(query_reward_balance(deps.storage)?)),
         QueryMsg::Log {} => to_json_binary(&(query_log(deps.storage)?)),
         QueryMsg::UnbondRecord {
             staker,
@@ -71,9 +71,9 @@ pub fn query_validators(storage: &dyn Storage) -> StdResult<ValidatorsRegistry> 
     Ok(validators)
 }
 
-pub fn query_balance(storage: &dyn Storage) -> StdResult<Balance> {
-    let balance = BALANCE.load(storage)?;
-    Ok(balance)
+pub fn query_reward_balance(storage: &dyn Storage) -> StdResult<Balance> {
+    let balance = REWARD_BALANCE.load(storage)?;
+    Ok(Balance { amount: balance })
 }
 
 pub fn query_staking_liquidity(

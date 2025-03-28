@@ -10,14 +10,14 @@ use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMs
 use crate::query::query_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, LOG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, STATE,
-    VALIDATORS_REGISTRY,
+    unbond_record, QuoteToken, Validator, LOG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+    REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::delegation::get_transfer_token_cosmos_msg;
 use crate::utils::{
     self, calc::check_slippage, delegation::get_actual_total_delegated,
-    delegation::get_actual_total_reward, delegation::get_mock_total_reward,
+    delegation::get_mock_total_reward, delegation::get_unclaimed_reward,
     delegation::submit_pending_batch, delegation::to_uint128,
 };
 use cosmwasm_std::{
@@ -88,14 +88,29 @@ pub fn bond(
         deps.querier,
         sender.to_string(),
         the_staker.clone(),
-        delegator,
+        delegator.clone(),
         payment.amount,
         env.block.time.nanos(),
         params,
-        validators_reg,
+        validators_reg.clone(),
         salt,
         None,
     )?;
+
+    // increment the reward balance on this contract as there is automatic reward withdrawal on delegation
+    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    let total_reward = utils::delegation::get_unclaimed_reward(
+        deps.querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_reg
+            .validators
+            .iter()
+            .map(|v| v.address.clone())
+            .collect(),
+    )?;
+    reward_balance += total_reward;
+    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     // create bond event here
     let bond_event = BondEvent(
@@ -325,16 +340,32 @@ pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         });
     }
 
+    let coin_denom = params.underlying_coin_denom.clone();
     let (msgs, events) = submit_pending_batch(
         deps.storage,
         deps.querier,
         env.block.time,
         info.sender,
-        delegator,
+        delegator.clone(),
         &mut pending_batch,
         params,
-        validators_reg,
+        validators_reg.clone(),
     )?;
+
+    // increment the reward balance on this contract as there is automatic reward withdrawal on undelegation
+    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    let total_reward = utils::delegation::get_unclaimed_reward(
+        deps.querier,
+        delegator.to_string(),
+        coin_denom,
+        validators_reg
+            .validators
+            .iter()
+            .map(|v| v.address.clone())
+            .collect(),
+    )?;
+    reward_balance += total_reward;
+    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     let res: Response = Response::new().add_messages(msgs).add_events(events);
 
@@ -433,14 +464,17 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     let total_bond_amount: Uint128;
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
-        let reward = get_actual_total_reward(
+
+        let unclaimed_reward = get_unclaimed_reward(
             deps.querier,
             delegator.to_string(),
             coin_denom.clone(),
             validators_list,
-            params.reward_address.into(),
         )?;
 
+        // query the reward from this contract state
+        let contract_reward_balance = REWARD_BALANCE.load(deps.storage)?;
+        let reward = unclaimed_reward + contract_reward_balance;
         total_bond_amount = delegated_amount + reward;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
@@ -504,6 +538,7 @@ pub fn process_rewards(
             }
         }
 
+        // query reward from the validator
         let withdraw_reward_msg: CosmosMsg =
             CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
                 validator: validator.address.to_string(),

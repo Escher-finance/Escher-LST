@@ -10,8 +10,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS,
-    PENDING_BATCH_ID, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    Parameters, State, Validator, ValidatorsRegistry, LOG, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -33,11 +33,7 @@ pub fn instantiate(
 
     LOG.save(deps.storage, &"".into())?;
 
-    let balance = Balance {
-        amount: Uint128::new(0),
-        last_updated: 0,
-    };
-    BALANCE.save(deps.storage, &balance)?;
+    REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
 
     let mut validators: Vec<Validator> = vec![];
     for validator in msg.validators {

@@ -159,7 +159,7 @@ pub enum QueryMsg {
         validators: Option<Vec<String>>,
     },
     #[returns(Balance)]
-    Balance {},
+    RewardBalance {},
     #[returns(Log)]
     Log {},
     #[returns(Vec<UnbondRecord>)]
