@@ -18,7 +18,6 @@ use cosmwasm_std::{
 use std::collections::HashMap;
 use std::str::FromStr;
 
-const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
 
 /// get total delegated token value from validators in native token
@@ -117,13 +116,13 @@ pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
 }
 
 /// return how much to undelegate native token from ratio of total delegated amount divide with total bond with reward value amount
+/// NOTE: Not used
 pub fn calculate_undelegate_amount(
     native_token_amount: Uint128,
     delegated_amount: Uint128,
     total_bonded_amount: Uint128,
 ) -> Uint128 {
-    let native_token_undelegate_decimal =
-        Decimal::new(native_token_amount * Uint128::from(DECIMAL_FRACTIONAL));
+    let native_token_undelegate_decimal = Decimal::from_ratio(native_token_amount, Uint128::one());
     let ratio = Decimal::from_ratio(delegated_amount, total_bonded_amount);
 
     println!(
@@ -135,12 +134,10 @@ pub fn calculate_undelegate_amount(
     let undelegate_native_decimal = native_token_undelegate_decimal * ratio;
     undelegate_native_decimal.to_uint_floor()
 }
+
+/// NOTE: This is the same calculation as `utils:calculate_native_token_from_staking_token`
 pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL));
-    let fract = (ratio * decimal_fract).to_uint_ceil();
-    let delegate_amount =
-        Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
-    delegate_amount
+    (ratio * Decimal::from_ratio(amount, Uint128::one())).to_uint_floor()
 }
 
 pub fn get_undelegate_from_validator_msgs(
@@ -164,8 +161,7 @@ pub fn get_undelegate_from_validator_msgs(
     for (pos, validator) in validators.into_iter().enumerate() {
         let ratio = Decimal::from_ratio(Uint128::from(validator.weight), total_weight);
 
-        let undelegate_amount_dec =
-            Decimal::new(undelegate_amount * Uint128::from(DECIMAL_FRACTIONAL));
+        let undelegate_amount_dec = Decimal::from_ratio(undelegate_amount, Uint128::one());
         let mut undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
         total_undelegated += undelegate_amount_for_validator;
 
@@ -195,7 +191,7 @@ pub fn get_validator_delegation_map_with_total_bond(
 ) -> Result<(HashMap<String, Uint128>, Uint128), ContractError> {
     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
 
-    let mut total_delegated_amount = Uint128::from(0u32);
+    let mut total_delegated_amount = Uint128::zero();
 
     for validator in validators {
         let validator_bond = deps
@@ -204,7 +200,7 @@ pub fn get_validator_delegation_map_with_total_bond(
 
         let delegation_amount = match validator_bond {
             Some(delegation) => delegation.amount.amount,
-            None => Uint128::from(0u32),
+            None => Uint128::zero(),
         };
         validator_delegation_map.insert(validator.address.to_string(), delegation_amount);
         total_delegated_amount += delegation_amount;
@@ -216,7 +212,7 @@ pub fn get_validator_delegation_map_with_total_bond(
 pub fn get_validator_delegation_map_base_on_weight(
     validators: Vec<Validator>,
     total_delegated_amount: Uint128,
-) -> Result<HashMap<String, Uint128>, ContractError> {
+) -> HashMap<String, Uint128> {
     let total_weight = validators
         .iter()
         .map(|v| v.weight)
@@ -231,7 +227,7 @@ pub fn get_validator_delegation_map_base_on_weight(
         correct_validator_delegation_map.insert(validator.address.to_string(), delegation_amount);
     }
 
-    Ok(correct_validator_delegation_map)
+    correct_validator_delegation_map
 }
 
 pub fn get_surplus_deficit_validators(
@@ -446,7 +442,7 @@ pub fn adjust_validators_delegation(
         get_validator_delegation_map_with_total_bond(deps, delegator.to_string(), prev_validators)?;
 
     let correct_validator_delegation_map =
-        get_validator_delegation_map_base_on_weight(validators, total_delegated_amount)?;
+        get_validator_delegation_map_base_on_weight(validators, total_delegated_amount);
 
     let (surplus_validators, deficient_validators) =
         get_surplus_deficit_validators(validator_delegation_map, correct_validator_delegation_map);
@@ -676,7 +672,16 @@ mod tests {
     use cosmwasm_std::assert_approx_eq;
 
     #[test]
-    fn test_get_undelegate_messages() {
+    fn test_calculate_delegated_amount() {
+        let amount = Uint128::new(112382);
+        assert_eq!(
+            calculate_delegated_amount(amount, Decimal::from_ratio(1_u128, 2_u128)),
+            amount / Uint128::new(2)
+        );
+    }
+
+    #[test]
+    fn test_get_undelegate_from_validator_msgs() {
         let undelegate_amount = Uint128::from(500642u32);
         let coin_denom = "muno".to_string();
 
@@ -710,6 +715,106 @@ mod tests {
             undelegate_msgs_unwrapped[0].1 * Uint128::from(2_u128),
             undelegate_msgs_unwrapped[1].1,
             "0.001"
+        );
+    }
+
+    #[test]
+    fn test_get_validator_delegation_map_base_on_weight() {
+        let validators = vec![
+            Validator {
+                address: "abc".to_string(),
+                weight: 10,
+            },
+            Validator {
+                address: "bcd".to_string(),
+                weight: 20,
+            },
+        ];
+        let total_delegated_amount = Uint128::new(250000);
+        let map =
+            get_validator_delegation_map_base_on_weight(validators.clone(), total_delegated_amount);
+        assert_eq!(map.len(), 2);
+        assert_approx_eq!(
+            map.values().sum::<Uint128>(),
+            total_delegated_amount,
+            "0.0001"
+        );
+        assert_approx_eq!(
+            map.get("abc").unwrap() * Uint128::new(2),
+            *map.get("bcd").unwrap(),
+            "0.0001"
+        );
+
+        assert_eq!(
+            HashMap::new(),
+            get_validator_delegation_map_base_on_weight(vec![], total_delegated_amount)
+        );
+        assert_eq!(
+            HashMap::from([
+                (validators[0].address.clone(), Uint128::zero()),
+                (validators[1].address.clone(), Uint128::zero())
+            ]),
+            get_validator_delegation_map_base_on_weight(validators, Uint128::zero())
+        );
+    }
+
+    #[test]
+    fn test_get_surplus_deficit_validators() {
+        let validator_a = "a".to_string();
+        let validator_b = "b".to_string();
+        let validator_c = "c".to_string();
+        let validator_d = "d".to_string();
+        let amount_a = Uint128::new(100);
+        let amount_b = Uint128::new(1000);
+        let amount_c = Uint128::new(250);
+        let correct_amount_b = Uint128::new(800);
+        let correct_amount_c = Uint128::new(350);
+        let correct_amount_d = Uint128::new(500);
+        let validator_delegation_map = HashMap::from([
+            (validator_a.clone(), amount_a),
+            (validator_b.clone(), amount_b),
+            (validator_c.clone(), amount_c),
+        ]);
+        let correct_validator_delegation_map = HashMap::from([
+            (validator_b.clone(), correct_amount_b),
+            (validator_c.clone(), correct_amount_c),
+            (validator_d.clone(), correct_amount_d),
+        ]);
+        let (mut surplus_validators, mut deficit_validators) = get_surplus_deficit_validators(
+            validator_delegation_map,
+            correct_validator_delegation_map,
+        );
+        surplus_validators.sort_by_key(|v| v.address.clone());
+        deficit_validators.sort_by_key(|v| v.address.clone());
+        assert_eq!(
+            surplus_validators,
+            vec![
+                ValidatorDelegation {
+                    address: validator_a.clone(),
+                    delegation_diff: DelegationDiff::Surplus,
+                    diff_amount: amount_a,
+                },
+                ValidatorDelegation {
+                    address: validator_b.clone(),
+                    delegation_diff: DelegationDiff::Surplus,
+                    diff_amount: amount_b.abs_diff(correct_amount_b),
+                },
+            ]
+        );
+        assert_eq!(
+            deficit_validators,
+            vec![
+                ValidatorDelegation {
+                    address: validator_c.clone(),
+                    delegation_diff: DelegationDiff::Deficit,
+                    diff_amount: amount_c.abs_diff(correct_amount_c),
+                },
+                ValidatorDelegation {
+                    address: validator_d.clone(),
+                    delegation_diff: DelegationDiff::Deficit,
+                    diff_amount: correct_amount_d,
+                },
+            ]
         );
     }
 
@@ -814,6 +919,46 @@ mod tests {
         assert_eq!(
             net_amounts,
             vec![("d".to_string(), 2500_u128), ("c".to_string(), 7500_u128)]
+        );
+    }
+
+    #[test]
+    fn test_get_delegate_to_validator_msgs() {
+        let delegate_amount = Uint128::new(50000);
+        let coin_denom = "denom".to_string();
+        let validators = vec![
+            Validator {
+                address: "abc".to_string(),
+                weight: 10,
+            },
+            Validator {
+                address: "bcd".to_string(),
+                weight: 20,
+            },
+        ];
+        let msgs = get_delegate_to_validator_msgs(delegate_amount, coin_denom, validators);
+        let amounts = msgs
+            .into_iter()
+            .filter_map(|msg| {
+                if let CosmosMsg::Staking(StakingMsg::Delegate { validator, amount }) = msg {
+                    return Some((validator, amount.amount));
+                }
+                None
+            })
+            .fold(HashMap::new(), |mut h, pair| {
+                h.entry(pair.0)
+                    .and_modify(|amount| *amount += pair.1)
+                    .or_insert(pair.1);
+                h
+            });
+        assert_approx_eq!(
+            amounts.get("abc").unwrap() * Uint128::new(2),
+            *amounts.get("bcd").unwrap(),
+            "0.001"
+        );
+        assert_eq!(
+            amounts.iter().map(|a| a.1).sum::<Uint128>(),
+            delegate_amount
         );
     }
 }
