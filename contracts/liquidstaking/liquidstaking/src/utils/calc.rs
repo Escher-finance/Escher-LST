@@ -4,8 +4,6 @@ use std::str::FromStr;
 
 use crate::ContractError;
 
-const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
-
 /// return how much staking token from underlying native coin denom
 pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
     (Decimal::from_ratio(stake_amount, Uint128::one()) / exchange_rate).to_uint_floor()
@@ -16,10 +14,7 @@ pub fn calculate_native_token_from_staking_token(
     staking_token: Uint128,
     exchange_rate: Decimal,
 ) -> Uint128 {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL));
-    let output =
-        (exchange_rate * decimal_fract) * Decimal::from_ratio(staking_token, Uint128::one());
-    output.to_uint_floor()
+    (exchange_rate * Decimal::from_ratio(staking_token, Uint128::one())).to_uint_floor()
 }
 
 pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
@@ -84,7 +79,8 @@ mod tests {
             staking_token / Uint128::new(2)
         );
 
-        let staking_token = Uint128::new(DECIMAL_FRACTIONAL);
+        let decimal_fractional: u128 = 1_000_000_000_000_000_000u128;
+        let staking_token = Uint128::new(decimal_fractional);
         assert_eq!(
             calculate_native_token_from_staking_token(
                 staking_token,
@@ -92,7 +88,7 @@ mod tests {
             ),
             Uint128::one()
         );
-        let staking_token = Uint128::new(DECIMAL_FRACTIONAL + 1);
+        let staking_token = Uint128::new(decimal_fractional + 1);
         assert_eq!(
             calculate_native_token_from_staking_token(
                 staking_token,
