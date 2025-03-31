@@ -9,6 +9,7 @@ use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
     unbond_record, QuoteToken, Validator, PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
+use crate::utils::validation::validate_validators;
 use crate::utils::{
     self, calc::check_slippage, delegation::get_actual_total_delegated,
     delegation::get_actual_total_reward, delegation::get_mock_total_reward, delegation::to_uint128,
@@ -967,6 +968,8 @@ pub fn update_validators(
         return Err(ContractError::EmptyValidator {});
     }
 
+    validate_validators(&deps, &validators)?;
+
     let mut validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let prev_validators = validators_reg.validators.clone();
     validators_reg.validators = validators.clone();
@@ -994,6 +997,9 @@ pub fn update_quote_token(
     quote_token: QuoteToken,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    if channel_id != quote_token.channel_id {
+        return Err(ContractError::InvalidQuoteTokens {});
+    }
     QUOTE_TOKEN.save(deps.storage, channel_id, &quote_token)?;
     Ok(Response::default())
 }
@@ -1233,4 +1239,47 @@ fn slippage_calculation() {
     let output = Uint128::new(10100);
     let result = utils::calc::check_slippage(output, expected, slippage);
     assert_eq!(result.is_ok(), true);
+}
+
+#[test]
+fn test_update_quote_token_channel_id_should_match() {
+    use cosmwasm_std::testing::{mock_dependencies, mock_env};
+
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    let owner = deps.api.addr_make("owner");
+
+    let info = MessageInfo {
+        sender: owner.clone(),
+        funds: vec![],
+    };
+    let mut channel_id = 10;
+    let quote_token = QuoteToken {
+        channel_id,
+        quote_token: "a".to_string(),
+        lst_quote_token: "b".to_string(),
+    };
+
+    cw_ownable::initialize_owner(&mut deps.storage, &deps.api, Some(owner.as_str())).unwrap();
+
+    // Good
+    update_quote_token(
+        deps.as_mut(),
+        env.clone(),
+        info.clone(),
+        channel_id,
+        quote_token.clone(),
+    )
+    .unwrap();
+
+    channel_id += 1;
+
+    // Fails - channel_id doesn't match
+    let err = update_quote_token(deps.as_mut(), env, info, channel_id, quote_token).unwrap_err();
+    assert!(if let ContractError::InvalidQuoteTokens {} = err {
+        true
+    } else {
+        false
+    });
 }

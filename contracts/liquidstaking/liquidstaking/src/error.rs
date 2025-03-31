@@ -72,4 +72,10 @@ pub enum ContractError {
 
     #[error("Unbond record query needs at least staker or released")]
     InvalidUnbondRecordQuery {},
+
+    #[error("Validators must be unique by address and have non-zero weight")]
+    InvalidValidators {},
+
+    #[error("Quote tokens must be unique by channel_id")]
+    InvalidQuoteTokens {},
 }

@@ -1,4 +1,5 @@
 use crate::instantiate::create_reward;
+use crate::utils::validation::{validate_quote_tokens, validate_validators};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
@@ -9,8 +10,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, PARAMETERS, QUOTE_TOKEN,
-    STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, State, ValidatorsRegistry, BALANCE, PARAMETERS, QUOTE_TOKEN, STATE,
+    VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -36,17 +37,12 @@ pub fn instantiate(
     };
     BALANCE.save(deps.storage, &balance)?;
 
-    let mut validators: Vec<Validator> = vec![];
-    for validator in msg.validators {
-        validators.push({
-            Validator {
-                address: validator.address,
-                weight: validator.weight,
-            }
-        })
-    }
+    validate_validators(&deps, &msg.validators)?;
 
-    let reg = ValidatorsRegistry { validators };
+    let reg = ValidatorsRegistry {
+        validators: msg.validators,
+    };
+
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
 
     // create reward contract message to instantiate reward contract that will receive staking reward
@@ -82,6 +78,8 @@ pub fn instantiate(
         last_bond_time: 0,
     };
     STATE.save(deps.storage, &state)?;
+
+    validate_quote_tokens(&msg.quote_tokens)?;
 
     for quote_token in msg.quote_tokens {
         QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
