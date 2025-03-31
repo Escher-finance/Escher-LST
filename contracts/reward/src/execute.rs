@@ -90,24 +90,6 @@ pub fn set_config(
     Ok(Response::default())
 }
 
-/// Update the ownership of the contract.
-#[allow(clippy::needless_pass_by_value)]
-pub fn update_ownership(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    action: cw_ownable::Action,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    if action == cw_ownable::Action::RenounceOwnership {
-        return Err(ContractError::OwnershipCannotBeRenounced);
-    };
-
-    let res: Response = Response::new().add_attribute("action", "update_ownership");
-
-    Ok(res)
-}
-
 pub fn transfer_to_owner(
     deps: DepsMut,
     env: Env,
