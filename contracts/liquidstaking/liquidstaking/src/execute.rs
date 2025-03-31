@@ -709,8 +709,10 @@ pub fn set_parameters(
     // change the fee receiver and fee rate on reward contract
     if fee_receiver.is_some() || fee_rate.is_some() {
         let msg = ExecuteRewardMsg::SetConfig {
-            fee_receiver: fee_receiver,
-            fee_rate: fee_rate,
+            fee_receiver,
+            fee_rate,
+            lst_contract_address: None,
+            coin_denom: None,
         };
         let msg_bin = to_json_binary(&msg)?;
         let msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
