@@ -62,10 +62,7 @@ pub enum ExecuteRewardMsg {
 pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
-    Bond {
-        amount: Option<Uint128>,
-        salt: String,
-    },
+    Bond {},
     /// Send liquid staking denom then undelegate native denom according exchange rate from validator
     Unbond {
         amount: Uint128,

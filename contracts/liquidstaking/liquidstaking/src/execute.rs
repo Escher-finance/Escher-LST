@@ -21,79 +21,51 @@ use cosmwasm_std::{
 };
 use unionlabs_primitives::{Bytes, H256};
 
-/// process bond call to contract
-pub fn bond(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    amount: Option<Uint128>,
-    salt: String,
-) -> Result<Response, ContractError> {
+/// process bond to stake user fund
+/// this function assume staker always equals to sender
+pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
-    let the_staker: String = sender.to_string();
     let delegator = env.contract.address;
 
-    let payment: Coin;
-    // if amount is none it should use senders funds to delegate and this assume the
-    // transaction happen on same chain directly as the original staker/sender to contract is on same cosmos based chain
-    if amount.is_none() {
-        // coin must have be sent along with transaction and it should be in underlying coin denom
-        if info.funds.len() > 1usize {
-            return Err(ContractError::InvalidAsset {});
-        }
-
-        payment = Coin {
-            amount: info
-                .funds
-                .iter()
-                .find(|x| x.denom == coin_denom && x.amount > Uint128::zero())
-                .ok_or_else(|| ContractError::NoAsset {})?
-                .amount
-                .clone(),
-            denom: coin_denom.clone(),
-        };
-    } else {
-        // if amount exists it should use this contract fund to delegate
-        // and this only can be called by "owner" or backend script using owner sign to do bond on behalf of original staker
-        cw_ownable::assert_owner(deps.storage, &sender)?;
-
-        let the_amount = amount.unwrap();
-
-        let lst_balance = deps
-            .querier
-            .query_balance(delegator.to_string(), coin_denom.clone())?;
-
-        if lst_balance.amount < the_amount.clone() {
-            return Err(ContractError::NotEnoughFund {});
-        }
-
-        payment = Coin {
-            amount: the_amount,
-            denom: coin_denom.clone(),
-        };
+    // coin must have be sent along with transaction and it should be in underlying coin denom
+    if info.funds.len() > 1usize {
+        return Err(ContractError::InvalidAsset {});
     }
 
+    // if the fund amount of required denom is zero, return No asset error
+    let payment = Coin {
+        amount: info
+            .funds
+            .iter()
+            .find(|x| x.denom == coin_denom && x.amount > Uint128::zero())
+            .ok_or_else(|| ContractError::NoAsset {})?
+            .amount
+            .clone(),
+        denom: coin_denom.clone(),
+    };
+
+    // get cosmos messages to delegate and mint liquid staking token
     let (msgs, sub_msgs, bond_data) = utils::delegation::process_bond(
         deps.storage,
         deps.querier,
         sender.to_string(),
-        the_staker.clone(),
+        sender.to_string(),
         delegator,
         payment.amount,
         env.block.time.nanos(),
         params,
         validators_reg,
-        salt,
+        "".to_string(),
         None,
     )?;
 
     // create bond event here
     let bond_event = BondEvent(
         sender.to_string(),
-        the_staker.clone(),
+        sender.to_string(),
         payment.amount.clone(),
         bond_data.delegated_amount.clone(),
         bond_data.mint_amount,
@@ -115,11 +87,11 @@ pub fn bond(
         .add_event(bond_event)
         .add_attributes(vec![
             attr("action", "bond"),
-            attr("from", sender),
-            attr("staker", the_staker.to_string()),
+            attr("from", sender.to_string()),
+            attr("staker", sender),
             attr("channel_id", "".to_string()),
             attr("bond_amount", payment.amount.to_string()),
-            attr("denom", coin_denom.to_string()),
+            attr("denom", coin_denom),
             attr("minted", bond_data.mint_amount),
             attr("exchange_rate", bond_data.exchange_rate.to_string()),
         ]);
