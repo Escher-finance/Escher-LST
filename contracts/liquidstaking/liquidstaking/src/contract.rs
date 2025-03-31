@@ -10,8 +10,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, ValidatorsRegistry, BALANCE, PARAMETERS, QUOTE_TOKEN, STATE,
-    VALIDATORS_REGISTRY,
+    Balance, Parameters, State, ValidatorsRegistry, BALANCE, PARAMETERS, QUOTE_TOKEN,
+    SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -91,6 +91,8 @@ pub fn instantiate(
         });
 
     let msgs: Vec<CosmosMsg> = vec![reward_msg, set_withdraw_msg];
+
+    SPLIT_REWARD_QUEUE.save(deps.storage, &vec![])?;
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
