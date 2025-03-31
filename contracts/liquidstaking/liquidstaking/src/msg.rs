@@ -110,25 +110,6 @@ pub enum ExecuteMsg {
     MigrateReward {
         code_id: u64,
     },
-    /// Below are Utilities for development purpose only
-    /// Move native balance to reward contract (for development phase only)
-    MoveToReward {},
-    /// Transfer utility (for development phase only)
-    Transfer {
-        amount: Uint128,
-        base_denom: String,
-        receiver: String,
-        ucs03_channel_id: u32,
-        ucs03_relay_contract: String,
-        quote_token: String,
-        salt: String,
-    },
-    /// Reset will set state to initial state and unbond all delegations (for development phase only)
-    Reset {},
-    /// Transfer all native balance of this contract to owner (for development purpose only)
-    TransferToOwner {},
-    // Utilities to transfer reward to this contract (for development only)
-    TransferReward {},
 }
 
 #[cw_ownable_query]

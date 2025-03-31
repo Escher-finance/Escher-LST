@@ -112,7 +112,6 @@ pub fn execute(
         ExecuteMsg::ProcessUnbonding { id, salt } => {
             execute::process_unbonding(deps, env, info, id, salt)
         }
-        ExecuteMsg::Reset {} => execute::reset(deps, env, info),
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::UpdateValidators { validators } => {
             execute::update_validators(deps, env, info, validators)
@@ -144,28 +143,6 @@ pub fn execute(
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
-        ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
-        ExecuteMsg::Transfer {
-            amount,
-            base_denom,
-            receiver,
-            ucs03_channel_id,
-            ucs03_relay_contract,
-            quote_token,
-            salt,
-        } => execute::transfer(
-            deps,
-            env,
-            info,
-            amount,
-            base_denom,
-            receiver,
-            ucs03_channel_id,
-            ucs03_relay_contract,
-            quote_token,
-            salt,
-        ),
-        ExecuteMsg::TransferToOwner {} => execute::transfer_to_owner(deps, env, info),
         ExecuteMsg::OnZkgm {
             path: _,
             source_channel_id: _,
@@ -174,7 +151,6 @@ pub fn execute(
             message,
         } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
-        ExecuteMsg::TransferReward {} => execute::transfer_reward(deps),
     }
 }
 
