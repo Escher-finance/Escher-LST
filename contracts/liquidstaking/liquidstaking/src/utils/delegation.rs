@@ -342,13 +342,18 @@ pub fn get_delegate_to_validator_msgs(
     let mut total_delegated: Uint128 = Uint128::from(0u32);
 
     let mut msgs: Vec<CosmosMsg> = vec![];
-    let mut first_validator: String = "".to_string();
+    let mut first_validator = String::new();
 
-    for (pos, validator) in validators.into_iter().enumerate() {
+    for validator in validators {
         let ratio =
             Decimal::from_ratio(Uint128::from(validator.weight), Uint128::from(total_weight));
 
         let delegate_amount = calculate_delegated_amount(delegate_amount, ratio);
+
+        if delegate_amount == Uint128::zero() {
+            continue;
+        }
+
         total_delegated += delegate_amount;
         let amount = Coin {
             amount: delegate_amount.clone(),
@@ -361,7 +366,7 @@ pub fn get_delegate_to_validator_msgs(
 
         msgs.push(staking_msg.into());
 
-        if pos == 0 {
+        if first_validator.is_empty() {
             first_validator = validator.address.to_string();
         }
     }
@@ -687,4 +692,38 @@ fn test_bond_calc() {
     let exchange_rate = Decimal::from_str("0.99771671118504649").expect("invalid decimal string");
     let staking_amount = calc::calculate_staking_token_from_rate(bond_amount, exchange_rate);
     println!("staking amount: {}", staking_amount);
+}
+
+#[test]
+fn test_get_delegate_to_validator_msgs_should_skip_zero_delegate_amount() {
+    let validators = Vec::from([
+        Validator {
+            address: "a".to_string(),
+            weight: 0,
+        },
+        Validator {
+            address: "b".to_string(),
+            weight: 9,
+        },
+        Validator {
+            address: "c".to_string(),
+            weight: 1,
+        },
+    ]);
+    let msgs =
+        get_delegate_to_validator_msgs(Uint128::from(100_u128), "denom".to_string(), validators);
+
+    let zero_amount_msg = msgs.iter().find(|msg| {
+        if let CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: _,
+            amount,
+        }) = msg
+        {
+            if amount.amount == Uint128::zero() {
+                return true;
+            }
+        }
+        false
+    });
+    assert!(zero_amount_msg.is_none());
 }
