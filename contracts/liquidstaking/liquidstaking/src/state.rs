@@ -62,9 +62,12 @@ pub struct Parameters {
 
 impl State {
     pub fn update_exchange_rate(&mut self) {
-        if self.total_bond_amount != Uint128::new(0) && self.total_supply != Uint128::new(0) {
-            self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_supply);
-        }
+        let zero = Uint128::zero();
+        self.exchange_rate = if self.total_bond_amount != zero && self.total_supply != zero {
+            Decimal::from_ratio(self.total_bond_amount, self.total_supply)
+        } else {
+            Decimal::one()
+        };
     }
 }
 
@@ -135,4 +138,37 @@ pub struct QuoteToken {
     pub channel_id: u32,
     pub quote_token: String,
     pub lst_quote_token: String,
+}
+
+#[test]
+fn test_update_exchange_rate_should_never_yield_zero() {
+    let decimal_zero = Decimal::zero();
+
+    let mut state = State {
+        exchange_rate: decimal_zero,
+        total_bond_amount: Uint128::zero(),
+        total_supply: Uint128::zero(),
+
+        total_delegated_amount: Uint128::default(),
+        bond_counter: u64::default(),
+        last_bond_time: u64::default(),
+    };
+
+    // If `total_bond_amount` and `total_supply` are zero
+    state.total_bond_amount = Uint128::zero();
+    state.total_supply = Uint128::zero();
+    state.update_exchange_rate();
+    assert_ne!(state.exchange_rate, decimal_zero);
+
+    // If only `total_bond_amount` is zero
+    state.total_bond_amount = Uint128::zero();
+    state.total_supply = Uint128::one();
+    state.update_exchange_rate();
+    assert_ne!(state.exchange_rate, decimal_zero);
+
+    // If only `total_supply` is zero
+    state.total_bond_amount = Uint128::one();
+    state.total_supply = Uint128::zero();
+    state.update_exchange_rate();
+    assert_ne!(state.exchange_rate, decimal_zero);
 }
