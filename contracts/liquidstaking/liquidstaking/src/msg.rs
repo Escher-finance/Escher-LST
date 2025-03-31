@@ -62,7 +62,10 @@ pub enum ExecuteRewardMsg {
 pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
-    Bond {},
+    Bond {
+        slippage: Option<Decimal>,
+        expected: Uint128,
+    },
     /// Send liquid staking denom then undelegate native denom according exchange rate from validator
     Unbond {
         amount: Uint128,
@@ -221,8 +224,6 @@ pub enum ZkgmMessage {
     },
     Unbond {
         amount: Uint128,
-        slippage: Option<Decimal>,
-        expected: Uint128,
     },
 }
 
