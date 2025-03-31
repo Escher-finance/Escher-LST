@@ -86,4 +86,7 @@ pub enum ContractError {
 
     #[error("batch unbonding not yet complete")]
     BatchIncompleteUnbonding {},
+
+    #[error("batch received amount can not bigger than expected native unstaked amount")]
+    InvalidBatchReceivedAmount {},
 }

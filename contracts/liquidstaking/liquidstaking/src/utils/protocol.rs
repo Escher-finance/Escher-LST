@@ -1,7 +1,7 @@
 use crate::msg::Ucs03ExecuteMsg;
 use crate::utils::delegation::DEFAULT_TIMEOUT_TIMESTAMP_OFFSET;
 use crate::ContractError;
-use cosmwasm_std::{to_json_binary, Coin, Env, Timestamp, Uint128, Uint256, WasmMsg};
+use cosmwasm_std::{to_json_binary, Coin, Timestamp, Uint128, Uint256, WasmMsg};
 use unionlabs_primitives::{Bytes, H256};
 
 pub fn ucs03_transfer(

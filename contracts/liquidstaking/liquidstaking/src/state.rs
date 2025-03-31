@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal, StdResult, Storage, Timestamp, Uint128};
+use cosmwasm_std::{Addr, Decimal, StdResult, Storage, Uint128};
 use cw_storage_plus::Map;
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 

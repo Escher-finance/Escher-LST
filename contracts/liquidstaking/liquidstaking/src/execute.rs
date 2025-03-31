@@ -21,9 +21,9 @@ use crate::utils::{
     delegation::submit_pending_batch, delegation::to_uint128,
 };
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
-    DepsMut, DistributionMsg, Env, Event, MessageInfo, Response, StdResult, SubMsg, Uint128,
-    Uint256, WasmMsg,
+    attr, from_json, to_json_binary, Addr, BankMsg, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,
+    DistributionMsg, Env, Event, MessageInfo, Response, StdResult, SubMsg, Uint128, Uint256,
+    WasmMsg,
 };
 use unionlabs_primitives::{Bytes, H256};
 
@@ -334,8 +334,8 @@ pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     Ok(res)
 }
 
-// Set the batch received amount and set the status to received
-// This will be called by backend and the amount data is pulled from indexer when batch complete unbonding is akready executed on chain
+// Set the batch received amount and set the batch status to received
+// This will be called by backend and the amount data is pulled from indexer when batch complete unbonding is already executed on chain
 pub fn set_batch_received_amount(
     deps: DepsMut,
     env: Env,
@@ -359,6 +359,10 @@ pub fn set_batch_received_amount(
             actual: env.block.time.seconds(),
             expected: batch.next_batch_action_time.unwrap(),
         });
+    }
+
+    if amount > batch.expected_native_unstaked.unwrap() {
+        return Err(ContractError::InvalidBatchReceivedAmount {});
     }
 
     batch.update_status(BatchStatus::Received, None);
@@ -457,33 +461,6 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     ]);
 
     Ok(res)
-}
-
-fn get_unbond_attrs(
-    sender: String,
-    the_staker: String,
-    current_exchange_rate: String,
-    unbond_amount: String,
-    undelegate_amount: String,
-    total_delegated_amount: String,
-    total_bond_amount: String,
-    total_lst_supply: String,
-    coin_denom: String,
-    channel_id: String,
-) -> Vec<Attribute> {
-    return vec![
-        attr("action", "unbond"),
-        attr("sender", sender),
-        attr("staker", the_staker),
-        attr("exchange_rate", current_exchange_rate),
-        attr("unbond_amount", unbond_amount),
-        attr("undelegate_amount", undelegate_amount),
-        attr("total_delegated_amount", total_delegated_amount),
-        attr("total_bond_amount", total_bond_amount),
-        attr("total_lst_supply", total_lst_supply),
-        attr("denom", coin_denom),
-        attr("channel_id", channel_id),
-    ];
 }
 
 /// Process rewards by withdraw delegator reward then call redelegate to reward contract on reply
