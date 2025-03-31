@@ -289,8 +289,8 @@ pub fn get_restaking_msgs(
     for surplus_validator in surplus_validators.iter_mut() {
         for deficient_validator in deficient_validators.iter_mut() {
             if surplus_validator.diff_amount < deficient_validator.diff_amount {
-                if surplus_validator.diff_amount == Uint128::from(0u32) {
-                    break;
+                if surplus_validator.diff_amount.is_zero() {
+                    continue;
                 }
 
                 // the deficit amount higher than surplus amount so we can restake all surplus amount
@@ -308,6 +308,12 @@ pub fn get_restaking_msgs(
 
                 msgs.push(redelegate_msg);
             } else {
+                if deficient_validator.diff_amount.is_zero() {
+                    continue;
+                }
+
+                println!("{:?} <> {:?}", surplus_validator, deficient_validator);
+
                 let redelegate_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Redelegate {
                     src_validator: surplus_validator.address.clone(),
                     dst_validator: deficient_validator.address.clone(),
@@ -656,42 +662,95 @@ pub fn process_unbond(
     ))
 }
 
-#[test]
-fn test_get_undelegate_messages() {
-    let undelegate_amount = Uint128::from(500642u32);
-    let coin_denom = "muno".to_string();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let validators = vec![
-        Validator {
-            address: "abc".to_string(),
-            weight: 1,
-        },
-        Validator {
-            address: "bcd".to_string(),
-            weight: 1,
-        },
-    ];
-    let undelegate_msgs =
-        get_undelegate_from_validator_msgs(undelegate_amount, coin_denom.clone(), validators);
-    println!("undelegate amount: {}", 999995);
-    println!("undelegate_msgs: {:?}", undelegate_msgs);
-}
+    #[test]
+    fn test_get_undelegate_messages() {
+        let undelegate_amount = Uint128::from(500642u32);
+        let coin_denom = "muno".to_string();
 
-#[test]
-fn test_unbond_calc() {
-    let unbond_amount = Uint128::from(1000000u128);
-    let exchange_rate = Decimal::from_str("0.99771671118504649").expect("invalid decimal string");
-    let native_amount =
-        calc::calculate_native_token_from_staking_token(unbond_amount, exchange_rate);
-    println!("native amount: {}", native_amount);
-}
+        let validators = vec![
+            Validator {
+                address: "abc".to_string(),
+                weight: 1,
+            },
+            Validator {
+                address: "bcd".to_string(),
+                weight: 1,
+            },
+        ];
+        let undelegate_msgs =
+            get_undelegate_from_validator_msgs(undelegate_amount, coin_denom.clone(), validators);
+        println!("undelegate amount: {}", 999995);
+        println!("undelegate_msgs: {:?}", undelegate_msgs);
+    }
 
-#[test]
-fn test_bond_calc() {
-    let bond_amount = Uint128::from(1000000000u128);
-    let exchange_rate = Decimal::from_str("0.99771671118504649").expect("invalid decimal string");
-    let staking_amount = calc::calculate_staking_token_from_rate(bond_amount, exchange_rate);
-    println!("staking amount: {}", staking_amount);
+    #[test]
+    fn test_unbond_calc() {
+        let unbond_amount = Uint128::from(1000000u128);
+        let exchange_rate =
+            Decimal::from_str("0.99771671118504649").expect("invalid decimal string");
+        let native_amount =
+            calc::calculate_native_token_from_staking_token(unbond_amount, exchange_rate);
+        println!("native amount: {}", native_amount);
+    }
+
+    #[test]
+    fn test_bond_calc() {
+        let bond_amount = Uint128::from(1000000000u128);
+        let exchange_rate =
+            Decimal::from_str("0.99771671118504649").expect("invalid decimal string");
+        let staking_amount = calc::calculate_staking_token_from_rate(bond_amount, exchange_rate);
+        println!("staking amount: {}", staking_amount);
+    }
+
+    #[test]
+    fn test_get_restaking_msgs_amount_cannot_be_zero() {
+        let surplus_validators = Vec::from([
+            ValidatorDelegation {
+                address: "a".to_string(),
+                delegation_diff: DelegationDiff::Surplus,
+                diff_amount: Uint128::from(200_u128),
+            },
+            ValidatorDelegation {
+                address: "b".to_string(),
+                delegation_diff: DelegationDiff::Surplus,
+                diff_amount: Uint128::from(900_u128),
+            },
+        ]);
+        let deficient_validators = vec![
+            ValidatorDelegation {
+                address: "c".to_string(),
+                delegation_diff: DelegationDiff::Deficit,
+                diff_amount: Uint128::from(1000_u128),
+            },
+            ValidatorDelegation {
+                address: "d".to_string(),
+                delegation_diff: DelegationDiff::Deficit,
+                diff_amount: Uint128::from(500_u128),
+            },
+        ];
+        let msgs = get_restaking_msgs(
+            surplus_validators,
+            deficient_validators,
+            "denom".to_string(),
+        );
+        assert!(msgs.len() > 0);
+        let zero_redelegate = msgs.iter().find(|msg| {
+            if let CosmosMsg::Staking(StakingMsg::Redelegate {
+                src_validator: _,
+                dst_validator: _,
+                amount,
+            }) = msg
+            {
+                return amount.amount.is_zero();
+            }
+            false
+        });
+        assert!(zero_redelegate.is_none());
+    }
 }
 
 #[test]
