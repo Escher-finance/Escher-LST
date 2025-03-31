@@ -12,8 +12,8 @@ use crate::{
     },
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DelegationTotalRewardsResponse, DepsMut, Env,
-    QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Uint128, Uint256,
+    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, QuerierWrapper, StakingMsg,
+    StdResult, Storage, SubMsg, Uint128, Uint256,
 };
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -27,24 +27,18 @@ pub fn get_actual_total_delegated(
     delegator: String,
     denom: String,
     validators: Vec<String>,
-) -> Uint128 {
-    let delegations_resp = querier.query_all_delegations(delegator);
-    let mut total: Uint128 = Uint128::new(0);
+) -> StdResult<Uint128> {
+    let delegations_resp = querier.query_all_delegations(delegator)?;
 
-    if delegations_resp.is_ok() {
-        total = delegations_resp
-            .unwrap()
-            .into_iter()
-            .filter(|d| {
-                d.amount.denom == denom
-                    && !d.amount.amount.is_zero()
-                    && validators.contains(&d.validator)
-            })
-            .map(|d| d.amount.amount)
-            .sum();
-    }
-
-    total
+    Ok(delegations_resp
+        .into_iter()
+        .filter(|d| {
+            d.amount.denom == denom
+                && !d.amount.amount.is_zero()
+                && validators.contains(&d.validator)
+        })
+        .map(|d| d.amount.amount)
+        .sum())
 }
 
 /// get total of unclaimed reward from validators plus contract reward balance
@@ -56,17 +50,14 @@ pub fn get_actual_total_reward(
     reward_contract: String,
 ) -> StdResult<Uint128> {
     let mut total_rewards = Uint128::new(0);
-    let result: StdResult<DelegationTotalRewardsResponse> =
-        querier.query_delegation_total_rewards(delegator);
+    let result = querier.query_delegation_total_rewards(delegator)?;
 
-    if result.is_ok() {
-        for delegator_reward in result.unwrap().rewards {
-            if validators.contains(&delegator_reward.validator_address) {
-                for reward in delegator_reward.reward {
-                    if reward.denom == denom {
-                        let reward_val = to_uint128(reward.amount.to_uint_floor())?;
-                        total_rewards += reward_val;
-                    }
+    for delegator_reward in result.rewards {
+        if validators.contains(&delegator_reward.validator_address) {
+            for reward in delegator_reward.reward {
+                if reward.denom == denom {
+                    let reward_val = to_uint128(reward.amount.to_uint_floor())?;
+                    total_rewards += reward_val;
                 }
             }
         }
@@ -86,17 +77,14 @@ pub fn get_unclaimed_reward(
     validators: Vec<String>,
 ) -> StdResult<Uint128> {
     let mut total_rewards = Uint128::new(0);
-    let result: StdResult<DelegationTotalRewardsResponse> =
-        querier.query_delegation_total_rewards(delegator);
+    let result = querier.query_delegation_total_rewards(delegator)?;
 
-    if result.is_ok() {
-        for delegator_reward in result.unwrap().rewards {
-            if validators.contains(&delegator_reward.validator_address) {
-                for reward in delegator_reward.reward {
-                    if reward.denom == denom {
-                        let reward_val = to_uint128(reward.amount.to_uint_floor())?;
-                        total_rewards += reward_val;
-                    }
+    for delegator_reward in result.rewards {
+        if validators.contains(&delegator_reward.validator_address) {
+            for reward in delegator_reward.reward {
+                if reward.denom == denom {
+                    let reward_val = to_uint128(reward.amount.to_uint_floor())?;
+                    total_rewards += reward_val;
                 }
             }
         }
@@ -490,7 +478,7 @@ pub fn process_bond(
         delegator.to_string(),
         coin_denom.clone(),
         validators_list.clone(),
-    );
+    )?;
 
     let total_bond_amount: Uint128;
     if !cfg!(test) {
@@ -590,7 +578,7 @@ pub fn process_unbond(
         delegator.to_string(),
         coin_denom.clone(),
         validators_list.clone(),
-    );
+    )?;
     state.total_delegated_amount = delegated_amount;
     let reward = get_actual_total_reward(
         querier,
