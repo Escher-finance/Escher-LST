@@ -30,7 +30,7 @@ impl LstTemplateContract {
 
 pub fn split_revenue(amount: Uint128, fee_rate: Decimal, denom: String) -> (Coin, Coin) {
     let decimal_fract = Decimal::new(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL);
-    let fract = (fee_rate * decimal_fract).to_uint_ceil();
+    let fract = (fee_rate * decimal_fract).to_uint_floor();
     let fee_amount =
         Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
     let redelegate_amount = amount - fee_amount;
