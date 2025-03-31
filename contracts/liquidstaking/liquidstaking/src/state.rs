@@ -13,6 +13,8 @@ pub const LOG: Item<String> = Item::new("log");
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 
+pub const EXECUTOR: Item<Addr> = Item::new("executor");
+
 #[cw_serde]
 pub struct Balance {
     pub amount: Uint128,

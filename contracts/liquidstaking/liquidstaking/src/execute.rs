@@ -10,14 +10,14 @@ use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMs
 use crate::query::query_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, LOG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+    unbond_record, QuoteToken, Validator, EXECUTOR, LOG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
     REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::delegation::get_transfer_token_cosmos_msg;
 use crate::utils::{
-    self, calc::check_slippage, delegation::get_actual_total_delegated,
-    delegation::get_mock_total_reward, delegation::get_unclaimed_reward,
+    self, calc::check_slippage, delegation::assert_executor,
+    delegation::get_actual_total_delegated, delegation::get_mock_total_reward,
+    delegation::get_transfer_token_cosmos_msg, delegation::get_unclaimed_reward,
     delegation::submit_pending_batch, delegation::to_uint128,
 };
 use cosmwasm_std::{
@@ -314,7 +314,7 @@ pub fn receive(
 
 /// Process pending batch and execute it
 pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    assert_executor(deps.storage, info.sender.clone())?;
 
     let params = PARAMETERS.load(deps.storage)?;
     let delegator = env.contract.address.clone();
@@ -381,7 +381,7 @@ pub fn set_batch_received_amount(
     id: u64,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    assert_executor(deps.storage, info.sender)?;
 
     let mut batch = batches().load(deps.storage, id)?;
 
@@ -485,7 +485,6 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     }
 
     // after update exchange rate we update the state
-    state.bond_counter = state.bond_counter + 1;
     state.total_bond_amount = total_bond_amount + payment.amount;
     state.total_delegated_amount += payment.amount;
     state.last_bond_time = env.block.time.nanos();
@@ -510,7 +509,7 @@ pub fn process_rewards(
     env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    assert_executor(deps.storage, info.sender.clone())?;
 
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -875,7 +874,7 @@ pub fn process_batch_withdrawal(
     id: u64,
     salt: Vec<String>,
 ) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    assert_executor(deps.storage, info.sender)?;
 
     let mut batch = batches().load(deps.storage, id)?;
     if batch.received_native_unstaked.is_none() {
@@ -1152,6 +1151,20 @@ pub fn transfer_reward(deps: DepsMut) -> Result<Response, ContractError> {
     });
 
     let res: Response = Response::new().add_message(msg);
+    Ok(res)
+}
+
+/// Set executor
+pub fn set_executor(
+    deps: DepsMut,
+    info: MessageInfo,
+    executor: Addr,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    EXECUTOR.save(deps.storage, &executor)?;
+
+    let res: Response = Response::new().add_attribute("executor", executor.to_string());
     Ok(res)
 }
 

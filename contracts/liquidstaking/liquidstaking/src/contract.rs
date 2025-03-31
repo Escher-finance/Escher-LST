@@ -157,6 +157,7 @@ pub fn execute(
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
+        ExecuteMsg::SetExecutor { executor } => execute::set_executor(deps, info, executor),
         ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
         ExecuteMsg::Transfer {
             amount,
