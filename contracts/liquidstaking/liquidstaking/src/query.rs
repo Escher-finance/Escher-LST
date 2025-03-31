@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-use crate::msg::{Log, QueryMsg, StakingLiquidity};
+use crate::msg::{Executor, Log, QueryMsg, StakingLiquidity};
 use crate::state::unbond_record;
 use crate::state::{
-    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, LOG, PARAMETERS,
-    QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, EXECUTOR, LOG,
+    PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
@@ -43,6 +43,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Batch { status, min, max } => {
             to_json_binary(&query_batch(deps.storage, status, min, max)?)
         }
+        QueryMsg::Executor {} => to_json_binary(&query_executor(deps.storage)?),
     }
 }
 
@@ -143,6 +144,11 @@ pub fn query_staking_liquidity(
 pub fn query_log(storage: &dyn Storage) -> StdResult<Log> {
     let log = LOG.load(storage)?;
     Ok(Log { message: log })
+}
+
+pub fn query_executor(storage: &dyn Storage) -> StdResult<Executor> {
+    let executor = EXECUTOR.load(storage)?;
+    Ok(Executor { address: executor })
 }
 
 pub fn query_unbond_record(
