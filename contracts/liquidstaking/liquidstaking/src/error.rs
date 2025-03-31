@@ -89,4 +89,6 @@ pub enum ContractError {
 
     #[error("InvalidContractName")]
     InvalidPayload {},
+    #[error("batch received amount can not bigger than expected native unstaked amount")]
+    InvalidBatchReceivedAmount {},
 }

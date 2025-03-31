@@ -372,8 +372,8 @@ pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     Ok(res)
 }
 
-// Set the batch received amount and set the status to received
-// This will be called by backend and the amount data is pulled from indexer when batch complete unbonding is akready executed on chain
+// Set the batch received amount and set the batch status to received
+// This will be called by backend and the amount data is pulled from indexer when batch complete unbonding is already executed on chain
 pub fn set_batch_received_amount(
     deps: DepsMut,
     env: Env,
@@ -397,6 +397,10 @@ pub fn set_batch_received_amount(
             actual: env.block.time.seconds(),
             expected: batch.next_batch_action_time.unwrap(),
         });
+    }
+
+    if amount > batch.expected_native_unstaked.unwrap() {
+        return Err(ContractError::InvalidBatchReceivedAmount {});
     }
 
     batch.update_status(BatchStatus::Received, None);
