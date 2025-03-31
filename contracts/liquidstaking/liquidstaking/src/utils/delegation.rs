@@ -7,8 +7,8 @@ use crate::ContractError;
 use crate::{
     msg::{BondData, DelegationDiff, MintTokensPayload, UnbondData},
     state::{
-        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, LOG, PARAMETERS,
-        STATE, VALIDATORS_REGISTRY,
+        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, PARAMETERS, STATE,
+        VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::{
@@ -47,7 +47,7 @@ pub fn get_actual_total_delegated(
     total
 }
 
-/// get total delegated token value from validators in native token
+/// get total of unclaimed reward from validators plus contract reward balance
 pub fn get_actual_total_reward(
     querier: QuerierWrapper,
     delegator: String,
@@ -72,9 +72,10 @@ pub fn get_actual_total_reward(
         }
     }
 
+    // add query reward contract balance
     let reward_balance = querier.query_balance(reward_contract, denom)?;
     total_rewards += reward_balance.amount;
-    // add query reward contract balance
+
     Ok(total_rewards)
 }
 
@@ -126,12 +127,6 @@ pub fn calculate_undelegate_amount(
         Decimal::new(native_token_amount * Uint128::from(DECIMAL_FRACTIONAL));
     let ratio = Decimal::from_ratio(delegated_amount, total_bonded_amount);
 
-    println!(
-        "native_token_undelegate_decimal: {:?}",
-        native_token_undelegate_decimal
-    );
-    println!("ratio: {:?}", ratio);
-
     let undelegate_native_decimal = native_token_undelegate_decimal * ratio;
     undelegate_native_decimal.to_uint_floor()
 }
@@ -160,12 +155,11 @@ pub fn get_undelegate_from_validator_msgs(
 
     let total_validators = validators.len();
     let mut total_undelegated: Uint128 = Uint128::from(0u32);
+    let undelegate_amount_dec = Decimal::new(undelegate_amount * Uint128::from(DECIMAL_FRACTIONAL));
 
     for (pos, validator) in validators.into_iter().enumerate() {
         let ratio = Decimal::from_ratio(Uint128::from(validator.weight), total_weight);
 
-        let undelegate_amount_dec =
-            Decimal::new(undelegate_amount * Uint128::from(DECIMAL_FRACTIONAL));
         let mut undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
         total_undelegated += undelegate_amount_for_validator;
 
@@ -300,7 +294,7 @@ pub fn get_restaking_msgs(
                 }
 
                 // the deficit amount higher than surplus amount so we can restake all surplus amount
-                let undelegate_msg = CosmosMsg::Staking(StakingMsg::Redelegate {
+                let redelegate_msg = CosmosMsg::Staking(StakingMsg::Redelegate {
                     src_validator: surplus_validator.address.clone(),
                     dst_validator: deficient_validator.address.clone(),
                     amount: Coin {
@@ -312,12 +306,9 @@ pub fn get_restaking_msgs(
                 deficient_validator.diff_amount =
                     deficient_validator.diff_amount - surplus_validator.diff_amount;
 
-                msgs.push(undelegate_msg);
-                //
+                msgs.push(redelegate_msg);
             } else {
-                println!("{:?} <> {:?}", surplus_validator, deficient_validator);
-
-                let undelegate_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Redelegate {
+                let redelegate_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Redelegate {
                     src_validator: surplus_validator.address.clone(),
                     dst_validator: deficient_validator.address.clone(),
                     amount: Coin {
@@ -329,7 +320,7 @@ pub fn get_restaking_msgs(
                 surplus_validator.diff_amount =
                     surplus_validator.diff_amount - deficient_validator.diff_amount;
                 deficient_validator.diff_amount = Uint128::from(0u32);
-                msgs.push(undelegate_msg);
+                msgs.push(redelegate_msg);
             }
         }
     }
@@ -622,13 +613,6 @@ pub fn process_unbond(
     );
     msgs.extend(undelegate_msgs.clone());
 
-    LOG.save(
-        storage,
-        &format!(
-            "undelegate_amount: {}, {:?}",
-            undelegate_amount, undelegate_msgs
-        ),
-    )?;
     let burn_msg = token::burn_token(unbond_amount, params.cw20_address.to_string());
     msgs.push(burn_msg.into());
 

@@ -7,7 +7,7 @@ use crate::event::{
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, LOG, PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    unbond_record, QuoteToken, Validator, PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::{
     self, calc::check_slippage, delegation::get_actual_total_delegated,
@@ -264,10 +264,8 @@ pub fn zkgm_bond(
 
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
-    LOG.save(
-        deps.storage,
-        &format!("{}: {:?}", env.block.time, bond_event),
-    )?;
+    deps.api
+        .debug(&format!("{}: {:?}", env.block.time, bond_event));
 
     let res: Response = Response::new()
         .add_messages(msgs)
@@ -292,7 +290,7 @@ pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    amount: Option<Uint128>,
+    unbond_amount: Uint128,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -301,9 +299,6 @@ pub fn unbond(
     let the_staker: String = sender.to_string();
     let delegator = env.contract.address.clone();
 
-    let unbond_amount: Uint128;
-
-    unbond_amount = amount.unwrap();
     let msg = cw20::Cw20QueryMsg::Balance {
         address: delegator.to_string(),
     };
@@ -913,7 +908,7 @@ pub fn on_zkgm(
         sender,
         payload
     );
-    LOG.save(deps.storage, &msg)?;
+    deps.api.debug(&msg);
 
     // only ucs03 relayer contract can call this callback function
     let params = PARAMETERS.load(deps.storage)?;

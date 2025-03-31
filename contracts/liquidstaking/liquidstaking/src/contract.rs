@@ -9,8 +9,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, LOG, PARAMETERS,
-    QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, State, Validator, ValidatorsRegistry, BALANCE, PARAMETERS, QUOTE_TOKEN,
+    STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -29,8 +29,6 @@ pub fn instantiate(
     let binding = info.sender.to_string();
     let owner = Some(binding.as_ref());
     cw_ownable::initialize_owner(deps.storage, deps.api, owner)?;
-
-    LOG.save(deps.storage, &"".into())?;
 
     let balance = Balance {
         amount: Uint128::new(0),
@@ -183,8 +181,5 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
     Ok(Response::default())
 }
