@@ -7,14 +7,15 @@ use crate::state::{
     QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
+use crate::ContractError;
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
-use cosmwasm_std::{Binary, Deps, Env, StdResult, Storage};
+use cosmwasm_std::{Binary, Deps, Env, Storage};
 use cw2::ContractVersion;
 use cw_ownable::get_ownership;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
+    Ok(match msg {
         QueryMsg::State {} => to_json_binary(&query_state(deps.storage)?),
         QueryMsg::Parameters {} => to_json_binary(&query_params(deps.storage)?),
         QueryMsg::Validators {} => to_json_binary(&query_validators(deps.storage)?),
@@ -38,35 +39,38 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
-    }
+    }?)
 }
 
-pub fn query_quote_token(storage: &dyn Storage, channel_id: u32) -> StdResult<QuoteToken> {
+pub fn query_quote_token(
+    storage: &dyn Storage,
+    channel_id: u32,
+) -> Result<QuoteToken, ContractError> {
     let token = QUOTE_TOKEN.load(storage, channel_id)?;
     Ok(token)
 }
 
-pub fn query_version(storage: &dyn Storage) -> StdResult<ContractVersion> {
+pub fn query_version(storage: &dyn Storage) -> Result<ContractVersion, ContractError> {
     let ver = cw2::get_contract_version(storage)?;
     Ok(ver)
 }
 
-pub fn query_state(storage: &dyn Storage) -> StdResult<State> {
+pub fn query_state(storage: &dyn Storage) -> Result<State, ContractError> {
     let state = STATE.load(storage)?;
     Ok(state)
 }
 
-pub fn query_params(storage: &dyn Storage) -> StdResult<Parameters> {
+pub fn query_params(storage: &dyn Storage) -> Result<Parameters, ContractError> {
     let params = PARAMETERS.load(storage)?;
     Ok(params)
 }
 
-pub fn query_validators(storage: &dyn Storage) -> StdResult<ValidatorsRegistry> {
+pub fn query_validators(storage: &dyn Storage) -> Result<ValidatorsRegistry, ContractError> {
     let validators = VALIDATORS_REGISTRY.load(storage)?;
     Ok(validators)
 }
 
-pub fn query_balance(storage: &dyn Storage) -> StdResult<Balance> {
+pub fn query_balance(storage: &dyn Storage) -> Result<Balance, ContractError> {
     let balance = BALANCE.load(storage)?;
     Ok(balance)
 }
@@ -77,7 +81,7 @@ pub fn query_staking_liquidity(
     delegator: Option<String>,
     coin_denom: Option<String>,
     validators_list: Option<Vec<String>>,
-) -> StdResult<StakingLiquidity> {
+) -> Result<StakingLiquidity, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let the_delegator = delegator
         .clone()
@@ -128,7 +132,7 @@ pub fn query_staking_liquidity(
         amount: total_bond_amount,
         delegated: delegated_amount,
         reward: total_reward,
-        unclaimed_reward: unclaimed_reward,
+        unclaimed_reward,
         exchange_rate,
         time: env.block.time,
         total_supply: state.total_supply,
@@ -142,7 +146,7 @@ pub fn query_unbond_record(
     id: Option<u64>,
     min: Option<u64>,
     max: Option<u64>,
-) -> StdResult<Vec<UnbondRecord>> {
+) -> Result<Vec<UnbondRecord>, ContractError> {
     if id.is_some() {
         let unbonded_list = vec![unbond_record().load(storage, id.unwrap())?];
         return Ok(unbonded_list);
@@ -168,57 +172,69 @@ pub fn query_unbond_record(
         }
     };
 
-    if staker.is_some() && released.is_none() {
-        let mut unbonded_list: Vec<UnbondRecord> = vec![];
-        let unbonded_range = unbond_record().idx.staker.prefix(staker.unwrap()).range(
-            storage,
-            min_bound,
-            max_bound,
-            Order::Ascending,
-        );
+    match (staker, released) {
+        (Some(staker), None) => {
+            let mut unbonded_list: Vec<UnbondRecord> = vec![];
+            let unbonded_range = unbond_record().idx.staker.prefix(staker).range(
+                storage,
+                min_bound,
+                max_bound,
+                Order::Ascending,
+            );
 
-        for unbonded in unbonded_range {
-            if unbonded.is_ok() {
-                unbonded_list.push(unbonded.unwrap().1);
+            for unbonded in unbonded_range {
+                if unbonded.is_ok() {
+                    unbonded_list.push(unbonded.unwrap().1);
+                }
             }
+
+            Ok(unbonded_list)
         }
+        (None, Some(released)) => {
+            let mut unbonded_list: Vec<UnbondRecord> = vec![];
+            let unbonded_range = unbond_record()
+                .idx
+                .released
+                .prefix(released.to_string())
+                .range(storage, min_bound, max_bound, Order::Ascending);
 
-        return Ok(unbonded_list);
-    }
-
-    if staker.is_none() && released.is_some() {
-        let mut unbonded_list: Vec<UnbondRecord> = vec![];
-        let unbonded_range = unbond_record()
-            .idx
-            .released
-            .prefix(released.unwrap().to_string())
-            .range(storage, min_bound, max_bound, Order::Ascending);
-
-        for unbonded in unbonded_range {
-            if unbonded.is_ok() {
-                unbonded_list.push(unbonded.unwrap().1);
+            for unbonded in unbonded_range {
+                if unbonded.is_ok() {
+                    unbonded_list.push(unbonded.unwrap().1);
+                }
             }
+
+            Ok(unbonded_list)
         }
+        (Some(staker), Some(released)) => {
+            let mut unbonded_list: Vec<UnbondRecord> = vec![];
+            let unbonded_range = unbond_record()
+                .idx
+                .staker_released
+                .prefix(format!("{}-{}", staker, released))
+                .range(storage, min_bound, max_bound, Order::Ascending);
 
-        return Ok(unbonded_list);
-    }
-
-    if staker.is_some() && released.is_some() {
-        let mut unbonded_list: Vec<UnbondRecord> = vec![];
-        let unbonded_range = unbond_record()
-            .idx
-            .staker_released
-            .prefix(format!("{}-{}", staker.unwrap(), released.unwrap()))
-            .range(storage, min_bound, max_bound, Order::Ascending);
-
-        for unbonded in unbonded_range {
-            if unbonded.is_ok() {
-                unbonded_list.push(unbonded.unwrap().1);
+            for unbonded in unbonded_range {
+                if unbonded.is_ok() {
+                    unbonded_list.push(unbonded.unwrap().1);
+                }
             }
+
+            Ok(unbonded_list)
         }
-
-        return Ok(unbonded_list);
+        (None, None) => Err(ContractError::InvalidUnbondRecordQuery {}),
     }
+}
 
-    Ok(vec![])
+#[test]
+fn test_query_unbond_record_should_return_err_if_invalid_query() {
+    use cosmwasm_std::testing::mock_dependencies;
+    let deps = mock_dependencies();
+    let err = query_unbond_record(&deps.storage, None, None, None, Some(0), Some(100)).unwrap_err();
+    let has_right_error = if let ContractError::InvalidUnbondRecordQuery {} = err {
+        true
+    } else {
+        false
+    };
+    assert!(has_right_error);
 }
