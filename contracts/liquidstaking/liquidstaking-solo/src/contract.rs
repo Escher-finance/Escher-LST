@@ -59,6 +59,8 @@ pub fn instantiate(
         reward_address: env.clone().contract.address.clone(),
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
+        epoch_period: msg.epoch_period,
+        batch_period: msg.batch_period,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -97,14 +99,18 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Bond { amount, salt } => execute::bond(deps, env, info, amount, salt),
-        ExecuteMsg::Unbond { amount } => execute::unbond(deps, env, info, amount),
-
-        ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
-        ExecuteMsg::ProcessUnbonding { id, salt } => {
-            execute::process_unbonding(deps, env, info, id, salt)
+        ExecuteMsg::Bond { slippage, expected } => {
+            execute::bond(deps, env, info, slippage, expected)
         }
-        ExecuteMsg::Reset {} => execute::reset(deps, env, info),
+        ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
+        ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
+        ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
+        ExecuteMsg::ProcessBatchWithdrawal { id, salt } => {
+            execute::process_batch_withdrawal(deps, env, info, id, salt)
+        }
+        ExecuteMsg::SetBatchReceivedAmount { id, amount } => {
+            execute::set_batch_received_amount(deps, env, info, id, amount)
+        }
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::UpdateValidators { validators } => {
             execute::update_validators(deps, env, info, validators)
@@ -136,28 +142,6 @@ pub fn execute(
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
-        ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
-        ExecuteMsg::Transfer {
-            amount,
-            base_denom,
-            receiver,
-            ucs03_channel_id,
-            ucs03_relay_contract,
-            quote_token,
-            salt,
-        } => execute::transfer(
-            deps,
-            env,
-            info,
-            amount,
-            base_denom,
-            receiver,
-            ucs03_channel_id,
-            ucs03_relay_contract,
-            quote_token,
-            salt,
-        ),
-        ExecuteMsg::TransferToOwner {} => execute::transfer_to_owner(deps, env, info),
         ExecuteMsg::OnZkgm {
             channel_id,
             sender,
@@ -165,7 +149,6 @@ pub fn execute(
         } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::SplitReward {} => execute::split_reward(deps, env, info),
-        ExecuteMsg::TransferReward {} => execute::transfer_reward(deps),
         ExecuteMsg::SetConfig {
             lst_contract_address,
             fee_receiver,
@@ -180,7 +163,6 @@ pub fn execute(
             fee_rate,
             coin_denom,
         ),
-        ExecuteMsg::Burn { amount } => execute::burn(deps, env, info, amount),
         ExecuteMsg::NormalizeSupply {} => execute::normalize_supply(deps, env),
     }
 }

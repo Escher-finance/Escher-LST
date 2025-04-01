@@ -64,7 +64,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
         let quote_token = QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
         let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
-            env,
+            env.block.time,
             params.ucs03_relay_contract,
             payload.channel_id.unwrap(),
             Bytes::from_str(payload.staker.as_str()).unwrap(),
