@@ -1151,65 +1151,68 @@ mod tests {
             delegate_amount
         );
     }
-}
 
-#[test]
-fn test_get_delegate_to_validator_msgs_should_skip_zero_delegate_amount() {
-    let validators = Vec::from([
-        Validator {
-            address: "a".to_string(),
-            weight: 0,
-        },
-        Validator {
-            address: "b".to_string(),
-            weight: 9,
-        },
-        Validator {
-            address: "c".to_string(),
-            weight: 1,
-        },
-    ]);
-    let msgs =
-        get_delegate_to_validator_msgs(Uint128::from(100_u128), "denom".to_string(), validators);
+    #[test]
+    fn test_get_delegate_to_validator_msgs_should_skip_zero_delegate_amount() {
+        let validators = Vec::from([
+            Validator {
+                address: "a".to_string(),
+                weight: 0,
+            },
+            Validator {
+                address: "b".to_string(),
+                weight: 9,
+            },
+            Validator {
+                address: "c".to_string(),
+                weight: 1,
+            },
+        ]);
+        let msgs = get_delegate_to_validator_msgs(
+            Uint128::from(100_u128),
+            "denom".to_string(),
+            validators,
+        );
 
-    let zero_amount_msg = msgs.iter().find(|msg| {
-        if let CosmosMsg::Staking(StakingMsg::Delegate {
-            validator: _,
-            amount,
-        }) = msg
-        {
-            if amount.amount == Uint128::zero() {
-                return true;
+        let zero_amount_msg = msgs.iter().find(|msg| {
+            if let CosmosMsg::Staking(StakingMsg::Delegate {
+                validator: _,
+                amount,
+            }) = msg
+            {
+                if amount.amount == Uint128::zero() {
+                    return true;
+                }
             }
-        }
-        false
-    });
-    assert!(zero_amount_msg.is_none());
-}
+            false
+        });
+        assert!(zero_amount_msg.is_none());
+    }
 
-#[test]
-fn test_get_validator_delegation_map_base_on_weight_should_delegate_remaining_amount() {
-    let validators = Vec::from([
-        Validator {
-            address: "a".to_string(),
-            weight: 1,
-        },
-        Validator {
-            address: "b".to_string(),
-            weight: 100,
-        },
-        Validator {
-            address: "c".to_string(),
-            weight: 1000,
-        },
-    ]);
-    let total_delegated_amount = Uint128::from(500000_u128);
+    #[test]
+    fn test_get_validator_delegation_map_base_on_weight_should_delegate_remaining_amount() {
+        let validators = Vec::from([
+            Validator {
+                address: "a".to_string(),
+                weight: 1,
+            },
+            Validator {
+                address: "b".to_string(),
+                weight: 100,
+            },
+            Validator {
+                address: "c".to_string(),
+                weight: 1000,
+            },
+        ]);
+        let total_delegated_amount = Uint128::from(500000_u128);
 
-    assert_eq!(
-        get_validator_delegation_map_base_on_weight(validators, total_delegated_amount)
-            .iter()
-            .map(|(_addr, amount)| amount)
-            .sum::<Uint128>(),
-        total_delegated_amount
-    )
+        assert_eq!(
+            get_validator_delegation_map_base_on_weight(validators, total_delegated_amount)
+                .iter()
+                .map(|(_addr, amount)| amount)
+                .sum::<Uint128>(),
+            total_delegated_amount
+        )
+    }
 }
