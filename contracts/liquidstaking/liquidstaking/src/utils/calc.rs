@@ -157,7 +157,6 @@ mod tests {
                 _ => unsupported_err,
             }
         });
-        // modify querier accordingly
         let querier_wrapper = QuerierWrapper::<Empty>::new(&querier);
         assert_eq!(
             total_lst_supply(querier_wrapper, "cw20".to_string()).unwrap(),

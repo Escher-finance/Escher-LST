@@ -853,7 +853,7 @@ pub fn get_transfer_token_cosmos_msg(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::{assert_approx_eq, testing::MockQuerier, Empty};
+    use cosmwasm_std::{assert_approx_eq, testing::MockQuerier, DecCoin, Decimal256, Empty};
 
     #[test]
     fn test_calculate_delegated_amount() {
@@ -1262,7 +1262,9 @@ mod tests {
                 Vec::default(),
             ),
         ];
-        querier.staking.update("denom", validators, delegations);
+        querier
+            .staking
+            .update(denom.clone(), validators, delegations);
         let querier_wrapper = QuerierWrapper::<Empty>::new(&querier);
 
         let total_delegated = get_actual_total_delegated(
@@ -1273,5 +1275,52 @@ mod tests {
         )
         .unwrap();
         assert_eq!(total_delegated, Uint128::new(3000));
+    }
+
+    #[test]
+    fn test_get_unclaimed_reward() {
+        let mut querier = MockQuerier::default();
+        let delegator_addr = Addr::unchecked("delegator");
+        let denom = "denom".to_string();
+        let validator_addr_a = "a".to_string();
+        let validator_addr_b = "b".to_string();
+        let validator_addr_c = "c".to_string();
+
+        querier.distribution.set_rewards(
+            validator_addr_a.clone(),
+            delegator_addr.clone(),
+            Vec::from([DecCoin::new(
+                Decimal256::from_str("2000.0").unwrap(),
+                denom.clone(),
+            )]),
+        );
+        querier.distribution.set_rewards(
+            validator_addr_b.clone(),
+            delegator_addr.clone(),
+            Vec::from([DecCoin::new(
+                Decimal256::from_str("1000.0").unwrap(),
+                denom.clone(),
+            )]),
+        );
+        querier.distribution.set_rewards(
+            validator_addr_c.clone(),
+            delegator_addr.clone(),
+            Vec::from([DecCoin::new(
+                Decimal256::from_str("500.0").unwrap(),
+                denom.clone(),
+            )]),
+        );
+
+        let querier_wrapper = QuerierWrapper::<Empty>::new(&querier);
+
+        let unclaimed_rewards = get_unclaimed_reward(
+            querier_wrapper,
+            delegator_addr.to_string(),
+            denom.clone(),
+            Vec::from([validator_addr_a.clone(), validator_addr_b.clone()]),
+        )
+        .unwrap();
+
+        assert_eq!(unclaimed_rewards, Uint128::new(3000));
     }
 }
