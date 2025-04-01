@@ -109,6 +109,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_batch_status() {
+        assert_eq!(BatchStatus::Pending.to_string(), "pending");
+        assert_eq!(BatchStatus::Submitted.to_string(), "submitted");
+        assert_eq!(BatchStatus::Received.to_string(), "received");
+        assert_eq!(BatchStatus::Released.to_string(), "released");
+    }
+
+    #[test]
     fn test_batch() {
         let mut next_batch_action_time = 10;
         let mut batch = Batch::new(0, Uint128::new(1000), next_batch_action_time);
