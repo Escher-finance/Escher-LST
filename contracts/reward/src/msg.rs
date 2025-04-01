@@ -1,6 +1,6 @@
 use crate::state::Config;
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Decimal};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_ownable::cw_ownable_query;
 
 #[cw_serde]
@@ -38,4 +38,14 @@ pub enum QueryMsg {
 }
 
 #[cw_serde]
+pub enum LSTQueryMsg {
+    RewardBalance {},
+}
+
+#[cw_serde]
 pub struct MigrateMsg {}
+
+#[cw_serde]
+pub struct Balance {
+    pub amount: Uint128,
+}

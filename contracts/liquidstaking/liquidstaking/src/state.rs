@@ -6,7 +6,7 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
-pub const BALANCE: Item<Balance> = Item::new("balance");
+pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
 
 // Map of channel id to the quote token and lst quote token of destination chain
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
@@ -18,7 +18,6 @@ pub const SPLIT_REWARD_QUEUE: Item<Vec<String>> = Item::new("redelegate_batch");
 #[cw_serde]
 pub struct Balance {
     pub amount: Uint128,
-    pub last_updated: u64,
 }
 
 #[cw_serde]

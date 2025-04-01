@@ -143,7 +143,7 @@ pub enum QueryMsg {
         validators: Option<Vec<String>>,
     },
     #[returns(Balance)]
-    Balance {},
+    RewardBalance {},
     #[returns(Vec<UnbondRecord>)]
     UnbondRecord {
         staker: Option<String>,

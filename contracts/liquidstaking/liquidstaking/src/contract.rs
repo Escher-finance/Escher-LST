@@ -11,8 +11,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, ValidatorsRegistry, BALANCE, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
+    Parameters, State, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+    REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -32,11 +32,7 @@ pub fn instantiate(
     let owner = Some(binding.as_ref());
     cw_ownable::initialize_owner(deps.storage, deps.api, owner)?;
 
-    let balance = Balance {
-        amount: Uint128::new(0),
-        last_updated: 0,
-    };
-    BALANCE.save(deps.storage, &balance)?;
+    REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
 
     validate_validators(&deps, &msg.validators)?;
 
