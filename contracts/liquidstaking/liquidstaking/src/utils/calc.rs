@@ -17,6 +17,7 @@ pub fn calculate_native_token_from_staking_token(
     (exchange_rate * Decimal::from_ratio(staking_token, Uint128::one())).to_uint_floor()
 }
 
+/// Convert Uint256 to Uint128
 pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
     Uint128::from_str(&v.to_string())
 }

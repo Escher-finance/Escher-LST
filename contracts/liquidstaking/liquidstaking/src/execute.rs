@@ -14,12 +14,13 @@ use crate::state::{
     REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
+use crate::utils::calc::to_uint128;
 use crate::utils::delegation::get_transfer_token_cosmos_msg;
 use crate::utils::validation::validate_validators;
 use crate::utils::{
     self, calc::check_slippage, delegation::get_actual_total_delegated,
     delegation::get_mock_total_reward, delegation::get_unclaimed_reward,
-    delegation::submit_pending_batch, delegation::to_uint128,
+    delegation::submit_pending_batch,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,

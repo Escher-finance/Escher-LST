@@ -2,8 +2,11 @@ use crate::event::SubmitBatchEvent;
 use crate::event::UnbondEventsFromAtts;
 use crate::event::UnstakeRequestEvent;
 use crate::msg::ValidatorDelegation;
+use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc;
+use crate::utils::calc::to_uint128;
 use crate::utils::delegation;
+use crate::utils::protocol;
 use crate::utils::token;
 use crate::ContractError;
 use crate::{
@@ -26,9 +29,6 @@ use unionlabs_primitives::H256;
 
 use std::collections::HashMap;
 use std::str::FromStr;
-
-use super::batch::{batches, Batch, BatchStatus};
-use super::protocol;
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
 
@@ -74,11 +74,6 @@ pub fn get_unclaimed_reward(
 
     // add query reward contract balance
     Ok(total_rewards)
-}
-
-/// Convert Uint256 to Uint128
-pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
-    Uint128::from_str(&v.to_string())
 }
 
 // for testing only
