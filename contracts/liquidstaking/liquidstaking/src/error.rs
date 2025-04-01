@@ -2,6 +2,8 @@ use cosmwasm_std::StdError;
 use cw_ownable::OwnershipError;
 use thiserror::Error;
 
+use crate::utils::batch::BatchStatus;
+
 #[derive(Error, Debug)]
 pub enum ContractError {
     #[error("{0}")]
@@ -78,4 +80,21 @@ pub enum ContractError {
 
     #[error("Quote tokens must be unique by channel_id")]
     InvalidQuoteTokens {},
+    #[error("no pending batch is available")]
+    EmptyBatch {},
+
+    #[error("bath status is incorrect, actual: {actual}, expected: {expected}")]
+    BatchStatusIncorrect {
+        actual: BatchStatus,
+        expected: BatchStatus,
+    },
+
+    #[error("batch is not ready to be executed")]
+    BatchNotReady { actual: u64, expected: u64 },
+
+    #[error("batch unbonding not yet complete")]
+    BatchIncompleteUnbonding {},
+
+    #[error("batch received amount can not bigger than expected native unstaked amount")]
+    InvalidBatchReceivedAmount {},
 }

@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::state::{
-    Balance, Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry,
+use crate::{
+    state::{Balance, Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry},
+    utils::batch::{Batch, BatchStatus},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
@@ -34,6 +35,8 @@ pub struct InstantiateMsg {
     pub salt: String,
     // tokens
     pub quote_tokens: Vec<QuoteToken>,
+    // batch period range in seconds to execute batch
+    pub batch_period: u64,
 }
 
 #[cw_serde]
@@ -70,12 +73,18 @@ pub enum ExecuteMsg {
     Unbond {
         amount: Uint128,
     },
+    /// Submit pending batch
+    SubmitBatch {},
     // Withdraw staking rewards and call split reward to reward contract
     ProcessRewards {},
-    // Process finished unbonding and send native token back to user
-    ProcessUnbonding {
+    SetBatchReceivedAmount {
         id: u64,
-        salt: String,
+        amount: Uint128,
+    },
+    // Process batch with complete unbonding(already receive token) to automatic withdraw and send native token back to user
+    ProcessBatchWithdrawal {
+        id: u64,
+        salt: Vec<String>,
     },
     /// Change parameters, only owner can do this
     SetParameters {
@@ -143,9 +152,13 @@ pub enum QueryMsg {
     Version {},
     #[returns(QuoteToken)]
     QuoteToken { channel_id: u32 },
+    #[returns(Batch)]
+    Batch {
+        status: Option<BatchStatus>,
+        min: Option<u64>,
+        max: Option<u64>,
+    },
 }
-
-pub type Fees = BTreeMap<String, Coin>;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -193,12 +206,6 @@ pub struct MintTokensPayload {
 pub struct BondRewardsPayload {
     pub amount: Uint128,
     pub validator: String,
-}
-
-#[cw_serde]
-pub struct UndelegationRecord {
-    pub amount: Uint128,
-    pub validator: Validator,
 }
 
 #[cw_serde]

@@ -1,4 +1,5 @@
 use crate::instantiate::create_reward;
+use crate::utils::batch::{batches, Batch};
 use crate::utils::validation::{validate_quote_tokens, validate_validators};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -10,8 +11,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Balance, Parameters, State, ValidatorsRegistry, BALANCE, PARAMETERS, QUOTE_TOKEN,
-    SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
+    Balance, Parameters, State, ValidatorsRegistry, BALANCE, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -66,6 +67,7 @@ pub fn instantiate(
         reward_address: reward_addr.clone(),
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
+        batch_period: msg.batch_period,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -93,6 +95,13 @@ pub fn instantiate(
     let msgs: Vec<CosmosMsg> = vec![reward_msg, set_withdraw_msg];
 
     SPLIT_REWARD_QUEUE.save(deps.storage, &vec![])?;
+    let pending_batch = Batch::new(
+        1,
+        Uint128::zero(),
+        env.block.time.seconds() + params.batch_period,
+    );
+    batches().save(deps.storage, pending_batch.id, &pending_batch)?;
+    PENDING_BATCH_ID.save(deps.storage, &pending_batch.id)?;
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
@@ -111,10 +120,13 @@ pub fn execute(
             execute::bond(deps, env, info, slippage, expected)
         }
         ExecuteMsg::Unbond { amount } => execute::unbond(deps, env, info, amount),
-
+        ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
-        ExecuteMsg::ProcessUnbonding { id, salt } => {
-            execute::process_unbonding(deps, env, info, id, salt)
+        ExecuteMsg::ProcessBatchWithdrawal { id, salt } => {
+            execute::process_batch_withdrawal(deps, env, info, id, salt)
+        }
+        ExecuteMsg::SetBatchReceivedAmount { id, amount } => {
+            execute::set_batch_received_amount(deps, env, info, id, amount)
         }
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::UpdateValidators { validators } => {
