@@ -884,7 +884,7 @@ mod tests {
                 weight: 20,
             },
         ];
-        let undelegate_msgs =
+        let (total_undelegate_amount, undelegate_msgs, _) =
             get_undelegate_from_validator_msgs(undelegate_amount, coin_denom.clone(), validators);
         let undelegate_msgs_unwrapped = undelegate_msgs
             .iter()
@@ -898,8 +898,9 @@ mod tests {
         assert_eq!(undelegate_msgs_unwrapped.len(), 2);
         assert_eq!(
             undelegate_msgs_unwrapped[0].1 + undelegate_msgs_unwrapped[1].1,
-            undelegate_amount
+            total_undelegate_amount
         );
+        assert_approx_eq!(undelegate_amount, total_undelegate_amount, "0.001");
         assert_approx_eq!(
             undelegate_msgs_unwrapped[0].1 * Uint128::from(2_u128),
             undelegate_msgs_unwrapped[1].1,
