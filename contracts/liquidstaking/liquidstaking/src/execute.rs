@@ -6,7 +6,7 @@ use crate::event::{
     BatchReceivedEvent, BondEvent, ProcessBatchUnbondingEvent, ProcessRewardsEvent,
     ProcessUnbondingEvent, UpdateValidatorsEvent,
 };
-use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
+use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
 use crate::query::query_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
@@ -25,10 +25,10 @@ use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Coin, CosmosMsg, DecCoin, Decimal, DepsMut,
     DistributionMsg, Env, Event, MessageInfo, Response, StdResult, SubMsg, Uint128, WasmMsg,
 };
+use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
 
-/// process bond to stake user fund
-/// this function assume staker always equals to sender
+/// process bond/stake to contract
 pub fn bond(
     deps: DepsMut,
     env: Env,
@@ -232,17 +232,26 @@ pub fn zkgm_bond(
     Ok(res)
 }
 
-/// Process unbond call to contract
-pub fn unbond(
+/// Process receive msg from liquid stoken cw20 contract with embedded unbond payload msg to do unbond/unstake
+pub fn receive(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    unbond_amount: Uint128,
+    cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let sender = info.sender.to_string();
     let the_staker: String = sender.to_string();
     let delegator = env.contract.address.clone();
+
+    let payload_msg: Cw20PayloadMsg = from_json(cw20_msg.msg)?;
+
+    // make sure the payload is Unstake
+    if !matches!(payload_msg, Cw20PayloadMsg::Unstake {}) {
+        return Err(ContractError::InvalidPayload {});
+    }
+
+    let unbond_amount = cw20_msg.amount;
 
     let msg = cw20::Cw20QueryMsg::Balance {
         address: delegator.to_string(),

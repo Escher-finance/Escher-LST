@@ -7,6 +7,7 @@ use crate::{
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
 use cw2::ContractVersion;
+use cw20::Cw20ReceiveMsg;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use schemars::JsonSchema;
 use unionlabs_primitives::{Bytes, H256};
@@ -59,6 +60,11 @@ pub enum ExecuteRewardMsg {
     TransferToOwner {},
 }
 
+#[cw_serde]
+pub enum Cw20PayloadMsg {
+    Unstake {},
+}
+
 #[cw_ownable_execute]
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -69,10 +75,8 @@ pub enum ExecuteMsg {
         slippage: Option<Decimal>,
         expected: Uint128,
     },
-    /// Send liquid staking denom then undelegate native denom according exchange rate from validator
-    Unbond {
-        amount: Uint128,
-    },
+    /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
+    Receive(Cw20ReceiveMsg),
     /// Submit pending batch
     SubmitBatch {},
     // Withdraw staking rewards and call split reward to reward contract

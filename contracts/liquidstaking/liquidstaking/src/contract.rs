@@ -119,7 +119,7 @@ pub fn execute(
         ExecuteMsg::Bond { slippage, expected } => {
             execute::bond(deps, env, info, slippage, expected)
         }
-        ExecuteMsg::Unbond { amount } => execute::unbond(deps, env, info, amount),
+        ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
         ExecuteMsg::ProcessBatchWithdrawal { id, salt } => {
