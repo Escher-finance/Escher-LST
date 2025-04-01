@@ -853,7 +853,7 @@ pub fn get_transfer_token_cosmos_msg(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::assert_approx_eq;
+    use cosmwasm_std::{assert_approx_eq, testing::MockQuerier, Empty};
 
     #[test]
     fn test_calculate_delegated_amount() {
@@ -1209,5 +1209,69 @@ mod tests {
                 .sum::<Uint128>(),
             total_delegated_amount
         )
+    }
+
+    #[test]
+    fn test_get_actual_total_delegated() {
+        let mut querier = MockQuerier::default();
+        let delegator_addr = Addr::unchecked("delegator");
+        let denom = "denom".to_string();
+        let validator_addr_a = "a".to_string();
+        let validator_addr_b = "b".to_string();
+        let validator_addr_c = "c".to_string();
+        let validators = &[
+            cosmwasm_std::Validator::create(
+                validator_addr_a.clone(),
+                Decimal::default(),
+                Decimal::default(),
+                Decimal::default(),
+            ),
+            cosmwasm_std::Validator::create(
+                validator_addr_b.clone(),
+                Decimal::default(),
+                Decimal::default(),
+                Decimal::default(),
+            ),
+            cosmwasm_std::Validator::create(
+                validator_addr_c.clone(),
+                Decimal::default(),
+                Decimal::default(),
+                Decimal::default(),
+            ),
+        ];
+        let delegations = &[
+            cosmwasm_std::FullDelegation::create(
+                delegator_addr.clone(),
+                validator_addr_a.clone(),
+                Coin::new(Uint128::new(1000), denom.clone()),
+                Coin::default(),
+                Vec::default(),
+            ),
+            cosmwasm_std::FullDelegation::create(
+                delegator_addr.clone(),
+                validator_addr_b.clone(),
+                Coin::new(Uint128::new(2000), denom.clone()),
+                Coin::default(),
+                Vec::default(),
+            ),
+            cosmwasm_std::FullDelegation::create(
+                delegator_addr.clone(),
+                validator_addr_c.clone(),
+                Coin::new(Uint128::new(500), denom.clone()),
+                Coin::default(),
+                Vec::default(),
+            ),
+        ];
+        querier.staking.update("denom", validators, delegations);
+        let querier_wrapper = QuerierWrapper::<Empty>::new(&querier);
+
+        let total_delegated = get_actual_total_delegated(
+            querier_wrapper,
+            delegator_addr.to_string(),
+            denom.clone(),
+            Vec::from([validator_addr_a, validator_addr_b]),
+        )
+        .unwrap();
+        assert_eq!(total_delegated, Uint128::new(3000));
     }
 }
