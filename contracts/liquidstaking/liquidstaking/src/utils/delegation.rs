@@ -110,7 +110,7 @@ pub fn get_undelegate_from_validator_msgs(
     undelegate_amount: Uint128,
     coin_denom: String,
     validators: Vec<Validator>,
-) -> (Vec<CosmosMsg>, Vec<Attribute>) {
+) -> (Uint128, Vec<CosmosMsg>, Vec<Attribute>) {
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     let total_weight = Uint128::from(
@@ -121,22 +121,14 @@ pub fn get_undelegate_from_validator_msgs(
             .unwrap_or(0),
     );
 
-    let total_validators = validators.len();
-    let mut total_undelegated: Uint128 = Uint128::from(0u32);
-    let undelegate_amount_dec = Decimal::from_ratio(undelegate_amount, Uint128::one());
-
     let mut atts = vec![];
 
-    for (pos, validator) in validators.into_iter().enumerate() {
+    let mut total_undelegate_amount = Uint128::zero();
+    for validator in validators.into_iter() {
         let ratio = Decimal::from_ratio(Uint128::from(validator.weight), total_weight);
 
-        let mut undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
-        total_undelegated += undelegate_amount_for_validator;
-
-        if pos == (total_validators - 1) {
-            let remaining = undelegate_amount - total_undelegated;
-            undelegate_amount_for_validator += remaining;
-        }
+        let undelegate_amount_dec = Decimal::from_ratio(undelegate_amount, Uint128::one());
+        let undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
 
         let amount = Coin {
             amount: undelegate_amount_for_validator.clone(),
@@ -151,9 +143,11 @@ pub fn get_undelegate_from_validator_msgs(
             key: validator.address.to_string(),
             value: undelegate_amount_for_validator.to_string(),
         });
+
+        total_undelegate_amount += undelegate_amount_for_validator;
     }
 
-    (msgs, atts)
+    (total_undelegate_amount, msgs, atts)
 }
 
 pub fn get_validator_delegation_map_with_total_bond(
@@ -716,7 +710,7 @@ pub fn submit_pending_batch(
     if delegated_amount < undelegate_amount {
         return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker and if process rewards not happen yet
     }
-    let (undelegate_msgs, atts) = get_undelegate_from_validator_msgs(
+    let (total_undelegate_amount, undelegate_msgs, atts) = get_undelegate_from_validator_msgs(
         undelegate_amount,
         coin_denom.clone(),
         validators_reg.validators,
@@ -729,21 +723,21 @@ pub fn submit_pending_batch(
     msgs.push(burn_msg.into());
 
     // // update total bond, supply and exchange rate here
-    state.total_bond_amount = total_bond_amount - undelegate_amount;
+    state.total_bond_amount = total_bond_amount - total_undelegate_amount;
     state.total_supply = state.total_supply - batch.total_liquid_stake;
-    state.total_delegated_amount = delegated_amount - undelegate_amount;
+    state.total_delegated_amount = delegated_amount - total_undelegate_amount;
     state.update_exchange_rate();
     STATE.save(storage, &state)?;
 
     let next_action_time = time.seconds() + params.unbonding_time;
-    batch.expected_native_unstaked = Some(undelegate_amount);
+    batch.expected_native_unstaked = Some(total_undelegate_amount);
     batch.update_status(BatchStatus::Submitted, Some(next_action_time));
 
     let ev = SubmitBatchEvent(
         batch.id,
         sender.to_string(),
         batch.total_liquid_stake,
-        undelegate_amount,
+        total_undelegate_amount,
         delegated_amount,
         total_bond_amount,
         state.total_supply,
