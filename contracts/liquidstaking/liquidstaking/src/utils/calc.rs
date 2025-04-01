@@ -113,4 +113,13 @@ mod tests {
         // Fails - upper bound
         assert!(check_slippage(Uint128::new(100), Uint128::new(105), Decimal::percent(4)).is_err());
     }
+
+    #[test]
+    fn test_to_uint128() {
+        let amount = 123050;
+        assert_eq!(
+            to_uint128(Uint256::from_u128(amount)),
+            Ok(Uint128::new(amount))
+        )
+    }
 }
