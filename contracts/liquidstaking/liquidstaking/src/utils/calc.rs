@@ -54,6 +54,10 @@ pub fn check_slippage(
 
 #[cfg(test)]
 mod tests {
+    use cosmwasm_std::{
+        from_json, testing::MockQuerier, to_json_binary, Empty, SystemError, SystemResult,
+    };
+
     use super::*;
 
     #[test]
@@ -122,5 +126,42 @@ mod tests {
             to_uint128(Uint256::from_u128(amount)),
             Ok(Uint128::new(amount))
         )
+    }
+
+    #[test]
+    fn test_total_lst_supply() {
+        let mut querier = MockQuerier::default();
+        let total_supply = Uint128::new(100000);
+        querier.update_wasm(move |wasm_query| {
+            let unsupported_err = SystemResult::Err(SystemError::Unknown {});
+            match wasm_query {
+                cosmwasm_std::WasmQuery::Smart {
+                    contract_addr: _,
+                    msg,
+                } => {
+                    let cw20_msg: cw20::Cw20QueryMsg = from_json(msg).unwrap();
+                    match cw20_msg {
+                        cw20::Cw20QueryMsg::TokenInfo {} => {
+                            let response = TokenInfoResponse {
+                                name: String::default(),
+                                symbol: String::default(),
+                                decimals: u8::default(),
+                                total_supply,
+                            };
+                            let bin = to_json_binary(&response).unwrap();
+                            return SystemResult::Ok(cosmwasm_std::ContractResult::Ok(bin));
+                        }
+                        _ => unsupported_err,
+                    }
+                }
+                _ => unsupported_err,
+            }
+        });
+        // modify querier accordingly
+        let querier_wrapper = QuerierWrapper::<Empty>::new(&querier);
+        assert_eq!(
+            total_lst_supply(querier_wrapper, "cw20".to_string()).unwrap(),
+            total_supply
+        );
     }
 }
