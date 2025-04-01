@@ -103,3 +103,34 @@ pub fn batches<'a>() -> IndexedMap<u64, Batch, BatchIndexes<'a>> {
     };
     IndexedMap::new(BATCH_NAMESPACE, indexes)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_batch() {
+        let mut next_batch_action_time = 10;
+        let mut batch = Batch::new(0, Uint128::new(1000), next_batch_action_time);
+        assert_eq!(batch.status, BatchStatus::Pending);
+        assert_eq!(batch.next_batch_action_time, Some(next_batch_action_time));
+
+        next_batch_action_time += 10;
+        batch.update_status(BatchStatus::Pending, Some(next_batch_action_time));
+        assert_eq!(batch.status, BatchStatus::Pending);
+        assert_eq!(batch.next_batch_action_time, Some(next_batch_action_time));
+
+        next_batch_action_time += 10;
+        batch.update_status(BatchStatus::Submitted, Some(next_batch_action_time));
+        assert_eq!(batch.status, BatchStatus::Submitted);
+        assert_eq!(batch.next_batch_action_time, Some(next_batch_action_time));
+
+        batch.update_status(BatchStatus::Received, Some(next_batch_action_time));
+        assert_eq!(batch.status, BatchStatus::Received);
+        assert_eq!(batch.next_batch_action_time, None);
+
+        batch.update_status(BatchStatus::Released, Some(next_batch_action_time));
+        assert_eq!(batch.status, BatchStatus::Released);
+        assert_eq!(batch.next_batch_action_time, None);
+    }
+}
