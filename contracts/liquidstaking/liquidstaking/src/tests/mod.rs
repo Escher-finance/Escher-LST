@@ -27,7 +27,7 @@ pub fn make_contract(app: &mut App, sender: Addr, instantiate_msg: InstantiateMs
         .unwrap()
 }
 
-pub fn get_instantiate_msg_mock() -> InstantiateMsg {
+pub fn mock_instantiate_msg() -> InstantiateMsg {
     InstantiateMsg {
         underlying_coin_denom: "denom".to_string(),
         validators: vec![
