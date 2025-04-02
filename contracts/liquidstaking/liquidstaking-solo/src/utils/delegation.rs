@@ -47,18 +47,6 @@ pub fn get_actual_total_delegated(
         .sum())
 }
 
-pub fn get_actual_total_reward(
-    storage: &mut dyn Storage,
-    querier: QuerierWrapper,
-    delegator: String,
-    denom: String,
-    validators: Vec<String>,
-) -> StdResult<Uint128> {
-    let unclaimed_reward = get_unclaimed_reward(querier, delegator, denom, validators)?;
-    let reward_balance = REWARD_BALANCE.load(storage)?;
-    Ok(unclaimed_reward + reward_balance)
-}
-
 pub fn get_unclaimed_reward(
     querier: QuerierWrapper,
     delegator: String,
@@ -72,7 +60,7 @@ pub fn get_unclaimed_reward(
         if validators.contains(&delegator_reward.validator_address) {
             for reward in delegator_reward.reward {
                 if reward.denom == denom {
-                    let reward_val = to_uint128(reward.amount.to_uint_floor())?;
+                    let reward_val = calc::to_uint128(reward.amount.to_uint_floor())?;
                     total_rewards += reward_val;
                 }
             }
@@ -80,11 +68,6 @@ pub fn get_unclaimed_reward(
     }
 
     Ok(total_rewards)
-}
-
-/// Convert Uint256 to Uint128
-pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
-    Uint128::from_str(&v.to_string())
 }
 
 // for testing only
@@ -122,25 +105,12 @@ pub fn get_undelegate_from_validator_msgs(
         let undelegate_amount_dec = Decimal::from_ratio(undelegate_amount, Uint128::one());
         let undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
 
-        let undelegate_msg: proto::cosmos::staking::v1beta1::MsgUndelegate =
-            proto::cosmos::staking::v1beta1::MsgUndelegate {
-                delegator_address: delegator.to_string(),
-                validator_address: validator.address.to_string(),
-                amount: Some(proto::cosmos::base::v1beta1::Coin {
-                    denom: coin_denom.clone(),
-                    amount: undelegate_amount_for_validator.into(),
-                }),
-            };
-
-        let wrapped_msg: proto::babylon::epoching::v1::MsgWrappedUndelegate =
-            proto::babylon::epoching::v1::MsgWrappedUndelegate {
-                msg: Some(undelegate_msg),
-            };
-
-        let undelegate_staking_msg = CosmosMsg::Any(AnyMsg {
-            type_url: "/babylon.epoching.v1.MsgWrappedUndelegate".to_string(),
-            value: Binary::from(wrapped_msg.encode_to_vec()),
-        });
+        let undelegate_staking_msg = get_babylon_undelegate_cosmos_msg(
+            delegator.to_string(),
+            validator.address.to_string(),
+            undelegate_amount_for_validator.to_string(),
+            coin_denom.clone(),
+        );
 
         msgs.push(undelegate_staking_msg);
 
@@ -283,55 +253,31 @@ pub fn get_restaking_msgs(
                     break;
                 }
 
-                let redelegate_msg = proto::cosmos::staking::v1beta1::MsgBeginRedelegate {
-                    delegator_address: delegator.clone(),
-                    validator_src_address: surplus_validator.address.to_string(),
-                    validator_dst_address: deficient_validator.address.clone(),
-                    amount: Some(proto::cosmos::base::v1beta1::Coin {
-                        denom: denom.clone(),
-                        amount: surplus_validator.diff_amount.into(),
-                    }),
-                };
-
-                let restaking_msg: proto::babylon::epoching::v1::MsgWrappedBeginRedelegate =
-                    proto::babylon::epoching::v1::MsgWrappedBeginRedelegate {
-                        msg: Some(redelegate_msg),
-                    };
-
-                let redelegate = CosmosMsg::Any(AnyMsg {
-                    type_url: "/babylon.epoching.v1.MsgWrappedBeginRedelegate".to_string(),
-                    value: Binary::from(restaking_msg.encode_to_vec()),
-                });
+                let redelegate_msg = get_babylon_redelegate_cosmos_msg(
+                    delegator.clone(),
+                    surplus_validator.address.to_string(),
+                    deficient_validator.address.clone(),
+                    surplus_validator.diff_amount.into(),
+                    denom.clone(),
+                );
                 surplus_validator.diff_amount = Uint128::from(0u32);
                 deficient_validator.diff_amount =
                     deficient_validator.diff_amount - surplus_validator.diff_amount;
 
-                msgs.push(redelegate);
+                msgs.push(redelegate_msg);
             } else {
-                let redelegate_msg = proto::cosmos::staking::v1beta1::MsgBeginRedelegate {
-                    delegator_address: delegator.clone(),
-                    validator_src_address: surplus_validator.address.to_string(),
-                    validator_dst_address: deficient_validator.address.clone(),
-                    amount: Some(proto::cosmos::base::v1beta1::Coin {
-                        denom: denom.clone(),
-                        amount: deficient_validator.diff_amount.into(),
-                    }),
-                };
-
-                let restaking_msg: proto::babylon::epoching::v1::MsgWrappedBeginRedelegate =
-                    proto::babylon::epoching::v1::MsgWrappedBeginRedelegate {
-                        msg: Some(redelegate_msg),
-                    };
-
-                let redelegate = CosmosMsg::Any(AnyMsg {
-                    type_url: "/babylon.epoching.v1.MsgWrappedBeginRedelegate".to_string(),
-                    value: Binary::from(restaking_msg.encode_to_vec()),
-                });
+                let redelegate_msg = get_babylon_redelegate_cosmos_msg(
+                    delegator.clone(),
+                    surplus_validator.address.to_string(),
+                    deficient_validator.address.clone(),
+                    deficient_validator.diff_amount.into(),
+                    denom.clone(),
+                );
 
                 surplus_validator.diff_amount =
                     surplus_validator.diff_amount - deficient_validator.diff_amount;
                 deficient_validator.diff_amount = Uint128::from(0u32);
-                msgs.push(redelegate);
+                msgs.push(redelegate_msg);
             }
         }
     }
@@ -356,32 +302,26 @@ pub fn get_delegate_to_validator_msgs(
     let mut msgs: Vec<CosmosMsg> = vec![];
     let mut first_validator: String = "".to_string();
 
-    for validator in validators.into_iter() {
+    for validator in validators {
         let ratio =
             Decimal::from_ratio(Uint128::from(validator.weight), Uint128::from(total_weight));
 
         let delegate_amount = calculate_delegated_amount(delegate_amount, ratio);
+
+        if delegate_amount == Uint128::zero() {
+            continue;
+        }
+
         total_delegated += delegate_amount;
 
-        let delegate_msg = proto::cosmos::staking::v1beta1::MsgDelegate {
-            delegator_address: delegator.clone(),
-            validator_address: validator.address.to_string(),
-            amount: Some(proto::cosmos::base::v1beta1::Coin {
-                denom: coin_denom.clone(),
-                amount: delegate_amount.into(),
-            }),
-        };
+        let delegate_msg = get_babylon_delegate_cosmos_msg(
+            delegator.clone(),
+            validator.address.to_string(),
+            delegate_amount.to_string(),
+            coin_denom.clone(),
+        );
 
-        let staking_msg: proto::babylon::epoching::v1::MsgWrappedDelegate =
-            proto::babylon::epoching::v1::MsgWrappedDelegate {
-                msg: Some(delegate_msg),
-            };
-
-        let star_msg = CosmosMsg::Any(AnyMsg {
-            type_url: "/babylon.epoching.v1.MsgWrappedDelegate".to_string(),
-            value: Binary::from(staking_msg.encode_to_vec()),
-        });
-        msgs.push(star_msg);
+        msgs.push(delegate_msg.into());
 
         if first_validator.is_empty() {
             first_validator = validator.address.to_string();
@@ -392,26 +332,14 @@ pub fn get_delegate_to_validator_msgs(
 
     let remaining_amount = delegate_amount - total_delegated;
     if !remaining_amount.is_zero() {
-        let delegate_msg = proto::cosmos::staking::v1beta1::MsgDelegate {
-            delegator_address: delegator.clone(),
-            validator_address: first_validator.to_string(),
-            amount: Some(proto::cosmos::base::v1beta1::Coin {
-                denom: coin_denom.clone(),
-                amount: remaining_amount.into(),
-            }),
-        };
+        let delegate_msg = get_babylon_delegate_cosmos_msg(
+            delegator.clone(),
+            first_validator.to_string(),
+            remaining_amount.to_string(),
+            coin_denom,
+        );
 
-        let staking_msg: proto::babylon::epoching::v1::MsgWrappedDelegate =
-            proto::babylon::epoching::v1::MsgWrappedDelegate {
-                msg: Some(delegate_msg),
-            };
-
-        let remaining_staking_msg = CosmosMsg::Any(AnyMsg {
-            type_url: "/babylon.epoching.v1.MsgWrappedDelegate".to_string(),
-            value: Binary::from(staking_msg.encode_to_vec()),
-        });
-
-        msgs.push(remaining_staking_msg.into());
+        msgs.push(delegate_msg.into());
     }
     msgs
 }
@@ -560,101 +488,6 @@ pub fn process_bond(
     ))
 }
 
-/// Create unbond requests that will create unbond record and put in pending batch
-/// 1. Increase total liquid stake amount in pending batch
-/// 2. Create unbond record and save in pending batch
-/// 3. Create UnstakeRequest event
-pub fn unstake_request_in_batch(
-    env: Env,
-    storage: &mut dyn Storage,
-    sender: String,
-    staker: String,
-    unstake_amount: Uint128,
-    channel_id: Option<u32>,
-) -> Result<Event, ContractError> {
-    let pending_batch_id = PENDING_BATCH_ID.load(storage)?;
-    let mut pending_batch = batches().load(storage, pending_batch_id)?;
-
-    // update total unstaked liquid stake amount in batch and increase unbond records count
-    pending_batch.total_liquid_stake += unstake_amount;
-    pending_batch.unbond_records_count += 1;
-    batches().save(storage, pending_batch_id, &pending_batch)?;
-
-    let id: u64 = increment_tokens(storage).unwrap();
-    let record = UnbondRecord {
-        id,
-        batch_id: pending_batch.id,
-        height: env.block.height,
-        channel_id,
-        sender: sender.clone(),
-        staker: staker.clone(),
-        amount: unstake_amount,
-        released_height: 0,
-        released: false,
-    };
-    unbond_record().save(storage, id, &record)?;
-
-    let event = UnstakeRequestEvent(
-        sender,
-        staker,
-        channel_id,
-        unstake_amount,
-        record.id,
-        env.block.time,
-    );
-
-    Ok(event)
-}
-
-pub fn get_transfer_token_cosmos_msg(
-    storage: &mut dyn Storage,
-    staker: String,
-    channel_id: Option<u32>,
-    time: Timestamp,
-    ucs03_relay_contract: String,
-    undelegate_amount: Uint128,
-    denom: String,
-    salt: String,
-) -> Result<CosmosMsg, ContractError> {
-    // if balance exists, send to staker (it can be on same chain or other chain like evm/bera)
-    let msg: CosmosMsg = {
-        if channel_id.is_some() {
-            let funds = vec![Coin {
-                denom: denom.clone(),
-                amount: undelegate_amount.clone(),
-            }];
-
-            // get quote token of native base denom (muno) on specific channel id
-            let quote_token = QUOTE_TOKEN.load(storage, channel_id.unwrap())?;
-            let wasm_msg = protocol::ucs03_transfer(
-                time,
-                ucs03_relay_contract.as_str().into(),
-                channel_id.unwrap(),
-                Bytes::from_str(staker.as_str()).unwrap(),
-                denom.clone(),
-                undelegate_amount,
-                Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
-                Uint256::from(undelegate_amount),
-                funds,
-                H256::from_str(salt.as_str()).unwrap(),
-            )?;
-            let msg: CosmosMsg = CosmosMsg::Wasm(wasm_msg);
-            msg
-        } else {
-            let bank_msg = BankMsg::Send {
-                to_address: staker.clone(),
-                amount: vec![Coin {
-                    denom: denom,
-                    amount: undelegate_amount,
-                }],
-            };
-            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-            msg
-        }
-    };
-    Ok(msg)
-}
-
 /// Process unstake requests from batch that will burn liquid staking token, undelegate some amount from validator according to exchange rate and create UnbondRecord
 /// 1. Undelegate to validators
 /// 2. Set current batch status to submitted
@@ -779,4 +612,189 @@ pub fn submit_pending_batch(
     PENDING_BATCH_ID.save(storage, &new_pending_batch.id)?;
 
     Ok((msgs, events))
+}
+
+/// Create unbond requests that will create unbond record and put in pending batch
+/// 1. Increase total liquid stake amount in pending batch
+/// 2. Create unbond record and save in pending batch
+/// 3. Create UnstakeRequest event
+pub fn unstake_request_in_batch(
+    env: Env,
+    storage: &mut dyn Storage,
+    sender: String,
+    staker: String,
+    unstake_amount: Uint128,
+    channel_id: Option<u32>,
+) -> Result<Event, ContractError> {
+    let pending_batch_id = PENDING_BATCH_ID.load(storage)?;
+    let mut pending_batch = batches().load(storage, pending_batch_id)?;
+
+    // update total unstaked liquid stake amount in batch and increase unbond records count
+    pending_batch.total_liquid_stake += unstake_amount;
+    pending_batch.unbond_records_count += 1;
+    batches().save(storage, pending_batch_id, &pending_batch)?;
+
+    let id: u64 = increment_tokens(storage).unwrap();
+    let record = UnbondRecord {
+        id,
+        batch_id: pending_batch.id,
+        height: env.block.height,
+        channel_id,
+        sender: sender.clone(),
+        staker: staker.clone(),
+        amount: unstake_amount,
+        released_height: 0,
+        released: false,
+    };
+    unbond_record().save(storage, id, &record)?;
+
+    let event = UnstakeRequestEvent(
+        sender,
+        staker,
+        channel_id,
+        unstake_amount,
+        record.id,
+        env.block.time,
+    );
+
+    Ok(event)
+}
+
+pub fn get_transfer_token_cosmos_msg(
+    storage: &mut dyn Storage,
+    staker: String,
+    channel_id: Option<u32>,
+    time: Timestamp,
+    ucs03_relay_contract: String,
+    undelegate_amount: Uint128,
+    denom: String,
+    salt: String,
+) -> Result<CosmosMsg, ContractError> {
+    // if balance exists, send to staker (it can be on same chain or other chain like evm/bera)
+    let msg: CosmosMsg = {
+        if channel_id.is_some() {
+            let funds = vec![Coin {
+                denom: denom.clone(),
+                amount: undelegate_amount.clone(),
+            }];
+
+            // get quote token of native base denom (muno) on specific channel id
+            let quote_token = QUOTE_TOKEN.load(storage, channel_id.unwrap())?;
+            let wasm_msg = protocol::ucs03_transfer(
+                time,
+                ucs03_relay_contract.as_str().into(),
+                channel_id.unwrap(),
+                Bytes::from_str(staker.as_str()).unwrap(),
+                denom.clone(),
+                undelegate_amount,
+                Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
+                Uint256::from(undelegate_amount),
+                funds,
+                H256::from_str(salt.as_str()).unwrap(),
+            )?;
+            let msg: CosmosMsg = CosmosMsg::Wasm(wasm_msg);
+            msg
+        } else {
+            let bank_msg = BankMsg::Send {
+                to_address: staker.clone(),
+                amount: vec![Coin {
+                    denom: denom,
+                    amount: undelegate_amount,
+                }],
+            };
+            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
+            msg
+        }
+    };
+    Ok(msg)
+}
+
+pub fn get_actual_total_reward(
+    storage: &mut dyn Storage,
+    querier: QuerierWrapper,
+    delegator: String,
+    denom: String,
+    validators: Vec<String>,
+) -> StdResult<Uint128> {
+    let unclaimed_reward = get_unclaimed_reward(querier, delegator, denom, validators)?;
+    let reward_balance = REWARD_BALANCE.load(storage)?;
+    Ok(unclaimed_reward + reward_balance)
+}
+
+pub fn get_babylon_delegate_cosmos_msg(
+    delegator_address: String,
+    validator_address: String,
+    amount: String,
+    denom: String,
+) -> CosmosMsg {
+    let delegate_msg = proto::cosmos::staking::v1beta1::MsgDelegate {
+        delegator_address,
+        validator_address,
+        amount: Some(proto::cosmos::base::v1beta1::Coin { denom, amount }),
+    };
+
+    let staking_msg: proto::babylon::epoching::v1::MsgWrappedDelegate =
+        proto::babylon::epoching::v1::MsgWrappedDelegate {
+            msg: Some(delegate_msg),
+        };
+
+    let any_delegate_msg = CosmosMsg::Any(AnyMsg {
+        type_url: "/babylon.epoching.v1.MsgWrappedDelegate".to_string(),
+        value: Binary::from(staking_msg.encode_to_vec()),
+    });
+    any_delegate_msg
+}
+
+pub fn get_babylon_undelegate_cosmos_msg(
+    delegator_address: String,
+    validator_address: String,
+    amount: String,
+    denom: String,
+) -> CosmosMsg {
+    let undelegate_msg: proto::cosmos::staking::v1beta1::MsgUndelegate =
+        proto::cosmos::staking::v1beta1::MsgUndelegate {
+            delegator_address,
+            validator_address,
+            amount: Some(proto::cosmos::base::v1beta1::Coin { denom, amount }),
+        };
+
+    let wrapped_msg: proto::babylon::epoching::v1::MsgWrappedUndelegate =
+        proto::babylon::epoching::v1::MsgWrappedUndelegate {
+            msg: Some(undelegate_msg),
+        };
+
+    let undelegate_staking_msg = CosmosMsg::Any(AnyMsg {
+        type_url: "/babylon.epoching.v1.MsgWrappedUndelegate".to_string(),
+        value: Binary::from(wrapped_msg.encode_to_vec()),
+    });
+    undelegate_staking_msg
+}
+
+pub fn get_babylon_redelegate_cosmos_msg(
+    delegator_address: String,
+    validator_src_address: String,
+    validator_dst_address: String,
+    amount: String,
+    denom: String,
+) -> CosmosMsg {
+    let redelegate_msg = proto::cosmos::staking::v1beta1::MsgBeginRedelegate {
+        delegator_address,
+        validator_src_address,
+        validator_dst_address,
+        amount: Some(proto::cosmos::base::v1beta1::Coin {
+            denom: denom.clone(),
+            amount,
+        }),
+    };
+
+    let restaking_msg: proto::babylon::epoching::v1::MsgWrappedBeginRedelegate =
+        proto::babylon::epoching::v1::MsgWrappedBeginRedelegate {
+            msg: Some(redelegate_msg),
+        };
+
+    let redelegate = CosmosMsg::Any(AnyMsg {
+        type_url: "/babylon.epoching.v1.MsgWrappedBeginRedelegate".to_string(),
+        value: Binary::from(restaking_msg.encode_to_vec()),
+    });
+    redelegate
 }

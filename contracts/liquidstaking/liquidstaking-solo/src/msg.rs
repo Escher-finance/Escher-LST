@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    state::{Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry},
+    state::{
+        Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, Validator, ValidatorsRegistry,
+    },
     utils::batch::{Batch, BatchStatus},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
@@ -40,6 +42,9 @@ pub struct InstantiateMsg {
     pub epoch_period: Option<u32>,
     // batch period range in seconds to execute batch
     pub batch_period: u64,
+    /// whether to use external reward contract
+    /// if true, the contract will use external reward contract
+    pub use_external_reward: Option<bool>,
 }
 
 #[cw_serde]
@@ -100,6 +105,7 @@ pub enum ExecuteMsg {
         reward_address: Option<Addr>,
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
+        epoch_period: Option<u32>,
     },
     /// Update quote token
     UpdateQuoteToken {
@@ -121,7 +127,6 @@ pub enum ExecuteMsg {
     MigrateReward {
         code_id: u64,
     },
-    NormalizeSupply {},
     SplitReward {},
     SetConfig {
         lst_contract_address: Option<Addr>,
@@ -173,6 +178,8 @@ pub enum QueryMsg {
         min: Option<u64>,
         max: Option<u64>,
     },
+    #[returns(SupplyQueue)]
+    SupplyQueue {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;
@@ -204,11 +211,6 @@ pub struct StakingLiquidity {
     pub time: Timestamp,
     pub total_supply: Uint128,
     pub adjusted_supply: Uint128,
-}
-
-#[cw_serde]
-pub struct Log {
-    pub message: String,
 }
 
 #[cw_serde]

@@ -104,4 +104,7 @@ pub enum ContractError {
 
     #[error("InvalidContractName")]
     InvalidPayload {},
+
+    #[error("cannot migrate reward contract that is equal with current contract")]
+    InvalidRewardContractMigration {},
 }

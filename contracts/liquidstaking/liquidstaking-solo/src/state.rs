@@ -6,7 +6,6 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
-pub const LOG: Item<String> = Item::new("log");
 pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
@@ -63,8 +62,6 @@ pub struct Parameters {
     pub fee_rate: Decimal,
     // fee receiver
     pub fee_receiver: Addr,
-    // batch period range in seconds to execute batch
-    pub epoch_period: Option<u32>,
     // batch period range in seconds to execute batch
     pub batch_period: u64,
 }

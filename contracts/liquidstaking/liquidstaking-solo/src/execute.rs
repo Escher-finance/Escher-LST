@@ -13,15 +13,14 @@ use crate::msg::{
 use crate::query::query_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, CONFIG, LOG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+    unbond_record, QuoteToken, Validator, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
     REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
 use crate::utils::{
-    self, calc::check_slippage, calc::normalize_supply_queue,
+    self, calc::check_slippage, calc::normalize_supply_queue, calc::to_uint128,
     delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
-    delegation::to_uint128,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
@@ -202,15 +201,19 @@ pub fn zkgm_bond(
         deps.querier,
         sender.to_string(),
         staker.clone(),
-        delegator,
+        delegator.clone(),
         amount,
         env.block.time.nanos(),
         params,
-        validators_reg,
+        validators_reg.clone(),
         salt,
         Some(channel_id),
         env.block.height,
     )?;
+
+    if bond_data.mint_amount == Uint128::zero() {
+        return Err(ContractError::InvalidMintAmount {});
+    }
 
     // create bond event here
     let bond_event = BondEvent(
@@ -226,13 +229,22 @@ pub fn zkgm_bond(
         env.block.time,
         coin_denom.clone(),
     );
-
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
-    LOG.save(
-        deps.storage,
-        &format!("{}: {:?}", env.block.time, bond_event),
+    // increment the reward balance on this contract
+    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    let total_reward = utils::delegation::get_unclaimed_reward(
+        deps.querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_reg
+            .validators
+            .iter()
+            .map(|v| v.address.clone())
+            .collect(),
     )?;
+    reward_balance += total_reward;
+    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     let res: Response = Response::new()
         .add_messages(msgs)
@@ -248,6 +260,156 @@ pub fn zkgm_bond(
             attr("minted", bond_data.mint_amount),
             attr("exchange_rate", bond_data.exchange_rate.to_string()),
         ]);
+
+    Ok(res)
+}
+
+/// Process receive msg from liquid stoken cw20 contract with embedded unbond payload msg to do unbond/unstake
+pub fn receive(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    cw20_msg: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+    let sender = info.sender.to_string();
+    let the_staker: String = sender.to_string();
+    let delegator = env.contract.address.clone();
+
+    let payload_msg: Cw20PayloadMsg = from_json(cw20_msg.msg)?;
+
+    // make sure the payload is Unstake
+    if !matches!(payload_msg, Cw20PayloadMsg::Unstake {}) {
+        return Err(ContractError::InvalidPayload {});
+    }
+
+    let unbond_amount = cw20_msg.amount;
+
+    let msg = cw20::Cw20QueryMsg::Balance {
+        address: delegator.to_string(),
+    };
+
+    let balance: cw20::BalanceResponse = deps
+        .querier
+        .query_wasm_smart(params.cw20_address.clone(), &msg)?;
+
+    if balance.balance < unbond_amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let unstake_request_event = utils::delegation::unstake_request_in_batch(
+        env.clone(),
+        deps.storage,
+        sender.to_string(),
+        the_staker.clone(),
+        unbond_amount,
+        None,
+    )?;
+
+    let res: Response = Response::new().add_event(unstake_request_event);
+
+    Ok(res)
+}
+
+/// Process pending batch and execute it
+pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let params = PARAMETERS.load(deps.storage)?;
+    let delegator = env.contract.address.clone();
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    // first load pending batch
+    let pending_batch_id = PENDING_BATCH_ID.load(deps.storage)?;
+    let mut pending_batch = batches().load(deps.storage, pending_batch_id)?;
+
+    // make sure the batch execution time is correct
+    if let Some(est_next_batch_time) = pending_batch.next_batch_action_time {
+        // Check if the batch has been submitted
+        if env.block.time.seconds() < est_next_batch_time {
+            return Err(ContractError::BatchNotReady {
+                actual: env.block.time.seconds(),
+                expected: est_next_batch_time,
+            });
+        }
+    } else {
+        // Should not enter as pending batch should have a next batch action time
+        return Err(ContractError::BatchNotReady {
+            actual: env.block.time.seconds(),
+            expected: 0u64,
+        });
+    }
+
+    let coin_denom = params.underlying_coin_denom.clone();
+    let (msgs, events) = submit_pending_batch(
+        env.block.height,
+        deps.storage,
+        deps.querier,
+        env.block.time,
+        info.sender,
+        delegator.clone(),
+        &mut pending_batch,
+        params,
+        validators_reg.clone(),
+    )?;
+
+    // increment the reward balance on this contract as there is automatic reward withdrawal on undelegation
+    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    let total_reward = utils::delegation::get_unclaimed_reward(
+        deps.querier,
+        delegator.to_string(),
+        coin_denom,
+        validators_reg
+            .validators
+            .iter()
+            .map(|v| v.address.clone())
+            .collect(),
+    )?;
+    reward_balance += total_reward;
+    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
+
+    let res: Response = Response::new().add_messages(msgs).add_events(events);
+
+    Ok(res)
+}
+
+// Set the batch received amount and set the batch status to received
+// This will be called by backend and the amount data is pulled from indexer when batch complete unbonding is already executed on chain
+pub fn set_batch_received_amount(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    id: u64,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let mut batch = batches().load(deps.storage, id)?;
+
+    if batch.status != BatchStatus::Submitted {
+        // Should not enter as pending batch should have a next batch action time
+        return Err(ContractError::BatchStatusIncorrect {
+            actual: batch.status,
+            expected: BatchStatus::Submitted,
+        });
+    }
+    if env.block.time.seconds() > batch.next_batch_action_time.unwrap() {
+        return Err(ContractError::BatchNotReady {
+            actual: env.block.time.seconds(),
+            expected: batch.next_batch_action_time.unwrap(),
+        });
+    }
+
+    if amount > batch.expected_native_unstaked.unwrap() {
+        return Err(ContractError::InvalidBatchReceivedAmount {});
+    }
+
+    batch.update_status(BatchStatus::Received, None);
+    batch.received_native_unstaked = Some(amount);
+    batches().save(deps.storage, id, &batch)?;
+
+    let event = BatchReceivedEvent(batch.id, amount.to_string(), env.block.time);
+
+    let res: Response = Response::new().add_event(event);
 
     Ok(res)
 }
@@ -399,70 +561,6 @@ pub fn process_rewards(
     Ok(res)
 }
 
-/// Transfer all native balance of this contract to owner (for development purpose only)
-pub fn transfer_to_owner(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    let params = PARAMETERS.load(deps.storage)?;
-
-    let balance = deps
-        .querier
-        .query_balance(env.contract.address, params.underlying_coin_denom)?;
-
-    if balance.amount < Uint128::one() {
-        return Err(ContractError::NotEnoughAvailableFund {});
-    }
-
-    let owner = cw_ownable::get_ownership(deps.storage)?;
-
-    let bank_msg = BankMsg::Send {
-        to_address: owner.owner.unwrap().to_string(),
-        amount: vec![balance.clone()],
-    };
-    let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-
-    let res: Response = Response::new()
-        .add_message(msg)
-        .add_attribute("action", "transfer_to_owner")
-        .add_attribute("amount", balance.amount.to_string());
-
-    Ok(res)
-}
-
-/// Move all native balance to reward contract (for development only)
-pub fn move_to_reward(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    let params = PARAMETERS.load(deps.storage)?;
-
-    let balance = deps
-        .querier
-        .query_balance(env.contract.address, params.underlying_coin_denom)?;
-
-    if balance.amount < Uint128::one() {
-        return Err(ContractError::NotEnoughAvailableFund {});
-    }
-
-    let bank_msg = BankMsg::Send {
-        to_address: params.reward_address.to_string(),
-        amount: vec![balance.clone()],
-    };
-    let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-
-    let res: Response = Response::new()
-        .add_message(msg)
-        .add_attribute("action", "move_to_reward_contract")
-        .add_attribute("amount", balance.amount.to_string());
-
-    Ok(res)
-}
-
 /// Update the ownership of the contract.
 #[allow(clippy::needless_pass_by_value)]
 pub fn update_ownership(
@@ -496,6 +594,7 @@ pub fn set_parameters(
     reward_address: Option<Addr>,
     fee_receiver: Option<Addr>,
     fee_rate: Option<Decimal>,
+    epoch_period: Option<u32>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -520,6 +619,13 @@ pub fn set_parameters(
 
     params.fee_receiver = fee_receiver.clone().unwrap_or_else(|| params.fee_receiver);
     params.fee_rate = fee_rate.clone().unwrap_or_else(|| params.fee_rate);
+
+    // update epoch period in SUPPLY QUEUE
+    if epoch_period.is_some() {
+        let mut supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
+        supply_queue.epoch_period = epoch_period.unwrap();
+        SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
+    }
 
     let cw20_addr_string = match cw20_address {
         Some(cw20) => cw20.to_string(),
@@ -735,155 +841,6 @@ pub fn on_zkgm(
         }
     }
 }
-/// Process receive msg from liquid stoken cw20 contract with embedded unbond payload msg to do unbond/unstake
-pub fn receive(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    cw20_msg: Cw20ReceiveMsg,
-) -> Result<Response, ContractError> {
-    let params = PARAMETERS.load(deps.storage)?;
-    let sender = info.sender.to_string();
-    let the_staker: String = sender.to_string();
-    let delegator = env.contract.address.clone();
-
-    let payload_msg: Cw20PayloadMsg = from_json(cw20_msg.msg)?;
-
-    // make sure the payload is Unstake
-    if !matches!(payload_msg, Cw20PayloadMsg::Unstake {}) {
-        return Err(ContractError::InvalidPayload {});
-    }
-
-    let unbond_amount = cw20_msg.amount;
-
-    let msg = cw20::Cw20QueryMsg::Balance {
-        address: delegator.to_string(),
-    };
-
-    let balance: cw20::BalanceResponse = deps
-        .querier
-        .query_wasm_smart(params.cw20_address.clone(), &msg)?;
-
-    if balance.balance < unbond_amount {
-        return Err(ContractError::NotEnoughAvailableFund {});
-    }
-
-    let unstake_request_event = utils::delegation::unstake_request_in_batch(
-        env.clone(),
-        deps.storage,
-        sender.to_string(),
-        the_staker.clone(),
-        unbond_amount,
-        None,
-    )?;
-
-    let res: Response = Response::new().add_event(unstake_request_event);
-
-    Ok(res)
-}
-
-/// Process pending batch and execute it
-pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-
-    let params = PARAMETERS.load(deps.storage)?;
-    let delegator = env.contract.address.clone();
-    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
-    // first load pending batch
-    let pending_batch_id = PENDING_BATCH_ID.load(deps.storage)?;
-    let mut pending_batch = batches().load(deps.storage, pending_batch_id)?;
-
-    // make sure the batch execution time is correct
-    if let Some(est_next_batch_time) = pending_batch.next_batch_action_time {
-        // Check if the batch has been submitted
-        if env.block.time.seconds() < est_next_batch_time {
-            return Err(ContractError::BatchNotReady {
-                actual: env.block.time.seconds(),
-                expected: est_next_batch_time,
-            });
-        }
-    } else {
-        // Should not enter as pending batch should have a next batch action time
-        return Err(ContractError::BatchNotReady {
-            actual: env.block.time.seconds(),
-            expected: 0u64,
-        });
-    }
-
-    let coin_denom = params.underlying_coin_denom.clone();
-    let (msgs, events) = submit_pending_batch(
-        env.block.height,
-        deps.storage,
-        deps.querier,
-        env.block.time,
-        info.sender,
-        delegator.clone(),
-        &mut pending_batch,
-        params,
-        validators_reg.clone(),
-    )?;
-
-    // increment the reward balance on this contract as there is automatic reward withdrawal on undelegation
-    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
-    let total_reward = utils::delegation::get_unclaimed_reward(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom,
-        validators_reg
-            .validators
-            .iter()
-            .map(|v| v.address.clone())
-            .collect(),
-    )?;
-    reward_balance += total_reward;
-    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
-
-    let res: Response = Response::new().add_messages(msgs).add_events(events);
-
-    Ok(res)
-}
-
-// Set the batch received amount and set the batch status to received
-// This will be called by backend and the amount data is pulled from indexer when batch complete unbonding is already executed on chain
-pub fn set_batch_received_amount(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    id: u64,
-    amount: Uint128,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-
-    let mut batch = batches().load(deps.storage, id)?;
-
-    if batch.status != BatchStatus::Submitted {
-        // Should not enter as pending batch should have a next batch action time
-        return Err(ContractError::BatchStatusIncorrect {
-            actual: batch.status,
-            expected: BatchStatus::Submitted,
-        });
-    }
-    if env.block.time.seconds() > batch.next_batch_action_time.unwrap() {
-        return Err(ContractError::BatchNotReady {
-            actual: env.block.time.seconds(),
-            expected: batch.next_batch_action_time.unwrap(),
-        });
-    }
-
-    if amount > batch.expected_native_unstaked.unwrap() {
-        return Err(ContractError::InvalidBatchReceivedAmount {});
-    }
-
-    batch.update_status(BatchStatus::Received, None);
-    batch.received_native_unstaked = Some(amount);
-    batches().save(deps.storage, id, &batch)?;
-
-    let event = BatchReceivedEvent(batch.id, amount.to_string(), env.block.time);
-
-    let res: Response = Response::new().add_event(event);
-
-    Ok(res)
-}
 
 /// Update the ownership of the contract.
 #[allow(clippy::needless_pass_by_value)]
@@ -956,11 +913,16 @@ pub fn set_config(
 /// Migrate reward contract
 pub fn migrate_reward(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     _info: MessageInfo,
     code_id: u64,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
+
+    if params.reward_address == env.contract.address {
+        return Err(ContractError::InvalidRewardContractMigration {});
+    }
+
     let migrate = MigrateMsg {};
     let msg_bin = to_json_binary(&migrate)?;
     let migrate_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Migrate {
@@ -1055,113 +1017,6 @@ pub fn normalize_supply(deps: DepsMut, env: Env) -> Result<Response, ContractErr
     Ok(Response::default())
 }
 
-#[cfg(test)]
-// #[test]
-// fn validator_restaking_adjustment() {
-//     use std::collections::HashMap;
-
-//     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-//     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-
-//     validator_delegation_map.insert("A".into(), Uint128::new(50000));
-//     validator_delegation_map.insert("B".into(), Uint128::new(50000));
-
-//     correct_validator_delegation_map.insert("B".into(), Uint128::new(30000));
-//     correct_validator_delegation_map.insert("C".into(), Uint128::new(30000));
-//     correct_validator_delegation_map.insert("D".into(), Uint128::new(40000));
-
-//     let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
-//         validator_delegation_map,
-//         correct_validator_delegation_map,
-//     );
-
-//     let denom = "muno".to_string();
-//     let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
-//     println!("msgs: {:?}", msgs);
-// }
-
-// #[test]
-// fn validator_restaking_adjustment_2() {
-//     use std::collections::HashMap;
-
-//     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-//     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-
-//     validator_delegation_map.insert("A".into(), Uint128::new(50000));
-//     validator_delegation_map.insert("B".into(), Uint128::new(50000));
-//     validator_delegation_map.insert("C".into(), Uint128::new(50000));
-
-//     correct_validator_delegation_map.insert("B".into(), Uint128::new(75000));
-//     correct_validator_delegation_map.insert("C".into(), Uint128::new(75000));
-
-//     let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
-//         validator_delegation_map,
-//         correct_validator_delegation_map,
-//     );
-
-//     let denom = "muno".to_string();
-//     let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
-//     println!("msgs: {:?}", msgs);
-// }
-
-// #[test]
-// fn validator_restaking_adjustment_3() {
-//     use std::collections::HashMap;
-
-//     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-//     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-
-//     validator_delegation_map.insert("A".into(), Uint128::new(30000));
-//     validator_delegation_map.insert("B".into(), Uint128::new(40000));
-//     validator_delegation_map.insert("C".into(), Uint128::new(30000));
-
-//     correct_validator_delegation_map.insert("B".into(), Uint128::new(25000));
-//     correct_validator_delegation_map.insert("C".into(), Uint128::new(25000));
-//     correct_validator_delegation_map.insert("D".into(), Uint128::new(50000));
-
-//     let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
-//         validator_delegation_map,
-//         correct_validator_delegation_map,
-//     );
-
-//     let denom = "muno".to_string();
-//     let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
-//     println!("\nmsgs: {:?}", msgs);
-// }
-
-// #[test]
-// fn validator_restaking_adjustment_4() {
-//     use std::collections::HashMap;
-
-//     let mut validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-//     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
-
-//     validator_delegation_map.insert("B".into(), Uint128::new(40000));
-//     validator_delegation_map.insert("C".into(), Uint128::new(30000));
-//     validator_delegation_map.insert("A".into(), Uint128::new(30000));
-
-//     correct_validator_delegation_map.insert("A".into(), Uint128::new(80000));
-//     correct_validator_delegation_map.insert("B".into(), Uint128::new(20000));
-
-//     let (surplus, deficit) = utils::delegation::get_surplus_deficit_validators(
-//         validator_delegation_map,
-//         correct_validator_delegation_map,
-//     );
-
-//     let denom = "muno".to_string();
-//     let msgs = utils::delegation::get_restaking_msgs(surplus, deficit, denom);
-//     println!("\nmsgs: {:?}", msgs);
-// }
-
-// #[test]
-// fn test_delegate_amount() {
-//     let weight: u32 = 1;
-//     let total_weight: u32 = 1;
-//     let ratio = Decimal::from_ratio(Uint128::from(weight), Uint128::from(total_weight));
-//     let amount = Uint128::from(10u32);
-//     let delegate_amount = utils::delegation::calculate_delegated_amount(amount, ratio);
-//     println!("delegate_amount: {}", delegate_amount);
-// }
 #[test]
 fn test_calculate_native_token() {
     let staking_token = Uint128::from(10000u32);

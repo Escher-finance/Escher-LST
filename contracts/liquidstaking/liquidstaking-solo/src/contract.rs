@@ -1,17 +1,21 @@
-use cosmwasm_std::entry_point;
+use crate::instantiate::create_reward;
+use crate::utils::batch::{batches, Batch};
+use crate::utils::validation::{validate_quote_tokens, validate_validators};
+use cosmwasm_std::{entry_point, CosmosMsg, DistributionMsg};
 use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
-use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, Parameters, State, SupplyQueue, Validator, ValidatorsRegistry, CONFIG, LOG, PARAMETERS,
-    QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    Config, Parameters, State, SupplyQueue, ValidatorsRegistry, CONFIG, PARAMETERS,
+    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE,
+    VALIDATORS_REGISTRY,
 };
+use cw2::set_contract_version;
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:evm_union_liquid_staking";
+const CONTRACT_NAME: &str = "crates.io:liquidstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -27,20 +31,27 @@ pub fn instantiate(
     let owner = Some(binding.as_ref());
     cw_ownable::initialize_owner(deps.storage, deps.api, owner)?;
 
-    LOG.save(deps.storage, &"".into())?;
+    REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
 
-    let mut validators: Vec<Validator> = vec![];
-    for validator in msg.validators {
-        validators.push({
-            Validator {
-                address: validator.address,
-                weight: validator.weight,
-            }
-        })
-    }
+    validate_validators(&deps, &msg.validators)?;
 
-    let reg = ValidatorsRegistry { validators };
+    let reg = ValidatorsRegistry {
+        validators: msg.validators,
+    };
+
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
+
+    // create reward contract message to instantiate reward contract that will receive staking reward
+    let (reward_msg, reward_addr) = create_reward(
+        &deps,
+        &env,
+        msg.salt,
+        msg.reward_code_id,
+        env.clone().contract.address,
+        msg.fee_receiver.clone(),
+        msg.fee_rate.clone(),
+        msg.underlying_coin_denom.clone(),
+    )?;
 
     let reward_config = Config {
         lst_contract_address: env.clone().contract.address,
@@ -59,7 +70,6 @@ pub fn instantiate(
         reward_address: env.clone().contract.address.clone(),
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
-        epoch_period: msg.epoch_period,
         batch_period: msg.batch_period,
     };
     PARAMETERS.save(deps.storage, &params)?;
@@ -74,11 +84,22 @@ pub fn instantiate(
     };
     STATE.save(deps.storage, &state)?;
 
-    REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
+    validate_quote_tokens(&msg.quote_tokens)?;
 
     for quote_token in msg.quote_tokens {
         QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
     }
+
+    let set_withdraw_msg: CosmosMsg =
+        CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+            address: reward_addr.to_string(),
+        });
+
+    let msgs: Vec<CosmosMsg> = if msg.use_external_reward.unwrap_or(false) {
+        vec![reward_msg, set_withdraw_msg]
+    } else {
+        vec![]
+    };
 
     // set the supply queue
     let supply_queue = SupplyQueue {
@@ -88,7 +109,18 @@ pub fn instantiate(
     };
     SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
 
-    Ok(Response::new().add_attribute("action", "instantiate"))
+    SPLIT_REWARD_QUEUE.save(deps.storage, &vec![])?;
+    let pending_batch = Batch::new(
+        1,
+        Uint128::zero(),
+        env.block.time.seconds() + params.batch_period,
+    );
+    batches().save(deps.storage, pending_batch.id, &pending_batch)?;
+    PENDING_BATCH_ID.save(deps.storage, &pending_batch.id)?;
+
+    Ok(Response::new()
+        .add_attribute("action", "instantiate")
+        .add_messages(msgs))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -124,6 +156,7 @@ pub fn execute(
             reward_address,
             fee_receiver,
             fee_rate,
+            epoch_period,
         } => execute::set_parameters(
             deps,
             env,
@@ -136,6 +169,7 @@ pub fn execute(
             reward_address,
             fee_receiver,
             fee_rate,
+            epoch_period,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,
@@ -163,7 +197,6 @@ pub fn execute(
             fee_rate,
             coin_denom,
         ),
-        ExecuteMsg::NormalizeSupply {} => execute::normalize_supply(deps, env),
     }
 }
 

@@ -44,6 +44,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Batch { status, min, max } => {
             to_json_binary(&query_batch(deps.storage, status, min, max)?)
         }
+        QueryMsg::SupplyQueue {} => to_json_binary(&query_supply_queue(deps.storage)?),
     }?)
 }
 
@@ -78,6 +79,11 @@ pub fn query_params(storage: &dyn Storage) -> Result<Parameters, ContractError> 
 pub fn query_validators(storage: &dyn Storage) -> Result<ValidatorsRegistry, ContractError> {
     let validators = VALIDATORS_REGISTRY.load(storage)?;
     Ok(validators)
+}
+
+pub fn query_supply_queue(storage: &dyn Storage) -> Result<SupplyQueue, ContractError> {
+    let supply_queue = SUPPLY_QUEUE.load(storage)?;
+    Ok(supply_queue)
 }
 
 pub fn query_staking_liquidity(
