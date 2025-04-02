@@ -100,6 +100,7 @@ pub enum ExecuteMsg {
         reward_address: Option<Addr>,
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
+        batch_period: Option<u64>,
     },
     /// Update quote token
     UpdateQuoteToken {
