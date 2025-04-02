@@ -204,10 +204,17 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    if CONTRACT_VERSION.to_string() == "0.1.83" {
+        let params = PARAMETERS.load(deps.storage)?;
+        // migrate from 0.1.83 to 0.1.84
+        let balance = deps
+            .querier
+            .query_balance(env.contract.address, params.underlying_coin_denom)?;
+        REWARD_BALANCE.save(deps.storage, &balance.amount)?;
+    }
 
     Ok(Response::default())
 }
