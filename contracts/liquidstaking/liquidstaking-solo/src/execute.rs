@@ -216,21 +216,6 @@ pub fn zkgm_bond(
     );
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
-    // increment the reward balance on this contract
-    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
-    let total_reward = utils::delegation::get_unclaimed_reward(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_reg
-            .validators
-            .iter()
-            .map(|v| v.address.clone())
-            .collect(),
-    )?;
-    reward_balance += total_reward;
-    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
-
     let res: Response = Response::new()
         .add_messages(msgs)
         .add_submessages(sub_msgs)
