@@ -1,7 +1,7 @@
 [package]
 edition     = "2021"
 name         = "liquidstaking"
-version      = "0.1.81"
+version      = "0.1.82"
 
 [profile.dev]
 lto = "thin"
