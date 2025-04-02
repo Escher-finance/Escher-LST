@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
-use crate::state::{Parameters, PARAMETERS, QUOTE_TOKEN, SPLIT_REWARD_QUEUE, VALIDATORS_REGISTRY};
+use crate::state::{Parameters, WithdrawReward, PARAMETERS, QUOTE_TOKEN, SPLIT_REWARD_QUEUE};
 use crate::utils;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
@@ -104,13 +104,13 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
     let mut msgs: Vec<CosmosMsg> = vec![];
     let mut attrs: Vec<Attribute> = vec![];
 
-    let validator_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
-    let total_validators = validator_reg.validators.len();
     let mut split_reward_queue = SPLIT_REWARD_QUEUE.load(deps.storage)?;
 
-    split_reward_queue.push(payload.validator);
+    split_reward_queue.withdrawed_amount += payload.amount;
+    SPLIT_REWARD_QUEUE.save(deps.storage, &split_reward_queue)?;
 
-    if split_reward_queue.len() == total_validators {
+    if split_reward_queue.withdrawed_amount == split_reward_queue.target_amount {
+        // if total amount that should be withdrawed is reached, we need to split reward
         let msg = ExecuteRewardMsg::SplitReward {};
         let msg_bin = to_json_binary(&msg)?;
         let split_reward_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
@@ -125,8 +125,14 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
             attr("reward_contract", params.reward_address.clone().to_string()),
         ];
 
-        // reset SPLIT_REWARD_QUEUE as all validators already put in batch
-        SPLIT_REWARD_QUEUE.save(deps.storage, &vec![])?;
+        // reset SPLIT_REWARD_QUEUE as we already call the split reward and total amount that should be withdrawed is reached
+        SPLIT_REWARD_QUEUE.save(
+            deps.storage,
+            &WithdrawReward {
+                target_amount: Uint128::zero(),
+                withdrawed_amount: Uint128::zero(),
+            },
+        )?;
     }
 
     let res: Response = Response::new().add_messages(msgs).add_attributes(attrs);

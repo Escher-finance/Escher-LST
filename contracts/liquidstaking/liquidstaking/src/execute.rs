@@ -7,7 +7,8 @@ use crate::event::{
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, LOG, PARAMETERS, QUOTE_TOKEN, STATE, VALIDATORS_REGISTRY,
+    unbond_record, QuoteToken, Validator, WithdrawReward, LOG, PARAMETERS, QUOTE_TOKEN,
+    SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::{
     self, calc::check_slippage, delegation::get_actual_total_delegated,
@@ -523,13 +524,13 @@ pub fn process_rewards(
             }
         }
 
-        let withdraw_reward_msg: CosmosMsg =
-            CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
-                validator: validator.address.to_string(),
-            });
-
         if payload.amount != Uint128::zero() {
             let payload_bin = to_json_binary(&payload)?;
+
+            let withdraw_reward_msg: CosmosMsg =
+                CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
+                    validator: validator.address.to_string(),
+                });
 
             let sub_msg: SubMsg =
                 SubMsg::reply_always(withdraw_reward_msg, PROCESS_WITHDRAW_REWARD_REPLY_ID)
@@ -539,6 +540,14 @@ pub fn process_rewards(
         }
         attrs.push(attr("amount", payload.amount.to_string()));
     }
+
+    SPLIT_REWARD_QUEUE.save(
+        deps.storage,
+        &WithdrawReward {
+            target_amount: total_amount,
+            withdrawed_amount: Uint128::zero(),
+        },
+    )?;
 
     let ev = ProcessRewardsEvent(total_amount);
     let res: Response = Response::new()
