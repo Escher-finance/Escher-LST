@@ -222,7 +222,7 @@ pub fn query_unbond_record_from_batch(storage: &dyn Storage, batch_id: u64) -> V
     let mut unbonded_list: Vec<UnbondRecord> = vec![];
     let unbonded_range = unbond_record()
         .idx
-        .released
+        .batch
         .prefix(batch_id.to_string())
         .range(storage, None, None, Order::Ascending);
 

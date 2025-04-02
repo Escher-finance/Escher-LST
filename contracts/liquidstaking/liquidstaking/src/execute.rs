@@ -770,6 +770,14 @@ pub fn process_batch_withdrawal(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let mut batch = batches().load(deps.storage, id)?;
+
+    if batch.status != BatchStatus::Received {
+        return Err(ContractError::BatchStatusIncorrect {
+            actual: batch.status,
+            expected: BatchStatus::Received,
+        });
+    }
+
     if batch.received_native_unstaked.is_none() {
         return Err(ContractError::BatchIncompleteUnbonding {});
     }
