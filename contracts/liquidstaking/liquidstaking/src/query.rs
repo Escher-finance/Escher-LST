@@ -8,6 +8,7 @@ use crate::state::{
 };
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc;
+use crate::utils::calc::calculate_query_bounds;
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
 use crate::ContractError;
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
@@ -159,25 +160,9 @@ pub fn query_unbond_record(
         return Ok(unbonded_list);
     }
 
-    let min_bound = match min {
-        Some(min) => Some(cw_storage_plus::Bound::Inclusive((min, PhantomData))),
-        None => Some(cw_storage_plus::Bound::Inclusive((1, PhantomData))),
-    };
-
-    let max_bound = match max {
-        Some(max) => {
-            let max_id = if min.is_some() && max > min.unwrap() + 50 {
-                min.unwrap() + 50
-            } else {
-                max.min(50)
-            };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
-        }
-        None => {
-            let max_id = if min.is_some() { min.unwrap() + 50 } else { 50 };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
-        }
-    };
+    let (min_id, max_id) = calculate_query_bounds(min, max);
+    let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
+    let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
 
     match (staker, released) {
         (Some(staker), None) => {
