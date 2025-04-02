@@ -1,16 +1,11 @@
 use std::collections::HashSet;
 
-use cosmwasm_std::DepsMut;
-
 use crate::{
     state::{QuoteToken, Validator},
     ContractError,
 };
 
-pub fn validate_validators(
-    _deps: &DepsMut,
-    validators: &Vec<Validator>,
-) -> Result<(), ContractError> {
+pub fn validate_validators(validators: &Vec<Validator>) -> Result<(), ContractError> {
     let unique_validators_len = validators
         .iter()
         .cloned()
@@ -56,7 +51,7 @@ mod tests {
 
     #[test]
     fn test_validate_validators() {
-        let mut deps = mock_dependencies();
+        let deps = mock_dependencies();
 
         let mut validators = Vec::from([
             Validator {
@@ -73,20 +68,10 @@ mod tests {
             },
         ]);
 
-        // TODO: Try to find address validation for validator addr
-        // // Fails - bad addr
-        // let err = validate_validators(&deps.as_mut(), &validators).unwrap_err();
-        // assert!(if let ContractError::Std(_) = err {
-        //     true
-        // } else {
-        //     false
-        // });
-        //
-        // validators[0].address = deps.api.addr_make("a").to_string();
-
         // Fails - zero weight
         validators[0].weight = 0;
-        let err = validate_validators(&deps.as_mut(), &validators).unwrap_err();
+
+        let err = validate_validators(&validators).unwrap_err();
         assert!(if let ContractError::InvalidValidators {} = err {
             true
         } else {
@@ -96,7 +81,7 @@ mod tests {
         validators[0].weight = 1;
 
         // Good
-        validate_validators(&deps.as_mut(), &validators).unwrap();
+        validate_validators(&validators).unwrap();
 
         // Fails - repeated validator address
         let addr = validators[0].address.clone();
@@ -105,7 +90,7 @@ mod tests {
             weight: 10,
         });
 
-        let err = validate_validators(&deps.as_mut(), &validators).unwrap_err();
+        let err = validate_validators(&validators).unwrap_err();
         assert!(if let ContractError::InvalidValidators {} = err {
             true
         } else {

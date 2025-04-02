@@ -931,7 +931,7 @@ pub fn update_validators(
         return Err(ContractError::EmptyValidator {});
     }
 
-    validate_validators(&deps, &validators)?;
+    validate_validators(&validators)?;
 
     let mut validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let prev_validators = validators_reg.validators.clone();

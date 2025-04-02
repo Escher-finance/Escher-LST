@@ -34,7 +34,7 @@ pub fn instantiate(
 
     REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
 
-    validate_validators(&deps, &msg.validators)?;
+    validate_validators(&msg.validators)?;
 
     let reg = ValidatorsRegistry {
         validators: msg.validators,
