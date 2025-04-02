@@ -8,7 +8,7 @@ use crate::{
 };
 
 pub fn validate_validators(
-    deps: &DepsMut,
+    _deps: &DepsMut,
     validators: &Vec<Validator>,
 ) -> Result<(), ContractError> {
     let unique_validators_len = validators
@@ -23,7 +23,6 @@ pub fn validate_validators(
     }
 
     for validator in validators {
-        deps.api.addr_validate(&validator.address)?;
         if validator.weight == 0 {
             return Err(ContractError::InvalidValidators {});
         }
