@@ -17,7 +17,7 @@ use crate::{
     contract::{execute, instantiate},
     msg::InstantiateMsg,
     query::query,
-    state::Validator,
+    state::{Parameters, Validator},
 };
 
 pub fn make_contract(app: &mut App, sender: Addr, instantiate_msg: InstantiateMsg) -> Addr {
@@ -50,5 +50,19 @@ pub fn mock_instantiate_msg() -> InstantiateMsg {
         salt: "salt".to_string(),
         quote_tokens: vec![],
         batch_period: 3600,
+    }
+}
+
+pub fn mock_parameters() -> Parameters {
+    Parameters {
+        underlying_coin_denom: String::default(),
+        liquidstaking_denom: String::default(),
+        ucs03_relay_contract: String::default(),
+        unbonding_time: u64::default(),
+        cw20_address: Addr::unchecked("cw20"),
+        reward_address: Addr::unchecked("reward"),
+        fee_rate: Decimal::default(),
+        fee_receiver: Addr::unchecked("fee"),
+        batch_period: u64::default(),
     }
 }

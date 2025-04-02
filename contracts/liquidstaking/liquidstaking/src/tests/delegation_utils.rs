@@ -1,6 +1,7 @@
 use crate::{
     msg::{DelegationDiff, ValidatorDelegation},
-    state::{Parameters, Validator, ValidatorsRegistry, PARAMETERS, VALIDATORS_REGISTRY},
+    state::{Validator, ValidatorsRegistry, PARAMETERS, VALIDATORS_REGISTRY},
+    tests::mock_parameters,
     utils::delegation::*,
 };
 use cosmwasm_std::{
@@ -622,22 +623,9 @@ fn test_get_unbond_all_messages() {
 
     let deps_mut = deps.as_mut();
 
-    PARAMETERS
-        .save(
-            deps_mut.storage,
-            &Parameters {
-                underlying_coin_denom: denom.clone(),
-                liquidstaking_denom: String::default(),
-                ucs03_relay_contract: String::default(),
-                unbonding_time: u64::default(),
-                cw20_address: Addr::unchecked("cw20"),
-                reward_address: Addr::unchecked("reward"),
-                fee_rate: Decimal::default(),
-                fee_receiver: Addr::unchecked("fee"),
-                batch_period: u64::default(),
-            },
-        )
-        .unwrap();
+    let mut parameters = mock_parameters();
+    parameters.underlying_coin_denom = denom.clone();
+    PARAMETERS.save(deps_mut.storage, &parameters).unwrap();
     VALIDATORS_REGISTRY
         .save(deps_mut.storage, &ValidatorsRegistry { validators })
         .unwrap();
@@ -660,4 +648,105 @@ fn test_get_unbond_all_messages() {
     undelegates.sort_by_key(|x| x.0.clone());
     assert_eq!(undelegates[0], (validator_addr_a, Uint128::new(1000)));
     assert_eq!(undelegates[1], (validator_addr_b, Uint128::new(2000)));
+}
+
+#[test]
+fn test_adjust_validators_delegation() {
+    let mut deps = mock_dependencies();
+    let delegator_addr = Addr::unchecked("delegator");
+    let validator_addr_a = "a".to_string();
+    let validator_addr_b = "b".to_string();
+    let validator_addr_c = "c".to_string();
+    let denom = "denom".to_string();
+    let mut querier = MockQuerier::default();
+
+    let validators_cosm = &[
+        cosmwasm_std::Validator::create(
+            validator_addr_a.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            validator_addr_b.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+    ];
+    let prev_validators = Vec::from([
+        Validator {
+            weight: 50,
+            address: validator_addr_b.clone(),
+        },
+        Validator {
+            weight: 10,
+            address: validator_addr_c.clone(),
+        },
+    ]);
+    let validators = Vec::from([
+        Validator {
+            weight: 10,
+            address: validator_addr_a.clone(),
+        },
+        Validator {
+            weight: 20,
+            address: validator_addr_b.clone(),
+        },
+    ]);
+    let delegations = &[
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            validator_addr_a.clone(),
+            Coin::new(Uint128::new(1000), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            validator_addr_b.clone(),
+            Coin::new(Uint128::new(2000), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+    ];
+
+    querier
+        .staking
+        .update(denom.clone(), validators_cosm, delegations);
+    deps.querier = querier;
+
+    let mut parameters = mock_parameters();
+    parameters.underlying_coin_denom = denom.clone();
+
+    PARAMETERS.save(deps.as_mut().storage, &parameters).unwrap();
+
+    let (validator_delegation_map, total_delegated_amount) =
+        get_validator_delegation_map_with_total_bond(
+            deps.as_mut(),
+            delegator_addr.to_string(),
+            prev_validators.clone(),
+        )
+        .unwrap();
+
+    let correct_validator_delegation_map =
+        get_validator_delegation_map_base_on_weight(validators.clone(), total_delegated_amount);
+
+    let (surplus_validators, deficient_validators) =
+        get_surplus_deficit_validators(validator_delegation_map, correct_validator_delegation_map);
+
+    let msgs: Vec<CosmosMsg> = get_restaking_msgs(surplus_validators, deficient_validators, denom);
+
+    assert!(!msgs.is_empty());
+
+    assert_eq!(
+        msgs,
+        adjust_validators_delegation(
+            deps.as_mut(),
+            delegator_addr.clone(),
+            prev_validators.clone(),
+            validators.clone()
+        )
+        .unwrap()
+    );
 }
