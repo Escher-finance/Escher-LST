@@ -10,6 +10,7 @@ import {
 import { useGlobalContext } from "@/app/core/context";
 import { getExecuteContractMessage } from "@/utils/msg";
 import { useState } from "react";
+const { toBase64 } = require("@cosmjs/encoding");
 
 interface KeyProps {
   stateKey: number;
@@ -55,23 +56,27 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
         return;
       }
 
-      const transferCW20TokenMsg = {
-        transfer: {
-          recipient: network?.contracts.lst,
-          amount
+      // Define the Unbonding payload
+      const unbondingPayload = { unstake: { amount } };
+
+      // Encode the payload as base64 (Binary)
+      const payloadJson = JSON.stringify(unbondingPayload);
+      const payloadBytes = new TextEncoder().encode(payloadJson); // Convert string to Uint8Array
+      const payloadBinary = toBase64(payloadBytes); // Convert Uint8Array to base64 string
+
+      const unbondingMsg = {
+        send: {
+          contract: network?.contracts.lst,
+          amount: amount, // Amount of tokens to send
+          msg: payloadBinary, // Encoded Cw20PayloadMsg payload
         },
       };
-      const executeTransferCW20 = getExecuteContractMessage(userAddress, network?.contracts.cw20, transferCW20TokenMsg, []);
-      const unbondingMsg = {
-        unbond: {
-          amount
-        }
-      };
       console.log(JSON.stringify(unbondingMsg));
-      const executeUnbondingMsg = getExecuteContractMessage(userAddress, network?.contracts.lst, unbondingMsg, []);
 
+      // send to cw20 contract
+      const executeUnbondingMsg = getExecuteContractMessage(userAddress, network?.contracts.cw20, unbondingMsg, []);
 
-      let msgs = [executeTransferCW20, executeUnbondingMsg];
+      let msgs = [executeUnbondingMsg];
       const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "");
       alert(res?.transactionHash);
       console.log(res?.transactionHash);

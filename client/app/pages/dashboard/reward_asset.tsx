@@ -22,7 +22,7 @@ export default function RevenueAssets({ stateKey }: AssetsProps) {
 
     const getNativeBalance = async () => {
 
-        let bal = network?.chainName == "uniontestnet" ? await client?.getBalance(network?.contracts.reward, network?.stakeCurrency.coinMinimalDenom) : await client?.queryContractSmart(network?.contracts.reward, { balance: {} });
+        let bal = network?.chainName == "uniontestnet" ? await client?.getBalance(network?.contracts.reward, network?.stakeCurrency.coinMinimalDenom) : await client?.queryContractSmart(network?.contracts.reward, { reward_balance: {} });
 
         if (bal) {
             setStakeBalance(bal.amount);
