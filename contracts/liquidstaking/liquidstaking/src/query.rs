@@ -7,6 +7,7 @@ use crate::state::{
     QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, Batch, BatchStatus};
+use crate::utils::calc;
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
 use crate::ContractError;
 use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
@@ -123,8 +124,10 @@ pub fn query_staking_liquidity(
         .query_balance(params.reward_address.to_string(), denom)?;
 
     let total_reward = unclaimed_reward + reward_contract_balance.amount;
+    let fee = calc::calc_with_rate(total_reward, params.fee_rate);
+    let net_reward = total_reward - fee;
 
-    let total_bond_amount = delegated_amount + total_reward;
+    let total_bond_amount = delegated_amount + net_reward;
 
     let state: State = STATE.load(deps.storage)?;
     let mut exchange_rate: Decimal = Decimal::one();

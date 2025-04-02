@@ -4,6 +4,11 @@ use std::str::FromStr;
 
 use crate::ContractError;
 
+/// return how much output if multiplied with decimal rate
+pub fn calc_with_rate(input: Uint128, rate: Decimal) -> Uint128 {
+    (rate * Decimal::from_ratio(input, Uint128::one())).to_uint_floor()
+}
+
 /// return how much staking token from underlying native coin denom
 pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
     (Decimal::from_ratio(stake_amount, Uint128::one()) / exchange_rate).to_uint_floor()
@@ -14,7 +19,7 @@ pub fn calculate_native_token_from_staking_token(
     staking_token: Uint128,
     exchange_rate: Decimal,
 ) -> Uint128 {
-    (exchange_rate * Decimal::from_ratio(staking_token, Uint128::one())).to_uint_floor()
+    calc_with_rate(staking_token, exchange_rate)
 }
 
 /// Convert Uint256 to Uint128
