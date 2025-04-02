@@ -52,6 +52,10 @@ pub fn instantiate(
         msg.fee_rate.clone(),
         msg.underlying_coin_denom.clone(),
     )?;
+    let set_withdraw_msg: CosmosMsg =
+        CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+            address: reward_addr.to_string(),
+        });
 
     let reward_config = Config {
         lst_contract_address: env.clone().contract.address,
@@ -61,13 +65,21 @@ pub fn instantiate(
     };
     CONFIG.save(deps.storage, &reward_config)?;
 
+    let mut reward_address = env.contract.address;
+    let msgs: Vec<CosmosMsg> = if msg.use_external_reward.unwrap_or(false) {
+        reward_address = reward_addr;
+        vec![reward_msg, set_withdraw_msg]
+    } else {
+        vec![]
+    };
+
     let params = Parameters {
         underlying_coin_denom: msg.underlying_coin_denom,
         liquidstaking_denom: msg.liquidstaking_denom,
         ucs03_relay_contract: msg.ucs03_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
-        reward_address: env.clone().contract.address.clone(),
+        reward_address,
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
         batch_period: msg.batch_period,
@@ -89,17 +101,6 @@ pub fn instantiate(
     for quote_token in msg.quote_tokens {
         QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
     }
-
-    let set_withdraw_msg: CosmosMsg =
-        CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
-            address: reward_addr.to_string(),
-        });
-
-    let msgs: Vec<CosmosMsg> = if msg.use_external_reward.unwrap_or(false) {
-        vec![reward_msg, set_withdraw_msg]
-    } else {
-        vec![]
-    };
 
     // set the supply queue
     let supply_queue = SupplyQueue {
@@ -156,6 +157,7 @@ pub fn execute(
             reward_address,
             fee_receiver,
             fee_rate,
+            batch_period,
             epoch_period,
         } => execute::set_parameters(
             deps,
@@ -169,6 +171,7 @@ pub fn execute(
             reward_address,
             fee_receiver,
             fee_rate,
+            batch_period,
             epoch_period,
         ),
         ExecuteMsg::UpdateQuoteToken {
