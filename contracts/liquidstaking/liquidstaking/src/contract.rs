@@ -143,6 +143,7 @@ pub fn execute(
             reward_address,
             fee_receiver,
             fee_rate,
+            batch_period,
         } => execute::set_parameters(
             deps,
             env,
@@ -155,6 +156,7 @@ pub fn execute(
             reward_address,
             fee_receiver,
             fee_rate,
+            batch_period,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,
