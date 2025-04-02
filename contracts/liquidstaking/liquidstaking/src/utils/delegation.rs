@@ -30,6 +30,8 @@ use unionlabs_primitives::H256;
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use super::calc::calculate_native_token_from_staking_token;
+
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
 
 /// get total delegated token value from validators in native token
@@ -82,24 +84,10 @@ pub fn get_mock_total_reward(total_bond_amount: Uint128) -> Uint128 {
     calc::calculate_staking_token_from_rate(total_bond_amount, ratio)
 }
 
-/// return how much to undelegate native token from ratio of total delegated amount divide with total bond with reward value amount
-/// NOTE: Not used
-pub fn calculate_undelegate_amount(
-    native_token_amount: Uint128,
-    delegated_amount: Uint128,
-    total_bonded_amount: Uint128,
-) -> Uint128 {
-    let native_token_undelegate_decimal = Decimal::from_ratio(native_token_amount, Uint128::one());
-    let ratio = Decimal::from_ratio(delegated_amount, total_bonded_amount);
-
-    let undelegate_native_decimal = native_token_undelegate_decimal * ratio;
-    undelegate_native_decimal.to_uint_floor()
-}
-
-/// NOTE: This is the same calculation as `utils:calculate_native_token_from_staking_token`
-pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
-    (ratio * Decimal::from_ratio(amount, Uint128::one())).to_uint_floor()
-}
+// /// NOTE: This is the same calculation as `utils:calculate_native_token_from_staking_token`
+// pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
+//     (ratio * Decimal::from_ratio(amount, Uint128::one())).to_uint_floor()
+// }
 
 pub fn get_undelegate_from_validator_msgs(
     undelegate_amount: Uint128,
@@ -187,7 +175,8 @@ pub fn get_validator_delegation_map_base_on_weight(
     for validator in validators {
         let ratio = Decimal::from_ratio(validator.weight, total_weight);
 
-        let delegation_amount = calculate_delegated_amount(total_delegated_amount, ratio);
+        let delegation_amount =
+            calculate_native_token_from_staking_token(total_delegated_amount, ratio);
         total_delegation_amount += delegation_amount;
 
         let validator_address = validator.address.to_string();
@@ -334,7 +323,7 @@ pub fn get_delegate_to_validator_msgs(
         let ratio =
             Decimal::from_ratio(Uint128::from(validator.weight), Uint128::from(total_weight));
 
-        let delegate_amount = calculate_delegated_amount(delegate_amount, ratio);
+        let delegate_amount = calculate_native_token_from_staking_token(delegate_amount, ratio);
 
         if delegate_amount == Uint128::zero() {
             continue;
@@ -854,15 +843,6 @@ pub fn get_transfer_token_cosmos_msg(
 mod tests {
     use super::*;
     use cosmwasm_std::{assert_approx_eq, testing::MockQuerier, DecCoin, Decimal256, Empty};
-
-    #[test]
-    fn test_calculate_delegated_amount() {
-        let amount = Uint128::new(112382);
-        assert_eq!(
-            calculate_delegated_amount(amount, Decimal::from_ratio(1_u128, 2_u128)),
-            amount / Uint128::new(2)
-        );
-    }
 
     #[test]
     fn test_get_undelegate_from_validator_msgs() {
