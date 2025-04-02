@@ -9,12 +9,28 @@ export default function UnbondingRecords() {
 
     const [unreleasedUnbondingRecords, setUnreleasedUnbondingRecords] = useState<any[]>([]);
     const [releasedUnbondingRecords, setReleasedUnbondingRecords] = useState<any[]>([]);
+    const [liquidity, setLiquidity] = useState<any>(null);
 
     const {
         client,
         userAddress,
         network
     } = useGlobalContext();
+
+
+    const getLiquidity = async () => {
+        const msg: any = {
+            staking_liquidity: {}
+        };
+
+        const liquidity = await client?.queryContractSmart(
+            network?.contracts.lst,
+            msg
+        );
+
+        setLiquidity(liquidity);
+    }
+
 
 
     useEffect(() => {
@@ -53,6 +69,7 @@ export default function UnbondingRecords() {
         }
 
         getBalance();
+        getLiquidity();
     }, []);
 
     return (
@@ -66,9 +83,7 @@ export default function UnbondingRecords() {
                             <thead>
                                 <tr>
                                     <th>Unbond Amount</th>
-                                    <th>Received Amount</th>
-                                    <th>Started</th>
-                                    <th>Complete Estimation</th>
+                                    <th>Estimated Received Amount</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -79,13 +94,7 @@ export default function UnbondingRecords() {
                                                 {record.amount} {network?.stakeCurrency.liquidStakingDenomDisplay}
                                             </td>
                                             <td>
-                                                {record.undelegate_amount} {network?.stakeCurrency.coinMinimalDenom}
-                                            </td>
-                                            <td>
-                                                {new Date(Number(record.created / 1000000)).toLocaleString()}
-                                            </td>
-                                            <td>
-                                                {new Date(Number(record.created / 1000000) + 64800000).toLocaleString()}
+                                                {Intl.NumberFormat('en-US').format(Math.floor(record.amount * liquidity?.exchange_rate))}
                                             </td>
                                         </tr></>
                                     )
@@ -95,41 +104,6 @@ export default function UnbondingRecords() {
                         </table></>
                 }
                 <br />
-                {releasedUnbondingRecords.length > 0 &&
-                    <><div className="text-lg">RELEASED</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Unbond Amount</th>
-                                    <th>Received Amount</th>
-                                    <th>Started</th>
-                                    <th>Released</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {releasedUnbondingRecords.map((record: any, idx: number) => {
-                                    return (
-                                        <><tr key={idx}>
-                                            <td>
-                                                {record.amount} {network?.stakeCurrency.liquidStakingDenomDisplay}
-                                            </td>
-                                            <td>
-                                                {record.undelegate_amount} {network?.stakeCurrency.coinMinimalDenom}
-                                            </td>
-                                            <td>
-                                                {new Date(Number(record.created / 1000000)).toLocaleString()}
-                                            </td>
-                                            <td>
-                                                {new Date(Number(record.created / 1000000) + (network?.chainName == "uniontestnet" ? 180000 : 64800000)).toLocaleString()}
-                                            </td>
-                                        </tr></>
-                                    )
-                                })}
-
-                            </tbody>
-                        </table>
-                    </>
-                }
             </CardBody>
         </Card>
     );
