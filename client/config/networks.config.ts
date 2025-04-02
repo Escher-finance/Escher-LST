@@ -103,9 +103,9 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     currencies: [currency["babylontestnet"]],
     feeCurrencies: [currency["babylontestnet"]],
     contracts: {
-      lst: "bbn1qmayg959zunza00s040ppqesf7qnvusys3r2m9vw35ry28x9sncq84jphy",
-      cw20: "bbn1s5qwgvzzvs5h2wurz7mjwmc4n650g3207caddlz35fay8cl5ay6ss86ejy",
-      reward: "bbn1qmayg959zunza00s040ppqesf7qnvusys3r2m9vw35ry28x9sncq84jphy",
+      lst: "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss",
+      cw20: "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9",
+      reward: "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss",
     },
     gasPrice: "0.0025ubbn",
   },
@@ -117,4 +117,9 @@ export const BaseNetworks: Record<SupportedNetworks, ChainConfig> = {
 };
 
 export default Networks;
+
+//old babylon cw20: bbn1s5qwgvzzvs5h2wurz7mjwmc4n650g3207caddlz35fay8cl5ay6ss86ejy
+//old babylon lst : bbn1qmayg959zunza00s040ppqesf7qnvusys3r2m9vw35ry28x9sncq84jphy
+
+
 

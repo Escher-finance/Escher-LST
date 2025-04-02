@@ -22,19 +22,35 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: any) => {
+
     e.preventDefault();
     if (!userAddress) {
       alert("no user");
       return;
     }
+
+
+    const liquidity = await client?.queryContractSmart(
+      network?.contracts.lst,
+      {
+        staking_liquidity: {}
+      }
+    );
+
+
+
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const amount = formEntries.amount.toString();
+
+    const expected = Math.floor(Number(amount) / liquidity.exchange_rate);
+
     const msg = {
       bond: {
-        salt: getSalt()
-      }
+        salt: getSalt(),
+        expected: expected.toString(),
+      },
     };
 
     if (Number(amount) < 1000) {

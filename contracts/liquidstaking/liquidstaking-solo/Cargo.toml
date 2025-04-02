@@ -1,11 +1,22 @@
 [package]
 edition     = "2021"
 name         = "liquidstaking"
-version      = "0.1.80"
+version      = "0.1.82"
 
 [profile.dev]
 lto = "thin"
 strip = true
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(nonunion)'] }
@@ -25,8 +36,8 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 
 
 [dependencies]
-cosmwasm-schema = "2.1.0"
-cosmwasm-std = { version = "2.1.0", features = [
+cosmwasm-schema = "2.2.2"
+cosmwasm-std = { version = "2.2.2", features = [
   "staking",
   "stargate",
   "cosmwasm_1_4",

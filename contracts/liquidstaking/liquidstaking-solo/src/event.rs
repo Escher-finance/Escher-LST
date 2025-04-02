@@ -1,6 +1,5 @@
 use crate::state::Validator;
 use cosmwasm_std::{attr, Attribute, Decimal, Event, Timestamp, Uint128};
-
 pub const BOND_EVENT: &str = "bond";
 
 #[allow(non_snake_case)]
@@ -35,10 +34,39 @@ pub const UNBOND_EVENT: &str = "unbond";
 
 #[allow(non_snake_case)]
 pub fn UnbondEvent(
+    batch_id: u64,
+    validator: String,
+    undelegate_amount: String,
+    time: Timestamp,
+) -> Event {
+    Event::new(UNBOND_EVENT.to_string())
+        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("validator", validator)
+        .add_attribute("output_amount", undelegate_amount)
+        .add_attribute("time", format!("{}", time.nanos()))
+}
+
+#[allow(non_snake_case)]
+pub fn UnbondEventsFromAtts(atts: Vec<Attribute>, batch_id: u64, time: Timestamp) -> Vec<Event> {
+    let mut events = vec![];
+    for att in atts {
+        events.push(UnbondEvent(
+            batch_id,
+            att.key.clone(),
+            att.value.clone(),
+            time,
+        ));
+    }
+    events
+}
+
+pub const SUBMIT_BATCH_EVENT: &str = "submit_batch";
+
+#[allow(non_snake_case)]
+pub fn SubmitBatchEvent(
+    batch_id: u64,
     sender: String,
-    staker: String,
-    channel_id: Option<u32>,
-    unbond_amount: Uint128,
+    unstake_amount: Uint128,
     undelegate_amount: Uint128,
     delegated_amount: Uint128,
     total_bond_amount: Uint128,
@@ -46,19 +74,11 @@ pub fn UnbondEvent(
     exchange_rate: Decimal,
     time: Timestamp,
     denom: String,
-    record_id: u64,
 ) -> Event {
-    let mut channel_id_str = "".to_string();
-
-    if channel_id.is_some() {
-        channel_id_str = format!("{}", channel_id.unwrap());
-    }
-
-    Event::new(UNBOND_EVENT.to_string())
+    Event::new(SUBMIT_BATCH_EVENT.to_string())
+        .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("sender", sender)
-        .add_attribute("staker", staker)
-        .add_attribute("channel_id", channel_id_str)
-        .add_attribute("unbond_amount", unbond_amount)
+        .add_attribute("unstake_amount", unstake_amount)
         .add_attribute("output_amount", undelegate_amount)
         .add_attribute("delegated_amount", delegated_amount)
         .add_attribute("total_bond_amount", total_bond_amount)
@@ -66,7 +86,6 @@ pub fn UnbondEvent(
         .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("denom", denom)
-        .add_attribute("record_id", format!("{}", record_id))
 }
 
 pub const UPDATE_VALIDATORS_EVENT: &str = "update_validators";
@@ -105,10 +124,11 @@ pub const PROCESS_UNBONDING_EVENT: &str = "process_unbonding";
 
 #[allow(non_snake_case)]
 pub fn ProcessUnbondingEvent(
+    batch_id: u64,
+    channel_id: Option<u32>,
     staker: String,
     amount: Uint128,
     denom: String,
-    record_id: u64,
     time: Timestamp,
 ) -> Event {
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
@@ -116,7 +136,60 @@ pub fn ProcessUnbondingEvent(
         .add_attribute("amount", amount.to_string())
         .add_attribute("denom", denom)
         .add_attribute("time", format!("{}", time.nanos()))
+        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("channel_id", channel_id.unwrap_or(0).to_string())
+}
+
+pub const PROCESS_BATCH_UNBONDING_EVENT: &str = "process_batch_unbonding";
+
+#[allow(non_snake_case)]
+pub fn ProcessBatchUnbondingEvent(
+    batch_id: u64,
+    amount: Uint128,
+    denom: String,
+    time: Timestamp,
+) -> Event {
+    Event::new(PROCESS_BATCH_UNBONDING_EVENT.to_string())
+        .add_attribute("amount", amount.to_string())
+        .add_attribute("denom", denom)
+        .add_attribute("time", format!("{}", time.nanos()))
+        .add_attribute("batch_id", format!("{}", batch_id))
+}
+
+pub const UNSTAKE_REQUEST_EVENT: &str = "unstake_request";
+
+#[allow(non_snake_case)]
+pub fn UnstakeRequestEvent(
+    sender: String,
+    staker: String,
+    channel_id: Option<u32>,
+    amount: Uint128,
+    record_id: u64,
+    time: Timestamp,
+) -> Event {
+    let mut channel_id_str = "".to_string();
+
+    if channel_id.is_some() {
+        channel_id_str = format!("{}", channel_id.unwrap());
+    }
+
+    Event::new(UNSTAKE_REQUEST_EVENT.to_string())
+        .add_attribute("sender", sender)
+        .add_attribute("staker", staker)
+        .add_attribute("channel_id", channel_id_str)
+        .add_attribute("unbond_amount", amount)
+        .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("record_id", format!("{}", record_id))
+}
+
+pub const BATCH_RECEIVED_EVENT: &str = "batch_received";
+
+#[allow(non_snake_case)]
+pub fn BatchReceivedEvent(batch_id: u64, received_amount: String, time: Timestamp) -> Event {
+    Event::new(UNBOND_EVENT.to_string())
+        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("received_amount", received_amount)
+        .add_attribute("time", format!("{}", time.nanos()))
 }
 
 pub const SPLIT_REWARD_EVENT: &str = "split_reward";

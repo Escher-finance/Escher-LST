@@ -1,17 +1,21 @@
-use cosmwasm_std::entry_point;
+use crate::instantiate::create_reward;
+use crate::utils::batch::{batches, Batch};
+use crate::utils::validation::{validate_quote_tokens, validate_validators};
+use cosmwasm_std::{entry_point, CosmosMsg, DistributionMsg};
 use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
-use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, Parameters, State, SupplyQueue, Validator, ValidatorsRegistry, CONFIG, LOG, PARAMETERS,
-    QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    Config, Parameters, State, SupplyQueue, ValidatorsRegistry, CONFIG, PARAMETERS,
+    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE,
+    VALIDATORS_REGISTRY,
 };
+use cw2::set_contract_version;
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:evm_union_liquid_staking";
+const CONTRACT_NAME: &str = "crates.io:liquidstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -27,20 +31,31 @@ pub fn instantiate(
     let owner = Some(binding.as_ref());
     cw_ownable::initialize_owner(deps.storage, deps.api, owner)?;
 
-    LOG.save(deps.storage, &"".into())?;
+    REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
 
-    let mut validators: Vec<Validator> = vec![];
-    for validator in msg.validators {
-        validators.push({
-            Validator {
-                address: validator.address,
-                weight: validator.weight,
-            }
-        })
-    }
+    validate_validators(&deps, &msg.validators)?;
 
-    let reg = ValidatorsRegistry { validators };
+    let reg = ValidatorsRegistry {
+        validators: msg.validators,
+    };
+
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
+
+    // create reward contract message to instantiate reward contract that will receive staking reward
+    let (reward_msg, reward_addr) = create_reward(
+        &deps,
+        &env,
+        msg.salt,
+        msg.reward_code_id,
+        env.clone().contract.address,
+        msg.fee_receiver.clone(),
+        msg.fee_rate.clone(),
+        msg.underlying_coin_denom.clone(),
+    )?;
+    let set_withdraw_msg: CosmosMsg =
+        CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+            address: reward_addr.to_string(),
+        });
 
     let reward_config = Config {
         lst_contract_address: env.clone().contract.address,
@@ -50,15 +65,24 @@ pub fn instantiate(
     };
     CONFIG.save(deps.storage, &reward_config)?;
 
+    let mut reward_address = env.contract.address;
+    let msgs: Vec<CosmosMsg> = if msg.use_external_reward.unwrap_or(false) {
+        reward_address = reward_addr;
+        vec![reward_msg, set_withdraw_msg]
+    } else {
+        vec![]
+    };
+
     let params = Parameters {
         underlying_coin_denom: msg.underlying_coin_denom,
         liquidstaking_denom: msg.liquidstaking_denom,
         ucs03_relay_contract: msg.ucs03_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
-        reward_address: env.clone().contract.address.clone(),
+        reward_address,
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
+        batch_period: msg.batch_period,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -72,7 +96,7 @@ pub fn instantiate(
     };
     STATE.save(deps.storage, &state)?;
 
-    REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
+    validate_quote_tokens(&msg.quote_tokens)?;
 
     for quote_token in msg.quote_tokens {
         QUOTE_TOKEN.save(deps.storage, quote_token.channel_id, &quote_token)?;
@@ -86,7 +110,18 @@ pub fn instantiate(
     };
     SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
 
-    Ok(Response::new().add_attribute("action", "instantiate"))
+    SPLIT_REWARD_QUEUE.save(deps.storage, &vec![])?;
+    let pending_batch = Batch::new(
+        1,
+        Uint128::zero(),
+        env.block.time.seconds() + params.batch_period,
+    );
+    batches().save(deps.storage, pending_batch.id, &pending_batch)?;
+    PENDING_BATCH_ID.save(deps.storage, &pending_batch.id)?;
+
+    Ok(Response::new()
+        .add_attribute("action", "instantiate")
+        .add_messages(msgs))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -97,14 +132,18 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Bond { amount, salt } => execute::bond(deps, env, info, amount, salt),
-        ExecuteMsg::Unbond { amount } => execute::unbond(deps, env, info, amount),
-
-        ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
-        ExecuteMsg::ProcessUnbonding { id, salt } => {
-            execute::process_unbonding(deps, env, info, id, salt)
+        ExecuteMsg::Bond { slippage, expected } => {
+            execute::bond(deps, env, info, slippage, expected)
         }
-        ExecuteMsg::Reset {} => execute::reset(deps, env, info),
+        ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
+        ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
+        ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
+        ExecuteMsg::ProcessBatchWithdrawal { id, salt } => {
+            execute::process_batch_withdrawal(deps, env, info, id, salt)
+        }
+        ExecuteMsg::SetBatchReceivedAmount { id, amount } => {
+            execute::set_batch_received_amount(deps, env, info, id, amount)
+        }
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::UpdateValidators { validators } => {
             execute::update_validators(deps, env, info, validators)
@@ -118,6 +157,8 @@ pub fn execute(
             reward_address,
             fee_receiver,
             fee_rate,
+            batch_period,
+            epoch_period,
         } => execute::set_parameters(
             deps,
             env,
@@ -130,34 +171,14 @@ pub fn execute(
             reward_address,
             fee_receiver,
             fee_rate,
+            batch_period,
+            epoch_period,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
-        ExecuteMsg::MoveToReward {} => execute::move_to_reward(deps, env, info),
-        ExecuteMsg::Transfer {
-            amount,
-            base_denom,
-            receiver,
-            ucs03_channel_id,
-            ucs03_relay_contract,
-            quote_token,
-            salt,
-        } => execute::transfer(
-            deps,
-            env,
-            info,
-            amount,
-            base_denom,
-            receiver,
-            ucs03_channel_id,
-            ucs03_relay_contract,
-            quote_token,
-            salt,
-        ),
-        ExecuteMsg::TransferToOwner {} => execute::transfer_to_owner(deps, env, info),
         ExecuteMsg::OnZkgm {
             channel_id,
             sender,
@@ -165,7 +186,6 @@ pub fn execute(
         } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::SplitReward {} => execute::split_reward(deps, env, info),
-        ExecuteMsg::TransferReward {} => execute::transfer_reward(deps),
         ExecuteMsg::SetConfig {
             lst_contract_address,
             fee_receiver,
@@ -180,8 +200,6 @@ pub fn execute(
             fee_rate,
             coin_denom,
         ),
-        ExecuteMsg::Burn { amount } => execute::burn(deps, env, info, amount),
-        ExecuteMsg::NormalizeSupply {} => execute::normalize_supply(deps, env),
     }
 }
 

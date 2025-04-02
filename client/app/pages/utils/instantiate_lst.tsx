@@ -13,7 +13,7 @@ import { useGlobalContext } from "@/app/core/context";
 export default function InstantiateLiquidStaking() {
   const { userAddress, client, network } = useGlobalContext();
 
-  const lstCodeId = network.toString() === "uniontestnet" ? 258 : 235;
+  const lstCodeId = network.toString() === "uniontestnet" ? 258 : 375;
   const rewardCodeId = network.toString() === "uniontestnet" ? 171 : 235;
 
   const handleSubmit = async (e: any) => {
@@ -55,16 +55,19 @@ export default function InstantiateLiquidStaking() {
       underlying_coin_denom: "ubbn",
       validators: [
         { weight: 1, address: "bbnvaloper1z4ycjc5jykran5kxjjw90pxk6sx8w7fr2zxg93" },
+        { weight: 1, address: "bbnvaloper1w655632fhktke9xrsjmecl8wwjc86gasyaattq" }
       ],
       liquidstaking_denom: "ebbn",
       ucs03_relay_contract: "bbn1s5qwgvzzvs5h2wurz7mjwmc4n650g3207caddlz35fay8cl5ay6ss86ejy",
       fee_rate: "0.05",
       fee_receiver: "bbn17z2ea0dtzkpu9lc2eh0jcwxywh40th5ej00y9g",
       reward_code_id: rewardCodeId,
-      unbonding_time: 1944000,
+      unbonding_time: 64800,
       salt: uuidv4(),
-      cw20_address: "bbn1s5qwgvzzvs5h2wurz7mjwmc4n650g3207caddlz35fay8cl5ay6ss86ejy",
-      quote_tokens: []
+      cw20_address: "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9",
+      quote_tokens: [],
+      epoch_period: 360,
+      batch_period: 21600,
     };
 
 

@@ -1,9 +1,15 @@
 use std::collections::BTreeMap;
 
-use crate::state::{Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry};
+use crate::{
+    state::{
+        Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, Validator, ValidatorsRegistry,
+    },
+    utils::batch::{Batch, BatchStatus},
+};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
 use cw2::ContractVersion;
+use cw20::Cw20ReceiveMsg;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use schemars::JsonSchema;
 use unionlabs_primitives::{Bytes, H256};
@@ -34,6 +40,11 @@ pub struct InstantiateMsg {
     pub quote_tokens: Vec<QuoteToken>,
     /// epoch period
     pub epoch_period: Option<u32>,
+    // batch period range in seconds to execute batch
+    pub batch_period: u64,
+    /// whether to use external reward contract
+    /// if true, the contract will use external reward contract
+    pub use_external_reward: Option<bool>,
 }
 
 #[cw_serde]
@@ -52,7 +63,11 @@ pub enum ExecuteRewardMsg {
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
     },
-    TransferToOwner {},
+}
+
+#[cw_serde]
+pub enum Cw20PayloadMsg {
+    Unstake {},
 }
 
 #[cw_ownable_execute]
@@ -62,19 +77,23 @@ pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
     Bond {
-        amount: Option<Uint128>,
-        salt: String,
+        slippage: Option<Decimal>,
+        expected: Uint128,
     },
-    /// Send liquid staking denom then undelegate native denom according exchange rate from validator
-    Unbond {
-        amount: Option<Uint128>,
-    },
+    /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
+    Receive(Cw20ReceiveMsg),
+    /// Submit pending batch
+    SubmitBatch {},
     // Withdraw staking rewards and call split reward to reward contract
     ProcessRewards {},
-    // Process finished unbonding and send native token back to user
-    ProcessUnbonding {
+    SetBatchReceivedAmount {
         id: u64,
-        salt: String,
+        amount: Uint128,
+    },
+    // Process batch with complete unbonding(already receive token) to automatic withdraw and send native token back to user
+    ProcessBatchWithdrawal {
+        id: u64,
+        salt: Vec<String>,
     },
     /// Change parameters, only owner can do this
     SetParameters {
@@ -86,6 +105,8 @@ pub enum ExecuteMsg {
         reward_address: Option<Addr>,
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
+        batch_period: Option<u64>,
+        epoch_period: Option<u32>,
     },
     /// Update quote token
     UpdateQuoteToken {
@@ -107,36 +128,12 @@ pub enum ExecuteMsg {
     MigrateReward {
         code_id: u64,
     },
-    /// Below are Utilities for development purpose only
-    /// Move native balance to reward contract (for development phase only)
-    MoveToReward {},
-    /// Transfer utility (for development phase only)
-    Transfer {
-        amount: Uint128,
-        base_denom: String,
-        receiver: String,
-        ucs03_channel_id: u32,
-        ucs03_relay_contract: String,
-        quote_token: String,
-        salt: String,
-    },
-    NormalizeSupply {},
     SplitReward {},
-    /// Reset will set state to initial state and unbond all delegations (for development phase only)
-    Reset {},
-    /// Transfer all native balance of this contract to owner (for development purpose only)
-    TransferToOwner {},
-    // Utilities to transfer reward to this contract (for development only)
-    TransferReward {},
-
     SetConfig {
         lst_contract_address: Option<Addr>,
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
         coin_denom: Option<String>,
-    },
-    Burn {
-        amount: Uint128,
     },
 }
 
@@ -163,9 +160,7 @@ pub enum QueryMsg {
         validators: Option<Vec<String>>,
     },
     #[returns(Balance)]
-    Balance {},
-    #[returns(Log)]
-    Log {},
+    RewardBalance {},
     #[returns(Vec<UnbondRecord>)]
     UnbondRecord {
         staker: Option<String>,
@@ -178,6 +173,14 @@ pub enum QueryMsg {
     Version {},
     #[returns(QuoteToken)]
     QuoteToken { channel_id: u32 },
+    #[returns(Batch)]
+    Batch {
+        status: Option<BatchStatus>,
+        min: Option<u64>,
+        max: Option<u64>,
+    },
+    #[returns(SupplyQueue)]
+    SupplyQueue {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;
@@ -209,11 +212,6 @@ pub struct StakingLiquidity {
     pub time: Timestamp,
     pub total_supply: Uint128,
     pub adjusted_supply: Uint128,
-}
-
-#[cw_serde]
-pub struct Log {
-    pub message: String,
 }
 
 #[cw_serde]
@@ -260,8 +258,6 @@ pub enum ZkgmMessage {
     },
     Unbond {
         amount: Uint128,
-        slippage: Option<Decimal>,
-        expected: Uint128,
     },
 }
 
