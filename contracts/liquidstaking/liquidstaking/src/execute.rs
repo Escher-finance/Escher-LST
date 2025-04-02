@@ -254,11 +254,11 @@ pub fn zkgm_bond(
 pub fn receive(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
-    let sender = info.sender.to_string();
+    let sender = cw20_msg.sender;
     let the_staker: String = sender.to_string();
     let delegator = env.contract.address.clone();
 
