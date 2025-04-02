@@ -478,7 +478,6 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     let total_bond_amount = delegated_amount + total_reward;
 
     // after update exchange rate we update the state
-    state.bond_counter = state.bond_counter + 1;
     state.total_bond_amount = total_bond_amount + payment.amount;
     state.total_delegated_amount += payment.amount;
     state.last_bond_time = env.block.time.nanos();
@@ -594,6 +593,7 @@ pub fn set_parameters(
     reward_address: Option<Addr>,
     fee_receiver: Option<Addr>,
     fee_rate: Option<Decimal>,
+    batch_period: Option<u64>,
     epoch_period: Option<u32>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
@@ -619,6 +619,10 @@ pub fn set_parameters(
 
     params.fee_receiver = fee_receiver.clone().unwrap_or_else(|| params.fee_receiver);
     params.fee_rate = fee_rate.clone().unwrap_or_else(|| params.fee_rate);
+
+    if batch_period.is_some() {
+        params.batch_period = batch_period.unwrap();
+    };
 
     // update epoch period in SUPPLY QUEUE
     if epoch_period.is_some() {
