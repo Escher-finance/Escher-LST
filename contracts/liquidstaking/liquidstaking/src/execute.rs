@@ -505,21 +505,19 @@ pub fn process_rewards(
     let mut total_amount: Uint128 = Uint128::zero();
 
     for validator in validators_reg.validators {
-        let result: StdResult<Vec<DecCoin>> = deps
+        let delegation_rewards = deps
             .querier
-            .query_delegation_rewards(delegator.clone(), validator.address.to_string());
+            .query_delegation_rewards(delegator.clone(), validator.address.to_string())?;
 
         let mut payload = BondRewardsPayload {
             validator: validator.address.clone(),
             amount: Uint128::zero(),
         };
 
-        if result.is_ok() {
-            for reward in result.unwrap() {
-                if reward.denom == coin_denom {
-                    payload.amount = to_uint128(reward.amount.to_uint_floor())?;
-                    total_amount += payload.amount;
-                }
+        for reward in delegation_rewards {
+            if reward.denom == coin_denom {
+                payload.amount = to_uint128(reward.amount.to_uint_floor())?;
+                total_amount += payload.amount;
             }
         }
 
