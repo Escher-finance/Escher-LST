@@ -106,7 +106,43 @@ pub fn batches<'a>() -> IndexedMap<u64, Batch, BatchIndexes<'a>> {
 
 #[cfg(test)]
 mod tests {
+    use cosmwasm_std::testing::mock_dependencies;
+
     use super::*;
+
+    #[test]
+    fn test_batch_indexes() {
+        let mut deps = mock_dependencies();
+        let storage = deps.as_mut().storage;
+
+        let batch_a = Batch {
+            id: 0,
+            total_liquid_stake: Uint128::new(1000),
+            expected_native_unstaked: None,
+            received_native_unstaked: None,
+            unbond_records_count: 5,
+            next_batch_action_time: Some(1000000),
+            status: BatchStatus::Pending,
+        };
+        let batch_b = Batch {
+            id: 1,
+            total_liquid_stake: Uint128::new(2000),
+            expected_native_unstaked: None,
+            received_native_unstaked: None,
+            unbond_records_count: 5,
+            next_batch_action_time: None,
+            status: BatchStatus::Received,
+        };
+
+        let batch_map = batches();
+        batch_map.save(storage, batch_a.id, &batch_a).unwrap();
+        batch_map.save(storage, batch_b.id, &batch_b).unwrap();
+
+        assert_eq!(
+            batch_map.load(storage, batch_b.id).unwrap().status,
+            batch_b.status
+        );
+    }
 
     #[test]
     fn test_batch_status() {
