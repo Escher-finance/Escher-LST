@@ -23,6 +23,7 @@ use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
 use super::batch::{Batch, BatchStatus};
+use super::calc::calculate_fee_from_reward;
 use super::protocol;
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
@@ -422,7 +423,8 @@ pub fn process_bond(
             validators_list,
         )?;
 
-        total_bond_amount = delegated_amount + reward;
+        let fee = calculate_fee_from_reward(reward, params.fee_rate);
+        total_bond_amount = delegated_amount + reward - fee;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
     }
@@ -532,7 +534,8 @@ pub fn submit_pending_batch(
     let contract_reward_balance = REWARD_BALANCE.load(storage)?;
     let reward = unclaimed_reward + contract_reward_balance;
 
-    let total_bond_amount = delegated_amount + reward;
+    let fee = calculate_fee_from_reward(reward, params.fee_rate);
+    let total_bond_amount = delegated_amount + reward - fee;
 
     if total_bond_amount.is_zero() || state.total_supply.is_zero() {
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});

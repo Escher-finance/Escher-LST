@@ -4,11 +4,14 @@ use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
 use cw20::TokenInfoResponse;
 use std::str::FromStr;
 
-const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
-
 /// return how much staking token from underlying native coin denom
 pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
     (Decimal::from_ratio(stake_amount, Uint128::one()) / exchange_rate).to_uint_floor()
+}
+
+/// return how much fee from reward
+pub fn calculate_fee_from_reward(reward: Uint128, fee_rate: Decimal) -> Uint128 {
+    (fee_rate * Decimal::from_ratio(reward, Uint128::one())).to_uint_floor()
 }
 
 /// return how much underlying native coin denom from staking token base on exchange rate
@@ -16,10 +19,7 @@ pub fn calculate_native_token_from_staking_token(
     staking_token: Uint128,
     exchange_rate: Decimal,
 ) -> Uint128 {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL));
-    let output =
-        (exchange_rate * decimal_fract) * Decimal::from_ratio(staking_token, Uint128::one());
-    output.to_uint_floor()
+    (exchange_rate * Decimal::from_ratio(staking_token, Uint128::one())).to_uint_floor()
 }
 
 pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
@@ -131,26 +131,26 @@ fn test_normalize_supply_queue() {
         },
         MintQueue {
             amount: Uint128::new(50),
-            time: 650,
+            block: 650,
         },
         MintQueue {
             amount: Uint128::new(20),
-            time: 730,
+            block: 730,
         },
     ];
 
     let burn_queue = vec![
         BurnQueue {
             amount: Uint128::new(10),
-            time: 700,
+            block: 700,
         },
         BurnQueue {
             amount: Uint128::new(20),
-            time: 730,
+            block: 730,
         },
         BurnQueue {
             amount: Uint128::new(30),
-            time: 650,
+            block: 650,
         },
     ];
 
@@ -161,7 +161,7 @@ fn test_normalize_supply_queue() {
     };
 
     let current_block = 740;
-    normalize_supply_queue(&mut supply_queue, current_time);
+    normalize_supply_queue(&mut supply_queue, current_block);
     println!(">> new_supply_queue::: {:?} ", supply_queue);
 }
 
@@ -170,30 +170,30 @@ fn test_normalize_total_supply() {
     let mint_queue = vec![
         MintQueue {
             amount: Uint128::new(40),
-            time: 700,
+            block: 700,
         },
         MintQueue {
             amount: Uint128::new(50),
-            time: 171168541,
+            block: 171168541,
         },
         MintQueue {
             amount: Uint128::new(20),
-            time: 700,
+            block: 700,
         },
     ];
 
     let burn_queue = vec![
         BurnQueue {
             amount: Uint128::new(10),
-            time: 700,
+            block: 700,
         },
         BurnQueue {
             amount: Uint128::new(20),
-            time: 171168541,
+            block: 171168541,
         },
         BurnQueue {
             amount: Uint128::new(30),
-            time: 700,
+            block: 700,
         },
     ];
 
@@ -206,7 +206,7 @@ fn test_normalize_total_supply() {
     let current_supply = Uint128::from(20000u128);
     let current_block = 1000;
 
-    normalize_supply_queue(&mut supply_queue, current_time);
+    normalize_supply_queue(&mut supply_queue, current_block);
 
     let new_supply = normalize_total_supply(current_supply, &supply_queue.mint, &supply_queue.burn);
     println!(
