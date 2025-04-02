@@ -101,7 +101,7 @@ export default function Liquidity({ stateKey }: AssetsProps) {
                                 </div>
                                 <div className="text-lg">
                                     <span>Reward</span>
-                                    <span className="px-2 text-xs">(Unclaimed + Reward Contract)</span>
+                                    <span className="px-2 text-xs">(Unclaimed + RewardContract - Fee)</span>
                                 </div>
                                 <div>
                                     {Intl.NumberFormat('en-US').format(Number(liquidity.reward))}  {network?.stakeCurrency.coinMinimalDenom}
