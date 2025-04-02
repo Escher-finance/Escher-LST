@@ -1303,4 +1303,12 @@ mod tests {
 
         assert_eq!(unclaimed_rewards, Uint128::new(3000));
     }
+
+    #[test]
+    fn test_get_mock_total_reward() {
+        assert_eq!(
+            get_mock_total_reward(Uint128::new(1000)),
+            Uint128::new(1005)
+        );
+    }
 }
