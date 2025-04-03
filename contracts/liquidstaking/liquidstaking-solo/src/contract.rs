@@ -83,6 +83,8 @@ pub fn instantiate(
         fee_rate: msg.fee_rate,
         fee_receiver: msg.fee_receiver,
         batch_period: msg.batch_period,
+        min_bond: msg.min_bond,
+        min_unbond: msg.min_unbond,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -159,6 +161,8 @@ pub fn execute(
             fee_rate,
             batch_period,
             epoch_period,
+            min_bond,
+            min_unbond,
         } => execute::set_parameters(
             deps,
             env,
@@ -173,6 +177,8 @@ pub fn execute(
             fee_rate,
             batch_period,
             epoch_period,
+            min_bond,
+            min_unbond,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,

@@ -565,6 +565,8 @@ pub fn set_parameters(
     fee_rate: Option<Decimal>,
     batch_period: Option<u64>,
     epoch_period: Option<u32>,
+    min_bond: Option<Uint128>,
+    min_unbond: Option<Uint128>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -589,6 +591,8 @@ pub fn set_parameters(
 
     params.fee_receiver = fee_receiver.clone().unwrap_or_else(|| params.fee_receiver);
     params.fee_rate = fee_rate.clone().unwrap_or_else(|| params.fee_rate);
+    params.min_bond = min_bond.clone().unwrap_or_else(|| params.min_bond);
+    params.min_unbond = min_unbond.clone().unwrap_or_else(|| params.min_unbond);
 
     if batch_period.is_some() {
         params.batch_period = batch_period.unwrap();
@@ -675,6 +679,14 @@ pub fn process_batch_withdrawal(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let mut batch = batches().load(deps.storage, id)?;
+
+    if batch.status != BatchStatus::Received {
+        return Err(ContractError::BatchStatusIncorrect {
+            actual: batch.status,
+            expected: BatchStatus::Received,
+        });
+    }
+
     if batch.received_native_unstaked.is_none() {
         return Err(ContractError::BatchIncompleteUnbonding {});
     }

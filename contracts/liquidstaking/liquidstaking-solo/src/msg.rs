@@ -45,6 +45,10 @@ pub struct InstantiateMsg {
     /// whether to use external reward contract
     /// if true, the contract will use external reward contract
     pub use_external_reward: Option<bool>,
+    // minimum bond/stake amount
+    pub min_bond: Uint128,
+    // minimum unbond/unstake amount
+    pub min_unbond: Uint128,
 }
 
 #[cw_serde]
@@ -107,6 +111,8 @@ pub enum ExecuteMsg {
         fee_rate: Option<Decimal>,
         batch_period: Option<u64>,
         epoch_period: Option<u32>,
+        min_bond: Option<Uint128>,
+        min_unbond: Option<Uint128>,
     },
     /// Update quote token
     UpdateQuoteToken {
