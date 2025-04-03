@@ -176,6 +176,7 @@ pub enum QueryMsg {
         staker: Option<String>,
         released: Option<bool>,
         id: Option<u64>,
+        batch_id: Option<u64>,
         min: Option<u64>,
         max: Option<u64>,
     },
