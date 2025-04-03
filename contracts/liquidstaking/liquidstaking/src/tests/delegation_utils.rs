@@ -1,13 +1,14 @@
 use crate::{
     event::UNSTAKE_REQUEST_EVENT,
-    msg::{DelegationDiff, Ucs03ExecuteMsg, ValidatorDelegation},
+    msg::{BondData, DelegationDiff, Ucs03ExecuteMsg, ValidatorDelegation},
     state::{
-        unbond_record, QuoteToken, UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS,
-        PENDING_BATCH_ID, QUOTE_TOKEN, TOKEN_COUNT, VALIDATORS_REGISTRY,
+        unbond_record, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS,
+        PENDING_BATCH_ID, QUOTE_TOKEN, STATE, TOKEN_COUNT, VALIDATORS_REGISTRY,
     },
     tests::mock_parameters,
     utils::{
         batch::{batches, Batch, BatchStatus},
+        calc,
         delegation::*,
     },
 };
@@ -17,6 +18,7 @@ use cosmwasm_std::{
     Addr, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
     StakingMsg, Timestamp, Uint128, Uint256,
 };
+use cw_multi_test::App;
 use std::{collections::HashMap, str::FromStr};
 use unionlabs_primitives::{encoding::HexPrefixed, Bytes, H256};
 
@@ -999,4 +1001,104 @@ fn test_unstake_request_in_batch() {
         .unwrap()
         .value;
     assert_eq!(record_id_attr, &new_token_count.to_string());
+}
+
+#[test]
+fn test_process_bond() {
+    let app = App::default();
+    let api = app.api();
+    let mut deps = mock_dependencies();
+    let querier = MockQuerier::default();
+    let sender = "sender".to_string();
+    let staker = "staker".to_string();
+    let delegator = api.addr_make("delegator");
+    let amount = Uint128::new(3000);
+    let bond_time = 36000;
+    let salt = "0x0000000000000000000000000000000000000000000000000000000000000001".to_string();
+    let params = mock_parameters();
+    let validator_addr_a = "a".to_string();
+    let validator_addr_b = "b".to_string();
+    let channel_id = Some(10);
+    let validators = Vec::from([
+        Validator {
+            weight: 10,
+            address: validator_addr_a.clone(),
+        },
+        Validator {
+            weight: 20,
+            address: validator_addr_b.clone(),
+        },
+    ]);
+    let validators_reg = ValidatorsRegistry {
+        validators: Vec::from(validators.clone()),
+    };
+    let querier_wrapper = QuerierWrapper::<Empty>::new(&querier);
+    let state = State {
+        exchange_rate: Decimal::from_str("1.1").unwrap(),
+        total_bond_amount: Uint128::new(20_000),
+        total_delegated_amount: Uint128::new(15_000),
+        total_supply: Uint128::new(100_000),
+        bond_counter: 5,
+        last_bond_time: 50000,
+    };
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+
+    let (msgs, sub_msgs, bond_data) = process_bond(
+        deps.as_mut().storage,
+        querier_wrapper,
+        sender,
+        staker,
+        delegator,
+        amount,
+        bond_time,
+        params.clone(),
+        validators_reg,
+        salt,
+        channel_id,
+    )
+    .unwrap();
+
+    let updated_state = STATE.load(deps.as_mut().storage).unwrap();
+    let total_bond_amount = get_mock_total_reward(state.total_bond_amount);
+
+    let mint_amount = calc::calculate_staking_token_from_rate(amount, updated_state.exchange_rate);
+
+    assert_eq!(
+        updated_state.exchange_rate,
+        Decimal::from_ratio(total_bond_amount + amount, state.total_supply + mint_amount),
+    );
+
+    assert_eq!(updated_state.bond_counter, state.bond_counter + 1);
+    assert_eq!(updated_state.total_supply, state.total_supply + mint_amount);
+    assert_eq!(updated_state.total_bond_amount, total_bond_amount + amount);
+    assert_eq!(updated_state.total_supply, state.total_supply + mint_amount);
+    assert_eq!(
+        updated_state.total_delegated_amount,
+        state.total_delegated_amount + amount,
+    );
+    assert_eq!(
+        updated_state.total_delegated_amount,
+        state.total_delegated_amount + amount,
+    );
+    assert_eq!(updated_state.last_bond_time, bond_time);
+
+    assert!(sub_msgs.is_empty());
+    assert_eq!(
+        bond_data,
+        BondData {
+            mint_amount,
+            delegated_amount: updated_state.total_delegated_amount,
+            total_bond_amount: updated_state.total_bond_amount,
+            exchange_rate: Decimal::from_ratio(total_bond_amount, state.total_supply),
+            total_supply: updated_state.total_supply
+        }
+    );
+    assert_eq!(
+        msgs,
+        get_delegate_to_validator_msgs(
+            amount,
+            params.underlying_coin_denom.to_string(),
+            validators
+        )
+    );
 }

@@ -55,8 +55,8 @@ pub fn mock_instantiate_msg() -> InstantiateMsg {
 
 pub fn mock_parameters() -> Parameters {
     Parameters {
-        underlying_coin_denom: String::default(),
-        liquidstaking_denom: String::default(),
+        underlying_coin_denom: "underlying_coin".to_string(),
+        liquidstaking_denom: "liquidstaking".to_string(),
         ucs03_relay_contract: String::default(),
         unbonding_time: u64::default(),
         cw20_address: Addr::unchecked("cw20"),

@@ -5,7 +5,6 @@ use crate::msg::ValidatorDelegation;
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc;
 use crate::utils::calc::to_uint128;
-use crate::utils::delegation;
 use crate::utils::protocol;
 use crate::utils::token;
 use crate::ContractError;
@@ -434,7 +433,7 @@ pub fn process_bond(
     channel_id: Option<u32>,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     let coin_denom = params.underlying_coin_denom.to_string();
-    let msgs = delegation::get_delegate_to_validator_msgs(
+    let msgs = get_delegate_to_validator_msgs(
         amount,
         coin_denom.to_string(),
         validators_reg.validators.clone(),
