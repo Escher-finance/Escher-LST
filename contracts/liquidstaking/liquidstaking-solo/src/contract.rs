@@ -1,16 +1,16 @@
 use crate::instantiate::create_reward;
 use crate::utils::batch::{batches, Batch};
 use crate::utils::validation::{validate_quote_tokens, validate_validators};
-use cosmwasm_std::{entry_point, CosmosMsg, DistributionMsg, StdError};
+use cosmwasm_std::{entry_point, CosmosMsg, DistributionMsg};
 use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
 
 use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, OldParameters, Parameters, State, SupplyQueue, ValidatorsRegistry, WithdrawReward,
-    CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE,
-    SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    Config, Parameters, State, SupplyQueue, ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS,
+    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE,
+    VALIDATORS_REGISTRY,
 };
 use cw2::set_contract_version;
 
@@ -231,38 +231,8 @@ pub fn execute(
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // Load the old data
-    let Some(old_data) = deps.storage.get(b"parameters") else {
-        return Err(ContractError::from(StdError::generic_err(
-            "Parameters not found in storage",
-        )));
-    };
-    // Try to deserialize it from the old parameters
-    let old_param_result: Result<OldParameters, StdError> = cosmwasm_std::from_json(&old_data);
-
-    if old_param_result.is_ok() {
-        let old_param = old_param_result.unwrap();
-        // Transform it
-        let new_data = Parameters {
-            underlying_coin_denom: old_param.underlying_coin_denom,
-            liquidstaking_denom: old_param.liquidstaking_denom,
-            ucs03_relay_contract: old_param.ucs03_relay_contract,
-            unbonding_time: old_param.unbonding_time,
-            cw20_address: old_param.cw20_address,
-            reward_address: old_param.reward_address,
-            fee_receiver: old_param.fee_receiver,
-            fee_rate: old_param.fee_rate,
-            batch_period: old_param.batch_period,
-            min_bond: Uint128::new(10000u128),
-            min_unbond: Uint128::new(10000u128),
-            batch_limit: 50,
-        };
-
-        // Serialize the new parameter
-        let new_data = cosmwasm_std::to_json_vec(&new_data)?;
-        // Store the new data
-        deps.storage.set(b"parameters", &new_data);
-    }
-
-    Ok(Response::default())
+    Ok(Response::new()
+        .add_attribute("action", "migrate")
+        .add_attribute("version", CONTRACT_VERSION)
+        .add_attribute("contract_name", CONTRACT_NAME))
 }

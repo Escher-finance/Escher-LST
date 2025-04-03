@@ -645,6 +645,7 @@ pub fn submit_pending_batch(
     let next_action_time = time.seconds() + params.unbonding_time;
     batch.expected_native_unstaked = Some(total_undelegate_amount);
     batch.update_status(BatchStatus::Submitted, Some(next_action_time));
+    batches().save(deps.storage, batch.id, &batch)?;
 
     let ev = SubmitBatchEvent(
         batch.id,
