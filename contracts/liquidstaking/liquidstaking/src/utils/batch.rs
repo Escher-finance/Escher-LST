@@ -46,13 +46,13 @@ impl Batch {
         }
     }
     pub fn update_status(&mut self, new_status: BatchStatus, next_action_time: Option<u64>) {
-        // Defined by caller - env.block.time + batch period
         match new_status {
+            // next batch time =  env.block.time + batch period
             BatchStatus::Pending => {
                 self.status = new_status;
                 self.next_batch_action_time = next_action_time;
             }
-            // Defined by caller - env.block.time + unbonding period
+            // next batch time = env.block.time + unbonding period
             BatchStatus::Submitted => {
                 self.status = new_status;
                 self.next_batch_action_time = next_action_time;
