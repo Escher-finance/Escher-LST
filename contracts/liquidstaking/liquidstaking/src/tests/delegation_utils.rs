@@ -1,14 +1,19 @@
 use crate::{
+    event::UNSTAKE_REQUEST_EVENT,
     msg::{DelegationDiff, Ucs03ExecuteMsg, ValidatorDelegation},
     state::{
-        QuoteToken, Validator, ValidatorsRegistry, PARAMETERS, QUOTE_TOKEN, VALIDATORS_REGISTRY,
+        unbond_record, QuoteToken, UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS,
+        PENDING_BATCH_ID, QUOTE_TOKEN, TOKEN_COUNT, VALIDATORS_REGISTRY,
     },
     tests::mock_parameters,
-    utils::delegation::*,
+    utils::{
+        batch::{batches, Batch, BatchStatus},
+        delegation::*,
+    },
 };
 use cosmwasm_std::{
     assert_approx_eq, from_json,
-    testing::{mock_dependencies, MockQuerier},
+    testing::{mock_dependencies, mock_env, MockQuerier},
     Addr, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
     StakingMsg, Timestamp, Uint128, Uint256,
 };
@@ -878,4 +883,120 @@ fn test_get_transfer_token_cosmos_msg() {
         ucs03_salt,
         H256::<HexPrefixed>::from_str(salt.as_str()).unwrap(),
     );
+}
+
+#[test]
+fn test_unstake_request_in_batch() {
+    let mut deps = mock_dependencies();
+    let mut env = mock_env();
+    env.block.height = 500000;
+    let sender = "sender".to_string();
+    let staker = "staker".to_string();
+    let unstake_amount = Uint128::new(50);
+    let pending_batch_id = 10;
+    let token_count = 5;
+    let channel_id = Some(1);
+    let pending_batch = Batch {
+        id: pending_batch_id,
+        total_liquid_stake: Uint128::new(100),
+        expected_native_unstaked: None,
+        received_native_unstaked: None,
+        unbond_records_count: 0,
+        next_batch_action_time: None,
+        status: BatchStatus::Pending,
+    };
+    batches()
+        .save(deps.as_mut().storage, pending_batch_id, &pending_batch)
+        .unwrap();
+    TOKEN_COUNT
+        .save(deps.as_mut().storage, &token_count)
+        .unwrap();
+    PENDING_BATCH_ID
+        .save(deps.as_mut().storage, &pending_batch_id)
+        .unwrap();
+
+    let unstake_request_event = unstake_request_in_batch(
+        env.clone(),
+        deps.as_mut().storage,
+        sender.clone(),
+        staker.clone(),
+        unstake_amount,
+        channel_id,
+    )
+    .unwrap();
+
+    let new_token_count = token_count + 1;
+    assert_eq!(
+        TOKEN_COUNT.load(deps.as_mut().storage).unwrap(),
+        new_token_count
+    );
+    assert_eq!(
+        batches()
+            .load(deps.as_mut().storage, pending_batch_id)
+            .unwrap(),
+        Batch {
+            total_liquid_stake: pending_batch.total_liquid_stake + unstake_amount,
+            unbond_records_count: pending_batch.unbond_records_count + 1,
+            ..pending_batch
+        }
+    );
+    assert_eq!(
+        unbond_record()
+            .load(deps.as_mut().storage, new_token_count)
+            .unwrap(),
+        UnbondRecord {
+            id: new_token_count,
+            batch_id: pending_batch_id,
+            height: env.block.height,
+            channel_id,
+            sender: sender.clone(),
+            staker: staker.clone(),
+            amount: unstake_amount,
+            released_height: 0,
+            released: false
+        }
+    );
+    assert_eq!(unstake_request_event.ty, UNSTAKE_REQUEST_EVENT);
+    let sender_attr = &unstake_request_event
+        .attributes
+        .iter()
+        .find(|a| a.key == "sender")
+        .unwrap()
+        .value;
+    assert_eq!(sender_attr, &sender);
+    let staker_attr = &unstake_request_event
+        .attributes
+        .iter()
+        .find(|a| a.key == "staker")
+        .unwrap()
+        .value;
+    assert_eq!(staker_attr, &staker);
+    let channel_id_attr = &unstake_request_event
+        .attributes
+        .iter()
+        .find(|a| a.key == "channel_id")
+        .unwrap()
+        .value;
+    assert_eq!(channel_id_attr, &channel_id.unwrap().to_string());
+    let unbond_amount_attr = &unstake_request_event
+        .attributes
+        .iter()
+        .find(|a| a.key == "unbond_amount")
+        .unwrap()
+        .value;
+    assert_eq!(unbond_amount_attr, &unstake_amount.to_string());
+    let time_attr = &unstake_request_event
+        .attributes
+        .iter()
+        .find(|a| a.key == "time")
+        .unwrap()
+        .value;
+    assert_eq!(time_attr, &env.block.time.nanos().to_string());
+    let record_id_attr = &unstake_request_event
+        .attributes
+        .iter()
+        .find(|a| a.key == "record_id")
+        .unwrap()
+        .value;
+    assert_eq!(record_id_attr, &new_token_count.to_string());
 }
