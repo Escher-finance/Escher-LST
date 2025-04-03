@@ -76,6 +76,7 @@ pub fn instantiate(
         batch_period: msg.batch_period,
         min_bond: msg.min_bond,
         min_unbond: msg.min_unbond,
+        batch_limit: msg.batch_limit,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -148,6 +149,7 @@ pub fn execute(
             batch_period,
             min_bond,
             min_unbond,
+            batch_limit,
         } => execute::set_parameters(
             deps,
             env,
@@ -163,6 +165,7 @@ pub fn execute(
             batch_period,
             min_bond,
             min_unbond,
+            batch_limit,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,

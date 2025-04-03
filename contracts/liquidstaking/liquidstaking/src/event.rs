@@ -146,15 +146,26 @@ pub const PROCESS_BATCH_UNBONDING_EVENT: &str = "process_batch_unbonding";
 #[allow(non_snake_case)]
 pub fn ProcessBatchUnbondingEvent(
     batch_id: u64,
-    amount: Uint128,
-    denom: String,
     time: Timestamp,
+    released_amount: Uint128,
+    total_amount: Uint128,
+    denom: String,
+    record_ids: Vec<u64>,
 ) -> Event {
     Event::new(PROCESS_BATCH_UNBONDING_EVENT.to_string())
-        .add_attribute("amount", amount.to_string())
+        .add_attribute("total_amount", total_amount.to_string())
+        .add_attribute("released_amount", released_amount.to_string())
         .add_attribute("denom", denom)
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute(
+            "record_ids",
+            record_ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+        )
 }
 
 pub const UNSTAKE_REQUEST_EVENT: &str = "unstake_request";
