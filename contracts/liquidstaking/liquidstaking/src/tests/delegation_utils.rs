@@ -1,16 +1,19 @@
 use crate::{
-    msg::{DelegationDiff, ValidatorDelegation},
-    state::{Validator, ValidatorsRegistry, PARAMETERS, VALIDATORS_REGISTRY},
+    msg::{DelegationDiff, Ucs03ExecuteMsg, ValidatorDelegation},
+    state::{
+        QuoteToken, Validator, ValidatorsRegistry, PARAMETERS, QUOTE_TOKEN, VALIDATORS_REGISTRY,
+    },
     tests::mock_parameters,
     utils::delegation::*,
 };
 use cosmwasm_std::{
-    assert_approx_eq,
+    assert_approx_eq, from_json,
     testing::{mock_dependencies, MockQuerier},
     Addr, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
-    StakingMsg, Uint128,
+    StakingMsg, Timestamp, Uint128, Uint256,
 };
 use std::{collections::HashMap, str::FromStr};
+use unionlabs_primitives::{encoding::HexPrefixed, Bytes, H256};
 
 #[test]
 fn test_get_validator_delegation_map_base_on_weight() {
@@ -775,5 +778,104 @@ fn test_get_undelegate_msgs() {
                 value: "200".to_string()
             },
         ])
+    );
+}
+
+#[test]
+fn test_get_transfer_token_cosmos_msg() {
+    let mut deps = mock_dependencies();
+    let quote_token = QuoteToken {
+        channel_id: 1,
+        quote_token: "0xbeef".to_string(),
+        lst_quote_token: "lst_quote_token".to_string(),
+    };
+    QUOTE_TOKEN
+        .save(deps.as_mut().storage, quote_token.channel_id, &quote_token)
+        .unwrap();
+    let staker = "0xffff".to_string();
+    let channel_id = Some(quote_token.channel_id);
+    let time = Timestamp::default();
+    let ucs03_relay_contract = "ucs03_relay".to_string();
+    let undelegate_amount = Uint128::new(1000);
+    let denom = "denom".to_string();
+    let salt = "0x0000000000000000000000000000000000000000000000000000000000000001".to_string();
+
+    let amount_funds = Vec::from([Coin {
+        denom: denom.clone(),
+        amount: undelegate_amount,
+    }]);
+
+    // channel_id is None
+    let CosmosMsg::Bank(cosmwasm_std::BankMsg::Send { to_address, amount }) =
+        get_transfer_token_cosmos_msg(
+            deps.as_mut().storage,
+            staker.clone(),
+            None,
+            time,
+            ucs03_relay_contract.clone(),
+            undelegate_amount,
+            denom.clone(),
+            salt.clone(),
+        )
+        .unwrap()
+    else {
+        panic!("expected bank send msg");
+    };
+    assert_eq!(to_address, staker.clone());
+    assert_eq!(amount, amount_funds.clone());
+
+    // channel_id is Some
+    let CosmosMsg::Wasm(cosmwasm_std::WasmMsg::Execute {
+        contract_addr,
+        msg,
+        funds,
+    }) = get_transfer_token_cosmos_msg(
+        deps.as_mut().storage,
+        staker.clone(),
+        channel_id,
+        time,
+        ucs03_relay_contract.clone(),
+        undelegate_amount,
+        denom.clone(),
+        salt.clone(),
+    )
+    .unwrap()
+    else {
+        panic!("expected wasm execute msg");
+    };
+    assert_eq!(contract_addr, ucs03_relay_contract);
+    assert_eq!(funds, amount_funds);
+    let ucs03_execute_msg: Ucs03ExecuteMsg = from_json(msg).unwrap();
+    let Ucs03ExecuteMsg::Transfer {
+        channel_id: ucs03_channel_id,
+        receiver: ucs03_receiver,
+        base_token: ucs03_base_token,
+        base_amount: ucs03_base_amount,
+        quote_token: ucs03_quote_token,
+        quote_amount: ucs03_quote_amount,
+        timeout_height: ucs03_timeout_height,
+        timeout_timestamp: ucs03_timeout_timestamp,
+        salt: ucs03_salt,
+    } = ucs03_execute_msg;
+    assert_eq!(ucs03_channel_id, channel_id.unwrap());
+    assert_eq!(
+        ucs03_receiver,
+        Bytes::<HexPrefixed>::from_str(staker.as_str()).unwrap()
+    );
+    assert_eq!(ucs03_base_token, denom.clone());
+    assert_eq!(ucs03_base_amount, undelegate_amount);
+    assert_eq!(
+        ucs03_quote_token,
+        Bytes::<HexPrefixed>::from_str(quote_token.quote_token.as_str()).unwrap()
+    );
+    assert_eq!(ucs03_quote_amount, Uint256::from(undelegate_amount));
+    assert_eq!(ucs03_timeout_height, 0);
+    assert_eq!(
+        ucs03_timeout_timestamp,
+        time.plus_seconds(DEFAULT_TIMEOUT_TIMESTAMP_OFFSET).nanos()
+    );
+    assert_eq!(
+        ucs03_salt,
+        H256::<HexPrefixed>::from_str(salt.as_str()).unwrap(),
     );
 }
