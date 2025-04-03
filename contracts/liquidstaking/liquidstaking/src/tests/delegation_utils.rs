@@ -537,7 +537,7 @@ fn test_get_validator_delegation_map_with_total_bond() {
 
     let (validator_delegation_map, total_delegated_amount) =
         get_validator_delegation_map_with_total_bond(
-            deps.as_mut(),
+            deps.as_ref(),
             delegator_addr.to_string(),
             validators,
         )
@@ -723,7 +723,7 @@ fn test_adjust_validators_delegation() {
 
     let (validator_delegation_map, total_delegated_amount) =
         get_validator_delegation_map_with_total_bond(
-            deps.as_mut(),
+            deps.as_ref(),
             delegator_addr.to_string(),
             prev_validators.clone(),
         )
