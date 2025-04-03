@@ -7,49 +7,10 @@ use crate::{
 use cosmwasm_std::{
     assert_approx_eq,
     testing::{mock_dependencies, MockQuerier},
-    Addr, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper, StakingMsg,
-    Uint128,
+    Addr, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
+    StakingMsg, Uint128,
 };
 use std::{collections::HashMap, str::FromStr};
-
-#[test]
-fn test_get_undelegate_from_validator_msgs() {
-    let undelegate_amount = Uint128::from(500642u32);
-    let coin_denom = "muno".to_string();
-
-    let validators = vec![
-        Validator {
-            address: "abc".to_string(),
-            weight: 10,
-        },
-        Validator {
-            address: "bcd".to_string(),
-            weight: 20,
-        },
-    ];
-    let (total_undelegate_amount, undelegate_msgs, _) =
-        get_undelegate_from_validator_msgs(undelegate_amount, coin_denom.clone(), validators);
-    let undelegate_msgs_unwrapped = undelegate_msgs
-        .iter()
-        .filter_map(|msg| {
-            if let CosmosMsg::Staking(StakingMsg::Undelegate { validator, amount }) = msg {
-                return Some((validator, amount.amount));
-            }
-            return None;
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(undelegate_msgs_unwrapped.len(), 2);
-    assert_eq!(
-        undelegate_msgs_unwrapped[0].1 + undelegate_msgs_unwrapped[1].1,
-        total_undelegate_amount
-    );
-    assert_approx_eq!(undelegate_amount, total_undelegate_amount, "0.001");
-    assert_approx_eq!(
-        undelegate_msgs_unwrapped[0].1 * Uint128::from(2_u128),
-        undelegate_msgs_unwrapped[1].1,
-        "0.001"
-    );
-}
 
 #[test]
 fn test_get_validator_delegation_map_base_on_weight() {
@@ -748,5 +709,68 @@ fn test_adjust_validators_delegation() {
             validators.clone()
         )
         .unwrap()
+    );
+}
+
+#[test]
+fn test_get_undelegate_msgs() {
+    let undelegate_amount = Uint128::new(1000);
+    let coin_denom = "denom".to_string();
+    let validator_a = "a".to_string();
+    let validator_b = "b".to_string();
+    let validator_c = "c".to_string();
+    let other_validator = "other".to_string();
+    let validator_delegation_ratio = HashMap::from([
+        (validator_a.to_string(), Decimal::from_str("0.4").unwrap()),
+        (validator_b.to_string(), Decimal::from_str("0.3").unwrap()),
+        (validator_c.to_string(), Decimal::from_str("0.2").unwrap()),
+        (other_validator.to_string(), Decimal::from_str("0.0").unwrap()),
+    ]);
+    let (total_undelegate_amount, msgs, mut atts) = get_undelegate_msgs(
+        undelegate_amount,
+        coin_denom.clone(),
+        validator_delegation_ratio,
+    );
+    assert_eq!(total_undelegate_amount, Uint128::new(900));
+
+    assert_eq!(msgs.len(), 3);
+    let mut undelegates = msgs
+        .into_iter()
+        .map(|msg| {
+            let CosmosMsg::Staking(StakingMsg::Undelegate { validator, amount }) = msg else {
+                panic!("wrong cosmos msg");
+            };
+            if amount.denom != coin_denom {
+                panic!("wrong denom");
+            }
+            (validator, amount.amount)
+        })
+        .collect::<Vec<_>>();
+    undelegates.sort_by_key(|undelegate| undelegate.0.clone());
+    assert_eq!(
+        undelegates,
+        Vec::from([
+            (validator_a.clone(), Uint128::new(400)),
+            (validator_b.clone(), Uint128::new(300)),
+            (validator_c.clone(), Uint128::new(200)),
+        ])
+    );
+    atts.sort_by_key(|att| att.key.clone());
+    assert_eq!(
+        atts,
+        Vec::from([
+            Attribute {
+                key: validator_a.clone(),
+                value: "400".to_string()
+            },
+            Attribute {
+                key: validator_b.clone(),
+                value: "300".to_string()
+            },
+            Attribute {
+                key: validator_c.clone(),
+                value: "200".to_string()
+            },
+        ])
     );
 }
