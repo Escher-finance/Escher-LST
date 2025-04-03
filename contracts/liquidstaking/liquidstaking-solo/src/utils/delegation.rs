@@ -12,8 +12,8 @@ use crate::{
     },
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, DepsMut, Env, QuerierWrapper,
-    StdResult, Storage, SubMsg, Uint128, Uint256,
+    to_json_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    QuerierWrapper, StdResult, Storage, SubMsg, Uint128, Uint256,
 };
 use cosmwasm_std::{AnyMsg, BankMsg, Coin};
 use cosmwasm_std::{Event, Timestamp};
@@ -81,6 +81,42 @@ pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
     (ratio * Decimal::from_ratio(amount, Uint128::one())).to_uint_floor()
 }
 
+pub fn get_undelegate_msgs(
+    delegator: String,
+    undelegate_amount: Uint128,
+    coin_denom: String,
+    validator_delegation_ratio: HashMap<String, Decimal>,
+) -> (Uint128, Vec<CosmosMsg>, Vec<Attribute>) {
+    let mut msgs: Vec<CosmosMsg> = vec![];
+
+    let mut atts = vec![];
+
+    let mut total_undelegate_amount = Uint128::zero();
+
+    let undelegate_amount_dec: Decimal = Decimal::from_ratio(undelegate_amount, Uint128::one());
+
+    for (validator, ratio) in validator_delegation_ratio.into_iter() {
+        let undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
+
+        let undelegate_staking_msg = get_babylon_undelegate_cosmos_msg(
+            delegator.to_string(),
+            validator.clone(),
+            undelegate_amount_for_validator.to_string(),
+            coin_denom.clone(),
+        );
+        msgs.push(undelegate_staking_msg);
+
+        atts.push(Attribute {
+            key: validator,
+            value: undelegate_amount_for_validator.to_string(),
+        });
+
+        total_undelegate_amount += undelegate_amount_for_validator;
+    }
+
+    (total_undelegate_amount, msgs, atts)
+}
+
 pub fn get_undelegate_from_validator_msgs(
     delegator: String,
     undelegate_amount: Uint128,
@@ -126,7 +162,7 @@ pub fn get_undelegate_from_validator_msgs(
 }
 
 pub fn get_validator_delegation_map_with_total_bond(
-    deps: DepsMut,
+    deps: Deps,
     delegator: String,
     validators: Vec<Validator>,
 ) -> Result<(HashMap<String, Uint128>, Uint128), ContractError> {
@@ -355,7 +391,11 @@ pub fn adjust_validators_delegation(
     let denom = params.underlying_coin_denom;
 
     let (validator_delegation_map, total_delegated_amount) =
-        get_validator_delegation_map_with_total_bond(deps, delegator.to_string(), prev_validators)?;
+        get_validator_delegation_map_with_total_bond(
+            deps.as_ref(),
+            delegator.to_string(),
+            prev_validators,
+        )?;
 
     let correct_validator_delegation_map =
         get_validator_delegation_map_base_on_weight(validators, total_delegated_amount);
@@ -500,9 +540,8 @@ pub fn process_bond(
 /// 3. Create new SubmitBatchEvent
 /// 4. Create new pending batch
 pub fn submit_pending_batch(
+    deps: DepsMut,
     block_height: u64,
-    storage: &mut dyn Storage,
-    querier: QuerierWrapper,
     time: Timestamp,
     sender: Addr,
     delegator: Addr,
@@ -518,24 +557,25 @@ pub fn submit_pending_batch(
         .map(|v| v.address.clone())
         .collect();
 
-    let mut state = STATE.load(storage)?;
+    let mut state = STATE.load(deps.storage)?;
 
-    let delegated_amount = get_actual_total_delegated(
-        querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_list.clone(),
-    )?;
+    let (validator_delegation_map, delegated_amount) =
+        get_validator_delegation_map_with_total_bond(
+            deps.as_ref(),
+            delegator.to_string(),
+            validators_reg.validators.clone(),
+        )?;
+
     state.total_delegated_amount = delegated_amount;
     // query the total reward from this contract
     let unclaimed_reward = get_unclaimed_reward(
-        querier,
+        deps.querier,
         delegator.to_string(),
         coin_denom.clone(),
         validators_list,
     )?;
 
-    let contract_reward_balance = REWARD_BALANCE.load(storage)?;
+    let contract_reward_balance = REWARD_BALANCE.load(deps.storage)?;
     let reward = unclaimed_reward + contract_reward_balance;
 
     let fee = calculate_fee_from_reward(reward, params.fee_rate);
@@ -546,7 +586,7 @@ pub fn submit_pending_batch(
     }
 
     let mut current_exchange_rate = state.exchange_rate;
-    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
+    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
 
     if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
         calc::normalize_supply_queue(&mut supply_queue, block_height);
@@ -564,11 +604,19 @@ pub fn submit_pending_batch(
     if delegated_amount < undelegate_amount {
         return Err(ContractError::NotEnoughAvailableFund {}); // this error only happen on development or sole staker and if process rewards not happen yet
     }
-    let (total_undelegate_amount, undelegate_msgs, atts) = get_undelegate_from_validator_msgs(
+
+    let mut validators_delegation_ratio: HashMap<String, Decimal> = HashMap::new();
+
+    for (validator, amount) in validator_delegation_map.into_iter() {
+        let ratio = Decimal::from_ratio(amount, delegated_amount);
+        validators_delegation_ratio.insert(validator, ratio);
+    }
+
+    let (total_undelegate_amount, undelegate_msgs, atts) = get_undelegate_msgs(
         delegator.to_string(),
         undelegate_amount,
         coin_denom.clone(),
-        validators_reg.validators,
+        validators_delegation_ratio,
     );
     msgs.extend(undelegate_msgs.clone());
 
@@ -581,14 +629,14 @@ pub fn submit_pending_batch(
         block: block_height,
         amount: total_undelegate_amount,
     });
-    SUPPLY_QUEUE.save(storage, &supply_queue)?;
+    SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
 
     // // update total bond, supply and exchange rate here
     state.total_bond_amount = total_bond_amount - total_undelegate_amount;
     state.total_supply = state.total_supply - batch.total_liquid_stake;
     state.total_delegated_amount = delegated_amount - total_undelegate_amount;
     state.update_exchange_rate();
-    STATE.save(storage, &state)?;
+    STATE.save(deps.storage, &state)?;
 
     let next_action_time = time.seconds() + params.unbonding_time;
     batch.expected_native_unstaked = Some(total_undelegate_amount);
@@ -615,8 +663,14 @@ pub fn submit_pending_batch(
         Uint128::zero(),
         time.seconds() + params.batch_period,
     );
-    batches().save(storage, new_pending_batch.id, &new_pending_batch)?;
-    PENDING_BATCH_ID.save(storage, &new_pending_batch.id)?;
+    batches().save(deps.storage, new_pending_batch.id, &new_pending_batch)?;
+    PENDING_BATCH_ID.save(deps.storage, &new_pending_batch.id)?;
+
+    // increment the reward balance on this contract as there is automatic reward withdrawal on undelegation
+    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
+
+    reward_balance += unclaimed_reward;
+    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     Ok((msgs, events))
 }
