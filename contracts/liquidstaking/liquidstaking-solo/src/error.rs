@@ -107,4 +107,10 @@ pub enum ContractError {
 
     #[error("cannot migrate reward contract that is equal with current contract")]
     InvalidRewardContractMigration {},
+
+    #[error("bond amount is less than minimum bond amount")]
+    BondAmountTooLow {},
+
+    #[error("unbond amount is less than minimum unbond amount")]
+    UnbondAmountTooLow {},
 }

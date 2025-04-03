@@ -214,3 +214,29 @@ fn test_normalize_total_supply() {
         current_supply, new_supply
     );
 }
+
+pub fn calculate_query_bounds(min: Option<u64>, max: Option<u64>) -> (u64, u64) {
+    let max_dist = 50;
+    let min_bound = min.unwrap_or(1);
+    let max_bound = match max {
+        Some(max) => max.min(min.unwrap_or_default() + max_dist),
+        None => min.unwrap_or_default() + max_dist,
+    };
+    (min_bound, max_bound)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_query_bounds() {
+        assert_eq!(calculate_query_bounds(None, None), (1, 50));
+        assert_eq!(calculate_query_bounds(Some(200), None), (200, 250));
+        assert_eq!(calculate_query_bounds(None, Some(200)), (1, 50));
+        assert_eq!(calculate_query_bounds(Some(100), Some(300)), (100, 150));
+        assert_eq!(calculate_query_bounds(Some(2), Some(10)), (2, 10));
+        assert_eq!(calculate_query_bounds(Some(1000), Some(2000)), (1000, 1050));
+        assert_eq!(calculate_query_bounds(Some(200), Some(210)), (200, 210));
+    }
+}

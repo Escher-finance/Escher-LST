@@ -45,6 +45,13 @@ pub struct InstantiateMsg {
     /// whether to use external reward contract
     /// if true, the contract will use external reward contract
     pub use_external_reward: Option<bool>,
+    // minimum bond/stake amount
+    pub min_bond: Uint128,
+    // minimum unbond/unstake amount
+    pub min_unbond: Uint128,
+    // limit per batch
+    // this is the max number of unbonding records that can be processed in one batch
+    pub batch_limit: u32,
 }
 
 #[cw_serde]
@@ -107,6 +114,9 @@ pub enum ExecuteMsg {
         fee_rate: Option<Decimal>,
         batch_period: Option<u64>,
         epoch_period: Option<u32>,
+        min_bond: Option<Uint128>,
+        min_unbond: Option<Uint128>,
+        batch_limit: Option<u32>,
     },
     /// Update quote token
     UpdateQuoteToken {
@@ -173,8 +183,9 @@ pub enum QueryMsg {
     Version {},
     #[returns(QuoteToken)]
     QuoteToken { channel_id: u32 },
-    #[returns(Batch)]
+    #[returns(Vec<Batch>)]
     Batch {
+        id: Option<u64>,
         status: Option<BatchStatus>,
         min: Option<u64>,
         max: Option<u64>,

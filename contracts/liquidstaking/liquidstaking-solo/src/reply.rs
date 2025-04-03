@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
 use crate::state::{
-    Parameters, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, VALIDATORS_REGISTRY,
+    Parameters, WithdrawReward, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
 };
 use crate::utils;
 use cosmwasm_std::{
@@ -105,21 +105,21 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let payload: BondRewardsPayload = from_json(msg.payload)?;
+
+    let mut msgs: Vec<SubMsg> = vec![];
+    let mut attrs: Vec<Attribute> = vec![];
+
     // increment the reward balance on this contract as result of withdraw reward
     let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
     reward_balance += payload.amount;
     REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
-    let mut msgs: Vec<SubMsg> = vec![];
-    let mut attrs: Vec<Attribute> = vec![];
-
-    let validator_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
-    let total_validators = validator_reg.validators.len();
-
     let mut split_reward_queue = SPLIT_REWARD_QUEUE.load(deps.storage)?;
-    split_reward_queue.push(payload.validator);
+    split_reward_queue.withdrawed_amount += payload.amount;
+    SPLIT_REWARD_QUEUE.save(deps.storage, &split_reward_queue)?;
 
-    if split_reward_queue.len() == total_validators {
+    if split_reward_queue.withdrawed_amount == split_reward_queue.target_amount {
+        // if total amount that should be withdrawed is reached, we need to split reward
         let msg = ExecuteRewardMsg::SplitReward {};
         let msg_bin = to_json_binary(&msg)?;
         let split_reward_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
@@ -133,11 +133,17 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
             attr("reward_contract", params.reward_address.clone().to_string()),
         ];
 
+        // reset SPLIT_REWARD_QUEUE as we already call the split reward and total amount that should be withdrawed is reached
+        SPLIT_REWARD_QUEUE.save(
+            deps.storage,
+            &WithdrawReward {
+                target_amount: Uint128::zero(),
+                withdrawed_amount: Uint128::zero(),
+            },
+        )?;
+
         let sub_msg: SubMsg = SubMsg::reply_always(split_reward_msg, SPLIT_REWARD_REPLY_ID);
         msgs.push(sub_msg);
-
-        // reset SPLIT_REWARD_QUEUE as all validators already put in batch
-        SPLIT_REWARD_QUEUE.save(deps.storage, &vec![])?;
     }
 
     let res: Response = Response::new().add_submessages(msgs).add_attributes(attrs);
