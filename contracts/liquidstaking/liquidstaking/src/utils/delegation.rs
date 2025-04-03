@@ -488,6 +488,10 @@ pub fn process_bond(
     salt: String,
     channel_id: Option<u32>,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
+    if amount < params.min_bond {
+        return Err(ContractError::BondAmountTooLow {});
+    }
+
     let coin_denom = params.underlying_coin_denom.to_string();
     let msgs = delegation::get_delegate_to_validator_msgs(
         amount,
@@ -800,6 +804,11 @@ pub fn unstake_request_in_batch(
     unstake_amount: Uint128,
     channel_id: Option<u32>,
 ) -> Result<Event, ContractError> {
+    let params = PARAMETERS.load(storage)?;
+    if unstake_amount < params.min_unbond {
+        return Err(ContractError::UnbondAmountTooLow {});
+    }
+
     let pending_batch_id = PENDING_BATCH_ID.load(storage)?;
     let mut pending_batch = batches().load(storage, pending_batch_id)?;
 

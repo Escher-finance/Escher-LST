@@ -89,4 +89,10 @@ pub enum ContractError {
 
     #[error("batch received amount can not bigger than expected native unstaked amount")]
     InvalidBatchReceivedAmount {},
+
+    #[error("bond amount is less than minimum bond amount")]
+    BondAmountTooLow {},
+
+    #[error("unbond amount is less than minimum unbond amount")]
+    UnbondAmountTooLow {},
 }

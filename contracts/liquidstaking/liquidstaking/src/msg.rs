@@ -37,6 +37,10 @@ pub struct InstantiateMsg {
     pub quote_tokens: Vec<QuoteToken>,
     // batch period range in seconds to execute batch
     pub batch_period: u64,
+    // minimum bond/stake amount
+    pub min_bond: Uint128,
+    // minimum unbond/unstake amount
+    pub min_unbond: Uint128,
 }
 
 #[cw_serde]
@@ -96,6 +100,8 @@ pub enum ExecuteMsg {
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
         batch_period: Option<u64>,
+        min_bond: Option<Uint128>,
+        min_unbond: Option<Uint128>,
     },
     /// Update quote token
     UpdateQuoteToken {
