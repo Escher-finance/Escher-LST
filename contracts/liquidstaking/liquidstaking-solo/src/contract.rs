@@ -8,9 +8,9 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, OldParameters, Parameters, State, SupplyQueue, ValidatorsRegistry, CONFIG, PARAMETERS,
-    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE,
-    VALIDATORS_REGISTRY,
+    Config, OldParameters, Parameters, State, SupplyQueue, ValidatorsRegistry, WithdrawReward,
+    CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE,
+    SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use cw2::set_contract_version;
 
@@ -99,6 +99,14 @@ pub fn instantiate(
     };
     STATE.save(deps.storage, &state)?;
 
+    SPLIT_REWARD_QUEUE.save(
+        deps.storage,
+        &WithdrawReward {
+            target_amount: Uint128::zero(),
+            withdrawed_amount: Uint128::zero(),
+        },
+    )?;
+
     validate_quote_tokens(&msg.quote_tokens)?;
 
     for quote_token in msg.quote_tokens {
@@ -113,7 +121,14 @@ pub fn instantiate(
     };
     SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
 
-    SPLIT_REWARD_QUEUE.save(deps.storage, &vec![])?;
+    SPLIT_REWARD_QUEUE.save(
+        deps.storage,
+        &WithdrawReward {
+            target_amount: Uint128::zero(),
+            withdrawed_amount: Uint128::zero(),
+        },
+    )?;
+
     let pending_batch = Batch::new(
         1,
         Uint128::zero(),

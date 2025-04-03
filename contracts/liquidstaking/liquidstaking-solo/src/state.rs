@@ -19,7 +19,13 @@ pub const SUPPLY_QUEUE: Item<SupplyQueue> = Item::new("supply_queue");
 pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 
 // Queue of validator reward for executing split reward
-pub const SPLIT_REWARD_QUEUE: Item<Vec<String>> = Item::new("redelegate_batch");
+pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
+
+#[cw_serde]
+pub struct WithdrawReward {
+    pub withdrawed_amount: Uint128,
+    pub target_amount: Uint128,
+}
 
 #[cw_serde]
 pub struct State {

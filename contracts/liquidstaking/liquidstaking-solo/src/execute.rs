@@ -13,8 +13,8 @@ use crate::msg::{
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-    REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    unbond_record, QuoteToken, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
@@ -23,9 +23,8 @@ use crate::utils::{
     delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
 };
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, DecCoin, Decimal,
-    DepsMut, DistributionMsg, Env, Event, MessageInfo, Response, StdResult, SubMsg, Uint128,
-    WasmMsg,
+    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
+    DistributionMsg, Env, Event, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
@@ -486,21 +485,19 @@ pub fn process_rewards(
     let mut total_amount: Uint128 = Uint128::zero();
 
     for validator in validators_reg.validators {
-        let result: StdResult<Vec<DecCoin>> = deps
+        let delegation_rewards = deps
             .querier
-            .query_delegation_rewards(delegator.clone(), validator.address.to_string());
+            .query_delegation_rewards(delegator.clone(), validator.address.to_string())?;
 
         let mut payload = BondRewardsPayload {
             validator: validator.address.clone(),
             amount: Uint128::zero(),
         };
 
-        if result.is_ok() {
-            for reward in result.unwrap() {
-                if reward.denom == coin_denom {
-                    payload.amount = to_uint128(reward.amount.to_uint_floor())?;
-                    total_amount += payload.amount;
-                }
+        for reward in delegation_rewards {
+            if reward.denom == coin_denom {
+                payload.amount = to_uint128(reward.amount.to_uint_floor())?;
+                total_amount += payload.amount;
             }
         }
 
@@ -520,6 +517,14 @@ pub fn process_rewards(
         }
         attrs.push(attr("amount", payload.amount.to_string()));
     }
+
+    SPLIT_REWARD_QUEUE.save(
+        deps.storage,
+        &WithdrawReward {
+            target_amount: total_amount,
+            withdrawed_amount: Uint128::zero(),
+        },
+    )?;
 
     let ev = ProcessRewardsEvent(total_amount);
     let res: Response = Response::new()
