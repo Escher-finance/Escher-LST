@@ -10,7 +10,7 @@ use crate::helpers;
 use crate::msg::{
     BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, MigrateMsg, ZkgmMessage,
 };
-use crate::query::query_unbond_record_from_batch;
+use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
     unbond_record, QuoteToken, Validator, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
@@ -567,6 +567,7 @@ pub fn set_parameters(
     epoch_period: Option<u32>,
     min_bond: Option<Uint128>,
     min_unbond: Option<Uint128>,
+    batch_limit: Option<u32>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -593,6 +594,7 @@ pub fn set_parameters(
     params.fee_rate = fee_rate.clone().unwrap_or_else(|| params.fee_rate);
     params.min_bond = min_bond.clone().unwrap_or_else(|| params.min_bond);
     params.min_unbond = min_unbond.clone().unwrap_or_else(|| params.min_unbond);
+    params.batch_limit = batch_limit.clone().unwrap_or_else(|| params.batch_limit);
 
     if batch_period.is_some() {
         params.batch_period = batch_period.unwrap();
@@ -677,7 +679,7 @@ pub fn process_batch_withdrawal(
     salt: Vec<String>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
-
+    let params = PARAMETERS.load(deps.storage)?;
     let mut batch = batches().load(deps.storage, id)?;
 
     if batch.status != BatchStatus::Received {
@@ -695,7 +697,17 @@ pub fn process_batch_withdrawal(
 
     let mut staker_undelegation: HashMap<String, StakerUndelegation> = HashMap::new();
 
-    let mut unbonding_records = query_unbond_record_from_batch(deps.storage, batch.id);
+    let mut unbonding_records =
+        query_unreleased_unbond_record_from_batch(deps.storage, batch.id, params.batch_limit);
+
+    let is_last_query = if unbonding_records.len() < params.batch_limit as usize {
+        true
+    } else {
+        false
+    };
+
+    let mut unbond_record_ids = vec![];
+    let mut released_amount = Uint128::zero();
 
     for record in unbonding_records.iter_mut() {
         let entry = staker_undelegation
@@ -717,10 +729,15 @@ pub fn process_batch_withdrawal(
             (user_to_total_unstake_ratio * total_received_amount_in_decimal).to_uint_floor();
 
         entry.unstake_return_native_amount = Some(unstake_return_native_amount);
+        released_amount += unstake_return_native_amount;
 
         record.released = true;
+
         record.released_height = env.block.height;
+
         unbond_record().save(deps.storage, record.id, &record)?;
+
+        unbond_record_ids.push(record.id);
     }
 
     let time = env.block.time;
@@ -728,14 +745,22 @@ pub fn process_batch_withdrawal(
     let denom = params.underlying_coin_denom;
     let ucs03_relay_contract = params.ucs03_relay_contract;
 
-    let mut events: Vec<Event> = vec![];
-    let ev = ProcessBatchUnbondingEvent(
-        id,
-        batch.received_native_unstaked.unwrap(),
-        denom.clone(),
-        time,
-    );
-    events.push(ev);
+    let mut events = vec![];
+
+    if released_amount > Uint128::zero() {
+        let mut events: Vec<Event> = vec![];
+
+        let ev = ProcessBatchUnbondingEvent(
+            id,
+            time,
+            released_amount,
+            batch.received_native_unstaked.unwrap(),
+            denom.clone(),
+            unbond_record_ids,
+        );
+
+        events.push(ev);
+    }
 
     let mut send_msgs: Vec<CosmosMsg> = vec![];
     let mut i = 0;
@@ -767,11 +792,16 @@ pub fn process_batch_withdrawal(
     batch.update_status(utils::batch::BatchStatus::Released, None);
     batches().save(deps.storage, id, &batch)?;
 
+    if is_last_query {
+        batch.update_status(utils::batch::BatchStatus::Released, None);
+        batches().save(deps.storage, id, &batch)?;
+    }
+
     let res: Response = Response::new()
         .add_messages(send_msgs)
         .add_events(events)
-        .add_attribute("action", "process_unbonding_batch")
-        .add_attribute("undelegate_amount", batch.received_native_unstaked.unwrap());
+        .add_attribute("action", "process_batch_withdrawal")
+        .add_attribute("batch_id", batch.id.to_string());
 
     Ok(res)
 }
