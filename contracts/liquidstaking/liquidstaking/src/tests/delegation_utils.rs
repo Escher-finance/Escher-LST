@@ -724,7 +724,10 @@ fn test_get_undelegate_msgs() {
         (validator_a.to_string(), Decimal::from_str("0.4").unwrap()),
         (validator_b.to_string(), Decimal::from_str("0.3").unwrap()),
         (validator_c.to_string(), Decimal::from_str("0.2").unwrap()),
-        (other_validator.to_string(), Decimal::from_str("0.0").unwrap()),
+        (
+            other_validator.to_string(),
+            Decimal::from_str("0.0").unwrap(),
+        ),
     ]);
     let (total_undelegate_amount, msgs, mut atts) = get_undelegate_msgs(
         undelegate_amount,
