@@ -100,7 +100,9 @@ pub fn get_undelegate_msgs(
 
     for (validator, ratio) in validator_delegation_ratio.into_iter() {
         let undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
-
+        if undelegate_amount_for_validator.is_zero() {
+            continue;
+        }
         let amount = Coin {
             amount: undelegate_amount_for_validator.clone(),
             denom: coin_denom.to_string(),
