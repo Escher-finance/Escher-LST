@@ -10,6 +10,8 @@ pub mod state;
 pub mod token_utils;
 pub mod validation_utils;
 
+use std::str::FromStr;
+
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_multi_test::{App, ContractWrapper, Executor};
 
@@ -50,6 +52,9 @@ pub fn mock_instantiate_msg() -> InstantiateMsg {
         salt: "salt".to_string(),
         quote_tokens: vec![],
         batch_period: 3600,
+        batch_limit: 50,
+        min_bond: Uint128::from_str("10000").unwrap(),
+        min_unbond: Uint128::from_str("10000").unwrap(),
     }
 }
 
@@ -64,5 +69,8 @@ pub fn mock_parameters() -> Parameters {
         fee_rate: Decimal::default(),
         fee_receiver: Addr::unchecked("fee"),
         batch_period: u64::default(),
+        batch_limit: 50,
+        min_bond: Uint128::from_str("10000").unwrap(),
+        min_unbond: Uint128::from_str("10000").unwrap(),
     }
 }
