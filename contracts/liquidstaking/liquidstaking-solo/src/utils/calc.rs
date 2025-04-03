@@ -219,8 +219,8 @@ pub fn calculate_query_bounds(min: Option<u64>, max: Option<u64>) -> (u64, u64) 
     let max_dist = 50;
     let min_bound = min.unwrap_or(1);
     let max_bound = match max {
-        Some(max) => max.min(min.unwrap_or_default() + max_dist),
-        None => min.unwrap_or_default() + max_dist,
+        Some(max) => max.min(min_bound + max_dist),
+        None => min_bound + max_dist,
     };
     (min_bound, max_bound)
 }
