@@ -121,50 +121,6 @@ pub fn get_undelegate_msgs(
     (total_undelegate_amount, msgs, atts)
 }
 
-pub fn get_undelegate_from_validator_msgs(
-    delegator: String,
-    undelegate_amount: Uint128,
-    coin_denom: String,
-    validators: Vec<Validator>,
-) -> (Uint128, Vec<CosmosMsg>, Vec<Attribute>) {
-    let mut msgs: Vec<CosmosMsg> = vec![];
-
-    let total_weight = Uint128::from(
-        validators
-            .iter()
-            .map(|v| v.weight)
-            .reduce(|a, b| (a + b))
-            .unwrap_or(0),
-    );
-
-    let mut atts = vec![];
-    let mut total_undelegated: Uint128 = Uint128::from(0u32);
-
-    for validator in validators.into_iter() {
-        let ratio = Decimal::from_ratio(Uint128::from(validator.weight), total_weight);
-
-        let undelegate_amount_dec = Decimal::from_ratio(undelegate_amount, Uint128::one());
-        let undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
-
-        let undelegate_staking_msg = get_babylon_undelegate_cosmos_msg(
-            delegator.to_string(),
-            validator.address.to_string(),
-            undelegate_amount_for_validator.to_string(),
-            coin_denom.clone(),
-        );
-
-        msgs.push(undelegate_staking_msg);
-
-        atts.push(Attribute {
-            key: validator.address.to_string(),
-            value: undelegate_amount_for_validator.to_string(),
-        });
-        total_undelegated += undelegate_amount_for_validator;
-    }
-
-    (total_undelegated, msgs, atts)
-}
-
 pub fn get_validator_delegation_map_with_total_bond(
     deps: Deps,
     delegator: String,
