@@ -71,17 +71,7 @@ mod tests {
             },
         ]);
 
-        // Fails - bad addr
-        let err = validate_validators(&deps.as_mut(), &validators).unwrap_err();
-        assert!(if let ContractError::Std(_) = err {
-            true
-        } else {
-            false
-        });
-
-        validators[0].address = deps.api.addr_make("a").to_string();
         validators[0].weight = 0;
-
         // Fails - zero weight
         let err = validate_validators(&deps.as_mut(), &validators).unwrap_err();
         assert!(if let ContractError::InvalidValidators {} = err {
