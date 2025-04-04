@@ -901,6 +901,9 @@ pub fn update_quote_token(
     quote_token: QuoteToken,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    if channel_id != quote_token.channel_id {
+        return Err(ContractError::InvalidQuoteTokens {});
+    }
     QUOTE_TOKEN.save(deps.storage, channel_id, &quote_token)?;
     Ok(Response::default())
 }
@@ -1033,77 +1036,4 @@ pub fn normalize_supply(deps: DepsMut, env: Env) -> Result<Response, ContractErr
     normalize_supply_queue(&mut supply_queue, env.block.height);
     SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
     Ok(Response::default())
-}
-
-#[test]
-fn test_calculate_native_token() {
-    let staking_token = Uint128::from(10000u32);
-    //60926366
-    let exchange_rate =
-        Decimal::from_ratio(Uint128::from(5350444044771u128), Uint128::from(30000u128));
-
-    println!("exchange_rate: {}", exchange_rate);
-
-    let undelegate_amount: Uint128 =
-        utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
-    println!("undelegate_amount: {}", undelegate_amount);
-}
-
-#[test]
-fn exchange_rate_calculation() {
-    let total_bond = Uint128::new(100);
-
-    let a = Uint128::new(10);
-    let b = Uint128::new(50);
-    let exchange_rate = Decimal::from_ratio(a, b);
-    println!("{:?} / {:?}", total_bond, exchange_rate);
-
-    let token = utils::calc::calculate_staking_token_from_rate(total_bond, exchange_rate);
-
-    println!("token: {:?}", token);
-    assert_eq!(token, Uint128::new(500));
-
-    // - Rewards for 4 days: 1000 Union * 0.0274% * 4 = 1.096 Union
-    // - Total staked Union + rewards (U + R): 1001.096 Union
-    // - Total LUnion (L): 1000 LUnion
-
-    // - New exchange rate: 1001.096 / 1000 = 1.001096 Union per LUnion
-    // - Bob receives: 500 / 1.001096 = 499.45 LUnion
-
-    let a = Uint128::new(1001096);
-    let b = Uint128::new(1000000);
-    let new_exchange_rate = Decimal::from_ratio(a, b);
-
-    let bond_amount = Uint128::new(500000000);
-    let mint_amount =
-        utils::calc::calculate_staking_token_from_rate(bond_amount, new_exchange_rate);
-    assert_eq!(mint_amount, Uint128::new(499452599));
-    println!("mint_amount: {:?}", mint_amount);
-}
-
-#[test]
-fn exchange_unbond_rate_calculation() {
-    let staking_token = Uint128::new(100);
-
-    let a = Uint128::new(110);
-    let b = Uint128::new(100);
-    let exchange_rate = Decimal::from_ratio(a, b);
-
-    let token =
-        utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
-    assert_eq!(token, Uint128::new(110));
-}
-
-#[test]
-fn slippage_calculation() {
-    let expected = Uint128::new(10000);
-    let slippage = Decimal::from_str("0.01").unwrap();
-    let output = Uint128::new(10140);
-
-    let result = utils::calc::check_slippage(output, expected, slippage);
-    assert_eq!(result.is_err(), true);
-
-    let output = Uint128::new(10100);
-    let result = utils::calc::check_slippage(output, expected, slippage);
-    assert_eq!(result.is_ok(), true);
 }

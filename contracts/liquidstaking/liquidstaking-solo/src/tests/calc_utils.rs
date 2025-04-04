@@ -1,4 +1,7 @@
-use crate::utils::calc::*;
+use crate::{
+    state::{BurnQueue, MintQueue, SupplyQueue},
+    utils::calc::*,
+};
 use cosmwasm_std::{
     from_json, testing::MockQuerier, to_json_binary, Decimal, Empty, QuerierWrapper, SystemError,
     SystemResult, Uint128, Uint256,
@@ -118,5 +121,98 @@ fn test_total_lst_supply() {
     assert_eq!(
         total_lst_supply(querier_wrapper, "cw20".to_string()).unwrap(),
         total_supply
+    );
+}
+
+#[test]
+fn test_normalize_supply_queue() {
+    let mint_queue = vec![
+        MintQueue {
+            amount: Uint128::new(40),
+            block: 700,
+        },
+        MintQueue {
+            amount: Uint128::new(50),
+            block: 650,
+        },
+        MintQueue {
+            amount: Uint128::new(20),
+            block: 730,
+        },
+    ];
+
+    let burn_queue = vec![
+        BurnQueue {
+            amount: Uint128::new(10),
+            block: 700,
+        },
+        BurnQueue {
+            amount: Uint128::new(20),
+            block: 730,
+        },
+        BurnQueue {
+            amount: Uint128::new(30),
+            block: 650,
+        },
+    ];
+
+    let mut supply_queue = SupplyQueue {
+        mint: mint_queue,
+        burn: burn_queue,
+        epoch_period: 3600,
+    };
+
+    let current_block = 740;
+    normalize_supply_queue(&mut supply_queue, current_block);
+    println!(">> new_supply_queue::: {:?} ", supply_queue);
+}
+
+#[test]
+fn test_normalize_total_supply() {
+    let mint_queue = vec![
+        MintQueue {
+            amount: Uint128::new(40),
+            block: 700,
+        },
+        MintQueue {
+            amount: Uint128::new(50),
+            block: 171168541,
+        },
+        MintQueue {
+            amount: Uint128::new(20),
+            block: 700,
+        },
+    ];
+
+    let burn_queue = vec![
+        BurnQueue {
+            amount: Uint128::new(10),
+            block: 700,
+        },
+        BurnQueue {
+            amount: Uint128::new(20),
+            block: 171168541,
+        },
+        BurnQueue {
+            amount: Uint128::new(30),
+            block: 700,
+        },
+    ];
+
+    let mut supply_queue = SupplyQueue {
+        mint: mint_queue,
+        burn: burn_queue,
+        epoch_period: 360,
+    };
+
+    let current_supply = Uint128::from(20000u128);
+    let current_block = 1000;
+
+    normalize_supply_queue(&mut supply_queue, current_block);
+
+    let new_supply = normalize_total_supply(current_supply, &supply_queue.mint, &supply_queue.burn);
+    println!(
+        "current_supply :{} >> new_supply::: {} ",
+        current_supply, new_supply
     );
 }

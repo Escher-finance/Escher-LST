@@ -11,7 +11,6 @@ use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
 use cw2::ContractVersion;
 use cw20::Cw20ReceiveMsg;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
-use schemars::JsonSchema;
 use unionlabs_primitives::{Bytes, H256};
 
 #[cw_serde]
