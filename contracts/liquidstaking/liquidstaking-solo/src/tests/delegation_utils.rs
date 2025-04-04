@@ -703,13 +703,27 @@ fn test_get_undelegate_msgs() {
     let mut undelegates = msgs
         .into_iter()
         .map(|msg| {
-            let CosmosMsg::Staking(StakingMsg::Undelegate { validator, amount }) = msg else {
+            let CosmosMsg::Any(AnyMsg { type_url: _, value }) = msg else {
                 panic!("wrong cosmos msg");
             };
+            let proto::babylon::epoching::v1::MsgWrappedDelegate { msg } =
+                proto::babylon::epoching::v1::MsgWrappedDelegate::decode(value.as_slice()).unwrap();
+            let proto::cosmos::staking::v1beta1::MsgDelegate {
+                delegator_address,
+                validator_address,
+                amount,
+            } = msg.unwrap();
+            let amount = amount.unwrap();
+            if delegator_address != delegator {
+                panic!("bad delegator");
+            }
             if amount.denom != coin_denom {
                 panic!("wrong denom");
             }
-            (validator, amount.amount)
+            (
+                validator_address,
+                Uint128::from_str(&amount.amount).unwrap(),
+            )
         })
         .collect::<Vec<_>>();
     undelegates.sort_by_key(|undelegate| undelegate.0.clone());
