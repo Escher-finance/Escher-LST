@@ -562,7 +562,7 @@ pub fn submit_pending_batch(
         )?;
 
     state.total_delegated_amount = delegated_amount;
-    // query the total reward from this contract
+    // query the unclaimed total reward
     let unclaimed_reward = get_unclaimed_reward(
         deps.querier,
         delegator.to_string(),
@@ -648,18 +648,8 @@ pub fn submit_pending_batch(
     PENDING_BATCH_ID.save(deps.storage, &new_pending_batch.id)?;
 
     // increment the reward balance on this contract as there is automatic reward withdrawal on undelegation
-    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
-    let total_reward = get_unclaimed_reward(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom,
-        validators_reg
-            .validators
-            .iter()
-            .map(|v| v.address.clone())
-            .collect(),
-    )?;
-    reward_balance += total_reward;
+    let mut reward_balance: Uint128 = REWARD_BALANCE.load(deps.storage)?;
+    reward_balance += unclaimed_reward;
     REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     Ok((msgs, events))
