@@ -4,11 +4,11 @@ Liquid staking components for Cosmos/CosmWasm-based contracts.
 
 Escher currently supports two contract versions:
 
-Babylon Chain:
-[Babylon Liquid Staking Contract](https://github.com/Escher-finance/cw-liquid-staking/tree/babylon/contracts/liquidstaking/liquidstaking-solo)
+- Babylon Chain:
+  [Babylon Liquid Staking Contract](https://github.com/Escher-finance/cw-liquid-staking/tree/babylon/contracts/liquidstaking/liquidstaking-solo)
 
-Union Chain: Separate implementation for the Union chain (you can see in the
-rest of the page).
+- Union Chain: Separate implementation for the Union chain (you can see in the
+  rest of the page).
 
 Key Differences:
 
@@ -30,9 +30,9 @@ Babylon Contract Details:
 
 ### Architecture
 
-For liquid staking contract implementation, we have 2 versions, one with
-separate reward contract and the other one is without. Please see this
-[Architecture](docs/architecture.md)
+- For liquid staking contract implementation, we have 2 versions, one with
+  separate reward contract and the other one is without. Please see this
+  [Architecture](docs/architecture.md)
 
 ## Components:
 
