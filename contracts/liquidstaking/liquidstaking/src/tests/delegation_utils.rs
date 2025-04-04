@@ -1,9 +1,9 @@
 use crate::{
-    event::UNSTAKE_REQUEST_EVENT,
+    event::{SUBMIT_BATCH_EVENT, UNBOND_EVENT, UNSTAKE_REQUEST_EVENT},
     msg::{BondData, DelegationDiff, Ucs03ExecuteMsg, ValidatorDelegation},
     state::{
         unbond_record, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS,
-        PENDING_BATCH_ID, QUOTE_TOKEN, STATE, TOKEN_COUNT, VALIDATORS_REGISTRY,
+        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, TOKEN_COUNT, VALIDATORS_REGISTRY,
     },
     tests::mock_parameters,
     utils::{
@@ -1103,4 +1103,172 @@ fn test_process_bond() {
             validators
         )
     );
+}
+
+#[test]
+fn test_submit_pending_batch() {
+    let mut deps = mock_dependencies();
+    let time = Timestamp::from_seconds(1000000);
+    let sender = deps.api.addr_make("sender");
+    let delegator = deps.api.addr_make("delegator");
+    let pending_batch_id = 10;
+    let mut pending_batch = Batch {
+        id: pending_batch_id,
+        total_liquid_stake: Uint128::new(100),
+        expected_native_unstaked: None,
+        received_native_unstaked: None,
+        unbond_records_count: 0,
+        next_batch_action_time: None,
+        status: BatchStatus::Pending,
+    };
+    let params = mock_parameters();
+    let validator_addr_a = "a".to_string();
+    let validator_addr_b = "b".to_string();
+    let validators = Vec::from([
+        Validator {
+            weight: 10,
+            address: validator_addr_a.clone(),
+        },
+        Validator {
+            weight: 20,
+            address: validator_addr_b.clone(),
+        },
+    ]);
+    let validators_cosm = &[
+        cosmwasm_std::Validator::create(
+            validator_addr_a.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            validator_addr_b.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+    ];
+    let delegations = &[
+        cosmwasm_std::FullDelegation::create(
+            delegator.clone(),
+            validator_addr_a.clone(),
+            Coin::new(Uint128::new(1000), params.underlying_coin_denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+        cosmwasm_std::FullDelegation::create(
+            delegator.clone(),
+            validator_addr_b.clone(),
+            Coin::new(Uint128::new(2000), params.underlying_coin_denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+    ];
+    let mut querier = MockQuerier::default();
+    querier.staking.update(
+        params.underlying_coin_denom.clone(),
+        validators_cosm,
+        delegations,
+    );
+    querier.distribution.set_rewards(
+        validator_addr_a.clone(),
+        delegator.clone(),
+        Vec::from([DecCoin::new(
+            Decimal256::from_str("20.0").unwrap(),
+            params.underlying_coin_denom.clone(),
+        )]),
+    );
+    querier.distribution.set_rewards(
+        validator_addr_b.clone(),
+        delegator.clone(),
+        Vec::from([DecCoin::new(
+            Decimal256::from_str("10.0").unwrap(),
+            params.underlying_coin_denom.clone(),
+        )]),
+    );
+    deps.querier = querier;
+    let validators_reg = ValidatorsRegistry {
+        validators: Vec::from(validators.clone()),
+    };
+    let state = State {
+        exchange_rate: Decimal::from_str("1.1").unwrap(),
+        total_bond_amount: Uint128::new(20_000),
+        total_delegated_amount: Uint128::new(15_000),
+        total_supply: Uint128::new(100_000),
+        bond_counter: 5,
+        last_bond_time: 50000,
+    };
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+    let reward_balance = Uint128::new(100_000);
+    REWARD_BALANCE
+        .save(deps.as_mut().storage, &reward_balance)
+        .unwrap();
+
+    let (msgs, events) = submit_pending_batch(
+        deps.as_mut(),
+        time,
+        sender,
+        delegator.clone(),
+        &mut pending_batch,
+        params.clone(),
+        validators_reg.clone(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        PENDING_BATCH_ID.load(&deps.storage).unwrap(),
+        pending_batch_id + 1
+    );
+    let querier_wrapper = QuerierWrapper::<Empty>::new(&deps.querier);
+    let total_reward = get_unclaimed_reward(
+        querier_wrapper,
+        delegator.to_string(),
+        params.underlying_coin_denom.clone(),
+        validators_reg
+            .validators
+            .iter()
+            .map(|v| v.address.clone())
+            .collect(),
+    )
+    .unwrap();
+    assert!(!total_reward.is_zero());
+    assert_eq!(
+        REWARD_BALANCE.load(&deps.storage).unwrap(),
+        reward_balance + total_reward
+    );
+    let updated_batch = batches().load(&deps.storage, pending_batch.id).unwrap();
+    assert!(matches!(updated_batch.status, BatchStatus::Submitted));
+    assert!(updated_batch.next_batch_action_time.is_some());
+    assert!(msgs.iter().all(|msg| {
+        match msg {
+            CosmosMsg::Wasm(cosmwasm_std::WasmMsg::Execute {
+                contract_addr,
+                msg,
+                funds,
+            }) => {
+                // Check burn msg
+                if *contract_addr != params.cw20_address.to_string() || !funds.is_empty() {
+                    return false;
+                }
+                let msg: cw20::Cw20ExecuteMsg = from_json(msg).unwrap();
+                let cw20::Cw20ExecuteMsg::Burn { amount } = msg else {
+                    return false;
+                };
+                return amount == pending_batch.total_liquid_stake;
+            }
+            CosmosMsg::Staking(StakingMsg::Undelegate { validator, amount }) => {
+                return validators
+                    .iter()
+                    .map(|v| v.address.clone())
+                    .collect::<Vec<_>>()
+                    .contains(validator)
+                    && amount.denom == params.underlying_coin_denom
+                    && !amount.amount.is_zero();
+            }
+            _ => false,
+        }
+    }));
+    assert!(events
+        .iter()
+        .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT));
 }
