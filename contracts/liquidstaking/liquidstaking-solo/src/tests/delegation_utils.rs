@@ -1200,6 +1200,32 @@ fn test_submit_pending_batch() {
         last_bond_time: 50000,
     };
     STATE.save(deps.as_mut().storage, &state).unwrap();
+    let supply_queue = SupplyQueue {
+        mint: Vec::from([
+            MintQueue {
+                amount: Uint128::new(100),
+                block: 1,
+            },
+            MintQueue {
+                amount: Uint128::new(200),
+                block: 2,
+            },
+        ]),
+        burn: Vec::from([
+            BurnQueue {
+                amount: Uint128::new(50),
+                block: 2,
+            },
+            BurnQueue {
+                amount: Uint128::new(70),
+                block: 3,
+            },
+        ]),
+        epoch_period: 10,
+    };
+    SUPPLY_QUEUE
+        .save(deps.as_mut().storage, &supply_queue)
+        .unwrap();
     let reward_balance = Uint128::new(100_000);
     REWARD_BALANCE
         .save(deps.as_mut().storage, &reward_balance)
@@ -1258,14 +1284,24 @@ fn test_submit_pending_batch() {
                 };
                 return amount == pending_batch.total_liquid_stake;
             }
-            CosmosMsg::Staking(StakingMsg::Undelegate { validator, amount }) => {
+            CosmosMsg::Any(AnyMsg { type_url: _, value }) => {
+                let proto::babylon::epoching::v1::MsgWrappedUndelegate { msg } =
+                    proto::babylon::epoching::v1::MsgWrappedUndelegate::decode(value.as_slice())
+                        .unwrap();
+                let proto::cosmos::staking::v1beta1::MsgUndelegate {
+                    delegator_address,
+                    validator_address,
+                    amount,
+                } = msg.unwrap();
+                let amount = amount.unwrap();
                 return validators
                     .iter()
                     .map(|v| v.address.clone())
                     .collect::<Vec<_>>()
-                    .contains(validator)
+                    .contains(&validator_address)
+                    && delegator_address == delegator.to_string()
                     && amount.denom == params.underlying_coin_denom
-                    && !amount.amount.is_zero();
+                    && !Uint128::from_str(&amount.amount).unwrap().is_zero();
             }
             _ => false,
         }
