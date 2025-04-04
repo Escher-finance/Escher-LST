@@ -8,7 +8,7 @@ pub mod protocol_utils;
 pub mod query;
 pub mod state;
 pub mod token_utils;
-// pub mod validation_utils;
+pub mod validation_utils;
 
 use std::str::FromStr;
 
