@@ -34,9 +34,12 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
             staker,
             released,
             id,
+            batch_id,
             min,
             max,
-        } => to_json_binary(&(query_unbond_record(deps.storage, staker, released, id, min, max)?)),
+        } => to_json_binary(
+            &(query_unbond_record(deps.storage, staker, released, id, batch_id, min, max)?),
+        ),
         QueryMsg::QuoteToken { channel_id } => {
             to_json_binary(&query_quote_token(deps.storage, channel_id)?)
         }
@@ -152,6 +155,7 @@ pub fn query_unbond_record(
     staker: Option<String>,
     released: Option<bool>,
     id: Option<u64>,
+    batch_id: Option<u64>,
     min: Option<u64>,
     max: Option<u64>,
 ) -> Result<Vec<UnbondRecord>, ContractError> {
@@ -164,58 +168,37 @@ pub fn query_unbond_record(
     let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
     let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
 
-    match (staker, released) {
-        (Some(staker), None) => {
-            let mut unbonded_list: Vec<UnbondRecord> = vec![];
-            let unbonded_range = unbond_record().idx.staker.prefix(staker).range(
+    let unbonded_range = if let Some(batch_id) = batch_id {
+        unbond_record()
+            .idx
+            .batch
+            .prefix(batch_id.to_string())
+            .range(storage, min_bound, max_bound, Order::Ascending)
+    } else {
+        match (staker, released) {
+            (Some(staker), None) => unbond_record().idx.staker.prefix(staker).range(
                 storage,
                 min_bound,
                 max_bound,
                 Order::Ascending,
-            );
-
-            for unbonded in unbonded_range {
-                if unbonded.is_ok() {
-                    unbonded_list.push(unbonded.unwrap().1);
-                }
-            }
-
-            Ok(unbonded_list)
-        }
-        (None, Some(released)) => {
-            let mut unbonded_list: Vec<UnbondRecord> = vec![];
-            let unbonded_range = unbond_record()
+            ),
+            (None, Some(released)) => unbond_record()
                 .idx
                 .released
                 .prefix(released.to_string())
-                .range(storage, min_bound, max_bound, Order::Ascending);
-
-            for unbonded in unbonded_range {
-                if unbonded.is_ok() {
-                    unbonded_list.push(unbonded.unwrap().1);
-                }
-            }
-
-            Ok(unbonded_list)
-        }
-        (Some(staker), Some(released)) => {
-            let mut unbonded_list: Vec<UnbondRecord> = vec![];
-            let unbonded_range = unbond_record()
+                .range(storage, min_bound, max_bound, Order::Ascending),
+            (Some(staker), Some(released)) => unbond_record()
                 .idx
                 .staker_released
                 .prefix(format!("{}-{}", staker, released))
-                .range(storage, min_bound, max_bound, Order::Ascending);
-
-            for unbonded in unbonded_range {
-                if unbonded.is_ok() {
-                    unbonded_list.push(unbonded.unwrap().1);
-                }
-            }
-
-            Ok(unbonded_list)
+                .range(storage, min_bound, max_bound, Order::Ascending),
+            (None, None) => return Err(ContractError::InvalidUnbondRecordQuery {}),
         }
-        (None, None) => Err(ContractError::InvalidUnbondRecordQuery {}),
-    }
+    };
+
+    Ok(unbonded_range
+        .filter_map(|unbonded| Some(unbonded.ok()?.1))
+        .collect())
 }
 
 pub fn query_unbond_record_from_batch(storage: &dyn Storage, batch_id: u64) -> Vec<UnbondRecord> {
