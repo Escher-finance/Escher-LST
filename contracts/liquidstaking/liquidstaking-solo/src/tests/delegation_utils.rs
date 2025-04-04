@@ -195,23 +195,35 @@ fn test_get_restaking_msgs() {
         },
     ];
     let msgs = get_restaking_msgs(
-        delegator,
+        delegator.clone(),
         surplus_validators,
         deficient_validators,
         "denom".to_string(),
     );
     let mut net_amounts = msgs
         .into_iter()
-        .filter_map(|msg| {
-            if let CosmosMsg::Staking(StakingMsg::Redelegate {
-                src_validator: _,
-                dst_validator,
-                amount,
-            }) = msg
-            {
-                return Some((dst_validator, amount.amount.u128()));
+        .map(|msg| {
+            if let CosmosMsg::Any(AnyMsg { type_url: _, value }) = msg {
+                let proto::babylon::epoching::v1::MsgWrappedBeginRedelegate { msg } =
+                    proto::babylon::epoching::v1::MsgWrappedBeginRedelegate::decode(
+                        value.as_slice(),
+                    )
+                    .unwrap();
+                let proto::cosmos::staking::v1beta1::MsgBeginRedelegate {
+                    delegator_address,
+                    validator_src_address: _,
+                    validator_dst_address,
+                    amount,
+                } = msg.unwrap();
+                if delegator_address != delegator {
+                    panic!("bad delegator");
+                }
+                return (
+                    validator_dst_address,
+                    u128::from_str(&amount.unwrap().amount).unwrap(),
+                );
             }
-            None
+            panic!("bad cosmos msg");
         })
         .fold(HashMap::new(), |mut h, pair| {
             h.entry(pair.0)
