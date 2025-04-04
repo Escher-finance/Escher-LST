@@ -38,6 +38,13 @@ pub struct InstantiateMsg {
     pub quote_tokens: Vec<QuoteToken>,
     // batch period range in seconds to execute batch
     pub batch_period: u64,
+    // minimum bond/stake amount
+    pub min_bond: Uint128,
+    // minimum unbond/unstake amount
+    pub min_unbond: Uint128,
+    // limit per batch
+    // this is the max number of unbonding records that can be processed in one batch
+    pub batch_limit: u32,
 }
 
 #[cw_serde]
@@ -101,6 +108,9 @@ pub enum ExecuteMsg {
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
         batch_period: Option<u64>,
+        min_bond: Option<Uint128>,
+        min_unbond: Option<Uint128>,
+        batch_limit: Option<u32>,
     },
     /// Update quote token
     UpdateQuoteToken {
@@ -160,6 +170,7 @@ pub enum QueryMsg {
     QuoteToken { channel_id: u32 },
     #[returns(Batch)]
     Batch {
+        id: Option<u64>,
         status: Option<BatchStatus>,
         min: Option<u64>,
         max: Option<u64>,
@@ -192,11 +203,6 @@ pub struct StakingLiquidity {
     pub exchange_rate: Decimal,
     pub time: Timestamp,
     pub total_supply: Uint128,
-}
-
-#[cw_serde]
-pub struct Log {
-    pub message: String,
 }
 
 #[cw_serde]

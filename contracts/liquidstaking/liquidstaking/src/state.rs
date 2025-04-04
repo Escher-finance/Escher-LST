@@ -63,6 +63,13 @@ pub struct Parameters {
     pub fee_receiver: Addr,
     // batch period range in seconds to execute batch
     pub batch_period: u64,
+    // min bond/stake amount
+    pub min_bond: Uint128,
+    // min unbond/unstake amount
+    pub min_unbond: Uint128,
+    // limit per batch
+    // this is the max number of unbonding records that can be processed in one batch
+    pub batch_limit: u32,
 }
 
 impl State {

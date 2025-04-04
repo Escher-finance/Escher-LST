@@ -894,7 +894,7 @@ fn test_unstake_request_in_batch() {
     env.block.height = 500000;
     let sender = "sender".to_string();
     let staker = "staker".to_string();
-    let unstake_amount = Uint128::new(50);
+    let unstake_amount = Uint128::new(10000);
     let pending_batch_id = 10;
     let token_count = 5;
     let channel_id = Some(1);
@@ -916,6 +916,8 @@ fn test_unstake_request_in_batch() {
     PENDING_BATCH_ID
         .save(deps.as_mut().storage, &pending_batch_id)
         .unwrap();
+    let params = mock_parameters();
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
 
     let unstake_request_event = unstake_request_in_batch(
         env.clone(),
@@ -1012,7 +1014,7 @@ fn test_process_bond() {
     let sender = "sender".to_string();
     let staker = "staker".to_string();
     let delegator = api.addr_make("delegator");
-    let amount = Uint128::new(3000);
+    let amount = Uint128::new(10000);
     let bond_time = 36000;
     let salt = "0x0000000000000000000000000000000000000000000000000000000000000001".to_string();
     let params = mock_parameters();

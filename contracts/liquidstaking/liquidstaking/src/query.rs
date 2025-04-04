@@ -45,9 +45,12 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         }
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
-        QueryMsg::Batch { status, min, max } => {
-            to_json_binary(&query_batch(deps.storage, status, min, max)?)
-        }
+        QueryMsg::Batch {
+            id,
+            status,
+            min,
+            max,
+        } => to_json_binary(&query_batch(deps.storage, id, status, min, max)?),
     }?)
 }
 
@@ -201,17 +204,29 @@ pub fn query_unbond_record(
         .collect())
 }
 
-pub fn query_unbond_record_from_batch(storage: &dyn Storage, batch_id: u64) -> Vec<UnbondRecord> {
+pub fn query_unreleased_unbond_record_from_batch(
+    storage: &dyn Storage,
+    batch_id: u64,
+    limit: u32,
+) -> Vec<UnbondRecord> {
     let mut unbonded_list: Vec<UnbondRecord> = vec![];
     let unbonded_range = unbond_record()
         .idx
-        .released
+        .batch
         .prefix(batch_id.to_string())
         .range(storage, None, None, Order::Ascending);
 
+    let mut count = 0;
     for unbonded in unbonded_range {
         if unbonded.is_ok() {
-            unbonded_list.push(unbonded.unwrap().1);
+            let unbond_record = unbonded.unwrap().1;
+            if unbond_record.released == false {
+                unbonded_list.push(unbond_record);
+                count += 1;
+                if count >= limit {
+                    break;
+                }
+            }
         }
     }
     unbonded_list
@@ -219,10 +234,17 @@ pub fn query_unbond_record_from_batch(storage: &dyn Storage, batch_id: u64) -> V
 
 pub fn query_batch(
     storage: &dyn Storage,
+    id: Option<u64>,
     status: Option<BatchStatus>,
     min: Option<u64>,
     max: Option<u64>,
 ) -> Result<Vec<Batch>, ContractError> {
+    // if batch id parameter is provided, return the batch with that id
+    if id.is_some() {
+        let batch = batches().load(storage, id.unwrap())?;
+        return Ok(vec![batch]);
+    }
+
     // if batch status parameter is none, set to pending as default
     let batch_status = match status {
         Some(status) => status,

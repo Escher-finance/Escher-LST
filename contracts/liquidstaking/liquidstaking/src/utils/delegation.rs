@@ -432,6 +432,10 @@ pub fn process_bond(
     salt: String,
     channel_id: Option<u32>,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
+    if amount < params.min_bond {
+        return Err(ContractError::BondAmountTooLow {});
+    }
+
     let coin_denom = params.underlying_coin_denom.to_string();
     let msgs = get_delegate_to_validator_msgs(
         amount,
@@ -562,7 +566,7 @@ pub fn submit_pending_batch(
         )?;
 
     state.total_delegated_amount = delegated_amount;
-    // query the total reward from this contract
+    // query the unclaimed total reward
     let unclaimed_reward = get_unclaimed_reward(
         deps.querier,
         delegator.to_string(),
@@ -618,9 +622,15 @@ pub fn submit_pending_batch(
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
-    let next_action_time = time.seconds() + params.unbonding_time;
     batch.expected_native_unstaked = Some(total_undelegate_amount);
-    batch.update_status(BatchStatus::Submitted, Some(next_action_time));
+
+    if batch.total_liquid_stake.is_zero() {
+        batch.update_status(BatchStatus::Released, None);
+    } else {
+        let next_action_time = time.seconds() + params.unbonding_time;
+        batch.update_status(BatchStatus::Submitted, Some(next_action_time));
+    }
+
     batches().save(deps.storage, batch.id, batch)?;
 
     let ev = SubmitBatchEvent(
@@ -648,18 +658,8 @@ pub fn submit_pending_batch(
     PENDING_BATCH_ID.save(deps.storage, &new_pending_batch.id)?;
 
     // increment the reward balance on this contract as there is automatic reward withdrawal on undelegation
-    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
-    let total_reward = get_unclaimed_reward(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom,
-        validators_reg
-            .validators
-            .iter()
-            .map(|v| v.address.clone())
-            .collect(),
-    )?;
-    reward_balance += total_reward;
+    let mut reward_balance: Uint128 = REWARD_BALANCE.load(deps.storage)?;
+    reward_balance += unclaimed_reward;
     REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     Ok((msgs, events))
@@ -677,6 +677,11 @@ pub fn unstake_request_in_batch(
     unstake_amount: Uint128,
     channel_id: Option<u32>,
 ) -> Result<Event, ContractError> {
+    let params = PARAMETERS.load(storage)?;
+    if unstake_amount < params.min_unbond {
+        return Err(ContractError::UnbondAmountTooLow {});
+    }
+
     let pending_batch_id = PENDING_BATCH_ID.load(storage)?;
     let mut pending_batch = batches().load(storage, pending_batch_id)?;
 
@@ -705,6 +710,7 @@ pub fn unstake_request_in_batch(
         channel_id,
         unstake_amount,
         record.id,
+        pending_batch.id,
         env.block.time,
     );
 
