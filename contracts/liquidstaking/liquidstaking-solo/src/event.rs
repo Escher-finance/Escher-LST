@@ -176,6 +176,7 @@ pub fn UnstakeRequestEvent(
     channel_id: Option<u32>,
     amount: Uint128,
     record_id: u64,
+    batch_id: u64,
     time: Timestamp,
 ) -> Event {
     let mut channel_id_str = "".to_string();
@@ -190,6 +191,7 @@ pub fn UnstakeRequestEvent(
         .add_attribute("channel_id", channel_id_str)
         .add_attribute("unbond_amount", amount)
         .add_attribute("time", format!("{}", time.nanos()))
+        .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("record_id", format!("{}", record_id))
 }
 

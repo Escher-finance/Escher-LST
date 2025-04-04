@@ -642,9 +642,15 @@ pub fn submit_pending_batch(
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
-    let next_action_time = time.seconds() + params.unbonding_time;
     batch.expected_native_unstaked = Some(total_undelegate_amount);
-    batch.update_status(BatchStatus::Submitted, Some(next_action_time));
+    // no unbond record in this batch or no liquid stake amount
+    // so we can release the batch and assume it as completed/done
+    if batch.total_liquid_stake.is_zero() {
+        batch.update_status(BatchStatus::Released, None);
+    } else {
+        let next_action_time = time.seconds() + params.unbonding_time;
+        batch.update_status(BatchStatus::Submitted, Some(next_action_time));
+    }
     batches().save(deps.storage, batch.id, &batch)?;
 
     let ev = SubmitBatchEvent(
@@ -726,6 +732,7 @@ pub fn unstake_request_in_batch(
         channel_id,
         unstake_amount,
         record.id,
+        pending_batch.id,
         env.block.time,
     );
 
