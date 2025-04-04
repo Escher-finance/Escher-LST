@@ -732,6 +732,7 @@ pub fn unstake_request_in_batch(
         channel_id,
         unstake_amount,
         record.id,
+        pending_batch.id,
         env.block.time,
     );
 
