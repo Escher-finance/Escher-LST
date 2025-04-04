@@ -622,9 +622,15 @@ pub fn submit_pending_batch(
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
 
-    let next_action_time = time.seconds() + params.unbonding_time;
     batch.expected_native_unstaked = Some(total_undelegate_amount);
-    batch.update_status(BatchStatus::Submitted, Some(next_action_time));
+
+    if batch.total_liquid_stake.is_zero() {
+        batch.update_status(BatchStatus::Released, None);
+    } else {
+        let next_action_time = time.seconds() + params.unbonding_time;
+        batch.update_status(BatchStatus::Submitted, Some(next_action_time));
+    }
+
     batches().save(deps.storage, batch.id, batch)?;
 
     let ev = SubmitBatchEvent(

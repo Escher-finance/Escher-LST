@@ -205,11 +205,6 @@ pub struct StakingLiquidity {
 }
 
 #[cw_serde]
-pub struct Log {
-    pub message: String,
-}
-
-#[cw_serde]
 pub struct MintTokensPayload {
     pub sender: String,
     pub staker: String,

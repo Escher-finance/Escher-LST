@@ -6,10 +6,10 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, MultiIndex};
 
 #[cw_serde]
 pub enum BatchStatus {
-    Pending,   // Pending means this batch still waiting the batch period to be submitted
+    Pending, // Pending means this batch still waiting the submit batch call after batch period to be submitted
     Submitted, // Submitted means this batch already processed and send undelegate message to validators
-    Received, // received means this batch already received native token from delegators as it already complete unbonding
-    Released, // released means it already send back the unstaked native token to user
+    Received, // received means this batch already received native token from validator undelegation as it already complete unbonding
+    Released, // released means it already send back the unstaked native token to user and batch is completed/done
 }
 
 #[cw_serde]
