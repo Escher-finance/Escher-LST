@@ -6,6 +6,22 @@ use cosmwasm_std::{
 use cw20::TokenInfoResponse;
 use std::str::FromStr;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_query_bounds() {
+        assert_eq!(calculate_query_bounds(None, None), (1, 50));
+        assert_eq!(calculate_query_bounds(Some(200), None), (200, 249));
+        assert_eq!(calculate_query_bounds(None, Some(200)), (1, 50));
+        assert_eq!(calculate_query_bounds(Some(100), Some(300)), (100, 149));
+        assert_eq!(calculate_query_bounds(Some(2), Some(10)), (2, 10));
+        assert_eq!(calculate_query_bounds(Some(1000), Some(2000)), (1000, 1049));
+        assert_eq!(calculate_query_bounds(Some(200), Some(210)), (200, 210));
+    }
+}
+
 #[test]
 fn test_calculate_staking_token_from_rate() {
     let stake_amount = Uint128::new(112382);
