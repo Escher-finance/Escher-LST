@@ -1,4 +1,5 @@
 use crate::event::SplitRewardEvent;
+use crate::msg::{Balance, LSTQueryMsg};
 use crate::{error::ContractError, msg::ExecuteLstMsg};
 
 use crate::helpers;
@@ -12,32 +13,40 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let config = CONFIG.load(deps.storage)?;
-    // only liquid staking contract able to call this function
-    if info.sender != config.lst_contract_address {
-        return Err(ContractError::Unauthorized {});
-    }
 
-    // first need to get this contract balance
+    // first need to get balance state that is stored on liquid staking contract
     let contract_addr: Addr = env.contract.address;
-    let balance = deps
+    let msg = LSTQueryMsg::RewardBalance {};
+
+    let reward_contract_balance = deps
         .querier
         .query_balance(contract_addr, config.coin_denom.clone())?;
 
-    let mut msgs: Vec<CosmosMsg> = vec![];
-
-    if balance.amount == Uint128::zero() {
+    if reward_contract_balance.amount == Uint128::zero() {
         return Err(ContractError::NoBalance {});
     }
 
+    let lst_contract_addr: Addr = config.lst_contract_address;
+    let lst_reward_balance: Balance = deps
+        .querier
+        .query_wasm_smart(lst_contract_addr.clone(), &msg)?;
+
+    let mut balance_to_split = lst_reward_balance.amount;
+
+    if reward_contract_balance.amount < balance_to_split {
+        balance_to_split = reward_contract_balance.amount;
+    }
+
+    let mut msgs: Vec<CosmosMsg> = vec![];
     let mut attrs: Vec<Attribute> = vec![
         attr("action", "split_reward"),
         attr("fee_rate", format!("{:?}", config.fee_rate)),
-        attr("amount", balance.amount.to_string()),
+        attr("amount", balance_to_split.to_string()),
         attr("fee_receiver", config.fee_receiver.to_string()),
         attr("time", format!("{}", env.block.time.nanos())),
     ];
     let (redelegate, fee) =
-        helpers::split_revenue(balance.amount, config.fee_rate, config.coin_denom);
+        helpers::split_revenue(balance_to_split, config.fee_rate, config.coin_denom);
 
     // Send the fee to revenue receiver
     let bank_msg = CosmosMsg::Bank(BankMsg::Send {
@@ -48,8 +57,7 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     msgs.push(bank_msg);
 
     // Redelegate by call the LST Contract and attach the funds
-    let lst: helpers::LstTemplateContract =
-        helpers::LstTemplateContract(config.lst_contract_address);
+    let lst: helpers::LstTemplateContract = helpers::LstTemplateContract(lst_contract_addr);
     let execute_msg = lst.call(ExecuteLstMsg::Redelegate {}, vec![redelegate.clone()])?;
     msgs.push(execute_msg);
 
@@ -58,7 +66,7 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
 
     let event = SplitRewardEvent(
         config.fee_rate,
-        balance.amount,
+        balance_to_split,
         redelegate.amount,
         fee.amount,
         env.block.time,
@@ -92,24 +100,6 @@ pub fn set_config(
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::default())
-}
-
-/// Update the ownership of the contract.
-#[allow(clippy::needless_pass_by_value)]
-pub fn update_ownership(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    action: cw_ownable::Action,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    if action == cw_ownable::Action::RenounceOwnership {
-        return Err(ContractError::OwnershipCannotBeRenounced);
-    };
-
-    let res: Response = Response::new().add_attribute("action", "update_ownership");
-
-    Ok(res)
 }
 
 pub fn transfer_to_owner(

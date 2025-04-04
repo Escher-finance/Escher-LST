@@ -9,10 +9,6 @@ pub mod msg;
 pub mod query;
 pub mod reply;
 pub mod state;
-
-// #[cfg(test)]
-// pub mod tests;
-
+pub mod tests;
 pub mod utils;
-
 pub use crate::error::ContractError;

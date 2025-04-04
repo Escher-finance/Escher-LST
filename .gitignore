@@ -3,6 +3,10 @@
 # Dotenv file
 .env
 
+*/node_modules
+*/.next
+
+*/*/artifacts
 /*/node_modules
 /*/dist
 /*/build

@@ -1,0 +1,89 @@
+use cosmwasm_std::{testing::mock_dependencies, Uint128};
+
+use crate::{
+    query::*,
+    state::{unbond_record, UnbondRecord},
+    ContractError,
+};
+
+#[test]
+fn test_query_unbond_record() {
+    let mut deps = mock_dependencies();
+    let total = 30;
+    let sender = "sender".to_string();
+    let staker = "staker".to_string();
+    for i in 0..total {
+        let unbond_rec = UnbondRecord {
+            id: i,
+            height: 10000,
+            sender: sender.clone(),
+            staker: staker.clone(),
+            channel_id: None,
+            amount: Uint128::new(1000),
+            released_height: 0,
+            // These bellow are just to create some variation in the data
+            released: i > (total / 2),
+            batch_id: if i % 2 == 0 { 1 } else { 2 },
+        };
+        unbond_record()
+            .save(deps.as_mut().storage, i, &unbond_rec)
+            .unwrap();
+    }
+    // Query by id
+    let unbond_recs =
+        query_unbond_record(&deps.storage, None, None, Some(20), None, None, None).unwrap();
+    assert_eq!(unbond_recs.len(), 1);
+    assert_eq!(unbond_recs[0].id, 20);
+    // Query by batch_id
+    let unbond_recs =
+        query_unbond_record(&deps.storage, None, None, None, Some(2), None, None).unwrap();
+    assert_eq!(unbond_recs.len(), total as usize / 2);
+    assert!(unbond_recs.iter().all(|r| r.batch_id == 2));
+    // Query by released
+    let unbond_recs =
+        query_unbond_record(&deps.storage, None, Some(false), None, None, None, None).unwrap();
+    assert_eq!(unbond_recs.len(), total as usize / 2);
+    assert!(unbond_recs.iter().all(|r| !r.released));
+    // Query by staker
+    let unbond_recs = query_unbond_record(
+        &deps.storage,
+        Some(staker.clone()),
+        None,
+        None,
+        None,
+        Some(10),
+        Some(15),
+    )
+    .unwrap();
+    assert_eq!(unbond_recs.len(), 6);
+    assert!(unbond_recs
+        .iter()
+        .all(|r| r.staker == staker && r.id >= 10 && r.id <= 15));
+    // Query by staker_released
+    let unbond_recs = query_unbond_record(
+        &deps.storage,
+        Some(staker.clone()),
+        Some(true),
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    assert_eq!(unbond_recs.len(), (total as usize / 2) - 1);
+    assert!(unbond_recs.iter().all(|r| r.staker == staker && r.released));
+}
+
+#[test]
+fn test_query_unbond_record_should_return_err_if_invalid_query() {
+    use cosmwasm_std::testing::mock_dependencies;
+    let deps = mock_dependencies();
+    let err =
+        query_unbond_record(&deps.storage, None, None, None, None, Some(0), Some(100)).unwrap_err();
+    let has_right_error = if let ContractError::InvalidUnbondRecordQuery {} = err {
+        true
+    } else {
+        false
+    };
+    assert!(has_right_error);
+}

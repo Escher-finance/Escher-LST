@@ -4,7 +4,10 @@ use std::str::FromStr;
 
 use crate::ContractError;
 
-const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
+/// return how much output if multiplied with decimal rate
+pub fn calc_with_rate(input: Uint128, rate: Decimal) -> Uint128 {
+    (rate * Decimal::from_ratio(input, Uint128::one())).to_uint_floor()
+}
 
 /// return how much staking token from underlying native coin denom
 pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
@@ -16,12 +19,10 @@ pub fn calculate_native_token_from_staking_token(
     staking_token: Uint128,
     exchange_rate: Decimal,
 ) -> Uint128 {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL));
-    let output =
-        (exchange_rate * decimal_fract) * Decimal::from_ratio(staking_token, Uint128::one());
-    output.to_uint_floor()
+    calc_with_rate(staking_token, exchange_rate)
 }
 
+/// Convert Uint256 to Uint128
 pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
     Uint128::from_str(&v.to_string())
 }
@@ -54,4 +55,15 @@ pub fn check_slippage(
     }
 
     Ok(())
+}
+
+pub fn calculate_query_bounds(min: Option<u64>, max: Option<u64>) -> (u64, u64) {
+    // NOTE: 49 because both bounds are inclusive
+    let max_dist = 49;
+    let min_bound = min.unwrap_or(1);
+    let max_bound = match max {
+        Some(max) => max.min(min_bound + max_dist),
+        None => min_bound + max_dist,
+    };
+    (min_bound, max_bound)
 }
