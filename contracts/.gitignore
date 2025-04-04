@@ -1,0 +1,6 @@
+
+/liquidstaking/artifacts
+/liquidstaking/*/artifacts
+
+/liquidstaking/*/target
+/reward/artifacts
