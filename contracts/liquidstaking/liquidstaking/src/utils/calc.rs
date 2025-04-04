@@ -4,8 +4,6 @@ use std::str::FromStr;
 
 use crate::ContractError;
 
-const DECIMAL_FRACTIONAL: u128 = 1_000_000_000_000_000_000u128;
-
 /// return how much staking token from underlying native coin denom
 pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {
     (Decimal::from_ratio(stake_amount, Uint128::one()) / exchange_rate).to_uint_floor()
@@ -16,10 +14,7 @@ pub fn calculate_native_token_from_staking_token(
     staking_token: Uint128,
     exchange_rate: Decimal,
 ) -> Uint128 {
-    let decimal_fract = Decimal::new(Uint128::from(DECIMAL_FRACTIONAL));
-    let output =
-        (exchange_rate * decimal_fract) * Decimal::from_ratio(staking_token, Uint128::one());
-    output.to_uint_floor()
+    (exchange_rate * Decimal::from_ratio(staking_token, Uint128::one())).to_uint_floor()
 }
 
 pub fn to_uint128(v: Uint256) -> StdResult<Uint128> {
@@ -54,4 +49,68 @@ pub fn check_slippage(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_staking_token_from_rate() {
+        let stake_amount = Uint128::new(112382);
+        assert_eq!(
+            calculate_staking_token_from_rate(stake_amount, Decimal::from_ratio(1_u128, 2_u128)),
+            stake_amount * Uint128::new(2)
+        );
+        assert_eq!(
+            calculate_staking_token_from_rate(stake_amount, Decimal::from_str("1.0").unwrap()),
+            stake_amount
+        );
+    }
+
+    #[test]
+    fn test_calculate_native_token_from_staking_token() {
+        let staking_token = Uint128::new(112382);
+        assert_eq!(
+            calculate_native_token_from_staking_token(
+                staking_token,
+                Decimal::from_ratio(1_u128, 2_u128)
+            ),
+            staking_token / Uint128::new(2)
+        );
+
+        let decimal_fractional: u128 = 1_000_000_000_000_000_000u128;
+        let staking_token = Uint128::new(decimal_fractional);
+        assert_eq!(
+            calculate_native_token_from_staking_token(
+                staking_token,
+                Decimal::from_ratio(1u128, staking_token)
+            ),
+            Uint128::one()
+        );
+        let staking_token = Uint128::new(decimal_fractional + 1);
+        assert_eq!(
+            calculate_native_token_from_staking_token(
+                staking_token,
+                Decimal::from_ratio(1u128, staking_token)
+            ),
+            Uint128::zero() // Not enough precision
+        );
+    }
+
+    #[test]
+    fn test_check_slippage() {
+        // Same value
+        assert!(check_slippage(Uint128::new(10), Uint128::new(10), Decimal::zero()).is_ok());
+
+        // Good - lower bound
+        assert!(check_slippage(Uint128::new(98), Uint128::new(100), Decimal::percent(2)).is_ok());
+        // Fails - lower bound
+        assert!(check_slippage(Uint128::new(98), Uint128::new(100), Decimal::percent(1)).is_err());
+
+        // Good - upper bound
+        assert!(check_slippage(Uint128::new(100), Uint128::new(105), Decimal::percent(5)).is_ok());
+        // Fails - upper bound
+        assert!(check_slippage(Uint128::new(100), Uint128::new(105), Decimal::percent(4)).is_err());
+    }
 }
