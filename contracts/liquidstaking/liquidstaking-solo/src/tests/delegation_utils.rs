@@ -3,13 +3,14 @@ use crate::{
     msg::{BondData, DelegationDiff, Ucs03ExecuteMsg, ValidatorDelegation},
     proto,
     state::{
-        unbond_record, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS,
-        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, TOKEN_COUNT,
+        unbond_record, BurnQueue, MintQueue, QuoteToken, State, SupplyQueue, UnbondRecord,
+        Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE,
+        STATE, SUPPLY_QUEUE, TOKEN_COUNT,
     },
     tests::mock_parameters,
     utils::{
         batch::{batches, Batch, BatchStatus},
-        calc,
+        calc::{self, normalize_supply_queue, normalize_total_supply},
         delegation::*,
     },
 };
@@ -1012,6 +1013,32 @@ fn test_process_bond() {
         last_bond_time: 50000,
     };
     STATE.save(deps.as_mut().storage, &state).unwrap();
+    let mut supply_queue = SupplyQueue {
+        mint: Vec::from([
+            MintQueue {
+                amount: Uint128::new(100),
+                block: 1,
+            },
+            MintQueue {
+                amount: Uint128::new(200),
+                block: 2,
+            },
+        ]),
+        burn: Vec::from([
+            BurnQueue {
+                amount: Uint128::new(50),
+                block: 2,
+            },
+            BurnQueue {
+                amount: Uint128::new(70),
+                block: 3,
+            },
+        ]),
+        epoch_period: 10,
+    };
+    SUPPLY_QUEUE
+        .save(deps.as_mut().storage, &supply_queue)
+        .unwrap();
 
     let (msgs, sub_msgs, bond_data) = process_bond(
         deps.as_mut().storage,
@@ -1034,9 +1061,12 @@ fn test_process_bond() {
 
     let mint_amount = calc::calculate_staking_token_from_rate(amount, updated_state.exchange_rate);
 
+    normalize_supply_queue(&mut supply_queue, block_height);
+    let normalized_total_supply =
+        normalize_total_supply(state.total_supply, &supply_queue.mint, &supply_queue.burn);
     assert_eq!(
         updated_state.exchange_rate,
-        Decimal::from_ratio(total_bond_amount + amount, state.total_supply + mint_amount),
+        Decimal::from_ratio(total_bond_amount, normalized_total_supply),
     );
 
     assert_eq!(updated_state.bond_counter, state.bond_counter + 1);
