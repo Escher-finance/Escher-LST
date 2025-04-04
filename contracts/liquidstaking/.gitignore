@@ -16,3 +16,6 @@
 .idea
 
 e2e/diagnostics
+
+*/target
+*/artifacts
