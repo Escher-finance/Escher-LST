@@ -8,8 +8,8 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, MultiIndex};
 pub enum BatchStatus {
     Pending, // Pending means this batch still waiting the submit batch call after batch period to be submitted
     Submitted, // Submitted means this batch already processed and send undelegate message to validators
-    Received, // received means this batch already received native token from validator undelegation as it already complete unbonding
-    Released, // released means it already send back the unstaked native token to user and batch is completed/done
+    Received, // Received means this batch already received native token from validator undelegation as it already complete unbonding
+    Released, // Released means it already send back the unstaked native token to user or batch is completed/done
 }
 
 #[cw_serde]
@@ -22,12 +22,11 @@ pub struct Batch {
     pub expected_native_unstaked: Option<Uint128>,
     /// The amount of native tokens received after unbonding
     pub received_native_unstaked: Option<Uint128>,
-
+    /// The number of unbond records in this batch
     pub unbond_records_count: u64,
-
     /// Estimated time when next batch action occurs
     pub next_batch_action_time: Option<u64>,
-
+    /// Status of this batch
     pub status: BatchStatus,
 }
 
