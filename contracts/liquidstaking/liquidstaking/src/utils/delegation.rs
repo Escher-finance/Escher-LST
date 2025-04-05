@@ -12,7 +12,8 @@ use crate::{
     msg::{BondData, DelegationDiff, MintTokensPayload},
     state::{
         increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, ValidatorsRegistry,
-        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
+        EXECUTOR, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE,
+        VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::Attribute;
@@ -460,6 +461,7 @@ pub fn process_bond(
     )?;
 
     let total_bond_amount: Uint128;
+
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
         // query the total reward from this contract
@@ -471,11 +473,13 @@ pub fn process_bond(
         )?;
 
         let contract_reward_balance = REWARD_BALANCE.load(storage)?;
-
         let reward = unclaimed_reward + contract_reward_balance;
         let fee = calc::calc_with_rate(reward, params.fee_rate);
 
         total_bond_amount = delegated_amount + reward - fee;
+
+        // update the reward balance on this contract as there is automatic reward withdrawal on delegation
+        REWARD_BALANCE.save(storage, &reward)?;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
     }
@@ -535,7 +539,7 @@ pub fn process_bond(
 }
 
 /// Process unstake requests from batch that will burn liquid staking token, undelegate some amount from validator according to exchange rate and create UnbondRecord
-/// 1. Delegate to validators
+/// 1. Undelegate to validators
 /// 2. Set current batch status to submitted
 /// 3. Create new SubmitBatchEvent
 /// 4. Create new pending batch
@@ -579,6 +583,9 @@ pub fn submit_pending_batch(
 
     let fee = calc::calc_with_rate(reward, params.fee_rate);
     let total_bond_amount = delegated_amount + reward - fee;
+
+    // update the reward balance on this contract as there is automatic reward withdrawal on undelegation
+    REWARD_BALANCE.save(deps.storage, &reward)?;
 
     if total_bond_amount.is_zero() || state.total_supply.is_zero() {
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
@@ -656,11 +663,6 @@ pub fn submit_pending_batch(
     );
     batches().save(deps.storage, new_pending_batch.id, &new_pending_batch)?;
     PENDING_BATCH_ID.save(deps.storage, &new_pending_batch.id)?;
-
-    // increment the reward balance on this contract as there is automatic reward withdrawal on undelegation
-    let mut reward_balance: Uint128 = REWARD_BALANCE.load(deps.storage)?;
-    reward_balance += unclaimed_reward;
-    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     Ok((msgs, events))
 }
@@ -764,4 +766,14 @@ pub fn get_transfer_token_cosmos_msg(
         }
     };
     Ok(msg)
+}
+
+pub fn assert_executor(storage: &mut dyn Storage, sender: Addr) -> Result<(), ContractError> {
+    let executor = EXECUTOR.load(storage)?;
+
+    if sender != executor {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    Ok(())
 }

@@ -11,8 +11,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Parameters, State, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-    REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
+    Parameters, State, ValidatorsRegistry, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -93,7 +93,14 @@ pub fn instantiate(
 
     let msgs: Vec<CosmosMsg> = vec![reward_msg, set_withdraw_msg];
 
-    SPLIT_REWARD_QUEUE.save(deps.storage, &vec![])?;
+    SPLIT_REWARD_QUEUE.save(
+        deps.storage,
+        &WithdrawReward {
+            target_amount: Uint128::zero(),
+            withdrawed_amount: Uint128::zero(),
+        },
+    )?;
+
     let pending_batch = Batch::new(
         1,
         Uint128::zero(),
@@ -166,6 +173,7 @@ pub fn execute(
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
+        ExecuteMsg::SetExecutor { executor } => execute::set_executor(deps, info, executor),
         ExecuteMsg::OnZkgm {
             path: _,
             source_channel_id: _,
