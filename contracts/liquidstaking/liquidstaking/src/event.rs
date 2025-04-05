@@ -160,11 +160,14 @@ pub fn ProcessBatchUnbondingEvent(
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute(
             "record_ids",
-            record_ids
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(","),
+            format!(
+                "[{}]",
+                record_ids
+                    .iter()
+                    .map(|id| id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
         )
 }
 
