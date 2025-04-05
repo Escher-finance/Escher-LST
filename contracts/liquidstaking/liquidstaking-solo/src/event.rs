@@ -159,11 +159,14 @@ pub fn ProcessBatchUnbondingEvent(
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute(
             "record_ids",
-            record_ids
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(","),
+            format!(
+                "[{}]",
+                record_ids
+                    .iter()
+                    .map(|id| id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
         )
 }
 
@@ -199,7 +202,7 @@ pub const BATCH_RECEIVED_EVENT: &str = "batch_received";
 
 #[allow(non_snake_case)]
 pub fn BatchReceivedEvent(batch_id: u64, received_amount: String, time: Timestamp) -> Event {
-    Event::new(UNBOND_EVENT.to_string())
+    Event::new(BATCH_RECEIVED_EVENT.to_string())
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("received_amount", received_amount)
         .add_attribute("time", format!("{}", time.nanos()))
