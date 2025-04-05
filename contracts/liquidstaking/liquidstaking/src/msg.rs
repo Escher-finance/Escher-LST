@@ -134,6 +134,9 @@ pub enum ExecuteMsg {
     MigrateReward {
         code_id: u64,
     },
+    SetExecutor {
+        executor: Addr,
+    },
 }
 
 #[cw_ownable_query]
@@ -175,6 +178,8 @@ pub enum QueryMsg {
         min: Option<u64>,
         max: Option<u64>,
     },
+    #[returns(Executor)]
+    Executor {},
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -203,6 +208,11 @@ pub struct StakingLiquidity {
     pub exchange_rate: Decimal,
     pub time: Timestamp,
     pub total_supply: Uint128,
+}
+
+#[cw_serde]
+pub struct Executor {
+    pub address: Addr,
 }
 
 #[cw_serde]

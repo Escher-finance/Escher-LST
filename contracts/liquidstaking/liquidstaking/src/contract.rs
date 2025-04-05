@@ -166,6 +166,7 @@ pub fn execute(
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
+        ExecuteMsg::SetExecutor { executor } => execute::set_executor(deps, info, executor),
         ExecuteMsg::OnZkgm {
             path: _,
             source_channel_id: _,

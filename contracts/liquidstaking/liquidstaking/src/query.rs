@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::msg::{QueryMsg, StakingLiquidity};
+use crate::msg::{Executor, QueryMsg, StakingLiquidity};
 use crate::state::unbond_record;
 use crate::state::{
-    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, PARAMETERS,
+    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, EXECUTOR, PARAMETERS,
     QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, Batch, BatchStatus};
@@ -51,6 +51,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
             min,
             max,
         } => to_json_binary(&query_batch(deps.storage, id, status, min, max)?),
+        QueryMsg::Executor {} => to_json_binary(&query_executor(deps.storage)?),
     }?)
 }
 
@@ -151,6 +152,11 @@ pub fn query_staking_liquidity(
         time: env.block.time,
         total_supply: state.total_supply,
     })
+}
+
+pub fn query_executor(storage: &dyn Storage) -> Result<Executor, ContractError> {
+    let executor = EXECUTOR.load(storage)?;
+    Ok(Executor { address: executor })
 }
 
 pub fn query_unbond_record(

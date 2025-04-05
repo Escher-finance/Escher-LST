@@ -12,7 +12,8 @@ use crate::{
     msg::{BondData, DelegationDiff, MintTokensPayload},
     state::{
         increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, ValidatorsRegistry,
-        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
+        EXECUTOR, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE,
+        VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::Attribute;
@@ -535,7 +536,7 @@ pub fn process_bond(
 }
 
 /// Process unstake requests from batch that will burn liquid staking token, undelegate some amount from validator according to exchange rate and create UnbondRecord
-/// 1. Delegate to validators
+/// 1. Undelegate to validators
 /// 2. Set current batch status to submitted
 /// 3. Create new SubmitBatchEvent
 /// 4. Create new pending batch
@@ -764,4 +765,14 @@ pub fn get_transfer_token_cosmos_msg(
         }
     };
     Ok(msg)
+}
+
+pub fn assert_executor(storage: &mut dyn Storage, sender: Addr) -> Result<(), ContractError> {
+    let executor = EXECUTOR.load(storage)?;
+
+    if sender != executor {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    Ok(())
 }

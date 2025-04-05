@@ -10,17 +10,16 @@ use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMs
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+    unbond_record, QuoteToken, Validator, EXECUTOR, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
     REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::to_uint128;
-use crate::utils::delegation::get_transfer_token_cosmos_msg;
+use crate::utils::calc::{check_slippage, to_uint128};
 use crate::utils::validation::validate_validators;
 use crate::utils::{
-    self, calc::check_slippage, delegation::get_actual_total_delegated,
-    delegation::get_mock_total_reward, delegation::get_unclaimed_reward,
-    delegation::submit_pending_batch,
+    self, delegation::assert_executor, delegation::get_actual_total_delegated,
+    delegation::get_mock_total_reward, delegation::get_transfer_token_cosmos_msg,
+    delegation::get_unclaimed_reward, delegation::submit_pending_batch,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env,
@@ -303,7 +302,7 @@ pub fn receive(
 
 /// Process pending batch and execute it
 pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    assert_executor(deps.storage, info.sender.clone())?;
 
     let params = PARAMETERS.load(deps.storage)?;
     let delegator = env.contract.address.clone();
@@ -353,7 +352,7 @@ pub fn set_batch_received_amount(
     id: u64,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    assert_executor(deps.storage, info.sender)?;
 
     let mut batch = batches().load(deps.storage, id)?;
 
@@ -481,7 +480,7 @@ pub fn process_rewards(
     env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    assert_executor(deps.storage, info.sender.clone())?;
 
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -679,7 +678,7 @@ pub fn process_batch_withdrawal(
     id: u64,
     salt: Vec<String>,
 ) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    assert_executor(deps.storage, info.sender)?;
 
     let params = PARAMETERS.load(deps.storage)?;
     let mut batch = batches().load(deps.storage, id)?;
@@ -919,5 +918,19 @@ pub fn migrate_reward(
     });
 
     let res: Response = Response::new().add_message(migrate_msg);
+    Ok(res)
+}
+
+/// Set executor who can run backend functions
+pub fn set_executor(
+    deps: DepsMut,
+    info: MessageInfo,
+    executor: Addr,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    EXECUTOR.save(deps.storage, &executor)?;
+
+    let res: Response = Response::new().add_attribute("executor", executor.to_string());
     Ok(res)
 }
