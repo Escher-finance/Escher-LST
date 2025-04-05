@@ -10,8 +10,8 @@ use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMs
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, EXECUTOR, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-    REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
+    unbond_record, QuoteToken, Validator, WithdrawReward, EXECUTOR, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::calc::{check_slippage, to_uint128};
@@ -510,14 +510,13 @@ pub fn process_rewards(
             }
         }
 
-        // query reward from the validator
-        let withdraw_reward_msg: CosmosMsg =
-            CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
-                validator: validator.address.to_string(),
-            });
-
         if payload.amount != Uint128::zero() {
             let payload_bin = to_json_binary(&payload)?;
+
+            let withdraw_reward_msg: CosmosMsg =
+                CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
+                    validator: validator.address.to_string(),
+                });
 
             let sub_msg: SubMsg =
                 SubMsg::reply_always(withdraw_reward_msg, PROCESS_WITHDRAW_REWARD_REPLY_ID)
@@ -527,6 +526,14 @@ pub fn process_rewards(
         }
         attrs.push(attr("amount", payload.amount.to_string()));
     }
+
+    SPLIT_REWARD_QUEUE.save(
+        deps.storage,
+        &WithdrawReward {
+            target_amount: total_amount,
+            withdrawed_amount: Uint128::zero(),
+        },
+    )?;
 
     let ev = ProcessRewardsEvent(total_amount);
     let res: Response = Response::new()
