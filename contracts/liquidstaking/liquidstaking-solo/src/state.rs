@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Decimal, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::Map;
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 
@@ -20,6 +20,9 @@ pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 
 // Queue of validator reward for executing split reward
 pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
+
+// Map of the latest bond timestamps for rate-limiting users
+pub const LATEST_BOND_TIMESTAMPS: Map<Addr, Timestamp> = Map::new("latest_bond_timestamps");
 
 #[cw_serde]
 pub struct WithdrawReward {
@@ -77,6 +80,8 @@ pub struct Parameters {
     // limit per batch
     // this is the max number of unbonding records that can be processed in one batch
     pub batch_limit: u32,
+    // bond/stake rate-limit time for each address
+    pub bond_rate_limit_secs: u64,
 }
 
 impl State {

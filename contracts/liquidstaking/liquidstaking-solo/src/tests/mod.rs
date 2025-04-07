@@ -57,6 +57,7 @@ pub fn mock_instantiate_msg() -> InstantiateMsg {
         batch_limit: 50,
         min_bond: Uint128::from_str("10000").unwrap(),
         min_unbond: Uint128::from_str("10000").unwrap(),
+        bond_rate_limit_secs: 3600,
     }
 }
 
@@ -74,5 +75,6 @@ pub fn mock_parameters() -> Parameters {
         batch_limit: 50,
         min_bond: Uint128::from_str("10000").unwrap(),
         min_unbond: Uint128::from_str("10000").unwrap(),
+        bond_rate_limit_secs: 3600,
     }
 }

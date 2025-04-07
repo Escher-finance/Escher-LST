@@ -18,6 +18,7 @@ use crate::state::{
 };
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
+use crate::utils::validation::rate_limit_bond;
 use crate::utils::{
     self, calc::check_slippage, calc::normalize_supply_queue, calc::to_uint128,
     delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
@@ -41,12 +42,20 @@ pub fn bond(
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
-    let delegator = env.contract.address;
 
     // coin must have be sent along with transaction and it should be in underlying coin denom
     if info.funds.len() > 1usize {
         return Err(ContractError::InvalidAsset {});
     }
+
+    rate_limit_bond(
+        deps.storage,
+        &env,
+        params.bond_rate_limit_secs,
+        sender.clone(),
+    )?;
+
+    let delegator = env.contract.address;
 
     let payment = Coin {
         amount: info

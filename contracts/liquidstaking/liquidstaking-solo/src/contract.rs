@@ -86,6 +86,7 @@ pub fn instantiate(
         min_bond: msg.min_bond,
         min_unbond: msg.min_unbond,
         batch_limit: msg.batch_limit,
+        bond_rate_limit_secs: msg.bond_rate_limit_secs,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
