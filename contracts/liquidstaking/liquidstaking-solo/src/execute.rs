@@ -24,7 +24,7 @@ use crate::utils::{
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
-    DistributionMsg, Env, Event, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
+    DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
@@ -358,7 +358,7 @@ pub fn set_batch_received_amount(
             expected: BatchStatus::Submitted,
         });
     }
-    if env.block.time.seconds() > batch.next_batch_action_time.unwrap() {
+    if env.block.time.seconds() < batch.next_batch_action_time.unwrap() {
         return Err(ContractError::BatchNotReady {
             actual: env.block.time.seconds(),
             expected: batch.next_batch_action_time.unwrap(),
@@ -709,7 +709,6 @@ pub fn process_batch_withdrawal(
     };
 
     let mut unbond_record_ids = vec![];
-    let mut released_amount = Uint128::zero();
 
     for record in unbonding_records.iter_mut() {
         let entry = staker_undelegation
@@ -731,7 +730,6 @@ pub fn process_batch_withdrawal(
             (user_to_total_unstake_ratio * total_received_amount_in_decimal).to_uint_floor();
 
         entry.unstake_return_native_amount = Some(unstake_return_native_amount);
-        released_amount += unstake_return_native_amount;
 
         record.released = true;
 
@@ -749,23 +747,9 @@ pub fn process_batch_withdrawal(
 
     let mut events = vec![];
 
-    if released_amount > Uint128::zero() {
-        let mut events: Vec<Event> = vec![];
-
-        let ev = ProcessBatchUnbondingEvent(
-            id,
-            time,
-            released_amount,
-            batch.received_native_unstaked.unwrap(),
-            denom.clone(),
-            unbond_record_ids,
-        );
-
-        events.push(ev);
-    }
-
     let mut send_msgs: Vec<CosmosMsg> = vec![];
     let mut i = 0;
+    let mut released_amount = Uint128::zero();
     for (key, undelegation) in staker_undelegation.iter() {
         let msg = get_transfer_token_cosmos_msg(
             deps.storage,
@@ -788,11 +772,23 @@ pub fn process_batch_withdrawal(
             env.block.time,
         );
         events.push(ev);
+
+        released_amount += undelegation.unstake_return_native_amount.unwrap();
         i += 1;
     }
 
-    batch.update_status(utils::batch::BatchStatus::Released, None);
-    batches().save(deps.storage, id, &batch)?;
+    if released_amount > Uint128::zero() {
+        let ev = ProcessBatchUnbondingEvent(
+            id,
+            time,
+            released_amount,
+            batch.received_native_unstaked.unwrap(),
+            denom.clone(),
+            unbond_record_ids,
+        );
+
+        events.push(ev);
+    }
 
     if is_last_query {
         batch.update_status(utils::batch::BatchStatus::Released, None);
