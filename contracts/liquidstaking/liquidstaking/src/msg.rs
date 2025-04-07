@@ -45,6 +45,8 @@ pub struct InstantiateMsg {
     // limit per batch
     // this is the max number of unbonding records that can be processed in one batch
     pub batch_limit: u32,
+    // bond/stake rate-limit time for each address
+    pub bond_rate_limit_secs: u64,
 }
 
 #[cw_serde]

@@ -1,4 +1,4 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{Addr, StdError};
 use cw_ownable::OwnershipError;
 use thiserror::Error;
 
@@ -106,4 +106,7 @@ pub enum ContractError {
 
     #[error("unbond amount is less than minimum unbond amount")]
     UnbondAmountTooLow {},
+
+    #[error("Bond rate limit exceeded for {user}, try again later")]
+    BondRateLimitExceeded { user: Addr },
 }
