@@ -239,6 +239,11 @@ pub fn receive(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
+    let state = STATE.load(deps.storage)?;
+    if state.exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
 
     // make sure only cw20 contract can call this function

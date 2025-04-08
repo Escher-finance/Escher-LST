@@ -254,6 +254,11 @@ pub fn receive(
     _info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
+    let state = STATE.load(deps.storage)?;
+    if state.exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
     let sender = cw20_msg.sender.to_string();
     let the_staker: String = sender.clone();
