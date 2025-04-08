@@ -202,7 +202,7 @@ pub fn zkgm_bond(
         deps.storage,
         &env,
         params.bond_rate_limit_secs,
-        sender.to_string(),
+        staker.clone(),
         crate::state::Action::ZkBond,
     )?;
 
