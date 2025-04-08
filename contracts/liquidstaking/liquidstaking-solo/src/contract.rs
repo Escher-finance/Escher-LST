@@ -8,9 +8,9 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, Parameters, State, SupplyQueue, ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS,
-    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE,
-    VALIDATORS_REGISTRY,
+    Config, Parameters, State, Status, SupplyQueue, ValidatorsRegistry, WithdrawReward, CONFIG,
+    PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
+    SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use cw2::set_contract_version;
 
@@ -224,13 +224,19 @@ pub fn execute(
             fee_rate,
             coin_denom,
         ),
+        ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
     }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
+    STATUS.save(
+        deps.storage,
+        &Status {
+            bond_is_paused: false,
+        },
+    )?;
     Ok(Response::new()
         .add_attribute("action", "migrate")
         .add_attribute("version", CONTRACT_VERSION)
