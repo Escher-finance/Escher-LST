@@ -53,7 +53,7 @@ pub fn bond(
         &env,
         params.bond_rate_limit_secs,
         sender.to_string(),
-        crate::state::Action::Bond,
+        crate::state::Action::Bond {},
     )?;
 
     let delegator = env.contract.address;
@@ -203,7 +203,7 @@ pub fn zkgm_bond(
         &env,
         params.bond_rate_limit_secs,
         staker.clone(),
-        crate::state::Action::ZkBond,
+        crate::state::Action::ZkBond {},
     )?;
 
     let delegator = env.contract.address;

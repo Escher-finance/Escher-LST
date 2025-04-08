@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::msg::{Executor, QueryMsg, StakingLiquidity};
-use crate::state::unbond_record;
+use crate::state::{unbond_record, Action, ACTION_TIMESTAMPS};
 use crate::state::{
     Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, EXECUTOR, PARAMETERS,
     QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
@@ -11,7 +11,7 @@ use crate::utils::calc;
 use crate::utils::calc::calculate_query_bounds;
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
 use crate::ContractError;
-use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
+use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Timestamp, Uint128};
 use cosmwasm_std::{Binary, Deps, Env, Storage};
 use cw2::ContractVersion;
 use cw_ownable::get_ownership;
@@ -52,7 +52,19 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
             max,
         } => to_json_binary(&query_batch(deps.storage, id, status, min, max)?),
         QueryMsg::Executor {} => to_json_binary(&query_executor(deps.storage)?),
+        QueryMsg::Timestamp { action, address } => {
+            to_json_binary(&query_timestamp(deps.storage, action, address)?)
+        }
     }?)
+}
+
+pub fn query_timestamp(
+    storage: &dyn Storage,
+    action: Action,
+    address: String,
+) -> Result<Option<Timestamp>, ContractError> {
+    let timestamp = ACTION_TIMESTAMPS.may_load(storage, format!("{action}-{address}"))?;
+    Ok(timestamp)
 }
 
 pub fn query_quote_token(

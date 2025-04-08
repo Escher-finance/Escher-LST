@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::{
     state::{
-        Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, Validator, ValidatorsRegistry,
+        Action, Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, Validator,
+        ValidatorsRegistry,
     },
     utils::batch::{Batch, BatchStatus},
 };
@@ -194,6 +195,8 @@ pub enum QueryMsg {
     },
     #[returns(SupplyQueue)]
     SupplyQueue {},
+    #[returns(Option<Timestamp>)]
+    Timestamp { action: Action, address: String },
 }
 
 pub type Fees = BTreeMap<String, Coin>;

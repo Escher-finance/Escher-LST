@@ -99,7 +99,7 @@ fn test_rate_limit() {
     let lock_time_secs = 3600;
     let user = "user".to_string();
 
-    let action = Action::ZkBond;
+    let action = Action::ZkBond {};
 
     let initial_block_time = Timestamp::from_seconds(10000);
 

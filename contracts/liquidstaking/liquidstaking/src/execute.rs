@@ -54,7 +54,7 @@ pub fn bond(
         &env,
         params.bond_rate_limit_secs,
         sender.to_string(),
-        crate::state::Action::Bond,
+        crate::state::Action::Bond {},
     )?;
 
     // if the fund amount of required denom is zero, return No asset error
@@ -189,7 +189,7 @@ pub fn zkgm_bond(
         &env,
         params.bond_rate_limit_secs,
         staker.clone(),
-        crate::state::Action::ZkBond,
+        crate::state::Action::ZkBond {},
     )?;
 
     let delegator = env.contract.address;

@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    state::{Balance, Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry},
+    state::{
+        Action, Balance, Parameters, QuoteToken, State, UnbondRecord, Validator, ValidatorsRegistry,
+    },
     utils::batch::{Batch, BatchStatus},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
@@ -182,6 +184,8 @@ pub enum QueryMsg {
     },
     #[returns(Executor)]
     Executor {},
+    #[returns(Option<Timestamp>)]
+    Timestamp { action: Action, address: String },
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

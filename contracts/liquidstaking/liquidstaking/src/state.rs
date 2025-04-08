@@ -24,8 +24,8 @@ pub const ACTION_TIMESTAMPS: Map<String, Timestamp> = Map::new("timestamps");
 
 #[cw_serde]
 pub enum Action {
-    Bond,
-    ZkBond,
+    Bond {},
+    ZkBond {},
 }
 
 impl fmt::Display for Action {
@@ -34,8 +34,8 @@ impl fmt::Display for Action {
             f,
             "{}",
             match self {
-                Self::Bond => "bond",
-                Self::ZkBond => "zkbond",
+                Self::Bond {} => "bond",
+                Self::ZkBond {} => "zkbond",
             }
         )
     }
