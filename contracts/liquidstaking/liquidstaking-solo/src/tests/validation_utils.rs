@@ -1,10 +1,10 @@
 use cosmwasm_std::{
     testing::{mock_dependencies, mock_env},
-    Addr, Timestamp,
+    Timestamp,
 };
 
 use crate::{
-    state::{QuoteToken, Validator, LATEST_BOND_TIMESTAMPS},
+    state::{Action, QuoteToken, Validator, ACTION_TIMESTAMPS},
     utils::validation::*,
     ContractError,
 };
@@ -93,53 +93,75 @@ fn test_validate_quote_tokens() {
 }
 
 #[test]
-fn test_rate_limit_bond() {
+fn test_rate_limit() {
     let mut deps = mock_dependencies();
     let mut env = mock_env();
     let lock_time_secs = 3600;
-    let user = Addr::unchecked("user");
+    let user = "user".to_string();
+
+    let action = Action::ZkBond;
 
     let initial_block_time = Timestamp::from_seconds(10000);
 
     env.block.time = initial_block_time.clone();
 
     assert_eq!(
-        LATEST_BOND_TIMESTAMPS
-            .may_load(&deps.storage, user.clone())
+        ACTION_TIMESTAMPS
+            .may_load(&deps.storage, format!("{action}-{user}"))
             .unwrap(),
         None
     );
 
     // first time - should pass
-    rate_limit_bond(deps.as_mut().storage, &env, lock_time_secs, user.clone()).unwrap();
+    rate_limit(
+        deps.as_mut().storage,
+        &env,
+        lock_time_secs,
+        user.clone(),
+        action.clone(),
+    )
+    .unwrap();
     assert_eq!(
-        LATEST_BOND_TIMESTAMPS
-            .may_load(&deps.storage, user.clone())
+        ACTION_TIMESTAMPS
+            .may_load(&deps.storage, format!("{action}-{user}"))
             .unwrap(),
         Some(initial_block_time)
     );
 
     // not enough time has passed - should fail
     env.block.time = env.block.time.plus_seconds(lock_time_secs - 1);
-    let err =
-        rate_limit_bond(deps.as_mut().storage, &env, lock_time_secs, user.clone()).unwrap_err();
+    let err = rate_limit(
+        deps.as_mut().storage,
+        &env,
+        lock_time_secs,
+        user.clone(),
+        action.clone(),
+    )
+    .unwrap_err();
     assert!(matches!(
         err,
-        ContractError::BondRateLimitExceeded { user: u } if user == u
+        ContractError::RateLimitExceeded { action: a, user: u } if user == u && action == a
     ));
     assert_eq!(
-        LATEST_BOND_TIMESTAMPS
-            .may_load(&deps.storage, user.clone())
+        ACTION_TIMESTAMPS
+            .may_load(&deps.storage, format!("{action}-{user}"))
             .unwrap(),
         Some(initial_block_time)
     );
 
     // enough time has passed - should pass
     env.block.time = env.block.time.plus_seconds(100);
-    rate_limit_bond(deps.as_mut().storage, &env, lock_time_secs, user.clone()).unwrap();
+    rate_limit(
+        deps.as_mut().storage,
+        &env,
+        lock_time_secs,
+        user.clone(),
+        action.clone(),
+    )
+    .unwrap();
     assert_eq!(
-        LATEST_BOND_TIMESTAMPS
-            .may_load(&deps.storage, user.clone())
+        ACTION_TIMESTAMPS
+            .may_load(&deps.storage, format!("{action}-{user}"))
             .unwrap(),
         Some(env.block.time)
     );

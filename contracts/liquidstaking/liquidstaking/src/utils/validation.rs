@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
-use cosmwasm_std::{Addr, Env, Storage};
+use cosmwasm_std::{Env, Storage};
 
 use crate::{
-    state::{QuoteToken, Validator, LATEST_BOND_TIMESTAMPS},
+    state::{Action, QuoteToken, Validator, ACTION_TIMESTAMPS},
     ContractError,
 };
 
@@ -45,23 +45,25 @@ pub fn validate_quote_tokens(quote_tokens: &Vec<QuoteToken>) -> Result<(), Contr
     Ok(())
 }
 
-pub fn rate_limit_bond(
+pub fn rate_limit(
     storage: &mut dyn Storage,
     env: &Env,
     lock_time_secs: u64,
-    user: Addr,
+    user: String,
+    action: Action,
 ) -> Result<(), ContractError> {
-    let latest_bond_time = LATEST_BOND_TIMESTAMPS
-        .may_load(storage, user.clone())?
+    let action_key = format!("{action}-{user}");
+    let latest_time = ACTION_TIMESTAMPS
+        .may_load(storage, action_key.clone())?
         .unwrap_or_default();
 
     let current_time = env.block.time;
 
-    if current_time < latest_bond_time.plus_seconds(lock_time_secs) {
-        return Err(ContractError::BondRateLimitExceeded { user });
+    if current_time < latest_time.plus_seconds(lock_time_secs) {
+        return Err(ContractError::RateLimitExceeded { action, user });
     }
 
-    LATEST_BOND_TIMESTAMPS.save(storage, user.clone(), &current_time)?;
+    ACTION_TIMESTAMPS.save(storage, action_key, &current_time)?;
 
     Ok(())
 }

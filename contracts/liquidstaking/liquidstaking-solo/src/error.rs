@@ -1,8 +1,8 @@
-use cosmwasm_std::{Addr, StdError};
+use cosmwasm_std::StdError;
 use cw_ownable::OwnershipError;
 use thiserror::Error;
 
-use crate::utils::batch::BatchStatus;
+use crate::{state::Action, utils::batch::BatchStatus};
 
 #[derive(Error, Debug)]
 pub enum ContractError {
@@ -114,6 +114,6 @@ pub enum ContractError {
     #[error("unbond amount is less than minimum unbond amount")]
     UnbondAmountTooLow {},
 
-    #[error("Bond rate limit exceeded for {user}, try again later")]
-    BondRateLimitExceeded { user: Addr },
+    #[error("{action} rate limit exceeded for {user}, try again later")]
+    RateLimitExceeded { action: Action, user: String },
 }

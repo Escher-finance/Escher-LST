@@ -1,3 +1,5 @@
+use std::fmt;
+
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Decimal, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::Map;
@@ -17,8 +19,27 @@ pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_que
 // Executor address that is allowed to execute the backend functions
 pub const EXECUTOR: Item<Addr> = Item::new("executor");
 
-// Map of the latest bond timestamps for rate-limiting users
-pub const LATEST_BOND_TIMESTAMPS: Map<Addr, Timestamp> = Map::new("latest_bond_timestamps");
+// Map of the timestamps of a certain action {Action}-{address}
+pub const ACTION_TIMESTAMPS: Map<String, Timestamp> = Map::new("timestamps");
+
+#[cw_serde]
+pub enum Action {
+    Bond,
+    ZkBond,
+}
+
+impl fmt::Display for Action {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Bond => "bond",
+                Self::ZkBond => "zkbond",
+            }
+        )
+    }
+}
 
 #[cw_serde]
 pub struct WithdrawReward {

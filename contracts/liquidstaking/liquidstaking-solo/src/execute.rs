@@ -18,7 +18,7 @@ use crate::state::{
 };
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
-use crate::utils::validation::rate_limit_bond;
+use crate::utils::validation::rate_limit;
 use crate::utils::{
     self, calc::check_slippage, calc::normalize_supply_queue, calc::to_uint128,
     delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
@@ -48,11 +48,12 @@ pub fn bond(
         return Err(ContractError::InvalidAsset {});
     }
 
-    rate_limit_bond(
+    rate_limit(
         deps.storage,
         &env,
         params.bond_rate_limit_secs,
-        sender.clone(),
+        sender.to_string(),
+        crate::state::Action::Bond,
     )?;
 
     let delegator = env.contract.address;

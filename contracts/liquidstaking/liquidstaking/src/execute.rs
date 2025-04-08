@@ -15,7 +15,7 @@ use crate::state::{
 };
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::calc::{check_slippage, to_uint128};
-use crate::utils::validation::{rate_limit_bond, validate_validators};
+use crate::utils::validation::{rate_limit, validate_validators};
 use crate::utils::{
     self, delegation::assert_executor, delegation::get_actual_total_delegated,
     delegation::get_mock_total_reward, delegation::get_transfer_token_cosmos_msg,
@@ -47,11 +47,12 @@ pub fn bond(
         return Err(ContractError::InvalidAsset {});
     }
 
-    rate_limit_bond(
+    rate_limit(
         deps.storage,
         &env,
         params.bond_rate_limit_secs,
-        sender.clone(),
+        sender.to_string(),
+        crate::state::Action::Bond,
     )?;
 
     // if the fund amount of required denom is zero, return No asset error
