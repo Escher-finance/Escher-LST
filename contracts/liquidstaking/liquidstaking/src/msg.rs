@@ -278,4 +278,9 @@ pub struct UnbondData {
 }
 
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub bond_rate_limit_secs: u64,
+}
+
+#[cw_serde]
+pub struct RewardMigrateMsg {}

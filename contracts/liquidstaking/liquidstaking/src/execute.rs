@@ -6,7 +6,9 @@ use crate::event::{
     BatchReceivedEvent, BondEvent, ProcessBatchUnbondingEvent, ProcessRewardsEvent,
     ProcessUnbondingEvent, UpdateValidatorsEvent,
 };
-use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
+use crate::msg::{
+    BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, RewardMigrateMsg, ZkgmMessage,
+};
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
@@ -918,7 +920,7 @@ pub fn migrate_reward(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let params = PARAMETERS.load(deps.storage)?;
-    let migrate = MigrateMsg {};
+    let migrate = RewardMigrateMsg {};
     let msg_bin = to_json_binary(&migrate)?;
     let migrate_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Migrate {
         contract_addr: params.reward_address.to_string(),

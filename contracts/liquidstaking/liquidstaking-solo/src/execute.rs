@@ -8,7 +8,7 @@ use crate::event::{
 };
 use crate::helpers;
 use crate::msg::{
-    BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, MigrateMsg, ZkgmMessage,
+    BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, RewardMigrateMsg, ZkgmMessage,
 };
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
@@ -963,7 +963,7 @@ pub fn migrate_reward(
         return Err(ContractError::InvalidRewardContractMigration {});
     }
 
-    let migrate = MigrateMsg {};
+    let migrate = RewardMigrateMsg {};
     let msg_bin = to_json_binary(&migrate)?;
     let migrate_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Migrate {
         contract_addr: params.reward_address.to_string(),

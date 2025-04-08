@@ -11,8 +11,9 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Parameters, State, ValidatorsRegistry, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
+    OldParameters, Parameters, State, ValidatorsRegistry, WithdrawReward, OLD_PARAMETERS,
+    PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE,
+    VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -187,7 +188,37 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    let OldParameters {
+        underlying_coin_denom,
+        liquidstaking_denom,
+        ucs03_relay_contract,
+        unbonding_time,
+        cw20_address,
+        reward_address,
+        fee_rate,
+        fee_receiver,
+        batch_period,
+        min_bond,
+        min_unbond,
+        batch_limit,
+    } = OLD_PARAMETERS.load(deps.storage)?;
+    let new_params = Parameters {
+        underlying_coin_denom,
+        liquidstaking_denom,
+        ucs03_relay_contract,
+        unbonding_time,
+        cw20_address,
+        reward_address,
+        fee_rate,
+        fee_receiver,
+        batch_period,
+        min_bond,
+        min_unbond,
+        batch_limit,
+        bond_rate_limit_secs: msg.bond_rate_limit_secs,
+    };
+    PARAMETERS.save(deps.storage, &new_params)?;
     Ok(Response::default())
 }

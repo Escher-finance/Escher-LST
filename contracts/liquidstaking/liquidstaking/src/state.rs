@@ -78,6 +78,32 @@ pub struct ValidatorsRegistry {
     pub validators: Vec<Validator>,
 }
 
+pub const OLD_PARAMETERS: Item<OldParameters> = Item::new("parameters");
+#[cw_serde]
+pub struct OldParameters {
+    pub underlying_coin_denom: String,
+    pub liquidstaking_denom: String,
+    pub ucs03_relay_contract: String,
+    pub unbonding_time: u64,
+    // liquid_staking denom/cw20 contract address
+    pub cw20_address: Addr,
+    // reward contract address
+    pub reward_address: Addr,
+    // fee fee_rate
+    pub fee_rate: Decimal,
+    // fee receiver
+    pub fee_receiver: Addr,
+    // batch period range in seconds to execute batch
+    pub batch_period: u64,
+    // min bond/stake amount
+    pub min_bond: Uint128,
+    // min unbond/unstake amount
+    pub min_unbond: Uint128,
+    // limit per batch
+    // this is the max number of unbonding records that can be processed in one batch
+    pub batch_limit: u32,
+}
+
 // Parameter is required data to instantiate and run contract
 #[cw_serde]
 pub struct Parameters {
