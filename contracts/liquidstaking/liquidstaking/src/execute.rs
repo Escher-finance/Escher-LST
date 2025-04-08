@@ -181,6 +181,15 @@ pub fn zkgm_bond(
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
+
+    rate_limit(
+        deps.storage,
+        &env,
+        params.bond_rate_limit_secs,
+        sender.to_string(),
+        crate::state::Action::ZkBond,
+    )?;
+
     let delegator = env.contract.address;
 
     let slippage_rate = match slippage {
