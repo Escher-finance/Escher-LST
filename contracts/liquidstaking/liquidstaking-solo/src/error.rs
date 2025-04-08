@@ -93,7 +93,7 @@ pub enum ContractError {
         expected: BatchStatus,
     },
 
-    #[error("batch is not ready to be executed")]
+    #[error("batch is not ready to be executed, actual: {actual}, expected: {expected}")]
     BatchNotReady { actual: u64, expected: u64 },
 
     #[error("batch unbonding not yet complete")]
