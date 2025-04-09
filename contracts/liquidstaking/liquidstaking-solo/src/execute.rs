@@ -365,7 +365,7 @@ pub fn set_batch_received_amount(
         });
     }
 
-    if amount > batch.expected_native_unstaked.unwrap() {
+    if amount > batch.expected_native_unstaked.unwrap() || amount == Uint128::zero() {
         return Err(ContractError::InvalidBatchReceivedAmount {});
     }
 
