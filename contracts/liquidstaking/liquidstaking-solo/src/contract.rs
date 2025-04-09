@@ -235,6 +235,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
         deps.storage,
         &Status {
             bond_is_paused: false,
+            unbond_is_paused: false,
         },
     )?;
     Ok(Response::new()

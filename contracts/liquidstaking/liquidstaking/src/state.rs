@@ -21,6 +21,7 @@ pub const EXECUTOR: Item<Addr> = Item::new("executor");
 #[cw_serde]
 pub struct Status {
     pub bond_is_paused: bool,
+    pub unbond_is_paused: bool,
 }
 
 #[cw_serde]

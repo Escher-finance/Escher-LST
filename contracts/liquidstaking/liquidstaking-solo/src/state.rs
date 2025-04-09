@@ -25,6 +25,7 @@ pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_que
 #[cw_serde]
 pub struct Status {
     pub bond_is_paused: bool,
+    pub unbond_is_paused: bool,
 }
 
 #[cw_serde]

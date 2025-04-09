@@ -147,6 +147,11 @@ pub fn zkgm_unbond(
     staker: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::Unauthorized {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
 
     let sender = info.sender.clone();
@@ -265,6 +270,11 @@ pub fn receive(
     _info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::Unauthorized {});
+    }
+
     let state = STATE.load(deps.storage)?;
     if state.exchange_rate < Decimal::one() {
         return Err(ContractError::InvalidExchangeRate {});
@@ -485,6 +495,11 @@ pub fn process_rewards(
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::Unauthorized {});
+    }
 
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
