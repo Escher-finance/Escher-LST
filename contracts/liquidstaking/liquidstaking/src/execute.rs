@@ -10,8 +10,9 @@ use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMs
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, WithdrawReward, EXECUTOR, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
+    unbond_record, QuoteToken, Status, Validator, WithdrawReward, EXECUTOR, PARAMETERS,
+    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
+    VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::calc::{check_slippage, to_uint128};
@@ -23,7 +24,7 @@ use crate::utils::{
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env,
-    Event, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
+    MessageInfo, Response, SubMsg, Uint128, WasmMsg,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
@@ -36,6 +37,11 @@ pub fn bond(
     slippage: Option<Decimal>,
     expected: Uint128,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.bond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
@@ -127,6 +133,11 @@ pub fn zkgm_unbond(
     staker: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
 
     let sender = info.sender.clone();
@@ -169,6 +180,11 @@ pub fn zkgm_bond(
     slippage: Option<Decimal>,
     expected: Uint128,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.bond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
@@ -239,6 +255,11 @@ pub fn receive(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
     let state = STATE.load(deps.storage)?;
     if state.exchange_rate < Decimal::one() {
         return Err(ContractError::InvalidExchangeRate {});
@@ -472,6 +493,11 @@ pub fn process_rewards(
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
     assert_executor(deps.storage, info.sender.clone())?;
+
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
 
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -932,4 +958,14 @@ pub fn set_executor(
 
     let res: Response = Response::new().add_attribute("executor", executor.to_string());
     Ok(res)
+}
+
+pub fn set_status(
+    deps: DepsMut,
+    info: MessageInfo,
+    status: Status,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    STATUS.save(deps.storage, &status)?;
+    Ok(Response::new())
 }

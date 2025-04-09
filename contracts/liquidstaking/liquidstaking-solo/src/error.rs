@@ -116,4 +116,7 @@ pub enum ContractError {
 
     #[error("Invalid exchange rate")]
     InvalidExchangeRate {},
+
+    #[error("This functionality is currently disabled for maintenance")]
+    FunctionalityUnderMaintenance {},
 }
