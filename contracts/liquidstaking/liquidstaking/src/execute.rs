@@ -39,7 +39,7 @@ pub fn bond(
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -135,7 +135,7 @@ pub fn zkgm_unbond(
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -182,7 +182,7 @@ pub fn zkgm_bond(
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -257,7 +257,7 @@ pub fn receive(
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
     let state = STATE.load(deps.storage)?;
@@ -496,7 +496,7 @@ pub fn process_rewards(
 
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
     let params = PARAMETERS.load(deps.storage)?;
