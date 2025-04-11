@@ -136,6 +136,14 @@ pub fn instantiate(
     batches().save(deps.storage, pending_batch.id, &pending_batch)?;
     PENDING_BATCH_ID.save(deps.storage, &pending_batch.id)?;
 
+    STATUS.save(
+        deps.storage,
+        &Status {
+            bond_is_paused: false,
+            unbond_is_paused: false,
+        },
+    )?;
+
     Ok(Response::new()
         .add_attribute("action", "instantiate")
         .add_messages(msgs))
