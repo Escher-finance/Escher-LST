@@ -225,3 +225,12 @@ pub fn SplitRewardEvent(
         .add_attribute("fee_amount", fee_amount.to_string())
         .add_attribute("time", format!("{}", time.nanos()))
 }
+
+pub const BATCH_RELEASED_EVENT: &str = "batch_released";
+
+#[allow(non_snake_case)]
+pub fn BatchReleasedEvent(batch_id: u64, time: Timestamp) -> Event {
+    Event::new(BATCH_RELEASED_EVENT.to_string())
+        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("time", format!("{}", time.nanos()))
+}

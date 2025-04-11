@@ -3,8 +3,8 @@ use std::str::FromStr;
 
 use crate::error::ContractError;
 use crate::event::{
-    BatchReceivedEvent, BondEvent, ProcessBatchUnbondingEvent, ProcessRewardsEvent,
-    ProcessUnbondingEvent, SplitRewardEvent, UpdateValidatorsEvent,
+    BatchReceivedEvent, BatchReleasedEvent, BondEvent, ProcessBatchUnbondingEvent,
+    ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent, UpdateValidatorsEvent,
 };
 use crate::helpers;
 use crate::msg::{
@@ -824,6 +824,8 @@ pub fn process_batch_withdrawal(
     if is_last_query {
         batch.update_status(utils::batch::BatchStatus::Released, None);
         batches().save(deps.storage, id, &batch)?;
+        let ev = BatchReleasedEvent(batch.id, env.block.time);
+        events.push(ev);
     }
 
     let res: Response = Response::new()
