@@ -267,7 +267,7 @@ pub fn zkgm_bond(
 pub fn receive(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
@@ -275,12 +275,17 @@ pub fn receive(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
+    let params = PARAMETERS.load(deps.storage)?;
+    // make sure only cw20 contract can call this function
+    if info.sender != params.cw20_address {
+        return Err(ContractError::Unauthorized {});
+    }
+
     let state = STATE.load(deps.storage)?;
     if state.exchange_rate < Decimal::one() {
         return Err(ContractError::InvalidExchangeRate {});
     }
 
-    let params = PARAMETERS.load(deps.storage)?;
     let sender = cw20_msg.sender.to_string();
     let the_staker: String = sender.clone();
     let delegator = env.contract.address.clone();
@@ -964,9 +969,10 @@ pub fn set_config(
 pub fn migrate_reward(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     code_id: u64,
 ) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let params = PARAMETERS.load(deps.storage)?;
 
     if params.reward_address == env.contract.address {
