@@ -251,13 +251,18 @@ pub fn zkgm_bond(
 pub fn receive(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let sender = cw20_msg.sender.to_string();
     let the_staker: String = sender.clone();
     let delegator = env.contract.address.clone();
+
+    // make sure the sender is the cw20 contract
+    if info.sender != params.cw20_address {
+        return Err(ContractError::Unauthorized {});
+    }
 
     let payload_msg: Cw20PayloadMsg = from_json(cw20_msg.msg)?;
 
