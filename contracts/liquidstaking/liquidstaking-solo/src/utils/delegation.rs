@@ -246,8 +246,8 @@ pub fn get_restaking_msgs(
     for surplus_validator in surplus_validators.iter_mut() {
         for deficient_validator in deficient_validators.iter_mut() {
             if surplus_validator.diff_amount < deficient_validator.diff_amount {
-                if surplus_validator.diff_amount == Uint128::from(0u32) {
-                    break;
+                if surplus_validator.diff_amount.is_zero() {
+                    continue;
                 }
 
                 let redelegate_msg = get_babylon_redelegate_cosmos_msg(
@@ -263,6 +263,10 @@ pub fn get_restaking_msgs(
 
                 msgs.push(redelegate_msg);
             } else {
+                if deficient_validator.diff_amount.is_zero() {
+                    continue;
+                }
+
                 let redelegate_msg = get_babylon_redelegate_cosmos_msg(
                     delegator.clone(),
                     surplus_validator.address.to_string(),
