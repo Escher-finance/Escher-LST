@@ -928,7 +928,13 @@ pub fn set_config(
     config.coin_denom = coin_denom.clone().unwrap_or_else(|| config.coin_denom);
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(Response::default())
+    let res = Response::new()
+        .add_attribute("action", "set_config")
+        .add_attribute("lst_contract_address", config.lst_contract_address)
+        .add_attribute("fee_receiver", config.fee_receiver)
+        .add_attribute("fee_rate", config.fee_rate.to_string())
+        .add_attribute("coin_denom", config.coin_denom);
+    Ok(res)
 }
 
 /// Migrate reward contract
