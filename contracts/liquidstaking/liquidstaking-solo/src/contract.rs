@@ -121,14 +121,6 @@ pub fn instantiate(
     };
     SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
 
-    SPLIT_REWARD_QUEUE.save(
-        deps.storage,
-        &WithdrawReward {
-            target_amount: Uint128::zero(),
-            withdrawed_amount: Uint128::zero(),
-        },
-    )?;
-
     let pending_batch = Batch::new(
         1,
         Uint128::zero(),

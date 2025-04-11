@@ -743,7 +743,6 @@ pub fn process_batch_withdrawal(
     }
 
     let time = env.block.time;
-    let params = PARAMETERS.load(deps.storage)?;
     let denom = params.underlying_coin_denom;
     let ucs03_relay_contract = params.ucs03_relay_contract;
 
