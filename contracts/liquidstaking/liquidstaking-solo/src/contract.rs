@@ -8,9 +8,9 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, Parameters, State, SupplyQueue, ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS,
-    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE,
-    VALIDATORS_REGISTRY,
+    Config, Parameters, State, Status, SupplyQueue, ValidatorsRegistry, WithdrawReward, CONFIG,
+    PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
+    SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use cw2::set_contract_version;
 
@@ -18,7 +18,7 @@ use cw2::set_contract_version;
 const CONTRACT_NAME: &str = "crates.io:liquidstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+// #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -98,6 +98,12 @@ pub fn instantiate(
         last_bond_time: 0,
     };
     STATE.save(deps.storage, &state)?;
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.storage, &status)?;
 
     SPLIT_REWARD_QUEUE.save(
         deps.storage,
