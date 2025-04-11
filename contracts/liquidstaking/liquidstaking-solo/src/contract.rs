@@ -41,22 +41,6 @@ pub fn instantiate(
 
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
 
-    // create reward contract message to instantiate reward contract that will receive staking reward
-    let (reward_msg, reward_addr) = create_reward(
-        &deps,
-        &env,
-        msg.salt,
-        msg.reward_code_id,
-        env.clone().contract.address,
-        msg.fee_receiver.clone(),
-        msg.fee_rate.clone(),
-        msg.underlying_coin_denom.clone(),
-    )?;
-    let set_withdraw_msg: CosmosMsg =
-        CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
-            address: reward_addr.to_string(),
-        });
-
     let reward_config = Config {
         lst_contract_address: env.clone().contract.address,
         fee_receiver: msg.fee_receiver.clone(),
@@ -65,8 +49,23 @@ pub fn instantiate(
     };
     CONFIG.save(deps.storage, &reward_config)?;
 
-    let mut reward_address = env.contract.address;
+    let mut reward_address = env.contract.address.clone();
     let msgs: Vec<CosmosMsg> = if msg.use_external_reward.unwrap_or(false) {
+        // create reward contract message to instantiate reward contract that will receive staking reward
+        let (reward_msg, reward_addr) = create_reward(
+            &deps,
+            &env,
+            msg.salt,
+            msg.reward_code_id,
+            env.clone().contract.address,
+            msg.fee_receiver.clone(),
+            msg.fee_rate.clone(),
+            msg.underlying_coin_denom.clone(),
+        )?;
+        let set_withdraw_msg: CosmosMsg =
+            CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+                address: reward_addr.to_string(),
+            });
         reward_address = reward_addr;
         vec![reward_msg, set_withdraw_msg]
     } else {
