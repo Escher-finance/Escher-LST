@@ -144,6 +144,7 @@ pub enum ExecuteMsg {
         fee_rate: Option<Decimal>,
         coin_denom: Option<String>,
     },
+    NormalizeSupply {},
 }
 
 #[cw_serde]
