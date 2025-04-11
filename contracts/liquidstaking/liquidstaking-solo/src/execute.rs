@@ -17,6 +17,7 @@ use crate::state::{
     QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
+use crate::utils::calc::calculate_fee_from_reward;
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
 use crate::utils::{
     self, calc::check_slippage, calc::normalize_supply_queue, calc::to_uint128,
@@ -441,7 +442,8 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
         validators_list,
     )?;
 
-    let total_bond_amount = delegated_amount + total_reward;
+    let fee = calculate_fee_from_reward(total_reward, params.fee_rate);
+    let total_bond_amount = delegated_amount + total_reward - fee;
 
     // after update exchange rate we update the state
     state.total_bond_amount = total_bond_amount + payment.amount;
