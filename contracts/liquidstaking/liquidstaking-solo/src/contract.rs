@@ -224,6 +224,7 @@ pub fn execute(
             fee_rate,
             coin_denom,
         ),
+        ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
     }
 }
 
