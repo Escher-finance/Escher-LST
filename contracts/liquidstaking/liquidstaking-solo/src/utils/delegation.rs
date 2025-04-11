@@ -23,7 +23,7 @@ use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
 use super::batch::{Batch, BatchStatus};
-use super::calc::calculate_fee_from_reward;
+use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
 use super::protocol;
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
@@ -435,7 +435,7 @@ pub fn process_bond(
 
     let mut exchange_rate = state.exchange_rate;
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+    if total_bond_amount != Uint128::zero() {
         calc::normalize_supply_queue(&mut supply_queue, block_height);
         exchange_rate =
             calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
@@ -546,9 +546,9 @@ pub fn submit_pending_batch(
     }
 
     let mut current_exchange_rate = state.exchange_rate;
-    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
+    let mut supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
 
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+    if total_bond_amount != Uint128::zero() {
         calc::normalize_supply_queue(&mut supply_queue, block_height);
         current_exchange_rate =
             calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
@@ -595,7 +595,8 @@ pub fn submit_pending_batch(
     state.total_bond_amount = total_bond_amount - total_undelegate_amount;
     state.total_supply = state.total_supply - batch.total_liquid_stake;
     state.total_delegated_amount = delegated_amount - total_undelegate_amount;
-    state.update_exchange_rate();
+    state.exchange_rate =
+        calculate_exchange_rate(state.total_bond_amount, state.total_supply, &supply_queue);
     STATE.save(deps.storage, &state)?;
 
     batch.expected_native_unstaked = Some(total_undelegate_amount);

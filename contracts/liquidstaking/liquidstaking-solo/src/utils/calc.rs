@@ -113,7 +113,7 @@ pub fn calculate_exchange_rate(
     queue: &SupplyQueue,
 ) -> Decimal {
     let mut exchange_rate: Decimal = Decimal::one();
-    if total_bond_amount != Uint128::zero() && total_supply != Uint128::zero() {
+    if total_bond_amount != Uint128::zero() {
         let normalize_total_supply = normalize_total_supply(total_supply, &queue.mint, &queue.burn);
 
         exchange_rate = Decimal::from_ratio(total_bond_amount, normalize_total_supply);

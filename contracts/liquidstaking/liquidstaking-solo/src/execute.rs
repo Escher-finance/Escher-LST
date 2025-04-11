@@ -17,6 +17,7 @@ use crate::state::{
     QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
+use crate::utils::calc::calculate_exchange_rate;
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
 use crate::utils::{
     self, calc::check_slippage, calc::normalize_supply_queue, calc::to_uint128,
@@ -447,7 +448,9 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     state.total_bond_amount = total_bond_amount + payment.amount;
     state.total_delegated_amount += payment.amount;
     state.last_bond_time = env.block.time.nanos();
-    state.update_exchange_rate();
+    let supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
+    state.exchange_rate =
+        calculate_exchange_rate(state.total_bond_amount, state.total_supply, &supply_queue);
 
     STATE.save(deps.storage, &state)?;
 
