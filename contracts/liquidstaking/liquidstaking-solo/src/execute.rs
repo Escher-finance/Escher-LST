@@ -711,6 +711,9 @@ pub fn process_batch_withdrawal(
     let mut unbond_record_ids = vec![];
     let mut released_amount = Uint128::zero();
 
+    let total_received_amount_in_decimal =
+        Decimal::from_ratio(total_received_amount, Uint128::one());
+
     for record in unbonding_records.iter_mut() {
         let entry = staker_undelegation
             .entry(record.staker.clone())
@@ -723,9 +726,6 @@ pub fn process_batch_withdrawal(
 
         let user_to_total_unstake_ratio =
             Decimal::from_ratio(entry.unstake_amount, batch.total_liquid_stake);
-
-        let total_received_amount_in_decimal =
-            Decimal::from_ratio(total_received_amount, Uint128::one());
 
         let unstake_return_native_amount =
             (user_to_total_unstake_ratio * total_received_amount_in_decimal).to_uint_floor();
@@ -740,6 +740,32 @@ pub fn process_batch_withdrawal(
         unbond_record().save(deps.storage, record.id, &record)?;
 
         unbond_record_ids.push(record.id);
+    }
+
+    let dust_amount = (total_received_amount_in_decimal
+        - Decimal::from_ratio(released_amount, Uint128::one()))
+    .to_uint_floor();
+
+    if dust_amount >= Uint128::one() {
+        let unbonding_records_len = Uint128::new(unbonding_records.len() as u128);
+        let min_for_each = dust_amount / unbonding_records_len;
+        let mut extra = dust_amount - (min_for_each * unbonding_records_len);
+        for record in unbonding_records.iter_mut() {
+            if min_for_each.is_zero() && extra.is_zero() {
+                break;
+            }
+            let one = Uint128::one();
+            let dust = min_for_each + if extra >= one { one } else { Uint128::zero() };
+            extra = extra.saturating_sub(one);
+            let staker_undelegation = match staker_undelegation.get_mut(&record.staker) {
+                Some(x) => x,
+                None => continue,
+            };
+            staker_undelegation.unstake_return_native_amount = staker_undelegation
+                .unstake_return_native_amount
+                .map(|x| x + dust);
+            released_amount += dust;
+        }
     }
 
     let time = env.block.time;
