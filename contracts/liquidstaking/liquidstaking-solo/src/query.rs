@@ -137,7 +137,7 @@ pub fn query_staking_liquidity(
     let state: State = STATE.load(deps.storage)?;
     let mut exchange_rate: Decimal = Decimal::one();
     let mut adjusted_supply = state.total_supply;
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+    if total_bond_amount != Uint128::zero() {
         let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
         calc::normalize_supply_queue(&mut supply_queue, env.block.height);
         adjusted_supply = calc::normalize_total_supply(

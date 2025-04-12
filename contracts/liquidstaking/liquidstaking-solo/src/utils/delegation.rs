@@ -23,7 +23,7 @@ use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
 use super::batch::{Batch, BatchStatus};
-use super::calc::calculate_fee_from_reward;
+use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
 use super::protocol;
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
@@ -439,12 +439,11 @@ pub fn process_bond(
 
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
     calc::normalize_supply_queue(&mut supply_queue, block_height);
-    let exchange_rate =
-        if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
-        } else {
-            Decimal::one()
-        };
+    let exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
 
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
 
@@ -553,12 +552,11 @@ pub fn submit_pending_batch(
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
 
     calc::normalize_supply_queue(&mut supply_queue, block_height);
-    let current_exchange_rate =
-        if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
-        } else {
-            Decimal::one()
-        };
+    let current_exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
     let undelegate_amount: Uint128 = calc::calculate_native_token_from_staking_token(
@@ -601,7 +599,8 @@ pub fn submit_pending_batch(
     state.total_bond_amount = total_bond_amount - total_undelegate_amount;
     state.total_supply = state.total_supply - batch.total_liquid_stake;
     state.total_delegated_amount = delegated_amount - total_undelegate_amount;
-    state.update_exchange_rate();
+    state.exchange_rate =
+        calculate_exchange_rate(state.total_bond_amount, state.total_supply, &supply_queue);
     STATE.save(deps.storage, &state)?;
 
     batch.expected_native_unstaked = Some(total_undelegate_amount);
