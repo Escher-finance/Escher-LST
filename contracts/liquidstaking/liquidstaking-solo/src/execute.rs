@@ -1101,14 +1101,6 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         .add_attributes(attrs))
 }
 
-pub fn normalize_supply(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
-    let mut supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
-
-    normalize_supply_queue(&mut supply_queue, env.block.height);
-    SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
-    Ok(Response::default())
-}
-
 pub fn set_status(
     deps: DepsMut,
     info: MessageInfo,
