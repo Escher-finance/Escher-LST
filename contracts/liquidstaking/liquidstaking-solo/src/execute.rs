@@ -17,6 +17,7 @@ use crate::state::{
     QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
+use crate::utils::calc::calculate_dust_distribution;
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
 use crate::utils::{
     self, calc::check_slippage, calc::normalize_supply_queue, calc::to_uint128,
@@ -746,26 +747,18 @@ pub fn process_batch_withdrawal(
         - Decimal::from_ratio(released_amount, Uint128::one()))
     .to_uint_floor();
 
-    if dust_amount >= Uint128::one() {
-        let unbonding_records_len = Uint128::new(unbonding_records.len() as u128);
-        let min_for_each = dust_amount / unbonding_records_len;
-        let mut extra = dust_amount - (min_for_each * unbonding_records_len);
-        for record in unbonding_records.iter_mut() {
-            if min_for_each.is_zero() && extra.is_zero() {
-                break;
-            }
-            let one = Uint128::one();
-            let dust = min_for_each + if extra >= one { one } else { Uint128::zero() };
-            extra = extra.saturating_sub(one);
-            let staker_undelegation = match staker_undelegation.get_mut(&record.staker) {
-                Some(x) => x,
-                None => continue,
-            };
-            staker_undelegation.unstake_return_native_amount = staker_undelegation
-                .unstake_return_native_amount
-                .map(|x| x + dust);
-            released_amount += dust;
-        }
+    let dust_distribution =
+        calculate_dust_distribution(dust_amount, Uint128::new(unbonding_records.len() as u128));
+    for (i, record) in unbonding_records.iter_mut().enumerate() {
+        let staker_undelegation = match staker_undelegation.get_mut(&record.staker) {
+            Some(x) => x,
+            None => continue,
+        };
+        let dust = dust_distribution[i];
+        staker_undelegation.unstake_return_native_amount = staker_undelegation
+            .unstake_return_native_amount
+            .map(|x| x + dust);
+        released_amount += dust;
     }
 
     let time = env.block.time;
