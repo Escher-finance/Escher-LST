@@ -4,6 +4,7 @@ use cw_storage_plus::Map;
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
+pub const STATUS: Item<Status> = Item::new("status");
 pub const STATE: Item<State> = Item::new("state");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
 pub const CONFIG: Item<Config> = Item::new("config");
@@ -20,6 +21,12 @@ pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 
 // Queue of validator reward for executing split reward
 pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
+
+#[cw_serde]
+pub struct Status {
+    pub bond_is_paused: bool,
+    pub unbond_is_paused: bool,
+}
 
 #[cw_serde]
 pub struct WithdrawReward {

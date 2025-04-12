@@ -13,8 +13,9 @@ use crate::msg::{
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    unbond_record, QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS,
+    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
+    VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::calc::calculate_dust_distribution;
@@ -40,6 +41,11 @@ pub fn bond(
     slippage: Option<Decimal>,
     expected: Uint128,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.bond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
@@ -144,6 +150,11 @@ pub fn zkgm_unbond(
     staker: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
 
     let sender = info.sender.clone();
@@ -186,6 +197,11 @@ pub fn zkgm_bond(
     slippage: Option<Decimal>,
     expected: Uint128,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.bond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
@@ -257,6 +273,11 @@ pub fn receive(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
     let sender = cw20_msg.sender.to_string();
     let the_staker: String = sender.clone();
@@ -480,6 +501,11 @@ pub fn process_rewards(
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
 
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -1065,4 +1091,14 @@ pub fn normalize_supply(deps: DepsMut, env: Env) -> Result<Response, ContractErr
     normalize_supply_queue(&mut supply_queue, env.block.height);
     SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
     Ok(Response::default())
+}
+
+pub fn set_status(
+    deps: DepsMut,
+    info: MessageInfo,
+    status: Status,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    STATUS.save(deps.storage, &status)?;
+    Ok(Response::new())
 }
