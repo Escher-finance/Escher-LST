@@ -433,13 +433,14 @@ pub fn process_bond(
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
     }
 
-    let mut exchange_rate = state.exchange_rate;
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        calc::normalize_supply_queue(&mut supply_queue, block_height);
-        exchange_rate =
-            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
-    }
+    calc::normalize_supply_queue(&mut supply_queue, block_height);
+    let exchange_rate =
+        if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+        } else {
+            Decimal::one()
+        };
 
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
 
@@ -545,14 +546,15 @@ pub fn submit_pending_batch(
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
     }
 
-    let mut current_exchange_rate = state.exchange_rate;
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
 
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        calc::normalize_supply_queue(&mut supply_queue, block_height);
-        current_exchange_rate =
-            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
-    }
+    calc::normalize_supply_queue(&mut supply_queue, block_height);
+    let current_exchange_rate =
+        if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+        } else {
+            Decimal::one()
+        };
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
     let undelegate_amount: Uint128 = calc::calculate_native_token_from_staking_token(
