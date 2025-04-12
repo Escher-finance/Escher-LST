@@ -490,6 +490,10 @@ pub fn process_bond(
         exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
     }
 
+    if exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
 
     // after update exchange rate we update the state

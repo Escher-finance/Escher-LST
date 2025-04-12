@@ -41,22 +41,6 @@ pub fn instantiate(
 
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
 
-    // create reward contract message to instantiate reward contract that will receive staking reward
-    let (reward_msg, reward_addr) = create_reward(
-        &deps,
-        &env,
-        msg.salt,
-        msg.reward_code_id,
-        env.clone().contract.address,
-        msg.fee_receiver.clone(),
-        msg.fee_rate.clone(),
-        msg.underlying_coin_denom.clone(),
-    )?;
-    let set_withdraw_msg: CosmosMsg =
-        CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
-            address: reward_addr.to_string(),
-        });
-
     let reward_config = Config {
         lst_contract_address: env.clone().contract.address,
         fee_receiver: msg.fee_receiver.clone(),
@@ -65,8 +49,23 @@ pub fn instantiate(
     };
     CONFIG.save(deps.storage, &reward_config)?;
 
-    let mut reward_address = env.contract.address;
+    let mut reward_address = env.contract.address.clone();
     let msgs: Vec<CosmosMsg> = if msg.use_external_reward.unwrap_or(false) {
+        // create reward contract message to instantiate reward contract that will receive staking reward
+        let (reward_msg, reward_addr) = create_reward(
+            &deps,
+            &env,
+            msg.salt,
+            msg.reward_code_id,
+            env.clone().contract.address,
+            msg.fee_receiver.clone(),
+            msg.fee_rate.clone(),
+            msg.underlying_coin_denom.clone(),
+        )?;
+        let set_withdraw_msg: CosmosMsg =
+            CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
+                address: reward_addr.to_string(),
+            });
         reward_address = reward_addr;
         vec![reward_msg, set_withdraw_msg]
     } else {
@@ -134,6 +133,14 @@ pub fn instantiate(
     );
     batches().save(deps.storage, pending_batch.id, &pending_batch)?;
     PENDING_BATCH_ID.save(deps.storage, &pending_batch.id)?;
+
+    STATUS.save(
+        deps.storage,
+        &Status {
+            bond_is_paused: false,
+            unbond_is_paused: false,
+        },
+    )?;
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
@@ -229,6 +236,17 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    let check_status = deps.storage.get(b"status");
+    if check_status.is_none() {
+        STATUS.save(
+            deps.storage,
+            &Status {
+                bond_is_paused: false,
+                unbond_is_paused: false,
+            },
+        )?;
+    }
 
     Ok(Response::new()
         .add_attribute("action", "migrate")

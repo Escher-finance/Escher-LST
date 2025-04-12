@@ -58,6 +58,10 @@ pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
     Ok(STATUS.load(storage)?)
 }
 
+pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
+    Ok(STATUS.load(storage)?)
+}
+
 pub fn query_reward_balance(storage: &dyn Storage) -> Result<Balance, ContractError> {
     let balance = REWARD_BALANCE.load(storage)?;
     Ok(Balance { amount: balance })

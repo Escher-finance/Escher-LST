@@ -6,6 +6,7 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATUS: Item<Status> = Item::new("status");
 pub const STATE: Item<State> = Item::new("state");
+pub const STATUS: Item<Status> = Item::new("status");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
 pub const CONFIG: Item<Config> = Item::new("config");
 
