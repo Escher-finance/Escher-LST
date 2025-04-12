@@ -133,8 +133,11 @@ pub fn calculate_query_bounds(min: Option<u64>, max: Option<u64>) -> (u64, u64) 
 }
 
 pub fn calculate_dust_distribution(dust_amount: Uint128, receivers_len: Uint128) -> Vec<Uint128> {
+    if receivers_len.is_zero() {
+        return Vec::new();
+    }
     let min_for_each = dust_amount / receivers_len;
-    let mut extra = dust_amount - (min_for_each * receivers_len);
+    let mut extra = dust_amount % receivers_len;
     (0..receivers_len.into())
         .map(|_| {
             let one = Uint128::one();
