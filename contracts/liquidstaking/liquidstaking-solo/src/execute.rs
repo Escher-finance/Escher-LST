@@ -22,6 +22,7 @@ use crate::utils::calc::calculate_dust_distribution;
 use crate::utils::calc::calculate_exchange_rate;
 use crate::utils::calc::calculate_fee_from_reward;
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
+use crate::utils::validation::validate_validators;
 use crate::utils::{
     self, calc::check_slippage, calc::normalize_supply_queue, calc::to_uint128,
     delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
@@ -931,6 +932,8 @@ pub fn update_validators(
     if validators.len() < 1 {
         return Err(ContractError::EmptyValidator {});
     }
+
+    validate_validators(&validators)?;
 
     let mut validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let prev_validators = validators_reg.validators.clone();
