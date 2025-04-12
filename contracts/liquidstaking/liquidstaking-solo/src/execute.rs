@@ -796,9 +796,6 @@ pub fn process_batch_withdrawal(
         i += 1;
     }
 
-    batch.update_status(utils::batch::BatchStatus::Released, None);
-    batches().save(deps.storage, id, &batch)?;
-
     if is_last_query {
         batch.update_status(utils::batch::BatchStatus::Released, None);
         batches().save(deps.storage, id, &batch)?;
