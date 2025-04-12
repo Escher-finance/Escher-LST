@@ -940,9 +940,10 @@ pub fn set_config(
 pub fn migrate_reward(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     code_id: u64,
 ) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let params = PARAMETERS.load(deps.storage)?;
 
     if params.reward_address == env.contract.address {
