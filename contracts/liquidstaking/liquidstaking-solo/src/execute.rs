@@ -24,8 +24,8 @@ use crate::utils::calc::calculate_fee_from_reward;
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
 use crate::utils::validation::validate_validators;
 use crate::utils::{
-    self, calc::check_slippage, calc::normalize_supply_queue, calc::to_uint128,
-    delegation::get_actual_total_delegated, delegation::get_actual_total_reward,
+    self, calc::check_slippage, calc::to_uint128, delegation::get_actual_total_delegated,
+    delegation::get_actual_total_reward,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
