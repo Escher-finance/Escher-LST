@@ -750,7 +750,7 @@ pub fn get_transfer_token_cosmos_msg(
 }
 
 pub fn get_actual_total_reward(
-    storage: &mut dyn Storage,
+    storage: &dyn Storage,
     querier: QuerierWrapper,
     delegator: String,
     denom: String,
