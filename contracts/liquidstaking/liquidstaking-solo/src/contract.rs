@@ -224,7 +224,6 @@ pub fn execute(
             fee_rate,
             coin_denom,
         ),
-        ExecuteMsg::NormalizeSupply {} => execute::normalize_supply(deps, env),
     }
 }
 
