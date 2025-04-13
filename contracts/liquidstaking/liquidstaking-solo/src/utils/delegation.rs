@@ -433,6 +433,9 @@ pub fn process_bond(
 
         let fee = calculate_fee_from_reward(reward, params.fee_rate);
         total_bond_amount = delegated_amount + reward - fee;
+
+        // Update reward balance with unclaimed reward because there is automatic reward withdrawal on delegate
+        REWARD_BALANCE.save(storage, &reward)?;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
     }
