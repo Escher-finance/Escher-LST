@@ -420,17 +420,16 @@ pub fn process_bond(
         validators_list.clone(),
     )?;
 
+    let reward = get_actual_total_reward(
+        storage,
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list,
+    )?;
     let total_bond_amount: Uint128;
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
-        let reward = get_actual_total_reward(
-            storage,
-            querier,
-            delegator.to_string(),
-            coin_denom.clone(),
-            validators_list,
-        )?;
-
         let fee = calculate_fee_from_reward(reward, params.fee_rate);
         total_bond_amount = delegated_amount + reward - fee;
     } else {
@@ -460,6 +459,10 @@ pub fn process_bond(
     state.exchange_rate = exchange_rate;
 
     STATE.save(storage, &state)?;
+
+    // update the reward balance on this contract with additional unclaimed reard
+    // because there is automatic reward withdrawal on delegation
+    REWARD_BALANCE.save(storage, &reward)?;
 
     let mut sub_msgs: Vec<SubMsg> = vec![];
     let payload = MintTokensPayload {
