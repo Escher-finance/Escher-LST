@@ -14,6 +14,11 @@ pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: D
     (Decimal::from_ratio(stake_amount, Uint128::one()) / exchange_rate).to_uint_floor()
 }
 
+/// return how much fee from reward
+pub fn calculate_fee_from_reward(reward: Uint128, fee_rate: Decimal) -> Uint128 {
+    (fee_rate * Decimal::from_ratio(reward, Uint128::one())).to_uint_floor()
+}
+
 /// return how much underlying native coin denom from staking token base on exchange rate
 pub fn calculate_native_token_from_staking_token(
     staking_token: Uint128,

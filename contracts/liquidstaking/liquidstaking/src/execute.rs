@@ -15,12 +15,12 @@ use crate::state::{
     VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::{check_slippage, to_uint128};
+use crate::utils::calc::{calculate_fee_from_reward, check_slippage, to_uint128};
 use crate::utils::validation::validate_validators;
 use crate::utils::{
     self, delegation::assert_executor, delegation::get_actual_total_delegated,
-    delegation::get_mock_total_reward, delegation::get_transfer_token_cosmos_msg,
-    delegation::get_unclaimed_reward, delegation::submit_pending_batch,
+    delegation::get_actual_total_reward, delegation::get_mock_total_reward,
+    delegation::get_transfer_token_cosmos_msg, delegation::submit_pending_batch,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env,
@@ -448,21 +448,18 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
         validators_list.clone(),
     )?;
 
+    let reward = get_actual_total_reward(
+        deps.storage,
+        deps.querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list,
+    )?;
     let total_bond_amount: Uint128;
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
-
-        let unclaimed_reward = get_unclaimed_reward(
-            deps.querier,
-            delegator.to_string(),
-            coin_denom.clone(),
-            validators_list,
-        )?;
-
-        // query the reward from this contract state
-        let contract_reward_balance = REWARD_BALANCE.load(deps.storage)?;
-        let reward = unclaimed_reward + contract_reward_balance;
-        total_bond_amount = delegated_amount + reward;
+        let fee = calculate_fee_from_reward(reward, params.fee_rate);
+        total_bond_amount = delegated_amount + reward - fee;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
     }
@@ -474,6 +471,9 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     state.update_exchange_rate();
 
     STATE.save(deps.storage, &state)?;
+
+    // update reward balance with addition of unclaimed reward because on redelegate as there is automatic reward withdrawal
+    REWARD_BALANCE.save(deps.storage, &reward)?;
 
     let res: Response = Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "redelegate"),
