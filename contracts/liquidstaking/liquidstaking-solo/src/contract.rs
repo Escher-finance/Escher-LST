@@ -98,6 +98,12 @@ pub fn instantiate(
     };
     STATE.save(deps.storage, &state)?;
 
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.storage, &status)?;
+
     SPLIT_REWARD_QUEUE.save(
         deps.storage,
         &WithdrawReward {
@@ -119,14 +125,6 @@ pub fn instantiate(
         epoch_period: msg.epoch_period.unwrap_or(360),
     };
     SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
-
-    SPLIT_REWARD_QUEUE.save(
-        deps.storage,
-        &WithdrawReward {
-            target_amount: Uint128::zero(),
-            withdrawed_amount: Uint128::zero(),
-        },
-    )?;
 
     let pending_batch = Batch::new(
         1,

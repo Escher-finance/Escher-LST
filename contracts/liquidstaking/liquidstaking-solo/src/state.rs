@@ -86,17 +86,6 @@ pub struct Parameters {
     pub batch_limit: u32,
 }
 
-impl State {
-    pub fn update_exchange_rate(&mut self) {
-        let zero = Uint128::zero();
-        self.exchange_rate = if self.total_bond_amount != zero && self.total_supply != zero {
-            Decimal::from_ratio(self.total_bond_amount, self.total_supply)
-        } else {
-            Decimal::one()
-        };
-    }
-}
-
 pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
 
 pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {

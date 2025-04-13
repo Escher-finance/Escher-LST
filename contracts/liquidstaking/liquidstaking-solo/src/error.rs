@@ -114,9 +114,12 @@ pub enum ContractError {
     #[error("unbond amount is less than minimum unbond amount")]
     UnbondAmountTooLow {},
 
-    #[error("Invalid exchange rate")]
-    InvalidExchangeRate {},
-
     #[error("This functionality is currently disabled for maintenance")]
     FunctionalityUnderMaintenance {},
+
+    #[error("invalid fee rate")]
+    InvalidFeeRate {},
+
+    #[error("Invalid exchange rate")]
+    InvalidExchangeRate {},
 }

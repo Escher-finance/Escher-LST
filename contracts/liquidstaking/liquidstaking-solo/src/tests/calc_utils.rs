@@ -216,3 +216,43 @@ fn test_normalize_total_supply() {
         current_supply, new_supply
     );
 }
+
+#[test]
+fn test_calculate_dust_distribution() {
+    assert!(calculate_dust_distribution(Uint128::zero(), Uint128::zero()).is_empty());
+    assert!(calculate_dust_distribution(Uint128::new(1000), Uint128::zero()).is_empty());
+    assert_eq!(
+        calculate_dust_distribution(Uint128::zero(), Uint128::new(10)).len(),
+        10
+    );
+    assert!(
+        calculate_dust_distribution(Uint128::zero(), Uint128::new(10))
+            .iter()
+            .all(|d| d.is_zero())
+    );
+    assert_eq!(
+        calculate_dust_distribution(Uint128::new(10), Uint128::new(2)),
+        Vec::from([Uint128::new(5), Uint128::new(5)])
+    );
+    assert_eq!(
+        calculate_dust_distribution(Uint128::new(9), Uint128::new(2)),
+        Vec::from([Uint128::new(5), Uint128::new(4)])
+    );
+    assert_eq!(
+        calculate_dust_distribution(Uint128::new(11), Uint128::new(5)),
+        Vec::from([
+            Uint128::new(3),
+            Uint128::new(2),
+            Uint128::new(2),
+            Uint128::new(2),
+            Uint128::new(2),
+        ])
+    );
+    let big_dust_amount = Uint128::new(12340123203498754234792834);
+    assert_eq!(
+        calculate_dust_distribution(big_dust_amount, Uint128::new(1500))
+            .iter()
+            .sum::<Uint128>(),
+        big_dust_amount
+    );
+}

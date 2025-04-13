@@ -113,7 +113,7 @@ pub fn calculate_exchange_rate(
     queue: &SupplyQueue,
 ) -> Decimal {
     let mut exchange_rate: Decimal = Decimal::one();
-    if total_bond_amount != Uint128::zero() && total_supply != Uint128::zero() {
+    if total_bond_amount != Uint128::zero() {
         let normalize_total_supply = normalize_total_supply(total_supply, &queue.mint, &queue.burn);
 
         exchange_rate = Decimal::from_ratio(total_bond_amount, normalize_total_supply);
@@ -130,4 +130,20 @@ pub fn calculate_query_bounds(min: Option<u64>, max: Option<u64>) -> (u64, u64) 
         None => min_bound + max_dist,
     };
     (min_bound, max_bound)
+}
+
+pub fn calculate_dust_distribution(dust_amount: Uint128, receivers_len: Uint128) -> Vec<Uint128> {
+    if receivers_len.is_zero() {
+        return Vec::new();
+    }
+    let min_for_each = dust_amount / receivers_len;
+    let mut extra = dust_amount % receivers_len;
+    (0..receivers_len.into())
+        .map(|_| {
+            let one = Uint128::one();
+            let dust = min_for_each + if extra >= one { one } else { Uint128::zero() };
+            extra = extra.saturating_sub(one);
+            dust
+        })
+        .collect()
 }

@@ -54,7 +54,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Status {} => to_json_binary(&query_status(deps.storage)?),
     }?)
 }
-
 pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
     Ok(STATUS.load(storage)?)
 }
@@ -142,7 +141,7 @@ pub fn query_staking_liquidity(
     let state: State = STATE.load(deps.storage)?;
     let mut exchange_rate: Decimal = Decimal::one();
     let mut adjusted_supply = state.total_supply;
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+    if total_bond_amount != Uint128::zero() {
         let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
         calc::normalize_supply_queue(&mut supply_queue, env.block.height);
         adjusted_supply = calc::normalize_total_supply(
@@ -268,24 +267,9 @@ pub fn query_batch(
         None => BatchStatus::Pending,
     };
 
-    let min_bound = match min {
-        Some(min) => Some(cw_storage_plus::Bound::Inclusive((min, PhantomData))),
-        None => Some(cw_storage_plus::Bound::Inclusive((1, PhantomData))),
-    };
-    let max_bound = match max {
-        Some(max) => {
-            let max_id = if min.is_some() && max > min.unwrap() + 50 {
-                min.unwrap() + 50
-            } else {
-                max
-            };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
-        }
-        None => {
-            let max_id = if min.is_some() { min.unwrap() + 50 } else { 50 };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
-        }
-    };
+    let (min_id, max_id) = calculate_query_bounds(min, max);
+    let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
+    let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
 
     let mut batch_list: Vec<Batch> = vec![];
     let batches = batches().idx.status.prefix(batch_status.to_string()).range(
