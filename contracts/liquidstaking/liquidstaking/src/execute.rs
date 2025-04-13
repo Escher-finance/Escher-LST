@@ -11,15 +11,15 @@ use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
     unbond_record, QuoteToken, Validator, WithdrawReward, EXECUTOR, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
+    QUOTE_TOKEN, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::{check_slippage, to_uint128};
+use crate::utils::calc::{calc_with_rate, check_slippage, to_uint128};
 use crate::utils::validation::validate_validators;
 use crate::utils::{
     self, delegation::assert_executor, delegation::get_actual_total_delegated,
-    delegation::get_mock_total_reward, delegation::get_transfer_token_cosmos_msg,
-    delegation::get_unclaimed_reward, delegation::submit_pending_batch,
+    delegation::get_actual_total_reward, delegation::get_mock_total_reward,
+    delegation::get_transfer_token_cosmos_msg, delegation::submit_pending_batch,
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env,
@@ -425,17 +425,15 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
 
-        let unclaimed_reward = get_unclaimed_reward(
+        let reward = get_actual_total_reward(
+            deps.storage,
             deps.querier,
             delegator.to_string(),
             coin_denom.clone(),
             validators_list,
         )?;
-
-        // query the reward from this contract state
-        let contract_reward_balance = REWARD_BALANCE.load(deps.storage)?;
-        let reward = unclaimed_reward + contract_reward_balance;
-        total_bond_amount = delegated_amount + reward;
+        let fee = calc_with_rate(reward, params.fee_rate);
+        total_bond_amount = delegated_amount + reward - fee;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
     }

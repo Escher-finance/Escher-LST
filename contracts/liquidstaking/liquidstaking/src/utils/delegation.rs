@@ -465,17 +465,14 @@ pub fn process_bond(
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
         // query the total reward from this contract
-        let unclaimed_reward = get_unclaimed_reward(
+        let reward = get_actual_total_reward(
+            storage,
             querier,
             delegator.to_string(),
             coin_denom.clone(),
             validators_list,
         )?;
-
-        let contract_reward_balance = REWARD_BALANCE.load(storage)?;
-        let reward = unclaimed_reward + contract_reward_balance;
         let fee = calc::calc_with_rate(reward, params.fee_rate);
-
         total_bond_amount = delegated_amount + reward - fee;
 
         // update the reward balance on this contract as there is automatic reward withdrawal on delegation
@@ -571,15 +568,14 @@ pub fn submit_pending_batch(
 
     state.total_delegated_amount = delegated_amount;
     // query the unclaimed total reward
-    let unclaimed_reward = get_unclaimed_reward(
+
+    let reward = get_actual_total_reward(
+        deps.storage,
         deps.querier,
         delegator.to_string(),
         coin_denom.clone(),
         validators_list,
     )?;
-
-    let contract_reward_balance = REWARD_BALANCE.load(deps.storage)?;
-    let reward = unclaimed_reward + contract_reward_balance;
 
     let fee = calc::calc_with_rate(reward, params.fee_rate);
     let total_bond_amount = delegated_amount + reward - fee;
@@ -776,4 +772,16 @@ pub fn assert_executor(storage: &mut dyn Storage, sender: Addr) -> Result<(), Co
     }
 
     Ok(())
+}
+
+pub fn get_actual_total_reward(
+    storage: &dyn Storage,
+    querier: QuerierWrapper,
+    delegator: String,
+    denom: String,
+    validators: Vec<String>,
+) -> StdResult<Uint128> {
+    let unclaimed_reward = get_unclaimed_reward(querier, delegator, denom, validators)?;
+    let reward_balance = REWARD_BALANCE.load(storage)?;
+    Ok(unclaimed_reward + reward_balance)
 }
