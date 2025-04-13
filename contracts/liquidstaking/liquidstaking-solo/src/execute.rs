@@ -91,20 +91,6 @@ pub fn bond(
 
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
-    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
-    let total_reward = utils::delegation::get_unclaimed_reward(
-        deps.querier,
-        delegator.to_string(),
-        coin_denom.clone(),
-        validators_reg
-            .validators
-            .iter()
-            .map(|v| v.address.clone())
-            .collect(),
-    )?;
-    reward_balance += total_reward;
-    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
-
     // create bond event here
     let bond_event = BondEvent(
         sender.to_string(),
