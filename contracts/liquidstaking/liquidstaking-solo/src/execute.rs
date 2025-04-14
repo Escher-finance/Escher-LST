@@ -1,11 +1,9 @@
-use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::error::ContractError;
 use crate::event::{
     BatchReceivedEvent, BatchReleasedEvent, BondEvent, ProcessBatchUnbondingEvent,
-    ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent, UpdateConfigEvent,
-    UpdateValidatorsEvent,
+    ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent, UpdateValidatorsEvent,
 };
 use crate::helpers;
 use crate::msg::{
@@ -14,12 +12,11 @@ use crate::msg::{
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS,
-    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
+    QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
     VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::calculate_dust_distribution;
 use crate::utils::calc::calculate_exchange_rate;
 use crate::utils::calc::calculate_fee_from_reward;
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
@@ -703,6 +700,7 @@ pub fn set_parameters(
     Ok(res)
 }
 
+#[derive(Debug)]
 pub struct StakerUndelegation {
     pub unstake_amount: Uint128,
     pub channel_id: Option<u32>,
@@ -738,8 +736,6 @@ pub fn process_batch_withdrawal(
 
     let total_received_amount = batch.received_native_unstaked.unwrap();
 
-    let mut staker_undelegation: HashMap<String, StakerUndelegation> = HashMap::new();
-
     let mut unbonding_records =
         query_unreleased_unbond_record_from_batch(deps.storage, batch.id, params.batch_limit);
 
@@ -749,57 +745,14 @@ pub fn process_batch_withdrawal(
         false
     };
 
-    let mut unbond_record_ids = vec![];
-    let mut released_amount = Uint128::zero();
-
-    let total_received_amount_in_decimal =
-        Decimal::from_ratio(total_received_amount, Uint128::one());
-
-    for record in unbonding_records.iter_mut() {
-        let entry = staker_undelegation
-            .entry(record.staker.clone())
-            .and_modify(|e| e.unstake_amount += record.amount)
-            .or_insert(StakerUndelegation {
-                unstake_amount: record.amount,
-                channel_id: record.channel_id,
-                unstake_return_native_amount: None,
-            });
-
-        let user_to_total_unstake_ratio =
-            Decimal::from_ratio(entry.unstake_amount, batch.total_liquid_stake);
-
-        let unstake_return_native_amount =
-            (user_to_total_unstake_ratio * total_received_amount_in_decimal).to_uint_floor();
-
-        entry.unstake_return_native_amount = Some(unstake_return_native_amount);
-        released_amount += unstake_return_native_amount;
-
-        record.released = true;
-
-        record.released_height = env.block.height;
-
-        unbond_record().save(deps.storage, record.id, &record)?;
-
-        unbond_record_ids.push(record.id);
-    }
-
-    let dust_amount = (total_received_amount_in_decimal
-        - Decimal::from_ratio(released_amount, Uint128::one()))
-    .to_uint_floor();
-
-    let dust_distribution =
-        calculate_dust_distribution(dust_amount, Uint128::new(unbonding_records.len() as u128));
-    for (i, record) in unbonding_records.iter_mut().enumerate() {
-        let staker_undelegation = match staker_undelegation.get_mut(&record.staker) {
-            Some(x) => x,
-            None => continue,
-        };
-        let dust = dust_distribution[i];
-        staker_undelegation.unstake_return_native_amount = staker_undelegation
-            .unstake_return_native_amount
-            .map(|x| x + dust);
-        released_amount += dust;
-    }
+    let (staker_undelegation, unbond_record_ids, total_released_amount) =
+        crate::utils::delegation::get_staker_undelegation(
+            deps.storage,
+            total_received_amount,
+            &mut unbonding_records,
+            batch.total_liquid_stake,
+            env.block.height,
+        )?;
 
     let time = env.block.time;
     let denom = params.underlying_coin_denom;
@@ -809,7 +762,6 @@ pub fn process_batch_withdrawal(
 
     let mut send_msgs: Vec<CosmosMsg> = vec![];
     let mut i = 0;
-    let mut released_amount = Uint128::zero();
     for (key, undelegation) in staker_undelegation.iter() {
         let msg = get_transfer_token_cosmos_msg(
             deps.storage,
@@ -833,15 +785,14 @@ pub fn process_batch_withdrawal(
         );
         events.push(ev);
 
-        released_amount += undelegation.unstake_return_native_amount.unwrap();
         i += 1;
     }
 
-    if released_amount > Uint128::zero() {
+    if total_released_amount > Uint128::zero() {
         let ev = ProcessBatchUnbondingEvent(
             id,
             time,
-            released_amount,
+            total_released_amount,
             batch.received_native_unstaked.unwrap(),
             denom.clone(),
             unbond_record_ids,
@@ -992,22 +943,13 @@ pub fn set_config(
     config.coin_denom = coin_denom.clone().unwrap_or_else(|| config.coin_denom);
     CONFIG.save(deps.storage, &config)?;
 
-    let event = UpdateConfigEvent(
-        config.lst_contract_address.clone(),
-        config.fee_receiver.clone(),
-        config.fee_rate,
-        config.coin_denom.clone(),
-    );
-
-    let attrs = Vec::from([
-        attr("action", "set_config"),
-        attr("lst_contract_address", config.lst_contract_address),
-        attr("fee_receiver", config.fee_receiver),
-        attr("fee_rate", config.fee_rate.to_string()),
-        attr("coin_denom", config.coin_denom),
-    ]);
-
-    Ok(Response::new().add_attributes(attrs).add_event(event))
+    let res = Response::new()
+        .add_attribute("action", "set_config")
+        .add_attribute("lst_contract_address", config.lst_contract_address)
+        .add_attribute("fee_receiver", config.fee_receiver)
+        .add_attribute("fee_rate", config.fee_rate.to_string())
+        .add_attribute("coin_denom", config.coin_denom);
+    Ok(res)
 }
 
 /// Migrate reward contract
