@@ -183,6 +183,7 @@ pub fn query_unbond_record(
     let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
     let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
 
+    // unbond record query with specific batch id skip min and max bound
     let unbonded_range = if let Some(batch_id) = batch_id {
         unbond_record()
             .idx
@@ -249,6 +250,8 @@ pub fn query_unreleased_unbond_record_from_batch(
     unbonded_list
 }
 
+// query batch by id or status
+// min bound and max bound only used when status filter is released
 pub fn query_batch(
     storage: &dyn Storage,
     id: Option<u64>,
@@ -267,9 +270,17 @@ pub fn query_batch(
         None => BatchStatus::Pending,
     };
 
-    let (min_id, max_id) = calculate_query_bounds(min, max);
-    let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
-    let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
+    let (min_bound, max_bound) = match batch_status {
+        BatchStatus::Pending => (None, None),
+        BatchStatus::Submitted => (None, None),
+        BatchStatus::Received => (None, None),
+        BatchStatus::Released => {
+            let (min_id, max_id) = calculate_query_bounds(min, max);
+            let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
+            let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
+            (min_bound, max_bound)
+        }
+    };
 
     let mut batch_list: Vec<Batch> = vec![];
     let batches = batches().idx.status.prefix(batch_status.to_string()).range(
@@ -278,7 +289,6 @@ pub fn query_batch(
         max_bound,
         Order::Ascending,
     );
-
     for batch in batches {
         if batch.is_ok() {
             batch_list.push(batch.unwrap().1);
