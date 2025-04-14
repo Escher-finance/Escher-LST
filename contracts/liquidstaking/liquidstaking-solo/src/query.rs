@@ -188,7 +188,7 @@ pub fn query_unbond_record(
             .idx
             .batch
             .prefix(batch_id.to_string())
-            .range(storage, min_bound, max_bound, Order::Ascending)
+            .range(storage, None, None, Order::Ascending)
     } else {
         match (staker, released) {
             (Some(staker), None) => unbond_record().idx.staker.prefix(staker).range(
