@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::error::ContractError;
@@ -13,11 +12,10 @@ use crate::msg::{
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    unbond_record, QuoteToken, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    QuoteToken, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+    REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::calculate_dust_distribution;
 use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
 use crate::utils::{
     self, calc::check_slippage, calc::normalize_supply_queue, calc::to_uint128,
@@ -698,8 +696,6 @@ pub fn process_batch_withdrawal(
 
     let total_received_amount = batch.received_native_unstaked.unwrap();
 
-    let mut staker_undelegation: HashMap<String, StakerUndelegation> = HashMap::new();
-
     let mut unbonding_records =
         query_unreleased_unbond_record_from_batch(deps.storage, batch.id, params.batch_limit);
 
@@ -709,57 +705,14 @@ pub fn process_batch_withdrawal(
         false
     };
 
-    let mut unbond_record_ids = vec![];
-    let mut released_amount = Uint128::zero();
-
-    let total_received_amount_in_decimal =
-        Decimal::from_ratio(total_received_amount, Uint128::one());
-
-    for record in unbonding_records.iter_mut() {
-        let entry = staker_undelegation
-            .entry(record.staker.clone())
-            .and_modify(|e| e.unstake_amount += record.amount)
-            .or_insert(StakerUndelegation {
-                unstake_amount: record.amount,
-                channel_id: record.channel_id,
-                unstake_return_native_amount: None,
-            });
-
-        let user_to_total_unstake_ratio =
-            Decimal::from_ratio(entry.unstake_amount, batch.total_liquid_stake);
-
-        let unstake_return_native_amount =
-            (user_to_total_unstake_ratio * total_received_amount_in_decimal).to_uint_floor();
-
-        entry.unstake_return_native_amount = Some(unstake_return_native_amount);
-        released_amount += unstake_return_native_amount;
-
-        record.released = true;
-
-        record.released_height = env.block.height;
-
-        unbond_record().save(deps.storage, record.id, &record)?;
-
-        unbond_record_ids.push(record.id);
-    }
-
-    let dust_amount = (total_received_amount_in_decimal
-        - Decimal::from_ratio(released_amount, Uint128::one()))
-    .to_uint_floor();
-
-    let dust_distribution =
-        calculate_dust_distribution(dust_amount, Uint128::new(unbonding_records.len() as u128));
-    for (i, record) in unbonding_records.iter_mut().enumerate() {
-        let staker_undelegation = match staker_undelegation.get_mut(&record.staker) {
-            Some(x) => x,
-            None => continue,
-        };
-        let dust = dust_distribution[i];
-        staker_undelegation.unstake_return_native_amount = staker_undelegation
-            .unstake_return_native_amount
-            .map(|x| x + dust);
-        released_amount += dust;
-    }
+    let (staker_undelegation, unbond_record_ids, total_released_amount) =
+        crate::utils::delegation::get_staker_undelegation(
+            deps.storage,
+            total_received_amount,
+            &mut unbonding_records,
+            batch.total_liquid_stake,
+            env.block.height,
+        )?;
 
     let time = env.block.time;
     let params = PARAMETERS.load(deps.storage)?;
@@ -768,13 +721,13 @@ pub fn process_batch_withdrawal(
 
     let mut events = vec![];
 
-    if released_amount > Uint128::zero() {
+    if total_released_amount > Uint128::zero() {
         let mut events: Vec<Event> = vec![];
 
         let ev = ProcessBatchUnbondingEvent(
             id,
             time,
-            released_amount,
+            total_released_amount,
             batch.received_native_unstaked.unwrap(),
             denom.clone(),
             unbond_record_ids,

@@ -1,4 +1,5 @@
 use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
+use crate::execute::StakerUndelegation;
 use crate::msg::ValidatorDelegation;
 use crate::proto;
 use crate::state::{ValidatorsRegistry, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE};
@@ -832,4 +833,79 @@ pub fn get_babylon_redelegate_cosmos_msg(
         value: Binary::from(restaking_msg.encode_to_vec()),
     });
     redelegate
+}
+
+pub fn get_staker_undelegation(
+    storage: &mut dyn Storage,
+    total_received_amount: Uint128,
+    unbonding_records: &mut Vec<UnbondRecord>,
+    total_liquid_stake: Uint128,
+    block_height: u64,
+) -> Result<(HashMap<String, StakerUndelegation>, Vec<u64>, Uint128), ContractError> {
+    let total_received_amount_in_decimal =
+        Decimal::from_ratio(total_received_amount, Uint128::one());
+    let mut unbond_record_ids = vec![];
+    let mut staker_undelegation: HashMap<String, StakerUndelegation> = HashMap::new();
+
+    for record in unbonding_records.iter_mut() {
+        let entry = staker_undelegation
+            .entry(record.staker.clone())
+            .and_modify(|e| e.unstake_amount += record.amount)
+            .or_insert(StakerUndelegation {
+                unstake_amount: record.amount,
+                channel_id: record.channel_id,
+                unstake_return_native_amount: None,
+            });
+
+        let user_to_total_unstake_ratio =
+            Decimal::from_ratio(entry.unstake_amount, total_liquid_stake);
+
+        let unstake_return_native_amount =
+            (user_to_total_unstake_ratio * total_received_amount_in_decimal).to_uint_floor();
+
+        entry.unstake_return_native_amount = Some(unstake_return_native_amount);
+
+        record.released = true;
+
+        record.released_height = block_height;
+        if cfg!(test) {
+            unbond_record().save(storage, record.id, &record)?;
+        }
+
+        unbond_record_ids.push(record.id);
+    }
+
+    // released amount before adjusted with dust distribution, sometime it can be lower than total received amount
+    let released_amount: Uint128 = staker_undelegation
+        .values()
+        .map(|item| item.unstake_return_native_amount.unwrap())
+        .sum();
+
+    let dust_amount = (total_received_amount_in_decimal
+        - Decimal::from_ratio(released_amount, Uint128::one()))
+    .to_uint_floor();
+
+    let mut total_released_amount = Uint128::zero();
+    let dust_distribution = calc::calculate_dust_distribution(
+        dust_amount,
+        Uint128::new(unbonding_records.len() as u128),
+    );
+    for (i, record) in unbonding_records.iter_mut().enumerate() {
+        let staker_undelegation = match staker_undelegation.get_mut(&record.staker) {
+            Some(x) => x,
+            None => continue,
+        };
+        let dust = dust_distribution[i];
+        staker_undelegation.unstake_return_native_amount = staker_undelegation
+            .unstake_return_native_amount
+            .map(|x| x + dust);
+
+        total_released_amount += staker_undelegation.unstake_return_native_amount.unwrap();
+    }
+
+    Ok((
+        staker_undelegation,
+        unbond_record_ids,
+        total_released_amount,
+    ))
 }
