@@ -601,6 +601,10 @@ pub fn set_parameters(
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
+    if fee_rate.is_some() && fee_rate.unwrap() > Decimal::one() {
+        return Err(ContractError::InvalidFeeRate {});
+    }
+
     let mut params = PARAMETERS.load(deps.storage)?;
 
     params.underlying_coin_denom = underlying_coin_denom
@@ -759,7 +763,6 @@ pub fn process_batch_withdrawal(
     }
 
     let time = env.block.time;
-    let params = PARAMETERS.load(deps.storage)?;
     let denom = params.underlying_coin_denom;
     let ucs03_relay_contract = params.ucs03_relay_contract;
 
