@@ -724,7 +724,7 @@ pub fn unstake_request_in_batch(
 }
 
 pub fn get_transfer_token_cosmos_msg(
-    storage: &mut dyn Storage,
+    storage: &dyn Storage,
     staker: String,
     channel_id: Option<u32>,
     time: Timestamp,
