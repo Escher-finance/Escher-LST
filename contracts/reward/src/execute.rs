@@ -91,6 +91,10 @@ pub fn set_config(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let mut config = CONFIG.load(deps.storage)?;
 
+    if fee_rate.is_some() && fee_rate.unwrap() > Decimal::one() {
+        return Err(ContractError::InvalidFeeRate {});
+    }
+
     config.lst_contract_address = lst_contract_address
         .clone()
         .unwrap_or_else(|| config.lst_contract_address);

@@ -112,4 +112,7 @@ pub enum ContractError {
 
     #[error("This functionality is currently disabled for maintenance")]
     FunctionalityUnderMaintenance {},
+
+    #[error("invalid fee rate")]
+    InvalidFeeRate {},
 }
