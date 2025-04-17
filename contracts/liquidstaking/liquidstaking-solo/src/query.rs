@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::msg::{Balance, QueryMsg, StakingLiquidity};
-use crate::state::unbond_record;
+use crate::state::{unbond_record, Status, STATUS};
 use crate::state::{
     Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, ValidatorsRegistry, PARAMETERS,
     QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
@@ -51,7 +51,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
             max,
         } => to_json_binary(&query_batch(deps.storage, id, status, min, max)?),
         QueryMsg::SupplyQueue {} => to_json_binary(&query_supply_queue(deps.storage)?),
+        QueryMsg::Status {} => to_json_binary(&query_status(deps.storage)?),
     }?)
+}
+pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
+    Ok(STATUS.load(storage)?)
 }
 
 pub fn query_reward_balance(storage: &dyn Storage) -> Result<Balance, ContractError> {
@@ -137,7 +141,7 @@ pub fn query_staking_liquidity(
     let state: State = STATE.load(deps.storage)?;
     let mut exchange_rate: Decimal = Decimal::one();
     let mut adjusted_supply = state.total_supply;
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+    if total_bond_amount != Uint128::zero() {
         let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
         calc::normalize_supply_queue(&mut supply_queue, env.block.height);
         adjusted_supply = calc::normalize_total_supply(
@@ -179,12 +183,13 @@ pub fn query_unbond_record(
     let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
     let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
 
+    // unbond record query with specific batch id skip min and max bound
     let unbonded_range = if let Some(batch_id) = batch_id {
         unbond_record()
             .idx
             .batch
             .prefix(batch_id.to_string())
-            .range(storage, min_bound, max_bound, Order::Ascending)
+            .range(storage, None, None, Order::Ascending)
     } else {
         match (staker, released) {
             (Some(staker), None) => unbond_record().idx.staker.prefix(staker).range(
@@ -245,6 +250,8 @@ pub fn query_unreleased_unbond_record_from_batch(
     unbonded_list
 }
 
+// query batch by id or status
+// min bound and max bound only used when status filter is released
 pub fn query_batch(
     storage: &dyn Storage,
     id: Option<u64>,
@@ -263,22 +270,15 @@ pub fn query_batch(
         None => BatchStatus::Pending,
     };
 
-    let min_bound = match min {
-        Some(min) => Some(cw_storage_plus::Bound::Inclusive((min, PhantomData))),
-        None => Some(cw_storage_plus::Bound::Inclusive((1, PhantomData))),
-    };
-    let max_bound = match max {
-        Some(max) => {
-            let max_id = if min.is_some() && max > min.unwrap() + 50 {
-                min.unwrap() + 50
-            } else {
-                max
-            };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
-        }
-        None => {
-            let max_id = if min.is_some() { min.unwrap() + 50 } else { 50 };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
+    let (min_bound, max_bound) = match batch_status {
+        BatchStatus::Pending => (None, None),
+        BatchStatus::Submitted => (None, None),
+        BatchStatus::Received => (None, None),
+        BatchStatus::Released => {
+            let (min_id, max_id) = calculate_query_bounds(min, max);
+            let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
+            let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
+            (min_bound, max_bound)
         }
     };
 
@@ -289,7 +289,6 @@ pub fn query_batch(
         max_bound,
         Order::Ascending,
     );
-
     for batch in batches {
         if batch.is_ok() {
             batch_list.push(batch.unwrap().1);

@@ -1,5 +1,5 @@
 use crate::state::Validator;
-use cosmwasm_std::{attr, Attribute, Decimal, Event, Timestamp, Uint128};
+use cosmwasm_std::{attr, Addr, Attribute, Decimal, Event, Timestamp, Uint128};
 pub const BOND_EVENT: &str = "bond";
 
 #[allow(non_snake_case)]
@@ -224,4 +224,29 @@ pub fn SplitRewardEvent(
         .add_attribute("redelegate_amount", redelegate_amount.to_string())
         .add_attribute("fee_amount", fee_amount.to_string())
         .add_attribute("time", format!("{}", time.nanos()))
+}
+
+pub const BATCH_RELEASED_EVENT: &str = "batch_released";
+
+#[allow(non_snake_case)]
+pub fn BatchReleasedEvent(batch_id: u64, time: Timestamp) -> Event {
+    Event::new(BATCH_RELEASED_EVENT.to_string())
+        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("time", format!("{}", time.nanos()))
+}
+
+pub const UPDATE_CONFIG_EVENT: &str = "update_config";
+
+#[allow(non_snake_case)]
+pub fn UpdateConfigEvent(
+    lst_contract_address: Addr,
+    fee_receiver: Addr,
+    fee_rate: Decimal,
+    coin_denom: String,
+) -> Event {
+    Event::new(UPDATE_CONFIG_EVENT.to_string())
+        .add_attribute("lst_contract_address", lst_contract_address)
+        .add_attribute("fee_receiver", fee_receiver)
+        .add_attribute("fee_rate", fee_rate.to_string())
+        .add_attribute("coin_denom", coin_denom)
 }

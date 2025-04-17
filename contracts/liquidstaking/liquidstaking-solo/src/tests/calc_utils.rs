@@ -216,3 +216,106 @@ fn test_normalize_total_supply() {
         current_supply, new_supply
     );
 }
+
+#[test]
+fn test_calculate_dust_distribution() {
+    assert!(calculate_dust_distribution(Uint128::zero(), Uint128::zero()).is_empty());
+    assert!(calculate_dust_distribution(Uint128::new(1000), Uint128::zero()).is_empty());
+    assert_eq!(
+        calculate_dust_distribution(Uint128::zero(), Uint128::new(10)).len(),
+        10
+    );
+    assert!(
+        calculate_dust_distribution(Uint128::zero(), Uint128::new(10))
+            .iter()
+            .all(|d| d.is_zero())
+    );
+    assert_eq!(
+        calculate_dust_distribution(Uint128::new(10), Uint128::new(2)),
+        Vec::from([Uint128::new(5), Uint128::new(5)])
+    );
+    assert_eq!(
+        calculate_dust_distribution(Uint128::new(9), Uint128::new(2)),
+        Vec::from([Uint128::new(5), Uint128::new(4)])
+    );
+    assert_eq!(
+        calculate_dust_distribution(Uint128::new(11), Uint128::new(5)),
+        Vec::from([
+            Uint128::new(3),
+            Uint128::new(2),
+            Uint128::new(2),
+            Uint128::new(2),
+            Uint128::new(2),
+        ])
+    );
+    let big_dust_amount = Uint128::new(12340123203498754234792834);
+    assert_eq!(
+        calculate_dust_distribution(big_dust_amount, Uint128::new(1500))
+            .iter()
+            .sum::<Uint128>(),
+        big_dust_amount
+    );
+}
+
+#[test]
+fn test_staker_undelegation_with_dust_distribution() {
+    let total_received_amount = Uint128::from_str("2022599").unwrap();
+
+    let total_liquid_stake: Uint128 = Uint128::from_str("1949557").unwrap();
+
+    let unbond_record_1 = crate::state::UnbondRecord {
+        id: 101,
+        height: 730899,
+        sender: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        staker: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        channel_id: None,
+        amount: Uint128::new(540000u128),
+        released_height: 0,
+        released: false,
+        batch_id: 27,
+    };
+
+    let unbond_record_2 = crate::state::UnbondRecord {
+        id: 101,
+        height: 730899,
+        sender: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        staker: "bbn1yj3h4tjw8s6n0cd6jmc0s9pqmud57yk5hf2nvf".into(),
+        channel_id: None,
+        amount: Uint128::new(409557u128),
+        released_height: 0,
+        released: false,
+        batch_id: 27,
+    };
+
+    let unbond_record_3 = crate::state::UnbondRecord {
+        id: 101,
+        height: 730899,
+        sender: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        staker: "bbn132ltlddr9gkun8kgrefquem2w754kpy8z5j4wx".into(),
+        channel_id: None,
+        amount: Uint128::new(1000000u128),
+        released_height: 0,
+        released: false,
+        batch_id: 27,
+    };
+
+    let mut unbond_records = vec![unbond_record_1, unbond_record_2, unbond_record_3];
+
+    let mut store = cosmwasm_std::testing::MockStorage::new();
+
+    let (_, unbond_record_ids, total_released_amount) =
+        crate::utils::delegation::get_staker_undelegation(
+            &mut store,
+            total_received_amount,
+            &mut unbond_records,
+            total_liquid_stake,
+            1000,
+        )
+        .unwrap();
+
+    assert_eq!(total_received_amount, total_released_amount);
+    assert_eq!(
+        unbond_record_ids,
+        unbond_records.iter().map(|u| u.id).collect::<Vec<u64>>()
+    );
+}

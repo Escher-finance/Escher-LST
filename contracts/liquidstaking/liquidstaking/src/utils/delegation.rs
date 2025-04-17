@@ -490,6 +490,10 @@ pub fn process_bond(
         exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
     }
 
+    if exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
 
     // after update exchange rate we update the state
@@ -720,7 +724,7 @@ pub fn unstake_request_in_batch(
 }
 
 pub fn get_transfer_token_cosmos_msg(
-    storage: &mut dyn Storage,
+    storage: &dyn Storage,
     staker: String,
     channel_id: Option<u32>,
     time: Timestamp,

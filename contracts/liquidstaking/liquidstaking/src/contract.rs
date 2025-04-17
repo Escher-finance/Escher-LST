@@ -11,8 +11,8 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Parameters, State, ValidatorsRegistry, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, VALIDATORS_REGISTRY,
+    Parameters, State, Status, ValidatorsRegistry, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
 };
 
 // version info for migration info
@@ -182,11 +182,19 @@ pub fn execute(
             message,
         } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
+        ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
     }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    STATUS.save(
+        deps.storage,
+        &Status {
+            bond_is_paused: false,
+            unbond_is_paused: false,
+        },
+    )?;
     Ok(Response::default())
 }

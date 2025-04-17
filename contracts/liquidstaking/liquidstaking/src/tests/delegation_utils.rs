@@ -1039,7 +1039,7 @@ fn test_process_bond() {
         exchange_rate: Decimal::from_str("1.1").unwrap(),
         total_bond_amount: Uint128::new(20_000),
         total_delegated_amount: Uint128::new(15_000),
-        total_supply: Uint128::new(100_000),
+        total_supply: Uint128::new(10_000),
         bond_counter: 5,
         last_bond_time: 50000,
     };

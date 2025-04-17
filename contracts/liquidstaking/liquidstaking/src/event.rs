@@ -208,3 +208,12 @@ pub fn BatchReceivedEvent(batch_id: u64, received_amount: String, time: Timestam
         .add_attribute("received_amount", received_amount)
         .add_attribute("time", format!("{}", time.nanos()))
 }
+
+pub const BATCH_RELEASED_EVENT: &str = "batch_released";
+
+#[allow(non_snake_case)]
+pub fn BatchReleasedEvent(batch_id: u64, time: Timestamp) -> Event {
+    Event::new(BATCH_RELEASED_EVENT.to_string())
+        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("time", format!("{}", time.nanos()))
+}

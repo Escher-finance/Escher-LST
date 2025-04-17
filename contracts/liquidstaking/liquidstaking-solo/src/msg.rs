@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::{
     state::{
-        Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, Validator, ValidatorsRegistry,
+        Parameters, QuoteToken, State, Status, SupplyQueue, UnbondRecord, Validator,
+        ValidatorsRegistry,
     },
     utils::batch::{Batch, BatchStatus},
 };
@@ -63,11 +64,12 @@ pub struct InstantiateRewardMsg {
 
 #[cw_serde]
 pub enum ExecuteRewardMsg {
-    MigrateMsg {},
     SplitReward {},
     SetConfig {
         fee_receiver: Option<Addr>,
         fee_rate: Option<Decimal>,
+        lst_contract_address: Option<Addr>,
+        coin_denom: Option<String>,
     },
 }
 
@@ -144,6 +146,7 @@ pub enum ExecuteMsg {
         fee_rate: Option<Decimal>,
         coin_denom: Option<String>,
     },
+    SetStatus(Status),
 }
 
 #[cw_serde]
@@ -192,6 +195,8 @@ pub enum QueryMsg {
     },
     #[returns(SupplyQueue)]
     SupplyQueue {},
+    #[returns(Status)]
+    Status {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;

@@ -1,4 +1,5 @@
 use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
+use crate::execute::StakerUndelegation;
 use crate::msg::ValidatorDelegation;
 use crate::proto;
 use crate::state::{ValidatorsRegistry, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE};
@@ -23,7 +24,7 @@ use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
 use super::batch::{Batch, BatchStatus};
-use super::calc::calculate_fee_from_reward;
+use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
 use super::protocol;
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
@@ -246,8 +247,8 @@ pub fn get_restaking_msgs(
     for surplus_validator in surplus_validators.iter_mut() {
         for deficient_validator in deficient_validators.iter_mut() {
             if surplus_validator.diff_amount < deficient_validator.diff_amount {
-                if surplus_validator.diff_amount == Uint128::from(0u32) {
-                    break;
+                if surplus_validator.diff_amount.is_zero() {
+                    continue;
                 }
 
                 let redelegate_msg = get_babylon_redelegate_cosmos_msg(
@@ -263,6 +264,10 @@ pub fn get_restaking_msgs(
 
                 msgs.push(redelegate_msg);
             } else {
+                if deficient_validator.diff_amount.is_zero() {
+                    continue;
+                }
+
                 let redelegate_msg = get_babylon_redelegate_cosmos_msg(
                     delegator.clone(),
                     surplus_validator.address.to_string(),
@@ -429,16 +434,23 @@ pub fn process_bond(
 
         let fee = calculate_fee_from_reward(reward, params.fee_rate);
         total_bond_amount = delegated_amount + reward - fee;
+
+        // Update reward balance with unclaimed reward because there is automatic reward withdrawal on delegate
+        REWARD_BALANCE.save(storage, &reward)?;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
     }
 
-    let mut exchange_rate = state.exchange_rate;
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        calc::normalize_supply_queue(&mut supply_queue, block_height);
-        exchange_rate =
-            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
+    calc::normalize_supply_queue(&mut supply_queue, block_height);
+    let exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
+
+    if exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
     }
 
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
@@ -545,14 +557,14 @@ pub fn submit_pending_batch(
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
     }
 
-    let mut current_exchange_rate = state.exchange_rate;
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
 
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        calc::normalize_supply_queue(&mut supply_queue, block_height);
-        current_exchange_rate =
-            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
-    }
+    calc::normalize_supply_queue(&mut supply_queue, block_height);
+    let current_exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
     let undelegate_amount: Uint128 = calc::calculate_native_token_from_staking_token(
@@ -595,7 +607,8 @@ pub fn submit_pending_batch(
     state.total_bond_amount = total_bond_amount - total_undelegate_amount;
     state.total_supply = state.total_supply - batch.total_liquid_stake;
     state.total_delegated_amount = delegated_amount - total_undelegate_amount;
-    state.update_exchange_rate();
+    state.exchange_rate =
+        calculate_exchange_rate(state.total_bond_amount, state.total_supply, &supply_queue);
     STATE.save(deps.storage, &state)?;
 
     batch.expected_native_unstaked = Some(total_undelegate_amount);
@@ -745,7 +758,7 @@ pub fn get_transfer_token_cosmos_msg(
 }
 
 pub fn get_actual_total_reward(
-    storage: &mut dyn Storage,
+    storage: &dyn Storage,
     querier: QuerierWrapper,
     delegator: String,
     denom: String,
@@ -832,4 +845,79 @@ pub fn get_babylon_redelegate_cosmos_msg(
         value: Binary::from(restaking_msg.encode_to_vec()),
     });
     redelegate
+}
+
+pub fn get_staker_undelegation(
+    storage: &mut dyn Storage,
+    total_received_amount: Uint128,
+    unbonding_records: &mut Vec<UnbondRecord>,
+    total_liquid_stake: Uint128,
+    block_height: u64,
+) -> Result<(HashMap<String, StakerUndelegation>, Vec<u64>, Uint128), ContractError> {
+    let total_received_amount_in_decimal =
+        Decimal::from_ratio(total_received_amount, Uint128::one());
+    let mut unbond_record_ids = vec![];
+    let mut staker_undelegation: HashMap<String, StakerUndelegation> = HashMap::new();
+
+    for record in unbonding_records.iter_mut() {
+        let entry = staker_undelegation
+            .entry(record.staker.clone())
+            .and_modify(|e| e.unstake_amount += record.amount)
+            .or_insert(StakerUndelegation {
+                unstake_amount: record.amount,
+                channel_id: record.channel_id,
+                unstake_return_native_amount: None,
+            });
+
+        let user_to_total_unstake_ratio =
+            Decimal::from_ratio(entry.unstake_amount, total_liquid_stake);
+
+        let unstake_return_native_amount =
+            (user_to_total_unstake_ratio * total_received_amount_in_decimal).to_uint_floor();
+
+        entry.unstake_return_native_amount = Some(unstake_return_native_amount);
+
+        record.released = true;
+
+        record.released_height = block_height;
+        if cfg!(test) {
+            unbond_record().save(storage, record.id, &record)?;
+        }
+
+        unbond_record_ids.push(record.id);
+    }
+
+    // released amount before adjusted with dust distribution, sometime it can be lower than total received amount
+    let released_amount: Uint128 = staker_undelegation
+        .values()
+        .map(|item| item.unstake_return_native_amount.unwrap())
+        .sum();
+
+    let dust_amount = (total_received_amount_in_decimal
+        - Decimal::from_ratio(released_amount, Uint128::one()))
+    .to_uint_floor();
+
+    let mut total_released_amount = Uint128::zero();
+    let dust_distribution = calc::calculate_dust_distribution(
+        dust_amount,
+        Uint128::new(unbonding_records.len() as u128),
+    );
+    for (i, record) in unbonding_records.iter_mut().enumerate() {
+        let staker_undelegation = match staker_undelegation.get_mut(&record.staker) {
+            Some(x) => x,
+            None => continue,
+        };
+        let dust = dust_distribution[i];
+        staker_undelegation.unstake_return_native_amount = staker_undelegation
+            .unstake_return_native_amount
+            .map(|x| x + dust);
+
+        total_released_amount += staker_undelegation.unstake_return_native_amount.unwrap();
+    }
+
+    Ok((
+        staker_undelegation,
+        unbond_record_ids,
+        total_released_amount,
+    ))
 }
