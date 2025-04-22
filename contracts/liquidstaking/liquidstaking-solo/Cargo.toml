@@ -1,10 +1,10 @@
 [package]
 edition     = "2021"
 name         = "liquidstaking"
-version      = "0.1.122"
+version      = "0.1.123"
 
 [profile.dev]
-lto = "thin"
+lto = "thin"  
 strip = true
 
 [profile.release]
@@ -26,6 +26,9 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 library = []
+serde    = []
+schemars = ["dep:schemars"]
+bincode  = ["dep:bincode"]
 
 [package.metadata.scripts]
 optimize = """docker run --rm -v "$(pwd)":/code \
@@ -45,7 +48,7 @@ cosmwasm-std = { version = "2.2.2", features = [
 ] }
 
 cw-storage-plus = "2.0.0"
-schemars = "0.8.16"
+schemars = { version = "0.8.16", optional = true }
 serde = { version = "1.0.197", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.58" }
 cw-ownable = "2.1.0"
@@ -54,6 +57,8 @@ cw2 = "2.0.0"
 cw20 = "2.0.0"
 enumorph = "0.1.2"
 prost = { version = "0.13", features = ["derive"] }
+serde_bytes      = { version = "0.11.15", optional = true }
+bincode          = { version = "2.0.1", default-features = false, features = ["std"] , optional = true }
 
 [dependencies.unionlabs_primitives]
 path = "../unionlabs-primitives"

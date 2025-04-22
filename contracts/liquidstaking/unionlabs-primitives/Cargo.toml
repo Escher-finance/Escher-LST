@@ -9,13 +9,12 @@ base64                   = { version = "0.21", default-features = false, optiona
 bincode                  = { git = "https://github.com/bincode-org/bincode",  features = ["alloc"]  , optional = true }
 generic-array            = { version = "0.14.7", default-features = false , optional = true }
 hex                      = { version = "0.4.3", features = ["std"] }
-primitive-types          = { version = "0.12.1", default-features = false , optional = true }
 rlp                      = { version = "0.5.2", default-features = false , optional = true }
 serde = { version = "1.0.197", default-features = false, features = ["derive"] , optional = true }
 serde_bytes      = { version = "0.11.15", optional = true }
 thiserror = { version = "1.0.58" }
 typenum                  = { version = "1.17.0", default-features = false, optional = true }  
-
+primitive-types          = { version = "0.12.1", default-features = false }  
 
 [features]
 default = ["serde", "base64"]
@@ -27,4 +26,4 @@ serde   = ["dep:serde", "dep:serde_bytes"]
 
 alloy-primitives-compat = ["dep:alloy-primitives"]
 generic-array-compat    = ["dep:generic-array", "dep:typenum", "typenum/const-generics"]
-primitive-types-compat  = ["dep:primitive-types"]
+primitive-types-compat  = []

@@ -209,10 +209,15 @@ pub fn execute(
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
         ExecuteMsg::OnZkgm {
-            channel_id,
+            caller: _caller,
+            path: _path,
+            source_channel_id: _source_channel_id,
+            destination_channel_id,
             sender,
             message,
-        } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
+            relayer: _relayer,
+            relayer_msg: _relayer_msg,
+        } => execute::on_zkgm(deps, env, info, destination_channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::SplitReward {} => execute::split_reward(deps, env, info),
         ExecuteMsg::SetConfig {

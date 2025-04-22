@@ -17,9 +17,12 @@ mod bytes;
 
 mod compat;
 
+pub mod uint;
+
 pub use crate::{
     bytes::Bytes,
     fixed_bytes::{FixedBytes, FixedBytesError},
+    uint::U256,
 };
 
 pub type H64<E = HexPrefixed> = FixedBytes<8, E>;
