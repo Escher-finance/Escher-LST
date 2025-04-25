@@ -13,16 +13,17 @@ use crate::{
     },
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    to_json_binary, Addr, Attribute, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
     QuerierWrapper, StdResult, Storage, SubMsg, Uint128, Uint256,
 };
-use cosmwasm_std::{AnyMsg, BankMsg, Coin};
+use cosmwasm_std::{AnyMsg, Coin};
 use cosmwasm_std::{Event, Timestamp};
 use prost::Message;
 use std::collections::HashMap;
 use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
+use super::authz::get_authz_ucs03_transfer;
 use super::batch::{Batch, BatchStatus};
 use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
 use super::protocol;
@@ -482,9 +483,15 @@ pub fn process_bond(
     SUPPLY_QUEUE.save(storage, &supply_queue)?;
 
     if !cfg!(test) {
+        let mut recipient = delegator.to_string().clone();
+
+        // if staker is from other chain, minted/staking token will be minted to transfer handler
+        if staker != sender && channel_id.is_some() {
+            recipient = params.transfer_handler;
+        }
         // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg = token::get_staked_token_submsg(
-            delegator.to_string(),
+            recipient,
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,
@@ -709,7 +716,7 @@ pub fn unstake_request_in_batch(
 }
 
 pub fn get_transfer_token_cosmos_msg(
-    storage: &mut dyn Storage,
+    storage: &dyn Storage,
     staker: String,
     channel_id: Option<u32>,
     time: Timestamp,
@@ -755,6 +762,49 @@ pub fn get_transfer_token_cosmos_msg(
         }
     };
     Ok(msg)
+}
+
+pub fn get_unbonding_ucs03_transfer_cosmos_msg(
+    storage: &mut dyn Storage,
+    lst_contract: Addr,
+    staker: String,
+    channel_id: Option<u32>,
+    time: Timestamp,
+    ucs03_relay_contract: String,
+    undelegate_amount: Uint128,
+    transfer_fee: Uint128,
+    denom: String,
+    salt: String,
+) -> Result<CosmosMsg, ContractError> {
+    let total_amount = undelegate_amount + transfer_fee;
+
+    // for the amount
+    let funds = vec![Coin {
+        denom: denom.clone(),
+        amount: total_amount.clone(),
+    }];
+
+    let params = PARAMETERS.load(storage)?;
+    // get quote token of native base denom (muno) on specific channel id
+    let quote_token = QUOTE_TOKEN.load(storage, channel_id.unwrap())?;
+
+    let authz_ucs03_msg = get_authz_ucs03_transfer(
+        params.cw20_address.to_string(),
+        params.transfer_handler,  // granter
+        lst_contract.to_string(), // grantee
+        time,
+        ucs03_relay_contract.as_str().into(),
+        channel_id.unwrap(),
+        Bytes::from_str(staker.as_str()).unwrap(),
+        denom.clone(),
+        total_amount,
+        Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
+        Uint256::from(undelegate_amount),
+        funds,
+        H256::from_str(salt.as_str()).unwrap(),
+    )?;
+
+    Ok(authz_ucs03_msg)
 }
 
 pub fn get_actual_total_reward(

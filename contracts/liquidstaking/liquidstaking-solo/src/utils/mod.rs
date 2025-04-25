@@ -1,3 +1,4 @@
+pub mod authz;
 pub mod batch;
 pub mod calc;
 pub mod delegation;
