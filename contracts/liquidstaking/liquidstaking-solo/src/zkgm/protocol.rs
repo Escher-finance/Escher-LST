@@ -38,6 +38,7 @@ pub fn ucs03_transfer(
         "Babylon"
     };
 
+    let base_token_path: u32 = 0;
     let fungible_order_instruction = Instruction {
         version: INSTR_VERSION_1,
         opcode: OP_FUNGIBLE_ASSET_ORDER,
@@ -49,7 +50,7 @@ pub fn ucs03_transfer(
             base_token_symbol: base_token_symbol.to_string(),
             base_token_name: base_token_name.to_string(),
             base_token_decimals,
-            base_token_path: U256::from_be_bytes(channel_id.to_be_bytes()),
+            base_token_path: U256::from_be_bytes(base_token_path.to_be_bytes()),
             quote_token: Vec::from(quote_token).into(),
             quote_amount: U256::from_be_bytes(quote_amount.to_be_bytes()),
         }
