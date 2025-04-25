@@ -4,12 +4,14 @@ pub mod execute;
 
 pub mod event;
 pub mod helpers;
+/// Various identifier types used throughout the IBC stack.
 pub mod instantiate;
 pub mod msg;
 pub mod query;
 pub mod reply;
 pub mod state;
 pub mod tests;
+pub mod types;
 pub mod utils;
 pub use crate::error::ContractError;
 // Include the generated code

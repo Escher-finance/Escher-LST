@@ -14,6 +14,7 @@ use crate::state::{
     PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
     VALIDATORS_REGISTRY,
 };
+use crate::types::ChannelId;
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::calc::{check_slippage, to_uint128};
 use crate::utils::validation::validate_validators;
@@ -129,7 +130,7 @@ pub fn zkgm_unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    channel_id: u32,
+    channel_id: ChannelId,
     staker: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
@@ -160,7 +161,7 @@ pub fn zkgm_unbond(
         sender.to_string(),
         staker.clone(),
         amount,
-        Some(channel_id),
+        Some(channel_id.raw()),
     )?;
 
     let res: Response = Response::new().add_event(unstake_request_event);
@@ -173,7 +174,7 @@ pub fn zkgm_bond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    channel_id: u32,
+    channel_id: ChannelId,
     staker: String,
     amount: Uint128,
     salt: String,
@@ -207,7 +208,7 @@ pub fn zkgm_bond(
         params,
         validators_reg,
         salt,
-        Some(channel_id),
+        Some(channel_id.raw()),
     )?;
 
     // create bond event here
@@ -832,7 +833,7 @@ pub fn on_zkgm(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    channel_id: u32,
+    channel_id: ChannelId,
     sender: Bytes,
     message: Bytes,
 ) -> Result<Response, ContractError> {
