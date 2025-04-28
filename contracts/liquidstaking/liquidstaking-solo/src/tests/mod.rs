@@ -57,6 +57,8 @@ pub fn mock_instantiate_msg() -> InstantiateMsg {
         batch_limit: 50,
         min_bond: Uint128::from_str("10000").unwrap(),
         min_unbond: Uint128::from_str("10000").unwrap(),
+        transfer_fee: Uint128::from_str("20000000").unwrap(),
+        transfer_handler: Addr::unchecked("transfer_handler").to_string(),
     }
 }
 
@@ -74,5 +76,7 @@ pub fn mock_parameters() -> Parameters {
         batch_limit: 50,
         min_bond: Uint128::from_str("10000").unwrap(),
         min_unbond: Uint128::from_str("10000").unwrap(),
+        transfer_fee: Uint128::from(20000000u128),
+        transfer_handler: Addr::unchecked("transfer_handler").to_string(),
     }
 }

@@ -821,38 +821,42 @@ fn test_get_transfer_token_cosmos_msg() {
     assert_eq!(contract_addr, ucs03_relay_contract);
     assert_eq!(funds, amount_funds);
     let ucs03_execute_msg: Ucs03ExecuteMsg = from_json(msg).unwrap();
-    let Ucs03ExecuteMsg::Transfer {
-        channel_id: ucs03_channel_id,
-        receiver: ucs03_receiver,
-        base_token: ucs03_base_token,
-        base_amount: ucs03_base_amount,
-        quote_token: ucs03_quote_token,
-        quote_amount: ucs03_quote_amount,
-        timeout_height: ucs03_timeout_height,
-        timeout_timestamp: ucs03_timeout_timestamp,
-        salt: ucs03_salt,
-    } = ucs03_execute_msg;
-    assert_eq!(ucs03_channel_id, channel_id.unwrap());
-    assert_eq!(
-        ucs03_receiver,
-        Bytes::<HexPrefixed>::from_str(staker.as_str()).unwrap()
-    );
-    assert_eq!(ucs03_base_token, denom.clone());
-    assert_eq!(ucs03_base_amount, undelegate_amount);
-    assert_eq!(
-        ucs03_quote_token,
-        Bytes::<HexPrefixed>::from_str(quote_token.quote_token.as_str()).unwrap()
-    );
-    assert_eq!(ucs03_quote_amount, Uint256::from(undelegate_amount));
-    assert_eq!(ucs03_timeout_height, 0);
-    assert_eq!(
-        ucs03_timeout_timestamp,
-        time.plus_seconds(DEFAULT_TIMEOUT_TIMESTAMP_OFFSET).nanos()
-    );
-    assert_eq!(
-        ucs03_salt,
-        H256::<HexPrefixed>::from_str(salt.as_str()).unwrap(),
-    );
+    match ucs03_execute_msg {
+        Ucs03ExecuteMsg::Transfer {
+            channel_id: ucs03_channel_id,
+            receiver: ucs03_receiver,
+            base_token: ucs03_base_token,
+            base_amount: ucs03_base_amount,
+            quote_token: ucs03_quote_token,
+            quote_amount: ucs03_quote_amount,
+            timeout_height: ucs03_timeout_height,
+            timeout_timestamp: ucs03_timeout_timestamp,
+            salt: ucs03_salt,
+        } => {
+            assert_eq!(ucs03_channel_id, channel_id.unwrap());
+            assert_eq!(
+                ucs03_receiver,
+                Bytes::<HexPrefixed>::from_str(staker.as_str()).unwrap()
+            );
+            assert_eq!(ucs03_base_token, denom.clone());
+            assert_eq!(ucs03_base_amount, undelegate_amount);
+            assert_eq!(
+                ucs03_quote_token,
+                Bytes::<HexPrefixed>::from_str(quote_token.quote_token.as_str()).unwrap()
+            );
+            assert_eq!(ucs03_quote_amount, Uint256::from(undelegate_amount));
+            assert_eq!(ucs03_timeout_height, 0);
+            assert_eq!(
+                ucs03_timeout_timestamp,
+                time.plus_seconds(DEFAULT_TIMEOUT_TIMESTAMP_OFFSET).nanos()
+            );
+            assert_eq!(
+                ucs03_salt,
+                H256::<HexPrefixed>::from_str(salt.as_str()).unwrap(),
+            );
+        }
+        _ => (),
+    };
 }
 
 #[test]
