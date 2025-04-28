@@ -69,8 +69,10 @@ pub fn ucs03_transfer(
     };
 
     let chan_id = ChannelId::from_raw(channel_id).unwrap();
+
+    let timeout_timestamp_offset: u64 = 86400; // 1 day period
     let timeout_timestamp =
-        Timestamp::from_nanos(time.plus_seconds(DEFAULT_TIMEOUT_TIMESTAMP_OFFSET).nanos());
+        Timestamp::from_nanos(time.plus_seconds(timeout_timestamp_offset).nanos());
 
     let relay_transfer_msg: Ucs03ExecuteMsg = Ucs03ExecuteMsg::Send {
         channel_id: chan_id,
