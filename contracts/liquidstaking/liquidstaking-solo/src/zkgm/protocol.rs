@@ -1,6 +1,5 @@
 use crate::msg::Ucs03ExecuteMsg;
 use crate::types::ChannelId;
-use crate::utils::delegation::DEFAULT_TIMEOUT_TIMESTAMP_OFFSET;
 use crate::ContractError;
 use alloy::primitives::U256;
 use alloy::sol_types::SolValue;
