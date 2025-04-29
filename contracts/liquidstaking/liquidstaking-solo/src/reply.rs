@@ -37,10 +37,14 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let params: Parameters = PARAMETERS.load(deps.storage)?;
     let payload: MintTokensPayload = from_json(msg.payload)?;
 
-    let msg = cw20::Cw20QueryMsg::Balance {
-        address: env.contract.address.to_string(),
+    let msg = match payload.channel_id {
+        Some(_) => cw20::Cw20QueryMsg::Balance {
+            address: params.transfer_handler.to_string(),
+        },
+        None => cw20::Cw20QueryMsg::Balance {
+            address: env.contract.address.to_string(),
+        },
     };
-
     let balance: cw20::BalanceResponse = deps
         .querier
         .query_wasm_smart(params.cw20_address.clone(), &msg)?;
