@@ -212,7 +212,7 @@ pub enum QueryMsg {
 
 pub type Fees = BTreeMap<String, Coin>;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Ucs03ExecuteMsg {
     /// This allows us to transfer via ucs03
