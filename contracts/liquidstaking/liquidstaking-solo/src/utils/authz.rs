@@ -1,4 +1,4 @@
-use cosmwasm_std::{to_json_binary, AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128, Uint256};
+use cosmwasm_std::{to_json_binary, AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128};
 
 use crate::{error::ContractError, zkgm::protocol::ucs03_transfer};
 use cosmos_sdk_proto::cosmos::authz::v1beta1::MsgExec;
@@ -80,7 +80,7 @@ pub fn get_authz_ucs03_transfer(
     base_token: String,
     base_amount: Uint128,
     quote_token: Bytes,
-    quote_amount: Uint256,
+    quote_amount: Uint128,
     funds: Vec<Coin>,
     salt: H256,
 ) -> Result<CosmosMsg, ContractError> {

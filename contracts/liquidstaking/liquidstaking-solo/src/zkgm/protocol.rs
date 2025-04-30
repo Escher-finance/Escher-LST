@@ -3,7 +3,7 @@ use crate::types::ChannelId;
 use crate::ContractError;
 use alloy::primitives::U256;
 use alloy::sol_types::SolValue;
-use cosmwasm_std::{to_json_binary, Binary, Timestamp, Uint128, Uint256, Uint64};
+use cosmwasm_std::{to_json_binary, Binary, Timestamp, Uint128, Uint64};
 use unionlabs_primitives::{Bytes, H256};
 
 use super::com::{
@@ -20,7 +20,7 @@ pub fn ucs03_transfer(
     base_token: String,
     base_amount: Uint128,
     quote_token: Bytes,
-    quote_amount: Uint256,
+    quote_amount: Uint128,
     salt: H256,
 ) -> Result<Binary, ContractError> {
     let base_token_decimals = 6;
@@ -32,12 +32,12 @@ pub fn ucs03_transfer(
     };
 
     let base_token_name = if base_token == cw20_contract {
-        "eBABY"
+        "ebbn"
     } else {
         "Babylon"
     };
 
-    let base_token_path: u32 = 0;
+    let base_token_path = U256::ZERO;
     let fungible_order_instruction = Instruction {
         version: INSTR_VERSION_1,
         opcode: OP_FUNGIBLE_ASSET_ORDER,
@@ -49,9 +49,9 @@ pub fn ucs03_transfer(
             base_token_symbol: base_token_symbol.to_string(),
             base_token_name: base_token_name.to_string(),
             base_token_decimals,
-            base_token_path: U256::from_be_bytes(base_token_path.to_be_bytes()),
+            base_token_path,
             quote_token: Vec::from(quote_token).into(),
-            quote_amount: U256::from_be_bytes(quote_amount.to_be_bytes()),
+            quote_amount: U256::from(quote_amount.u128()),
         }
         .abi_encode_params()
         .into(),

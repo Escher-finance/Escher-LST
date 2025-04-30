@@ -799,7 +799,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
         denom.clone(),
         total_amount,
         Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
-        Uint256::from(undelegate_amount),
+        undelegate_amount,
         funds,
         H256::from_str(salt.as_str()).unwrap(),
     )?;
