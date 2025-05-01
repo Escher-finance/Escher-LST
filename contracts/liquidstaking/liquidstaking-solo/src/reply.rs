@@ -58,11 +58,12 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     // if staker is from other chain, we need to use transfer handler address to do transfer back to user
     // so we need to get correct authz execute msg to cw20 and ucs03 to handle the transfer
     // also need to attach required funds
+    let mut quote_token_string = String::new();
+    let amount = payload.amount;
+
     if payload.staker != payload.sender && payload.channel_id.is_some() {
         let channel_id = payload.channel_id.unwrap();
         let params = PARAMETERS.load(deps.storage)?;
-
-        let mut msgs = vec![];
 
         // allow/approve ucs03 to transfer on behalf of transfer handler via authz
         let allowance_msg = crate::utils::authz::get_authz_increase_allowance_msg(
@@ -70,7 +71,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
             env.contract.address.to_string(),
             params.cw20_address.to_string(),
             params.zkgm_token_minter,
-            payload.amount,
+            amount,
             vec![],
         )?;
 
@@ -85,6 +86,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         }
 
         let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
+        quote_token_string = quote_token.lst_quote_token.clone();
 
         let authz_ucs03_msg = crate::utils::authz::get_authz_ucs03_transfer(
             params.cw20_address.to_string(),
@@ -95,9 +97,9 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
             channel_id,
             Bytes::from_str(payload.staker.as_str()).unwrap(),
             params.cw20_address.to_string(),
-            payload.amount.clone(),
+            amount,
             Bytes::from_str(quote_token.lst_quote_token.as_str()).unwrap(),
-            payload.amount,
+            amount,
             funds.clone(),
             unionlabs_primitives::H256::from_str(payload.salt.as_str()).unwrap(),
         )?;
@@ -107,7 +109,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         // if staker from same chain, this contract will send the cw20 staking token
         let msg = send_cw20(
             deps,
-            payload.amount,
+            amount,
             params.cw20_address.to_string(),
             payload.staker.clone(),
         )?;
@@ -117,10 +119,13 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let res: Response = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "mint_cw20")
+        .add_attribute("sender", payload.sender.to_string())
         .add_attribute("receiver", payload.staker.to_string())
-        .add_attribute("amount", payload.amount.to_string())
+        .add_attribute("channel_id", payload.channel_id.unwrap_or(0).to_string())
+        .add_attribute("amount", amount.to_string())
         .add_attribute("denom", params.liquidstaking_denom)
         .add_attribute("base_denom", params.cw20_address)
+        .add_attribute("quote_token", quote_token_string)
         .add_attribute("staked_token_balance", balance.balance.to_string());
     Ok(res)
 }
