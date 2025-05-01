@@ -58,6 +58,8 @@ pub struct InstantiateMsg {
     pub transfer_handler: String,
     // ucs03 transfer fee from babylon to other
     pub transfer_fee: Uint128,
+    // zkgm token_minter address as cw20 allowance spender
+    pub zkgm_token_minter: String,
 }
 
 #[cw_serde]
@@ -124,6 +126,9 @@ pub enum ExecuteMsg {
         min_bond: Option<Uint128>,
         min_unbond: Option<Uint128>,
         batch_limit: Option<u32>,
+        transfer_handler: Option<String>,
+        transfer_fee: Option<Uint128>,
+        zkgm_token_minter: Option<String>,
     },
     /// Update quote token
     UpdateQuoteToken {
@@ -318,6 +323,7 @@ pub struct UnbondData {
 #[cw_serde]
 pub struct MigrateMsg {
     pub transfer_handler: Option<String>,
+    pub zkgm_token_minter: Option<String>,
 }
 
 #[cw_serde]

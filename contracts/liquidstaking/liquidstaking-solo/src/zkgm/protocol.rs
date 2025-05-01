@@ -28,13 +28,13 @@ pub fn ucs03_transfer(
     let base_token_symbol = if base_token == cw20_contract {
         "eBABY"
     } else {
-        "BABY"
+        "ubbn"
     };
 
     let base_token_name = if base_token == cw20_contract {
         "ebbn"
     } else {
-        "Babylon"
+        "ubbn"
     };
 
     let base_token_path = U256::ZERO;

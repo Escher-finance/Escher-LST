@@ -768,7 +768,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     storage: &mut dyn Storage,
     lst_contract: Addr,
     staker: String,
-    channel_id: Option<u32>,
+    channel_id: u32,
     time: Timestamp,
     ucs03_relay_contract: String,
     undelegate_amount: Uint128,
@@ -786,7 +786,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
 
     let params = PARAMETERS.load(storage)?;
     // get quote token of native base denom (muno) on specific channel id
-    let quote_token = QUOTE_TOKEN.load(storage, channel_id.unwrap())?;
+    let quote_token = QUOTE_TOKEN.load(storage, channel_id)?;
 
     let authz_ucs03_msg = get_authz_ucs03_transfer(
         params.cw20_address.to_string(),
@@ -794,7 +794,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
         lst_contract.to_string(), // grantee
         time,
         ucs03_relay_contract.as_str().into(),
-        channel_id.unwrap(),
+        channel_id,
         Bytes::from_str(staker.as_str()).unwrap(),
         denom.clone(),
         total_amount,

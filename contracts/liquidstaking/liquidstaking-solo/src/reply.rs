@@ -5,16 +5,16 @@ use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
 use crate::state::{
     Parameters, WithdrawReward, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
 };
-use crate::utils::authz::{get_authz_increase_allowance_msg, get_authz_ucs03_transfer};
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, SubMsg, Uint128, Uint256, WasmMsg,
+    Env, Reply, Response, SubMsg, Uint128, WasmMsg,
 };
-use unionlabs_primitives::{Bytes, H256};
+use unionlabs_primitives::Bytes;
 
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
+pub const TRANSFER_STAKING_TOKEN_ID: u64 = 127;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
@@ -59,42 +59,49 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     // so we need to get correct authz execute msg to cw20 and ucs03 to handle the transfer
     // also need to attach required funds
     if payload.staker != payload.sender && payload.channel_id.is_some() {
-        let allowance_msg = get_authz_increase_allowance_msg(
+        let channel_id = payload.channel_id.unwrap();
+        let params = PARAMETERS.load(deps.storage)?;
+
+        let mut msgs = vec![];
+
+        // allow/approve ucs03 to transfer on behalf of transfer handler via authz
+        let allowance_msg = crate::utils::authz::get_authz_increase_allowance_msg(
             params.transfer_handler.clone(),
             env.contract.address.to_string(),
             params.cw20_address.to_string(),
-            params.ucs03_relay_contract.clone(),
+            params.zkgm_token_minter,
             payload.amount,
             vec![],
         )?;
 
-        // set funds to send the "fee" to transfer using ucs03
-        let funds = vec![Coin {
-            amount: params.transfer_fee,
-            denom: params.underlying_coin_denom,
-        }];
+        msgs.push(allowance_msg);
 
-        let quote_token = QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
+        let mut funds = vec![];
+        if params.transfer_fee > Uint128::zero() {
+            funds.push(Coin {
+                amount: params.transfer_fee, // need to add transfer fee
+                denom: params.underlying_coin_denom,
+            });
+        }
 
-        let authz_ucs03_msg = get_authz_ucs03_transfer(
+        let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
+
+        let authz_ucs03_msg = crate::utils::authz::get_authz_ucs03_transfer(
             params.cw20_address.to_string(),
             params.transfer_handler,
             env.contract.address.to_string(),
             env.block.time,
-            params.ucs03_relay_contract,
-            payload.channel_id.unwrap(),
+            params.ucs03_relay_contract.clone(),
+            channel_id,
             Bytes::from_str(payload.staker.as_str()).unwrap(),
             params.cw20_address.to_string(),
             payload.amount.clone(),
             Bytes::from_str(quote_token.lst_quote_token.as_str()).unwrap(),
-            Uint256::from(payload.amount.clone()),
-            funds,
-            H256::from_str(payload.salt.as_str()).unwrap(),
+            payload.amount,
+            funds.clone(),
+            unionlabs_primitives::H256::from_str(payload.salt.as_str()).unwrap(),
         )?;
 
-        // allow/approve ucs03 to transfer on behalf of transfer handler via authz
-        msgs.push(allowance_msg);
-        // send the ucs3 transfer with authz msg exec
         msgs.push(authz_ucs03_msg);
     } else {
         // if staker from same chain, this contract will send the cw20 staking token

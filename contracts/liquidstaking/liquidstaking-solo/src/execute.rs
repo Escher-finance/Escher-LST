@@ -604,6 +604,9 @@ pub fn set_parameters(
     min_bond: Option<Uint128>,
     min_unbond: Option<Uint128>,
     batch_limit: Option<u32>,
+    transfer_handler: Option<String>,
+    transfer_fee: Option<Uint128>,
+    zkgm_token_minter: Option<String>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -635,6 +638,13 @@ pub fn set_parameters(
     params.min_bond = min_bond.clone().unwrap_or_else(|| params.min_bond);
     params.min_unbond = min_unbond.clone().unwrap_or_else(|| params.min_unbond);
     params.batch_limit = batch_limit.clone().unwrap_or_else(|| params.batch_limit);
+    params.transfer_handler = transfer_handler
+        .clone()
+        .unwrap_or_else(|| params.transfer_handler);
+    params.transfer_fee = transfer_fee.clone().unwrap_or_else(|| params.transfer_fee);
+    params.zkgm_token_minter = zkgm_token_minter
+        .clone()
+        .unwrap_or_else(|| params.zkgm_token_minter);
 
     if batch_period.is_some() {
         params.batch_period = batch_period.unwrap();
@@ -796,7 +806,7 @@ pub fn process_batch_withdrawal(
                 deps.storage,
                 lst_contract.clone(),
                 key.clone(),
-                undelegation.channel_id,
+                undelegation.channel_id.unwrap(),
                 time,
                 ucs03_relay_contract.clone(),
                 undelegation.unstake_return_native_amount.unwrap(),

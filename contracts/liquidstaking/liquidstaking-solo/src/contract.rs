@@ -87,6 +87,7 @@ pub fn instantiate(
         batch_limit: msg.batch_limit,
         transfer_fee: msg.transfer_fee,
         transfer_handler: msg.transfer_handler,
+        zkgm_token_minter: msg.zkgm_token_minter,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -187,6 +188,9 @@ pub fn execute(
             min_bond,
             min_unbond,
             batch_limit,
+            transfer_handler,
+            transfer_fee,
+            zkgm_token_minter,
         } => execute::set_parameters(
             deps,
             env,
@@ -204,6 +208,9 @@ pub fn execute(
             min_bond,
             min_unbond,
             batch_limit,
+            transfer_handler,
+            transfer_fee,
+            zkgm_token_minter,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,
@@ -244,6 +251,8 @@ pub fn execute(
 pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+    let version = semver::Version::parse(CONTRACT_VERSION)?;
+
     let check_status = deps.storage.get(b"status");
     if check_status.is_none() {
         STATUS.save(
@@ -255,7 +264,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
         )?;
     }
 
-    if CONTRACT_VERSION == "0.1.124" {
+    if version.minor == 1 && version.patch < 143 {
         let Some(old_data) = deps.storage.get(b"parameters") else {
             return Err(ContractError::Std(StdError::generic_err("no parameters")));
         };
@@ -263,8 +272,8 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
         // Deserialize it from the old format
         let old_param: OldParameters = cosmwasm_std::from_json(&old_data)?;
 
-        let transfer_handler = match msg.transfer_handler {
-            Some(handler) => handler,
+        let zkgm_token_minter = match msg.zkgm_token_minter {
+            Some(minter) => minter,
             None => env.contract.address.to_string(),
         };
 
@@ -281,8 +290,9 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
             min_bond: old_param.min_bond,
             min_unbond: old_param.min_unbond,
             batch_limit: old_param.batch_limit,
-            transfer_handler: transfer_handler,
-            transfer_fee: Uint128::from(20000000u128),
+            transfer_handler: old_param.transfer_handler,
+            transfer_fee: old_param.transfer_fee,
+            zkgm_token_minter,
         };
 
         // Serialize the new data

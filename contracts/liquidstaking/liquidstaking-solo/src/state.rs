@@ -84,6 +84,10 @@ pub struct OldParameters {
     // limit per batch
     // this is the max number of unbonding records that can be processed in one batch
     pub batch_limit: u32,
+    // handler of cw20 staking token transfer, as ucs03 fee payer address and also minted cw20 staking token receiver
+    pub transfer_handler: String,
+    // ucs03 transfer fee from babylon to other
+    pub transfer_fee: Uint128,
 }
 
 // Parameter is required data to instantiate and run contract
@@ -114,6 +118,8 @@ pub struct Parameters {
     pub transfer_handler: String,
     // ucs03 transfer fee from babylon to other
     pub transfer_fee: Uint128,
+    // zkgm token_minter address as cw20 allowance spender
+    pub zkgm_token_minter: String,
 }
 
 pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
