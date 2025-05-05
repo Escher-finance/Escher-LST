@@ -126,7 +126,10 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         .add_attribute("denom", params.liquidstaking_denom)
         .add_attribute("base_denom", params.cw20_address)
         .add_attribute("quote_token", quote_token_string)
+        .add_attribute("transfer_handler", params.transfer_handler)
+        .add_attribute("transfer_fee", params.transfer_fee)
         .add_attribute("staked_token_balance", balance.balance.to_string());
+
     Ok(res)
 }
 
