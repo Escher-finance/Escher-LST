@@ -240,47 +240,50 @@ pub fn get_restaking_msgs(
     mut deficient_validators: Vec<ValidatorDelegation>,
     denom: String,
 ) -> Vec<CosmosMsg> {
-    let mut msgs: Vec<CosmosMsg> = vec![];
+    let mut msgs = Vec::new();
 
-    surplus_validators.sort_by(|a, b| b.diff_amount.cmp(&a.diff_amount));
-    deficient_validators.sort_by_key(|a| a.diff_amount);
+    // Sort surplus and deficient validators for deterministic behavior
+    surplus_validators.sort_by_key(|v| v.address.clone());
+    deficient_validators.sort_by_key(|v| v.address.clone());
 
     for surplus_validator in surplus_validators.iter_mut() {
-        for deficient_validator in deficient_validators.iter_mut() {
-            if surplus_validator.diff_amount < deficient_validator.diff_amount {
-                if surplus_validator.diff_amount.is_zero() {
-                    continue;
+        while surplus_validator.diff_amount > Uint128::zero() {
+            if let Some(deficient_validator) = deficient_validators
+                .iter_mut()
+                .find(|v| v.diff_amount > Uint128::zero())
+            {
+                // Calculate the amount to redelegate
+                let redelegate_amount = surplus_validator
+                    .diff_amount
+                    .min(deficient_validator.diff_amount);
+
+                // if test mode, we need to use the StakingMsg::Redelegate so it is readable and can be asserted
+                // otherwise we use the MsgWrappedBeginRedelegate that will be sent to babylon
+                if cfg!(test) {
+                    msgs.push(CosmosMsg::Staking(cosmwasm_std::StakingMsg::Redelegate {
+                        src_validator: surplus_validator.address.clone(),
+                        dst_validator: deficient_validator.address.clone(),
+                        amount: Coin {
+                            denom: denom.clone(),
+                            amount: redelegate_amount,
+                        },
+                    }));
+                } else {
+                    msgs.push(get_babylon_redelegate_cosmos_msg(
+                        delegator.clone(),
+                        surplus_validator.address.to_string(),
+                        deficient_validator.address.clone(),
+                        deficient_validator.diff_amount.into(),
+                        denom.clone(),
+                    ));
                 }
 
-                let redelegate_msg = get_babylon_redelegate_cosmos_msg(
-                    delegator.clone(),
-                    surplus_validator.address.to_string(),
-                    deficient_validator.address.clone(),
-                    surplus_validator.diff_amount.into(),
-                    denom.clone(),
-                );
-                surplus_validator.diff_amount = Uint128::from(0u32);
-                deficient_validator.diff_amount =
-                    deficient_validator.diff_amount - surplus_validator.diff_amount;
-
-                msgs.push(redelegate_msg);
+                // Update the surplus and deficit amounts
+                surplus_validator.diff_amount -= redelegate_amount;
+                deficient_validator.diff_amount -= redelegate_amount;
             } else {
-                if deficient_validator.diff_amount.is_zero() {
-                    continue;
-                }
-
-                let redelegate_msg = get_babylon_redelegate_cosmos_msg(
-                    delegator.clone(),
-                    surplus_validator.address.to_string(),
-                    deficient_validator.address.clone(),
-                    deficient_validator.diff_amount.into(),
-                    denom.clone(),
-                );
-
-                surplus_validator.diff_amount =
-                    surplus_validator.diff_amount - deficient_validator.diff_amount;
-                deficient_validator.diff_amount = Uint128::from(0u32);
-                msgs.push(redelegate_msg);
+                // No more deficient validators to process
+                break;
             }
         }
     }
