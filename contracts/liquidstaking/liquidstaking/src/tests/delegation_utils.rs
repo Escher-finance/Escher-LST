@@ -1585,15 +1585,15 @@ fn validators_restaking_adjustment_6() {
         },
         Validator {
             address: node_01.clone(),
-            weight: 20,
+            weight: 18,
         },
         Validator {
             address: lavender_5.clone(),
-            weight: 17,
+            weight: 16,
         },
         Validator {
             address: block_hunters.clone(),
-            weight: 17,
+            weight: 16,
         },
         Validator {
             address: figment.clone(),
@@ -1601,7 +1601,7 @@ fn validators_restaking_adjustment_6() {
         },
         Validator {
             address: fiona.clone(),
-            weight: 8,
+            weight: 12,
         },
         Validator {
             address: crypto_crew.clone(),
@@ -1633,33 +1633,31 @@ fn validators_restaking_adjustment_6() {
 
     println!("\nmsgs: {:#?}", msgs);
 
-    let staking_msg = CosmosMsg::Staking(StakingMsg::Redelegate {
-        amount: Coin {
-            denom: denom.to_string(),
-            amount: Uint128::new(65),
-        },
-        src_validator: figment.to_string(),
-        dst_validator: everstake.to_string(),
-    });
+    let staking_msg = get_redelegate_msg(65u128, denom.clone(), figment, fiona.clone());
     assert_eq!(msgs.get(0).unwrap(), &staking_msg);
 
-    let staking_msg = get_redelegate_msg(92u128, denom.clone(), lavender_5, everstake.clone());
+    let staking_msg = get_redelegate_msg(107466u128, denom.clone(), lavender_5, fiona.clone());
     assert_eq!(msgs.get(1).unwrap(), &staking_msg);
 
-    let staking_msg =
-        get_redelegate_msg(1276737u128, denom.clone(), cosmos_spaces, everstake.clone());
+    let staking_msg = get_redelegate_msg(
+        321922u128,
+        denom.clone(),
+        cosmos_spaces.clone(),
+        fiona.clone(),
+    );
     assert_eq!(msgs.get(2).unwrap(), &staking_msg);
 
-    let staking_msg = get_redelegate_msg(10u128, denom.clone(), crypto_crew, everstake.clone());
+    let staking_msg =
+        get_redelegate_msg(954815u128, denom.clone(), cosmos_spaces, everstake.clone());
     assert_eq!(msgs.get(3).unwrap(), &staking_msg);
 
-    let staking_msg = get_redelegate_msg(108u128, denom.clone(), node_01, everstake.clone());
+    let staking_msg = get_redelegate_msg(10u128, denom.clone(), crypto_crew, everstake.clone());
     assert_eq!(msgs.get(4).unwrap(), &staking_msg);
 
-    let staking_msg = get_redelegate_msg(43u128, denom.clone(), fiona, everstake.clone());
+    let staking_msg = get_redelegate_msg(214856u128, denom.clone(), node_01, everstake.clone());
     assert_eq!(msgs.get(5).unwrap(), &staking_msg);
 
-    let staking_msg = get_redelegate_msg(92u128, denom.clone(), block_hunters, everstake);
+    let staking_msg = get_redelegate_msg(107466u128, denom.clone(), block_hunters, everstake);
     assert_eq!(msgs.get(6).unwrap(), &staking_msg);
 }
 
