@@ -241,52 +241,39 @@ pub fn get_restaking_msgs(
     mut deficient_validators: Vec<ValidatorDelegation>,
     denom: String,
 ) -> Vec<CosmosMsg> {
-    let mut msgs: Vec<CosmosMsg> = vec![];
+    let mut msgs = Vec::new();
 
-    surplus_validators.sort_by(|a, b| b.diff_amount.cmp(&a.diff_amount));
-    deficient_validators.sort_by_key(|a| a.diff_amount);
+    // Sort surplus and deficient validators for deterministic behavior
+    surplus_validators.sort_by_key(|v| v.address.clone());
+    deficient_validators.sort_by_key(|v| v.address.clone());
 
     for surplus_validator in surplus_validators.iter_mut() {
-        for deficient_validator in deficient_validators.iter_mut() {
-            if surplus_validator.diff_amount < deficient_validator.diff_amount {
-                if surplus_validator.diff_amount.is_zero() {
-                    continue;
-                }
+        while surplus_validator.diff_amount > Uint128::zero() {
+            if let Some(deficient_validator) = deficient_validators
+                .iter_mut()
+                .find(|v| v.diff_amount > Uint128::zero())
+            {
+                // Calculate the amount to redelegate
+                let redelegate_amount = surplus_validator
+                    .diff_amount
+                    .min(deficient_validator.diff_amount);
 
-                // the deficit amount higher than surplus amount so we can restake all surplus amount
-                let redelegate_msg = CosmosMsg::Staking(StakingMsg::Redelegate {
+                // Create a redelegate message
+                msgs.push(CosmosMsg::Staking(StakingMsg::Redelegate {
                     src_validator: surplus_validator.address.clone(),
                     dst_validator: deficient_validator.address.clone(),
                     amount: Coin {
-                        amount: surplus_validator.diff_amount,
                         denom: denom.clone(),
+                        amount: redelegate_amount,
                     },
-                });
-                surplus_validator.diff_amount = Uint128::from(0u32);
-                deficient_validator.diff_amount =
-                    deficient_validator.diff_amount - surplus_validator.diff_amount;
+                }));
 
-                msgs.push(redelegate_msg);
+                // Update the surplus and deficit amounts
+                surplus_validator.diff_amount -= redelegate_amount;
+                deficient_validator.diff_amount -= redelegate_amount;
             } else {
-                if deficient_validator.diff_amount.is_zero() {
-                    continue;
-                }
-
-                println!("{:?} <> {:?}", surplus_validator, deficient_validator);
-
-                let redelegate_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Redelegate {
-                    src_validator: surplus_validator.address.clone(),
-                    dst_validator: deficient_validator.address.clone(),
-                    amount: Coin {
-                        amount: deficient_validator.diff_amount,
-                        denom: denom.clone(),
-                    },
-                });
-
-                surplus_validator.diff_amount =
-                    surplus_validator.diff_amount - deficient_validator.diff_amount;
-                deficient_validator.diff_amount = Uint128::from(0u32);
-                msgs.push(redelegate_msg);
+                // No more deficient validators to process
+                break;
             }
         }
     }
