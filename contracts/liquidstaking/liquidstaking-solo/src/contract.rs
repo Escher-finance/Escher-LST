@@ -251,8 +251,6 @@ pub fn execute(
 pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let version = semver::Version::parse(CONTRACT_VERSION)?;
-
     let check_status = deps.storage.get(b"status");
     if check_status.is_none() {
         STATUS.save(
@@ -263,19 +261,20 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
             },
         )?;
     }
+    let Some(old_data) = deps.storage.get(b"parameters") else {
+        return Err(ContractError::Std(StdError::generic_err("no parameters")));
+    };
 
-    if version.minor == 1 && version.patch < 143 {
-        let Some(old_data) = deps.storage.get(b"parameters") else {
-            return Err(ContractError::Std(StdError::generic_err("no parameters")));
-        };
+    // Deserialize it from the old format
+    let old_param_result: Result<OldParameters, StdError> = cosmwasm_std::from_json(&old_data);
 
-        // Deserialize it from the old format
-        let old_param: OldParameters = cosmwasm_std::from_json(&old_data)?;
-
+    if old_param_result.is_ok() {
         let zkgm_token_minter = match msg.zkgm_token_minter {
             Some(minter) => minter,
             None => env.contract.address.to_string(),
         };
+
+        let old_param: OldParameters = old_param_result.unwrap();
 
         let new_params = Parameters {
             underlying_coin_denom: old_param.underlying_coin_denom,
