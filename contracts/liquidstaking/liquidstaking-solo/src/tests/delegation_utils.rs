@@ -1655,7 +1655,7 @@ fn validators_restaking_adjustment_6() {
         },
     ]);
 
-    let total_delegated_amount = Uint128::new(10737403u128);
+    let total_delegated_amount = validator_delegation_map.values().copied().sum();
 
     let correct_validator_delegation_map =
         get_validator_delegation_map_base_on_weight(validators, total_delegated_amount);
@@ -1677,7 +1677,6 @@ fn validators_restaking_adjustment_6() {
         deficient_validators,
         denom.clone(),
     );
-
     println!("\nmsgs: {:#?}", msgs);
 
     let staking_msg = get_redelegate_msg(65u128, denom.clone(), figment, fiona.clone());
@@ -1722,4 +1721,422 @@ fn get_redelegate_msg(
         src_validator,
         dst_validator,
     })
+}
+
+#[test]
+fn validators_restaking_adjustment_7() {
+    let mut deps = mock_dependencies();
+    let delegator_addr = Addr::unchecked("delegator");
+    let blockhunters = "blockhunters".to_string();
+    let node01 = "01node".to_string();
+    let everstake = "everstake".to_string();
+    let figment = "figment".to_string();
+    let cosmosspaces = "cosmosspaces".to_string();
+    let cryptocrew = "cryptocrew".to_string();
+
+    let denom = "denom".to_string();
+    let mut querier = MockQuerier::default();
+
+    let validators_cosm = &[
+        cosmwasm_std::Validator::create(
+            blockhunters.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            node01.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            everstake.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            figment.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            cosmosspaces.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            cryptocrew.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+    ];
+    let delegations = &[
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            blockhunters.clone(),
+            Coin::new(Uint128::new(716), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            node01.clone(),
+            Coin::new(Uint128::new(713), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+    ];
+
+    let prev_validators = Vec::from([
+        Validator {
+            weight: 50,
+            address: blockhunters.clone(),
+        },
+        Validator {
+            weight: 50,
+            address: node01.clone(),
+        },
+    ]);
+    let validators = Vec::from([
+        Validator {
+            weight: 21,
+            address: blockhunters.clone(),
+        },
+        Validator {
+            weight: 23,
+            address: node01.clone(),
+        },
+        Validator {
+            weight: 17,
+            address: everstake.clone(),
+        },
+        Validator {
+            weight: 19,
+            address: figment.clone(),
+        },
+        Validator {
+            weight: 18,
+            address: cosmosspaces.clone(),
+        },
+        Validator {
+            weight: 2,
+            address: cryptocrew.clone(),
+        },
+    ]);
+
+    querier
+        .staking
+        .update(denom.clone(), validators_cosm, delegations);
+    deps.querier = querier;
+
+    let mut parameters = mock_parameters();
+    parameters.underlying_coin_denom = denom.clone();
+
+    PARAMETERS.save(deps.as_mut().storage, &parameters).unwrap();
+
+    let (validator_delegation_map, total_delegated_amount) =
+        get_validator_delegation_map_with_total_bond(
+            deps.as_ref(),
+            delegator_addr.to_string(),
+            prev_validators.clone(),
+        )
+        .unwrap();
+
+    println!(
+        "validator_delegation_map: {:#?}",
+        validator_delegation_map.clone()
+    );
+    println!("total_delegated_amount: {:#?}", total_delegated_amount);
+
+    let correct_validator_delegation_map =
+        get_validator_delegation_map_base_on_weight(validators.clone(), total_delegated_amount);
+
+    println!(
+        "correct_validator_delegation_map: {:#?}",
+        correct_validator_delegation_map
+    );
+
+    let (surplus_validators, deficient_validators) = get_surplus_deficit_validators(
+        validator_delegation_map.clone(),
+        correct_validator_delegation_map.clone(),
+    );
+
+    let msgs: Vec<CosmosMsg> = get_restaking_msgs(
+        delegator_addr.to_string(),
+        surplus_validators,
+        deficient_validators,
+        denom.clone(),
+    );
+
+    let mut new_delegation_map: HashMap<String, Uint128> = validator_delegation_map.clone();
+
+    for msg in msgs.iter() {
+        match msg {
+            CosmosMsg::Staking(StakingMsg::Redelegate {
+                amount,
+                src_validator,
+                dst_validator,
+                ..
+            }) => {
+                let amount = amount.amount;
+                let src_validator = src_validator.clone();
+                let dst_validator = dst_validator.clone();
+
+                new_delegation_map
+                    .entry(src_validator.clone())
+                    .and_modify(|v| *v -= amount);
+
+                new_delegation_map
+                    .entry(dst_validator.clone())
+                    .or_insert(Uint128::zero());
+
+                new_delegation_map
+                    .entry(dst_validator.clone())
+                    .and_modify(|v| *v += amount);
+            }
+            _ => {}
+        }
+    }
+
+    assert_eq!(
+        new_delegation_map.clone(),
+        correct_validator_delegation_map.clone()
+    )
+}
+
+#[test]
+fn validators_restaking_adjustment_8() {
+    let mut deps = mock_dependencies();
+    let delegator_addr = Addr::unchecked("delegator");
+    let blockhunters = "blockhunters".to_string();
+    let node01 = "01node".to_string();
+    let everstake = "everstake".to_string();
+    let figment = "figment".to_string();
+    let cosmosspaces = "cosmosspaces".to_string();
+    let cryptocrew = "cryptocrew".to_string();
+
+    let denom = "denom".to_string();
+    let mut querier = MockQuerier::default();
+
+    let validators_cosm = &[
+        cosmwasm_std::Validator::create(
+            blockhunters.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            node01.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            everstake.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            figment.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            cosmosspaces.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            cryptocrew.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+    ];
+    let delegations = &[
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            figment.clone(),
+            Coin::new(Uint128::new(416545), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            blockhunters.clone(),
+            Coin::new(Uint128::new(300951), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            cosmosspaces.clone(),
+            Coin::new(Uint128::new(257958), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            everstake.clone(),
+            Coin::new(Uint128::new(243627), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            node01.clone(),
+            Coin::new(Uint128::new(185356), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+        cosmwasm_std::FullDelegation::create(
+            delegator_addr.clone(),
+            cryptocrew.clone(),
+            Coin::new(Uint128::new(28662), denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+    ];
+
+    let prev_validators = Vec::from([
+        Validator {
+            weight: 21,
+            address: blockhunters.clone(),
+        },
+        Validator {
+            weight: 23,
+            address: node01.clone(),
+        },
+        Validator {
+            weight: 17,
+            address: everstake.clone(),
+        },
+        Validator {
+            weight: 19,
+            address: figment.clone(),
+        },
+        Validator {
+            weight: 18,
+            address: cosmosspaces.clone(),
+        },
+        Validator {
+            weight: 2,
+            address: cryptocrew.clone(),
+        },
+    ]);
+    let validators = Vec::from([
+        Validator {
+            weight: 15,
+            address: blockhunters.clone(),
+        },
+        Validator {
+            weight: 30,
+            address: node01.clone(),
+        },
+        Validator {
+            weight: 15,
+            address: everstake.clone(),
+        },
+        Validator {
+            weight: 15,
+            address: figment.clone(),
+        },
+        Validator {
+            weight: 15,
+            address: cosmosspaces.clone(),
+        },
+        Validator {
+            weight: 10,
+            address: cryptocrew.clone(),
+        },
+    ]);
+
+    querier
+        .staking
+        .update(denom.clone(), validators_cosm, delegations);
+    deps.querier = querier;
+
+    let mut parameters = mock_parameters();
+    parameters.underlying_coin_denom = denom.clone();
+
+    PARAMETERS.save(deps.as_mut().storage, &parameters).unwrap();
+
+    let (validator_delegation_map, total_delegated_amount) =
+        get_validator_delegation_map_with_total_bond(
+            deps.as_ref(),
+            delegator_addr.to_string(),
+            prev_validators.clone(),
+        )
+        .unwrap();
+
+    println!(
+        "validator_delegation_map: {:#?}",
+        validator_delegation_map.clone()
+    );
+    println!("total_delegated_amount: {:#?}", total_delegated_amount);
+
+    let correct_validator_delegation_map =
+        get_validator_delegation_map_base_on_weight(validators.clone(), total_delegated_amount);
+
+    println!(
+        "correct_validator_delegation_map: {:#?}",
+        correct_validator_delegation_map
+    );
+
+    let (surplus_validators, deficient_validators) = get_surplus_deficit_validators(
+        validator_delegation_map.clone(),
+        correct_validator_delegation_map.clone(),
+    );
+
+    let msgs: Vec<CosmosMsg> = get_restaking_msgs(
+        delegator_addr.to_string(),
+        surplus_validators,
+        deficient_validators,
+        denom.clone(),
+    );
+
+    let mut new_delegation_map: HashMap<String, Uint128> = validator_delegation_map.clone();
+
+    for msg in msgs.iter() {
+        match msg {
+            CosmosMsg::Staking(StakingMsg::Redelegate {
+                amount,
+                src_validator,
+                dst_validator,
+                ..
+            }) => {
+                let amount = amount.amount;
+                let src_validator = src_validator.clone();
+                let dst_validator = dst_validator.clone();
+
+                new_delegation_map
+                    .entry(src_validator.clone())
+                    .and_modify(|v| *v -= amount);
+
+                new_delegation_map
+                    .entry(dst_validator.clone())
+                    .or_insert(Uint128::zero());
+
+                new_delegation_map
+                    .entry(dst_validator.clone())
+                    .and_modify(|v| *v += amount);
+            }
+            _ => {}
+        }
+    }
+
+    assert_eq!(
+        new_delegation_map.clone(),
+        correct_validator_delegation_map.clone()
+    );
+
+    println!("new_delegation_map: {:#?}", new_delegation_map);
 }
