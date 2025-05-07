@@ -213,6 +213,8 @@ pub enum QueryMsg {
     SupplyQueue {},
     #[returns(Status)]
     Status {},
+    #[returns(Vec<cosmwasm_std::FullDelegation>)]
+    Delegations {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;

@@ -257,6 +257,11 @@ pub fn get_restaking_msgs(
                     .diff_amount
                     .min(deficient_validator.diff_amount);
 
+                // Skip invalid redelegate amounts
+                if redelegate_amount.is_zero() {
+                    continue;
+                }
+
                 // if test mode, we need to use the StakingMsg::Redelegate so it is readable and can be asserted
                 // otherwise we use the MsgWrappedBeginRedelegate that will be sent to babylon
                 if cfg!(test) {
