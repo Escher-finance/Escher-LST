@@ -261,42 +261,44 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
             },
         )?;
     }
-    let Some(old_data) = deps.storage.get(b"parameters") else {
-        return Err(ContractError::Std(StdError::generic_err("no parameters")));
-    };
 
-    // Deserialize it from the old format
-    let old_param_result: Result<OldParameters, StdError> = cosmwasm_std::from_json(&old_data);
-
-    if old_param_result.is_ok() {
-        let zkgm_token_minter = match msg.zkgm_token_minter {
-            Some(minter) => minter,
-            None => env.contract.address.to_string(),
+    if CONTRACT_VERSION == "0.1.157" {
+        let Some(old_data) = deps.storage.get(b"parameters") else {
+            return Err(ContractError::Std(StdError::generic_err("no parameters")));
         };
+        // Deserialize it from the old format
+        let old_param_result: Result<OldParameters, StdError> = cosmwasm_std::from_json(&old_data);
 
-        let old_param: OldParameters = old_param_result.unwrap();
+        if old_param_result.is_ok() {
+            let zkgm_token_minter = match msg.zkgm_token_minter {
+                Some(minter) => minter,
+                None => env.contract.address.to_string(),
+            };
 
-        let new_params = Parameters {
-            underlying_coin_denom: old_param.underlying_coin_denom,
-            liquidstaking_denom: old_param.liquidstaking_denom,
-            ucs03_relay_contract: old_param.ucs03_relay_contract,
-            unbonding_time: old_param.unbonding_time,
-            cw20_address: old_param.cw20_address,
-            reward_address: old_param.reward_address,
-            fee_rate: old_param.fee_rate,
-            fee_receiver: old_param.fee_receiver,
-            batch_period: old_param.batch_period,
-            min_bond: old_param.min_bond,
-            min_unbond: old_param.min_unbond,
-            batch_limit: old_param.batch_limit,
-            transfer_handler: old_param.transfer_handler,
-            transfer_fee: old_param.transfer_fee,
-            zkgm_token_minter,
-        };
+            let old_param: OldParameters = old_param_result.unwrap();
 
-        // Serialize the new data
-        let new_data = cosmwasm_std::to_json_vec(&new_params)?;
-        deps.storage.set(b"parameters", &new_data);
+            let new_params = Parameters {
+                underlying_coin_denom: old_param.underlying_coin_denom,
+                liquidstaking_denom: old_param.liquidstaking_denom,
+                ucs03_relay_contract: old_param.ucs03_relay_contract,
+                unbonding_time: old_param.unbonding_time,
+                cw20_address: old_param.cw20_address,
+                reward_address: old_param.reward_address,
+                fee_rate: old_param.fee_rate,
+                fee_receiver: old_param.fee_receiver,
+                batch_period: old_param.batch_period,
+                min_bond: old_param.min_bond,
+                min_unbond: old_param.min_unbond,
+                batch_limit: old_param.batch_limit,
+                transfer_handler: old_param.transfer_handler,
+                transfer_fee: old_param.transfer_fee,
+                zkgm_token_minter,
+            };
+
+            // Serialize the new data
+            let new_data = cosmwasm_std::to_json_vec(&new_params)?;
+            deps.storage.set(b"parameters", &new_data);
+        }
     }
 
     Ok(Response::new()
