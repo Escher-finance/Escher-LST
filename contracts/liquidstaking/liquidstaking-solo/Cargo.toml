@@ -62,6 +62,7 @@ bincode          = { version = "2.0.1", default-features = false, features = ["s
 cosmos-sdk-proto = { version = "0.27.0", default-features = false, features = ["cosmwasm"] }
 alloy = { version = "0.15.3", default-features = false, features = ["sol-types"] }
 hex-literal = "1.0.0"
+ibc ={ version = "0.57.0", default-features = false, features = ["borsh", "serde"]  }
 
 [dependencies.unionlabs_primitives]
 path = "../unionlabs-primitives"

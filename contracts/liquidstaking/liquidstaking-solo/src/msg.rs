@@ -330,3 +330,8 @@ pub struct MigrateMsg {
 
 #[cw_serde]
 pub struct RewardMigrateMsg {}
+
+#[cw_serde]
+pub struct IBCCallbackPayload {
+    pub salt: String,
+}
