@@ -258,6 +258,11 @@ pub fn get_restaking_msgs(
                     .diff_amount
                     .min(deficient_validator.diff_amount);
 
+                // Skip invalid redelegate amounts
+                if redelegate_amount.is_zero() {
+                    continue;
+                }
+
                 // Create a redelegate message
                 msgs.push(CosmosMsg::Staking(StakingMsg::Redelegate {
                     src_validator: surplus_validator.address.clone(),
