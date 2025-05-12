@@ -401,6 +401,7 @@ pub fn process_bond(
     salt: String,
     channel_id: Option<u32>,
     block_height: u64,
+    recipient: Option<String>,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
@@ -481,6 +482,7 @@ pub fn process_bond(
         amount: mint_amount,
         salt,
         channel_id,
+        recipient,
     };
     let payload_bin = to_json_binary(&payload)?;
 

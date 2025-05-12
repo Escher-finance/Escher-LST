@@ -61,7 +61,10 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let mut quote_token_string = String::new();
     let amount = payload.amount;
 
-    if payload.staker != payload.sender && payload.channel_id.is_some() {
+    if payload.staker != payload.sender
+        && payload.channel_id.is_some()
+        && payload.recipient.is_none()
+    {
         let channel_id = payload.channel_id.unwrap();
         let params = PARAMETERS.load(deps.storage)?;
 
@@ -106,13 +109,13 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
         msgs.push(authz_ucs03_msg);
     } else {
+        let receiver = match payload.recipient.clone() {
+            Some(receiver) => receiver,
+            None => payload.staker.clone(),
+        };
+
         // if staker from same chain, this contract will send the cw20 staking token
-        let msg = send_cw20(
-            deps,
-            amount,
-            params.cw20_address.to_string(),
-            payload.staker.clone(),
-        )?;
+        let msg = send_cw20(deps, amount, params.cw20_address.to_string(), receiver)?;
         msgs.push(msg);
     }
 
@@ -120,7 +123,8 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         .add_messages(msgs)
         .add_attribute("action", "mint_cw20")
         .add_attribute("sender", payload.sender.to_string())
-        .add_attribute("receiver", payload.staker.to_string())
+        .add_attribute("staker", payload.staker.to_string())
+        .add_attribute("recipient", format!("{:?}", payload.recipient))
         .add_attribute("channel_id", payload.channel_id.unwrap_or(0).to_string())
         .add_attribute("amount", amount.to_string())
         .add_attribute("denom", params.liquidstaking_denom)

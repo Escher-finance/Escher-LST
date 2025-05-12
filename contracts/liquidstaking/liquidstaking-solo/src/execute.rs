@@ -87,6 +87,7 @@ pub fn bond(
         "".to_string(),
         None,
         env.block.height,
+        None,
     )?;
 
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
@@ -136,10 +137,15 @@ pub fn zkgm_unbond(
     channel_id: ChannelId,
     staker: String,
     amount: Uint128,
+    recipient: Option<String>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
+    if recipient.is_some() {
+        deps.api.addr_validate(recipient.unwrap().as_str())?;
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -183,10 +189,16 @@ pub fn zkgm_bond(
     salt: String,
     slippage: Option<Decimal>,
     expected: Uint128,
+    recipient: Option<String>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
+    if recipient.is_some() {
+        deps.api
+            .addr_validate(recipient.clone().unwrap().as_str())?;
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -213,6 +225,7 @@ pub fn zkgm_bond(
         salt,
         Some(channel_id.raw()),
         env.block.height,
+        recipient,
     )?;
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -892,6 +905,7 @@ pub fn on_zkgm(
             salt,
             slippage,
             expected,
+            recipient,
         } => {
             return zkgm_bond(
                 deps,
@@ -903,10 +917,19 @@ pub fn on_zkgm(
                 salt,
                 slippage,
                 expected,
+                recipient,
             )
         }
-        ZkgmMessage::Unbond { amount } => {
-            return zkgm_unbond(deps, env, info, channel_id, format!("{}", sender), amount)
+        ZkgmMessage::Unbond { amount, recipient } => {
+            return zkgm_unbond(
+                deps,
+                env,
+                info,
+                channel_id,
+                format!("{}", sender),
+                amount,
+                recipient,
+            )
         }
     }
 }

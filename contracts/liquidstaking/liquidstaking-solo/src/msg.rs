@@ -263,6 +263,7 @@ pub struct MintTokensPayload {
     pub amount: Uint128,
     pub salt: String,
     pub channel_id: Option<u32>,
+    pub recipient: Option<String>,
 }
 
 #[cw_serde]
@@ -295,11 +296,13 @@ pub enum ZkgmMessage {
     Bond {
         amount: Uint128,
         salt: String,
-        slippage: Option<Decimal>,
         expected: Uint128,
+        slippage: Option<Decimal>,
+        recipient: Option<String>,
     },
     Unbond {
         amount: Uint128,
+        recipient: Option<String>,
     },
 }
 
