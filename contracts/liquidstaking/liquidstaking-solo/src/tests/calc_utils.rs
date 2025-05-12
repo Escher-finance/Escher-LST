@@ -273,6 +273,7 @@ fn test_staker_undelegation_with_dust_distribution() {
         released_height: 0,
         released: false,
         batch_id: 27,
+        recipient: None,
     };
 
     let unbond_record_2 = crate::state::UnbondRecord {
@@ -285,6 +286,7 @@ fn test_staker_undelegation_with_dust_distribution() {
         released_height: 0,
         released: false,
         batch_id: 27,
+        recipient: None,
     };
 
     let unbond_record_3 = crate::state::UnbondRecord {
@@ -297,6 +299,7 @@ fn test_staker_undelegation_with_dust_distribution() {
         released_height: 0,
         released: false,
         batch_id: 27,
+        recipient: None,
     };
 
     let mut unbond_records = vec![unbond_record_1, unbond_record_2, unbond_record_3];

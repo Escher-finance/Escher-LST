@@ -886,6 +886,7 @@ fn test_unstake_request_in_batch() {
         staker.clone(),
         unstake_amount,
         channel_id,
+        None,
     )
     .unwrap();
 
@@ -917,7 +918,8 @@ fn test_unstake_request_in_batch() {
             staker: staker.clone(),
             amount: unstake_amount,
             released_height: 0,
-            released: false
+            released: false,
+            recipient: None
         }
     );
     assert_eq!(unstake_request_event.ty, UNSTAKE_REQUEST_EVENT);
@@ -1045,6 +1047,7 @@ fn test_process_bond() {
         salt,
         channel_id,
         block_height,
+        None,
     )
     .unwrap();
 
