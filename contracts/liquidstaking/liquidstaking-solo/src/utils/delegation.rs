@@ -683,6 +683,7 @@ pub fn unstake_request_in_batch(
     staker: String,
     unstake_amount: Uint128,
     channel_id: Option<u32>,
+    recipient: Option<String>,
 ) -> Result<Event, ContractError> {
     let params = PARAMETERS.load(storage)?;
 
@@ -709,6 +710,7 @@ pub fn unstake_request_in_batch(
         amount: unstake_amount,
         released_height: 0,
         released: false,
+        recipient: recipient.clone(),
     };
     unbond_record().save(storage, id, &record)?;
 
@@ -720,6 +722,7 @@ pub fn unstake_request_in_batch(
         record.id,
         pending_batch.id,
         env.block.time,
+        recipient,
     );
 
     Ok(event)
@@ -913,20 +916,33 @@ pub fn get_staker_undelegation(
     unbonding_records: &mut Vec<UnbondRecord>,
     total_liquid_stake: Uint128,
     block_height: u64,
-) -> Result<(HashMap<String, StakerUndelegation>, Vec<u64>, Uint128), ContractError> {
+) -> Result<
+    (
+        HashMap<(String, String), StakerUndelegation>,
+        Vec<u64>,
+        Uint128,
+    ),
+    ContractError,
+> {
     let total_received_amount_in_decimal =
         Decimal::from_ratio(total_received_amount, Uint128::one());
     let mut unbond_record_ids = vec![];
-    let mut staker_undelegation: HashMap<String, StakerUndelegation> = HashMap::new();
+
+    // hash map with tuple of staker and recipient as key
+    let mut staker_undelegation: HashMap<(String, String), StakerUndelegation> = HashMap::new();
 
     for record in unbonding_records.iter_mut() {
         let entry = staker_undelegation
-            .entry(record.staker.clone())
+            .entry((
+                record.staker.clone(),
+                record.recipient.clone().unwrap_or("".to_string()),
+            ))
             .and_modify(|e| e.unstake_amount += record.amount)
             .or_insert(StakerUndelegation {
                 unstake_amount: record.amount,
                 channel_id: record.channel_id,
                 unstake_return_native_amount: None,
+                recipient: record.recipient.clone(),
             });
 
         let user_to_total_unstake_ratio =
@@ -963,10 +979,15 @@ pub fn get_staker_undelegation(
         Uint128::new(unbonding_records.len() as u128),
     );
     for (i, record) in unbonding_records.iter_mut().enumerate() {
-        let staker_undelegation = match staker_undelegation.get_mut(&record.staker) {
-            Some(x) => x,
-            None => continue,
+        let recipient = match record.recipient.clone() {
+            Some(recipient) => recipient,
+            None => "".to_string(),
         };
+        let staker_undelegation =
+            match staker_undelegation.get_mut(&(record.staker.clone(), recipient)) {
+                Some(x) => x,
+                None => continue,
+            };
         let dust = dust_distribution[i];
         staker_undelegation.unstake_return_native_amount = staker_undelegation
             .unstake_return_native_amount

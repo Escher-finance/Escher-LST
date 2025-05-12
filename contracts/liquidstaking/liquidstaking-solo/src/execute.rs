@@ -145,7 +145,8 @@ pub fn zkgm_unbond(
     }
 
     if recipient.is_some() {
-        deps.api.addr_validate(recipient.unwrap().as_str())?;
+        deps.api
+            .addr_validate(recipient.clone().unwrap().as_str())?;
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -171,6 +172,7 @@ pub fn zkgm_unbond(
         staker.clone(),
         amount,
         Some(channel_id.raw()),
+        recipient,
     )?;
 
     let res: Response = Response::new().add_event(unstake_request_event);
@@ -325,6 +327,7 @@ pub fn receive(
         sender.to_string(),
         the_staker.clone(),
         unbond_amount,
+        None,
         None,
     )?;
 
@@ -730,6 +733,7 @@ pub struct StakerUndelegation {
     pub unstake_amount: Uint128,
     pub channel_id: Option<u32>,
     pub unstake_return_native_amount: Option<Uint128>,
+    pub recipient: Option<String>,
 }
 
 /// Process received batch to release the native token back to user so user doesn't need to manually withdraw token
@@ -789,11 +793,15 @@ pub fn process_batch_withdrawal(
     let mut send_msgs: Vec<CosmosMsg> = vec![];
     let mut i = 0;
     let transfer_handler = params.transfer_handler.clone();
-    for (key, undelegation) in staker_undelegation.iter() {
+    for ((staker, unbond_recipient), undelegation) in staker_undelegation.iter() {
         // if staker from same chain, we send bank transfer directly
-        if undelegation.channel_id.is_none() {
+        if undelegation.channel_id.is_none() || undelegation.recipient.is_some() {
+            let recipient = match undelegation.recipient.clone() {
+                Some(addr) => addr,
+                None => staker.clone(),
+            };
             let bank_msg = BankMsg::Send {
-                to_address: key.clone(),
+                to_address: recipient,
                 amount: vec![Coin {
                     denom: denom.clone(),
                     amount: undelegation.unstake_return_native_amount.unwrap(),
@@ -818,7 +826,7 @@ pub fn process_batch_withdrawal(
             let msg = get_unbonding_ucs03_transfer_cosmos_msg(
                 deps.storage,
                 lst_contract.clone(),
-                key.clone(),
+                staker.clone(),
                 undelegation.channel_id.unwrap(),
                 time,
                 ucs03_relay_contract.clone(),
@@ -833,7 +841,8 @@ pub fn process_batch_withdrawal(
         let ev = ProcessUnbondingEvent(
             id,
             undelegation.channel_id,
-            key.to_string(),
+            staker.to_string(),
+            unbond_recipient.to_string(),
             undelegation.unstake_return_native_amount.unwrap(),
             denom.clone(),
             env.block.time,

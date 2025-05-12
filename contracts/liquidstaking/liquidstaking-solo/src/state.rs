@@ -145,6 +145,7 @@ pub struct UnbondRecord {
     pub released_height: u64,
     pub released: bool,
     pub batch_id: u64,
+    pub recipient: Option<String>,
 }
 
 pub struct UnbondRecordIndexes<'a> {

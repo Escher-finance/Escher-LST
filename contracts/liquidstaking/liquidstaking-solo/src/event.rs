@@ -127,12 +127,14 @@ pub fn ProcessUnbondingEvent(
     batch_id: u64,
     channel_id: Option<u32>,
     staker: String,
+    recipient: String,
     amount: Uint128,
     denom: String,
     time: Timestamp,
 ) -> Event {
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
         .add_attribute("staker", staker)
+        .add_attribute("recipient", recipient)
         .add_attribute("amount", amount.to_string())
         .add_attribute("denom", denom)
         .add_attribute("time", format!("{}", time.nanos()))
@@ -181,21 +183,27 @@ pub fn UnstakeRequestEvent(
     record_id: u64,
     batch_id: u64,
     time: Timestamp,
+    recipient: Option<String>,
 ) -> Event {
-    let mut channel_id_str = "".to_string();
+    let channel_id: String = match channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "".to_string(),
+    };
 
-    if channel_id.is_some() {
-        channel_id_str = format!("{}", channel_id.unwrap());
-    }
+    let recipient = match recipient {
+        Some(recipient) => recipient,
+        None => "".to_string(),
+    };
 
     Event::new(UNSTAKE_REQUEST_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", staker)
-        .add_attribute("channel_id", channel_id_str)
+        .add_attribute("channel_id", channel_id)
         .add_attribute("unbond_amount", amount)
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("record_id", format!("{}", record_id))
+        .add_attribute("recipient", recipient)
 }
 
 pub const BATCH_RECEIVED_EVENT: &str = "batch_received";
