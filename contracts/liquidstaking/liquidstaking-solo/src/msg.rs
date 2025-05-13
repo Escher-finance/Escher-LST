@@ -83,7 +83,10 @@ pub enum ExecuteRewardMsg {
 
 #[cw_serde]
 pub enum Cw20PayloadMsg {
-    Unstake {},
+    Unstake {
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+    },
 }
 
 #[cw_ownable_execute]
@@ -95,6 +98,8 @@ pub enum ExecuteMsg {
     Bond {
         slippage: Option<Decimal>,
         expected: Uint128,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
     },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
@@ -264,6 +269,7 @@ pub struct MintTokensPayload {
     pub salt: String,
     pub channel_id: Option<u32>,
     pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
 }
 
 #[cw_serde]
@@ -299,10 +305,12 @@ pub enum ZkgmMessage {
         expected: Uint128,
         slippage: Option<Decimal>,
         recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
     },
     Unbond {
         amount: Uint128,
         recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
     },
 }
 

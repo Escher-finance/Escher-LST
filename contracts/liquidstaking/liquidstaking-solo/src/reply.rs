@@ -14,7 +14,6 @@ use unionlabs_primitives::Bytes;
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
-pub const TRANSFER_STAKING_TOKEN_ID: u64 = 127;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
@@ -61,11 +60,17 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let mut quote_token_string = String::new();
     let amount = payload.amount;
 
-    if payload.staker != payload.sender
-        && payload.channel_id.is_some()
-        && payload.recipient.is_none()
-    {
-        let channel_id = payload.channel_id.unwrap();
+    // if the channel id or recipient channel id is set, it means that the receiver/recipient is on other chain
+    if payload.channel_id.is_some() || payload.recipient_channel_id.is_some() {
+        let channel_id = match payload.recipient_channel_id {
+            Some(channel_id) => channel_id,
+            None => payload.recipient_channel_id.unwrap(),
+        };
+
+        let recipient = match payload.recipient.clone() {
+            Some(recipient) => recipient,
+            None => payload.staker.clone(),
+        };
         let params = PARAMETERS.load(deps.storage)?;
 
         // allow/approve ucs03 to transfer on behalf of transfer handler via authz
@@ -98,7 +103,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
             env.block.time,
             params.ucs03_relay_contract.clone(),
             channel_id,
-            Bytes::from_str(payload.staker.as_str()).unwrap(),
+            Bytes::from_str(recipient.as_str()).unwrap(),
             params.cw20_address.to_string(),
             amount,
             Bytes::from_str(quote_token.lst_quote_token.as_str()).unwrap(),

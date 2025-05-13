@@ -15,7 +15,18 @@ pub fn BondEvent(
     channel_id: String,
     time: Timestamp,
     denom: String,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Event {
+    let recipient = match recipient {
+        Some(recipient) => recipient,
+        None => "".to_string(),
+    };
+
+    let recipient_channel_id: String = match recipient_channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "".to_string(),
+    };
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", format!("{}", staker))
@@ -28,6 +39,8 @@ pub fn BondEvent(
         .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("denom", denom)
+        .add_attribute("recipient", recipient)
+        .add_attribute("recipient_channel_id", recipient_channel_id)
 }
 
 pub const UNBOND_EVENT: &str = "unbond";
@@ -184,6 +197,7 @@ pub fn UnstakeRequestEvent(
     batch_id: u64,
     time: Timestamp,
     recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Event {
     let channel_id: String = match channel_id {
         Some(channel_id) => channel_id.to_string(),
@@ -192,6 +206,11 @@ pub fn UnstakeRequestEvent(
 
     let recipient = match recipient {
         Some(recipient) => recipient,
+        None => "".to_string(),
+    };
+
+    let recipient_channel_id: String = match recipient_channel_id {
+        Some(channel_id) => channel_id.to_string(),
         None => "".to_string(),
     };
 
@@ -204,6 +223,7 @@ pub fn UnstakeRequestEvent(
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("record_id", format!("{}", record_id))
         .add_attribute("recipient", recipient)
+        .add_attribute("recipient_channel_id", recipient_channel_id)
 }
 
 pub const BATCH_RECEIVED_EVENT: &str = "batch_received";

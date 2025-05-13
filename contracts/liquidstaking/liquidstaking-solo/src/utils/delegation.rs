@@ -402,6 +402,7 @@ pub fn process_bond(
     channel_id: Option<u32>,
     block_height: u64,
     recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
@@ -483,6 +484,7 @@ pub fn process_bond(
         salt,
         channel_id,
         recipient,
+        recipient_channel_id,
     };
     let payload_bin = to_json_binary(&payload)?;
 
@@ -684,6 +686,7 @@ pub fn unstake_request_in_batch(
     unstake_amount: Uint128,
     channel_id: Option<u32>,
     recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Result<Event, ContractError> {
     let params = PARAMETERS.load(storage)?;
 
@@ -711,6 +714,7 @@ pub fn unstake_request_in_batch(
         released_height: 0,
         released: false,
         recipient: recipient.clone(),
+        recipient_channel_id,
     };
     unbond_record().save(storage, id, &record)?;
 
@@ -723,6 +727,7 @@ pub fn unstake_request_in_batch(
         pending_batch.id,
         env.block.time,
         recipient,
+        recipient_channel_id,
     );
 
     Ok(event)

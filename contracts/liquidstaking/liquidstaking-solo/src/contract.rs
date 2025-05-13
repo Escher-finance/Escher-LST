@@ -158,9 +158,20 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Bond { slippage, expected } => {
-            execute::bond(deps, env, info, slippage, expected)
-        }
+        ExecuteMsg::Bond {
+            slippage,
+            expected,
+            recipient,
+            recipient_channel_id,
+        } => execute::bond(
+            deps,
+            env,
+            info,
+            slippage,
+            expected,
+            recipient,
+            recipient_channel_id,
+        ),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
@@ -336,6 +347,7 @@ pub fn migrate_unbond_record(deps: DepsMut) -> Result<(), ContractError> {
             released_height: old_record.released_height,
             released: old_record.released,
             recipient: None,
+            recipient_channel_id: None,
         };
 
         unbond_record().save(deps.storage, id, &new_record)?;
@@ -367,7 +379,6 @@ fn test_migrate_unbond_record() {
             channel_id: channel_id,
             amount: unstake_amount,
             released_height: 0,
-            // These bellow are just to create some variation in the data
             released: i > (token_count / 2),
             batch_id: pending_batch_id,
         };

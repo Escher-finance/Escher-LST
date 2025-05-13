@@ -41,10 +41,18 @@ pub fn bond(
     info: MessageInfo,
     slippage: Option<Decimal>,
     expected: Uint128,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
+    // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
+    if recipient.is_some() && recipient_channel_id.is_none() {
+        deps.api
+            .addr_validate(recipient.clone().unwrap().as_str())?;
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -87,7 +95,8 @@ pub fn bond(
         "".to_string(),
         None,
         env.block.height,
-        None,
+        recipient.clone(),
+        recipient_channel_id,
     )?;
 
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
@@ -105,6 +114,8 @@ pub fn bond(
         "".to_string(),
         env.block.time,
         coin_denom.clone(),
+        recipient,
+        recipient_channel_id,
     );
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -138,13 +149,15 @@ pub fn zkgm_unbond(
     staker: String,
     amount: Uint128,
     recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    if recipient.is_some() {
+    // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
+    if recipient.is_some() && recipient_channel_id.is_none() {
         deps.api
             .addr_validate(recipient.clone().unwrap().as_str())?;
     }
@@ -173,6 +186,7 @@ pub fn zkgm_unbond(
         amount,
         Some(channel_id.raw()),
         recipient,
+        recipient_channel_id,
     )?;
 
     let res: Response = Response::new().add_event(unstake_request_event);
@@ -192,13 +206,15 @@ pub fn zkgm_bond(
     slippage: Option<Decimal>,
     expected: Uint128,
     recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    if recipient.is_some() {
+    // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
+    if recipient.is_some() && recipient_channel_id.is_none() {
         deps.api
             .addr_validate(recipient.clone().unwrap().as_str())?;
     }
@@ -227,7 +243,8 @@ pub fn zkgm_bond(
         salt,
         Some(channel_id.raw()),
         env.block.height,
-        recipient,
+        recipient.clone(),
+        recipient_channel_id,
     )?;
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -247,6 +264,8 @@ pub fn zkgm_bond(
         format!("{}", channel_id),
         env.block.time,
         coin_denom.clone(),
+        recipient,
+        recipient_channel_id,
     );
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
@@ -303,9 +322,23 @@ pub fn receive(
     let payload_msg: Cw20PayloadMsg = from_json(cw20_msg.msg)?;
 
     // make sure the payload is Unstake
-    if !matches!(payload_msg, Cw20PayloadMsg::Unstake {}) {
+    if !matches!(
+        payload_msg,
+        Cw20PayloadMsg::Unstake {
+            recipient: _,
+            recipient_channel_id: _
+        }
+    ) {
         return Err(ContractError::InvalidPayload {});
     }
+
+    // get the recipient and recipient channel id from payload_msg
+    let (recipient, recipient_channel_id) = match payload_msg {
+        Cw20PayloadMsg::Unstake {
+            recipient,
+            recipient_channel_id,
+        } => (recipient, recipient_channel_id),
+    };
 
     let unbond_amount = cw20_msg.amount;
 
@@ -328,7 +361,8 @@ pub fn receive(
         the_staker.clone(),
         unbond_amount,
         None,
-        None,
+        recipient,
+        recipient_channel_id,
     )?;
 
     let res: Response = Response::new().add_event(unstake_request_event);
@@ -915,6 +949,7 @@ pub fn on_zkgm(
             slippage,
             expected,
             recipient,
+            recipient_channel_id,
         } => {
             return zkgm_bond(
                 deps,
@@ -927,9 +962,14 @@ pub fn on_zkgm(
                 slippage,
                 expected,
                 recipient,
+                recipient_channel_id,
             )
         }
-        ZkgmMessage::Unbond { amount, recipient } => {
+        ZkgmMessage::Unbond {
+            amount,
+            recipient,
+            recipient_channel_id,
+        } => {
             return zkgm_unbond(
                 deps,
                 env,
@@ -938,6 +978,7 @@ pub fn on_zkgm(
                 format!("{}", sender),
                 amount,
                 recipient,
+                recipient_channel_id,
             )
         }
     }

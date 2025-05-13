@@ -204,6 +204,7 @@ pub struct UnbondRecord {
     pub released: bool,
     pub batch_id: u64,
     pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
 }
 
 pub struct UnbondRecordIndexes<'a> {
