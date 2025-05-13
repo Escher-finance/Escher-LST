@@ -9,7 +9,7 @@ use crate::{
     utils::batch::{Batch, BatchStatus},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
+use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256, Uint64};
 use cw2::ContractVersion;
 use cw20::Cw20ReceiveMsg;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
@@ -54,6 +54,12 @@ pub struct InstantiateMsg {
     // limit per batch
     // this is the max number of unbonding records that can be processed in one batch
     pub batch_limit: u32,
+    // handler of cw20 staking token transfer, as ucs03 fee payer address and also minted cw20 staking token receiver
+    pub transfer_handler: String,
+    // ucs03 transfer fee from babylon to other
+    pub transfer_fee: Uint128,
+    // zkgm token_minter address as cw20 allowance spender
+    pub zkgm_token_minter: String,
 }
 
 #[cw_serde]
@@ -120,6 +126,9 @@ pub enum ExecuteMsg {
         min_bond: Option<Uint128>,
         min_unbond: Option<Uint128>,
         batch_limit: Option<u32>,
+        transfer_handler: Option<String>,
+        transfer_fee: Option<Uint128>,
+        zkgm_token_minter: Option<String>,
     },
     /// Update quote token
     UpdateQuoteToken {
@@ -204,14 +213,16 @@ pub enum QueryMsg {
     SupplyQueue {},
     #[returns(Status)]
     Status {},
+    #[returns(Vec<cosmwasm_std::FullDelegation>)]
+    Delegations {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Ucs03ExecuteMsg {
-    /// This allows us to transfer via ucs03 relayer
+    /// This allows us to transfer via ucs03
     Transfer {
         channel_id: u32,
         receiver: Bytes,
@@ -222,6 +233,14 @@ pub enum Ucs03ExecuteMsg {
         timeout_height: u64,
         timeout_timestamp: u64,
         salt: H256,
+    },
+    /// This allows us to send packet via ucs03
+    Send {
+        channel_id: ChannelId,
+        timeout_height: Uint64,
+        timeout_timestamp: Timestamp,
+        salt: H256,
+        instruction: Bytes,
     },
 }
 
@@ -304,4 +323,10 @@ pub struct UnbondData {
 }
 
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub transfer_handler: Option<String>,
+    pub zkgm_token_minter: Option<String>,
+}
+
+#[cw_serde]
+pub struct RewardMigrateMsg {}

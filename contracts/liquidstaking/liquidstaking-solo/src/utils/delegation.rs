@@ -13,16 +13,17 @@ use crate::{
     },
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    to_json_binary, Addr, Attribute, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
     QuerierWrapper, StdResult, Storage, SubMsg, Uint128, Uint256,
 };
-use cosmwasm_std::{AnyMsg, BankMsg, Coin};
+use cosmwasm_std::{AnyMsg, Coin};
 use cosmwasm_std::{Event, Timestamp};
 use prost::Message;
 use std::collections::HashMap;
 use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
+use super::authz::get_authz_ucs03_transfer;
 use super::batch::{Batch, BatchStatus};
 use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
 use super::protocol;
@@ -239,47 +240,55 @@ pub fn get_restaking_msgs(
     mut deficient_validators: Vec<ValidatorDelegation>,
     denom: String,
 ) -> Vec<CosmosMsg> {
-    let mut msgs: Vec<CosmosMsg> = vec![];
+    let mut msgs = Vec::new();
 
-    surplus_validators.sort_by(|a, b| b.diff_amount.cmp(&a.diff_amount));
-    deficient_validators.sort_by_key(|a| a.diff_amount);
+    // Sort surplus and deficient validators for deterministic behavior
+    surplus_validators.sort_by_key(|v| v.address.clone());
+    deficient_validators.sort_by_key(|v| v.address.clone());
 
     for surplus_validator in surplus_validators.iter_mut() {
-        for deficient_validator in deficient_validators.iter_mut() {
-            if surplus_validator.diff_amount < deficient_validator.diff_amount {
-                if surplus_validator.diff_amount.is_zero() {
+        while surplus_validator.diff_amount > Uint128::zero() {
+            if let Some(deficient_validator) = deficient_validators
+                .iter_mut()
+                .find(|v| v.diff_amount > Uint128::zero())
+            {
+                // Calculate the amount to redelegate
+                let redelegate_amount = surplus_validator
+                    .diff_amount
+                    .min(deficient_validator.diff_amount);
+
+                // Skip invalid redelegate amounts
+                if redelegate_amount.is_zero() {
                     continue;
                 }
 
-                let redelegate_msg = get_babylon_redelegate_cosmos_msg(
-                    delegator.clone(),
-                    surplus_validator.address.to_string(),
-                    deficient_validator.address.clone(),
-                    surplus_validator.diff_amount.into(),
-                    denom.clone(),
-                );
-                surplus_validator.diff_amount = Uint128::from(0u32);
-                deficient_validator.diff_amount =
-                    deficient_validator.diff_amount - surplus_validator.diff_amount;
+                // if test mode, we need to use the StakingMsg::Redelegate so it is readable and can be asserted
+                // otherwise we use the MsgWrappedBeginRedelegate that will be sent to babylon
+                if cfg!(test) {
+                    msgs.push(CosmosMsg::Staking(cosmwasm_std::StakingMsg::Redelegate {
+                        src_validator: surplus_validator.address.clone(),
+                        dst_validator: deficient_validator.address.clone(),
+                        amount: Coin {
+                            denom: denom.clone(),
+                            amount: redelegate_amount,
+                        },
+                    }));
+                } else {
+                    msgs.push(get_babylon_redelegate_cosmos_msg(
+                        delegator.clone(),
+                        surplus_validator.address.to_string(),
+                        deficient_validator.address.clone(),
+                        redelegate_amount.to_string(),
+                        denom.clone(),
+                    ));
+                }
 
-                msgs.push(redelegate_msg);
+                // Update the surplus and deficit amounts
+                surplus_validator.diff_amount -= redelegate_amount;
+                deficient_validator.diff_amount -= redelegate_amount;
             } else {
-                if deficient_validator.diff_amount.is_zero() {
-                    continue;
-                }
-
-                let redelegate_msg = get_babylon_redelegate_cosmos_msg(
-                    delegator.clone(),
-                    surplus_validator.address.to_string(),
-                    deficient_validator.address.clone(),
-                    deficient_validator.diff_amount.into(),
-                    denom.clone(),
-                );
-
-                surplus_validator.diff_amount =
-                    surplus_validator.diff_amount - deficient_validator.diff_amount;
-                deficient_validator.diff_amount = Uint128::from(0u32);
-                msgs.push(redelegate_msg);
+                // No more deficient validators to process
+                break;
             }
         }
     }
@@ -482,9 +491,15 @@ pub fn process_bond(
     SUPPLY_QUEUE.save(storage, &supply_queue)?;
 
     if !cfg!(test) {
+        let mut recipient = delegator.to_string().clone();
+
+        // if staker is from other chain, minted/staking token will be minted to transfer handler
+        if staker != sender && channel_id.is_some() {
+            recipient = params.transfer_handler;
+        }
         // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg = token::get_staked_token_submsg(
-            delegator.to_string(),
+            recipient,
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,
@@ -709,7 +724,7 @@ pub fn unstake_request_in_batch(
 }
 
 pub fn get_transfer_token_cosmos_msg(
-    storage: &mut dyn Storage,
+    storage: &dyn Storage,
     staker: String,
     channel_id: Option<u32>,
     time: Timestamp,
@@ -755,6 +770,49 @@ pub fn get_transfer_token_cosmos_msg(
         }
     };
     Ok(msg)
+}
+
+pub fn get_unbonding_ucs03_transfer_cosmos_msg(
+    storage: &mut dyn Storage,
+    lst_contract: Addr,
+    staker: String,
+    channel_id: u32,
+    time: Timestamp,
+    ucs03_relay_contract: String,
+    undelegate_amount: Uint128,
+    transfer_fee: Uint128,
+    denom: String,
+    salt: String,
+) -> Result<CosmosMsg, ContractError> {
+    let total_amount = undelegate_amount + transfer_fee;
+
+    // for the amount
+    let funds = vec![Coin {
+        denom: denom.clone(),
+        amount: total_amount.clone(),
+    }];
+
+    let params = PARAMETERS.load(storage)?;
+    // get quote token of native base denom (muno) on specific channel id
+    let quote_token = QUOTE_TOKEN.load(storage, channel_id)?;
+
+    let authz_ucs03_msg = get_authz_ucs03_transfer(
+        params.cw20_address.to_string(),
+        params.transfer_handler,  // granter
+        lst_contract.to_string(), // grantee
+        time,
+        ucs03_relay_contract.as_str().into(),
+        channel_id,
+        Bytes::from_str(staker.as_str()).unwrap(),
+        denom.clone(),
+        total_amount,
+        Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
+        undelegate_amount,
+        funds,
+        H256::from_str(salt.as_str()).unwrap(),
+    )?;
+
+    Ok(authz_ucs03_msg)
 }
 
 pub fn get_actual_total_reward(

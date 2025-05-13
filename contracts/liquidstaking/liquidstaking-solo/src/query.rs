@@ -10,7 +10,7 @@ use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc::{self, calculate_fee_from_reward, calculate_query_bounds};
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
 use crate::ContractError;
-use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
+use cosmwasm_std::{entry_point, to_json_binary, Decimal, FullDelegation, Order, Uint128};
 use cosmwasm_std::{Binary, Deps, Env, Storage};
 use cw2::ContractVersion;
 use cw_ownable::get_ownership;
@@ -52,6 +52,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         } => to_json_binary(&query_batch(deps.storage, id, status, min, max)?),
         QueryMsg::SupplyQueue {} => to_json_binary(&query_supply_queue(deps.storage)?),
         QueryMsg::Status {} => to_json_binary(&query_status(deps.storage)?),
+        QueryMsg::Delegations {} => to_json_binary(&query_delegations(deps, env)?),
     }?)
 }
 pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
@@ -295,4 +296,20 @@ pub fn query_batch(
         }
     }
     Ok(batch_list)
+}
+
+pub fn query_delegations(deps: Deps, env: Env) -> Result<Vec<FullDelegation>, ContractError> {
+    let validators_registry = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let delegator = env.contract.address.clone();
+    let mut delegations = vec![];
+    for validator in validators_registry.validators.iter() {
+        let validator_bond = deps
+            .querier
+            .query_delegation(delegator.clone(), validator.address.clone())?;
+
+        if validator_bond.is_some() {
+            delegations.push(validator_bond.unwrap());
+        }
+    }
+    Ok(delegations)
 }

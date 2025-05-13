@@ -5,16 +5,16 @@ use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
 use crate::state::{
     Parameters, WithdrawReward, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
 };
-use crate::utils;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, SubMsg, Uint128, Uint256, WasmMsg,
+    Env, Reply, Response, SubMsg, Uint128, WasmMsg,
 };
-use unionlabs_primitives::{Bytes, H256};
+use unionlabs_primitives::Bytes;
 
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
+pub const TRANSFER_STAKING_TOKEN_ID: u64 = 127;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
@@ -37,10 +37,14 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let params: Parameters = PARAMETERS.load(deps.storage)?;
     let payload: MintTokensPayload = from_json(msg.payload)?;
 
-    let msg = cw20::Cw20QueryMsg::Balance {
-        address: env.contract.address.to_string(),
+    let msg = match payload.channel_id {
+        Some(_) => cw20::Cw20QueryMsg::Balance {
+            address: params.transfer_handler.to_string(),
+        },
+        None => cw20::Cw20QueryMsg::Balance {
+            address: env.contract.address.to_string(),
+        },
     };
-
     let balance: cw20::BalanceResponse = deps
         .querier
         .query_wasm_smart(params.cw20_address.clone(), &msg)?;
@@ -51,39 +55,61 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
     let mut msgs: Vec<CosmosMsg> = vec![];
 
+    // if staker is from other chain, we need to use transfer handler address to do transfer back to user
+    // so we need to get correct authz execute msg to cw20 and ucs03 to handle the transfer
+    // also need to attach required funds
+    let mut quote_token_string = String::new();
+    let amount = payload.amount;
+
     if payload.staker != payload.sender && payload.channel_id.is_some() {
-        let allowance_msg = cw20::Cw20ExecuteMsg::IncreaseAllowance {
-            spender: params.ucs03_relay_contract.clone(),
-            amount: payload.amount.clone(),
-            expires: None,
-        };
+        let channel_id = payload.channel_id.unwrap();
+        let params = PARAMETERS.load(deps.storage)?;
 
-        let allow_bin = to_json_binary(&allowance_msg).unwrap();
-        let allow_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: params.cw20_address.to_string(),
-            msg: allow_bin,
-            funds: vec![],
-        });
-        msgs.push(allow_msg);
+        // allow/approve ucs03 to transfer on behalf of transfer handler via authz
+        let allowance_msg = crate::utils::authz::get_authz_increase_allowance_msg(
+            params.transfer_handler.clone(),
+            env.contract.address.to_string(),
+            params.cw20_address.to_string(),
+            params.zkgm_token_minter,
+            amount,
+            vec![],
+        )?;
 
-        let quote_token = QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
-        let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
+        msgs.push(allowance_msg);
+
+        let mut funds = vec![];
+        if params.transfer_fee > Uint128::zero() {
+            funds.push(Coin {
+                amount: params.transfer_fee, // need to add transfer fee
+                denom: params.underlying_coin_denom,
+            });
+        }
+
+        let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
+        quote_token_string = quote_token.lst_quote_token.clone();
+
+        let authz_ucs03_msg = crate::utils::authz::get_authz_ucs03_transfer(
+            params.cw20_address.to_string(),
+            params.transfer_handler,
+            env.contract.address.to_string(),
             env.block.time,
-            params.ucs03_relay_contract,
-            payload.channel_id.unwrap(),
+            params.ucs03_relay_contract.clone(),
+            channel_id,
             Bytes::from_str(payload.staker.as_str()).unwrap(),
             params.cw20_address.to_string(),
-            payload.amount.clone(),
+            amount,
             Bytes::from_str(quote_token.lst_quote_token.as_str()).unwrap(),
-            Uint256::from(payload.amount.clone()),
-            vec![],
-            H256::from_str(payload.salt.as_str()).unwrap(),
+            amount,
+            funds.clone(),
+            unionlabs_primitives::H256::from_str(payload.salt.as_str()).unwrap(),
         )?;
-        msgs.push(wasm_msg.into());
+
+        msgs.push(authz_ucs03_msg);
     } else {
+        // if staker from same chain, this contract will send the cw20 staking token
         let msg = send_cw20(
             deps,
-            payload.amount,
+            amount,
             params.cw20_address.to_string(),
             payload.staker.clone(),
         )?;
@@ -93,11 +119,17 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let res: Response = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "mint_cw20")
+        .add_attribute("sender", payload.sender.to_string())
         .add_attribute("receiver", payload.staker.to_string())
-        .add_attribute("amount", payload.amount.to_string())
+        .add_attribute("channel_id", payload.channel_id.unwrap_or(0).to_string())
+        .add_attribute("amount", amount.to_string())
         .add_attribute("denom", params.liquidstaking_denom)
         .add_attribute("base_denom", params.cw20_address)
+        .add_attribute("quote_token", quote_token_string)
+        .add_attribute("transfer_handler", params.transfer_handler)
+        .add_attribute("transfer_fee", params.transfer_fee)
         .add_attribute("staked_token_balance", balance.balance.to_string());
+
     Ok(res)
 }
 

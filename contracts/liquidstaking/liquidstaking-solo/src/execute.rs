@@ -8,7 +8,7 @@ use crate::event::{
 };
 use crate::helpers;
 use crate::msg::{
-    BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, MigrateMsg, ZkgmMessage,
+    BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, RewardMigrateMsg, ZkgmMessage,
 };
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
@@ -21,7 +21,7 @@ use crate::types::ChannelId;
 use crate::utils::batch::{batches, BatchStatus};
 use crate::utils::calc::calculate_exchange_rate;
 use crate::utils::calc::calculate_fee_from_reward;
-use crate::utils::delegation::{get_transfer_token_cosmos_msg, submit_pending_batch};
+use crate::utils::delegation::{get_unbonding_ucs03_transfer_cosmos_msg, submit_pending_batch};
 use crate::utils::validation::validate_validators;
 use crate::utils::{
     self, calc::check_slippage, calc::to_uint128, delegation::get_actual_total_delegated,
@@ -604,6 +604,9 @@ pub fn set_parameters(
     min_bond: Option<Uint128>,
     min_unbond: Option<Uint128>,
     batch_limit: Option<u32>,
+    transfer_handler: Option<String>,
+    transfer_fee: Option<Uint128>,
+    zkgm_token_minter: Option<String>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -635,6 +638,13 @@ pub fn set_parameters(
     params.min_bond = min_bond.clone().unwrap_or_else(|| params.min_bond);
     params.min_unbond = min_unbond.clone().unwrap_or_else(|| params.min_unbond);
     params.batch_limit = batch_limit.clone().unwrap_or_else(|| params.batch_limit);
+    params.transfer_handler = transfer_handler
+        .clone()
+        .unwrap_or_else(|| params.transfer_handler);
+    params.transfer_fee = transfer_fee.clone().unwrap_or_else(|| params.transfer_fee);
+    params.zkgm_token_minter = zkgm_token_minter
+        .clone()
+        .unwrap_or_else(|| params.zkgm_token_minter);
 
     if batch_period.is_some() {
         params.batch_period = batch_period.unwrap();
@@ -759,23 +769,53 @@ pub fn process_batch_withdrawal(
     let time = env.block.time;
     let denom = params.underlying_coin_denom;
     let ucs03_relay_contract = params.ucs03_relay_contract;
+    let lst_contract = env.contract.address;
 
     let mut events = vec![];
 
     let mut send_msgs: Vec<CosmosMsg> = vec![];
     let mut i = 0;
+    let transfer_handler = params.transfer_handler.clone();
     for (key, undelegation) in staker_undelegation.iter() {
-        let msg = get_transfer_token_cosmos_msg(
-            deps.storage,
-            key.clone(),
-            undelegation.channel_id,
-            time,
-            ucs03_relay_contract.clone(),
-            undelegation.unstake_return_native_amount.unwrap(),
-            denom.clone(),
-            salt.get(i).unwrap().clone(),
-        )?;
-        send_msgs.push(msg);
+        // if staker from same chain, we send bank transfer directly
+        if undelegation.channel_id.is_none() {
+            let bank_msg = BankMsg::Send {
+                to_address: key.clone(),
+                amount: vec![Coin {
+                    denom: denom.clone(),
+                    amount: undelegation.unstake_return_native_amount.unwrap(),
+                }],
+            };
+            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
+            send_msgs.push(msg);
+        } else {
+            // if staker is from other chain
+            // need to send transfer to transfer handler first before transfer to other chain via ucs03 contract
+            let bank_msg = BankMsg::Send {
+                to_address: transfer_handler.clone(),
+                amount: vec![Coin {
+                    denom: denom.clone(),
+                    amount: undelegation.unstake_return_native_amount.unwrap(),
+                }],
+            };
+            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
+            send_msgs.push(msg);
+
+            //after send bank msg to transfer handler, then call ucs03 on behalf of transfer handler to send token back
+            let msg = get_unbonding_ucs03_transfer_cosmos_msg(
+                deps.storage,
+                lst_contract.clone(),
+                key.clone(),
+                undelegation.channel_id.unwrap(),
+                time,
+                ucs03_relay_contract.clone(),
+                undelegation.unstake_return_native_amount.unwrap(),
+                params.transfer_fee,
+                denom.clone(),
+                salt.get(i).unwrap().clone(),
+            )?;
+            send_msgs.push(msg);
+        }
 
         let ev = ProcessUnbondingEvent(
             id,
@@ -977,7 +1017,7 @@ pub fn migrate_reward(
         return Err(ContractError::InvalidRewardContractMigration {});
     }
 
-    let migrate = MigrateMsg {};
+    let migrate = RewardMigrateMsg {};
     let msg_bin = to_json_binary(&migrate)?;
     let migrate_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Migrate {
         contract_addr: params.reward_address.to_string(),

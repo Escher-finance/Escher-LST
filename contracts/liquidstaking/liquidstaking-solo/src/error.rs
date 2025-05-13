@@ -122,4 +122,7 @@ pub enum ContractError {
 
     #[error("Invalid exchange rate")]
     InvalidExchangeRate {},
+
+    #[error("error encode any msg")]
+    EncodeAnyMsgError {},
 }

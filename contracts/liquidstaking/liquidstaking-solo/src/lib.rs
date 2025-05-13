@@ -13,6 +13,7 @@ pub mod state;
 pub mod tests;
 pub mod types;
 pub mod utils;
+pub mod zkgm;
 pub use crate::error::ContractError;
 // Include the generated code
 pub mod proto {

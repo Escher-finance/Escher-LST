@@ -1,16 +1,16 @@
 use crate::instantiate::create_reward;
 use crate::utils::batch::{batches, Batch};
 use crate::utils::validation::{validate_quote_tokens, validate_validators};
-use cosmwasm_std::{entry_point, CosmosMsg, DistributionMsg};
+use cosmwasm_std::{entry_point, CosmosMsg, DistributionMsg, StdError};
 use cosmwasm_std::{Decimal, DepsMut, Env, MessageInfo, Response, Uint128};
 
 use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, Parameters, State, Status, SupplyQueue, ValidatorsRegistry, WithdrawReward, CONFIG,
-    PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
-    SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    Config, OldParameters, Parameters, State, Status, SupplyQueue, ValidatorsRegistry,
+    WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE,
+    SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
 };
 use cw2::set_contract_version;
 
@@ -85,6 +85,9 @@ pub fn instantiate(
         min_bond: msg.min_bond,
         min_unbond: msg.min_unbond,
         batch_limit: msg.batch_limit,
+        transfer_fee: msg.transfer_fee,
+        transfer_handler: msg.transfer_handler,
+        zkgm_token_minter: msg.zkgm_token_minter,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -185,6 +188,9 @@ pub fn execute(
             min_bond,
             min_unbond,
             batch_limit,
+            transfer_handler,
+            transfer_fee,
+            zkgm_token_minter,
         } => execute::set_parameters(
             deps,
             env,
@@ -202,6 +208,9 @@ pub fn execute(
             min_bond,
             min_unbond,
             batch_limit,
+            transfer_handler,
+            transfer_fee,
+            zkgm_token_minter,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,
@@ -239,7 +248,7 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let check_status = deps.storage.get(b"status");
@@ -251,6 +260,45 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
                 unbond_is_paused: false,
             },
         )?;
+    }
+
+    if CONTRACT_VERSION == "0.1.157" {
+        let Some(old_data) = deps.storage.get(b"parameters") else {
+            return Err(ContractError::Std(StdError::generic_err("no parameters")));
+        };
+        // Deserialize it from the old format
+        let old_param_result: Result<OldParameters, StdError> = cosmwasm_std::from_json(&old_data);
+
+        if old_param_result.is_ok() {
+            let zkgm_token_minter = match msg.zkgm_token_minter {
+                Some(minter) => minter,
+                None => env.contract.address.to_string(),
+            };
+
+            let old_param: OldParameters = old_param_result.unwrap();
+
+            let new_params = Parameters {
+                underlying_coin_denom: old_param.underlying_coin_denom,
+                liquidstaking_denom: old_param.liquidstaking_denom,
+                ucs03_relay_contract: old_param.ucs03_relay_contract,
+                unbonding_time: old_param.unbonding_time,
+                cw20_address: old_param.cw20_address,
+                reward_address: old_param.reward_address,
+                fee_rate: old_param.fee_rate,
+                fee_receiver: old_param.fee_receiver,
+                batch_period: old_param.batch_period,
+                min_bond: old_param.min_bond,
+                min_unbond: old_param.min_unbond,
+                batch_limit: old_param.batch_limit,
+                transfer_handler: old_param.transfer_handler,
+                transfer_fee: old_param.transfer_fee,
+                zkgm_token_minter,
+            };
+
+            // Serialize the new data
+            let new_data = cosmwasm_std::to_json_vec(&new_params)?;
+            deps.storage.set(b"parameters", &new_data);
+        }
     }
 
     Ok(Response::new()
