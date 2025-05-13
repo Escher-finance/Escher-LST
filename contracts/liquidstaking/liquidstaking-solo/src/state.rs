@@ -135,6 +135,64 @@ pub fn num_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
 }
 
 #[cw_serde]
+pub struct OldUnbondRecord {
+    pub id: u64,
+    pub height: u64,
+    pub sender: String,
+    pub staker: String,
+    pub channel_id: Option<u32>,
+    pub amount: Uint128,
+    pub released_height: u64,
+    pub released: bool,
+    pub batch_id: u64,
+}
+
+pub struct OldUnbondRecordIndexes<'a> {
+    pub staker: MultiIndex<'a, String, OldUnbondRecord, u64>,
+    pub released: MultiIndex<'a, String, OldUnbondRecord, u64>,
+    pub staker_released: MultiIndex<'a, String, OldUnbondRecord, u64>,
+    pub batch: MultiIndex<'a, String, OldUnbondRecord, u64>,
+}
+
+impl<'a> IndexList<OldUnbondRecord> for OldUnbondRecordIndexes<'a> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<OldUnbondRecord>> + '_> {
+        let v: Vec<&dyn Index<OldUnbondRecord>> = vec![
+            &self.staker,
+            &self.released,
+            &self.staker_released,
+            &self.batch,
+        ];
+        Box::new(v.into_iter())
+    }
+}
+
+pub fn old_unbond_record<'a>() -> IndexedMap<u64, OldUnbondRecord, OldUnbondRecordIndexes<'a>> {
+    let indexes = OldUnbondRecordIndexes {
+        staker: MultiIndex::new(
+            |_pk, d: &OldUnbondRecord| d.staker.clone(),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__staker",
+        ),
+        released: MultiIndex::new(
+            |_pk, d: &OldUnbondRecord| d.released.to_string(),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__released",
+        ),
+        staker_released: MultiIndex::new(
+            |_pk, d: &OldUnbondRecord| format!("{}-{}", d.staker, d.released),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__staker_released",
+        ),
+        batch: MultiIndex::new(
+            |_pk, d: &OldUnbondRecord| d.batch_id.to_string(),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__batch",
+        ),
+    };
+    IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
+}
+
+#[cw_serde]
 pub struct UnbondRecord {
     pub id: u64,
     pub height: u64,
