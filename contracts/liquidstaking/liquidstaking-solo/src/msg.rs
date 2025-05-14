@@ -168,6 +168,9 @@ pub enum ExecuteMsg {
         coin_denom: Option<String>,
     },
     SetStatus(Status),
+    SetChain {
+        chain: crate::state::Chain,
+    },
 }
 
 #[cw_serde]
@@ -220,6 +223,8 @@ pub enum QueryMsg {
     Status {},
     #[returns(Vec<cosmwasm_std::FullDelegation>)]
     Delegations {},
+    #[returns(Vec<crate::state::Chain>)]
+    Chains {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;

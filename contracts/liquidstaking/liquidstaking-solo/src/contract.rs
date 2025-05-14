@@ -255,6 +255,7 @@ pub fn execute(
             coin_denom,
         ),
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
+        ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
     }
 }
 
@@ -313,7 +314,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
     }
 
     if CONTRACT_VERSION == "0.1.163" {
-        migrate_unbond_record(deps)?;
+        migrate_unbond_record(deps.storage)?;
     }
 
     Ok(Response::new()
@@ -322,12 +323,12 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
         .add_attribute("contract_name", CONTRACT_NAME))
 }
 
-pub fn migrate_unbond_record(deps: DepsMut) -> Result<(), ContractError> {
+pub fn migrate_unbond_record(storage: &mut dyn cosmwasm_std::Storage) -> Result<(), ContractError> {
     // Migrate the old unbond records to the new forma
 
     let old_unbond_records: Vec<(u64, crate::state::OldUnbondRecord)> =
         crate::state::old_unbond_record()
-            .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+            .range(storage, None, None, cosmwasm_std::Order::Ascending)
             .map(|item| {
                 item.map_err(|_| {
                     ContractError::Std(StdError::generic_err("Failed to load old unbond records"))
@@ -350,7 +351,7 @@ pub fn migrate_unbond_record(deps: DepsMut) -> Result<(), ContractError> {
             recipient_channel_id: None,
         };
 
-        unbond_record().save(deps.storage, id, &new_record)?;
+        unbond_record().save(storage, id, &new_record)?;
     }
 
     Ok(())
@@ -359,8 +360,6 @@ pub fn migrate_unbond_record(deps: DepsMut) -> Result<(), ContractError> {
 #[test]
 fn test_migrate_unbond_record() {
     let mut deps = cosmwasm_std::testing::mock_dependencies();
-    let mut env = cosmwasm_std::testing::mock_env();
-    env.block.height = 500000;
     let sender = "sender".to_string();
     let staker = "staker".to_string();
     let unstake_amount = Uint128::new(10000);
@@ -386,7 +385,7 @@ fn test_migrate_unbond_record() {
     }
 
     // Run migration
-    migrate_unbond_record(deps.as_mut()).unwrap();
+    migrate_unbond_record(deps.as_mut().storage).unwrap();
 
     // Verify new storage
     let new_store = unbond_record();
@@ -399,4 +398,6 @@ fn test_migrate_unbond_record() {
     assert_eq!(new_data.id, 8);
     assert_eq!(new_data.height, 1008);
     assert_eq!(new_data.recipient, None);
+
+    println!("{:#?}", new_data);
 }

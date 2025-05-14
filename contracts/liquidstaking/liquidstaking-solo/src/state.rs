@@ -11,7 +11,7 @@ pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
 
-// Map of channel id to the quote token and lst quote token of destination chain
+// Map of ucs03 channel id to the quote token and lst quote token of destination chain
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 
 // mint and burn queue of staking token
@@ -21,6 +21,9 @@ pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 
 // Queue of validator reward for executing split reward
 pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
+
+// Map of supported ucs03 chains with chain_id as key
+pub const CHAINS: Map<String, Chain> = Map::new("chains");
 
 #[cw_serde]
 pub struct Status {
@@ -294,4 +297,12 @@ pub struct SupplyQueue {
     pub burn: Vec<BurnQueue>,
     /// epooch period in seconds
     pub epoch_period: u32,
+}
+
+#[cw_serde]
+pub struct Chain {
+    pub name: String,
+    pub chain_id: String,
+    pub ucs03_channel_id: u32,
+    pub prefix: String,
 }

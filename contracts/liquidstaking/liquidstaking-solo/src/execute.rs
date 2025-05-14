@@ -13,7 +13,7 @@ use crate::msg::{
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
+    Chain, QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
     QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
     VALIDATORS_REGISTRY,
 };
@@ -1183,5 +1183,15 @@ pub fn set_status(
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     STATUS.save(deps.storage, &status)?;
+    Ok(Response::new())
+}
+
+pub fn set_chain(
+    deps: DepsMut,
+    info: MessageInfo,
+    chain: Chain,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::CHAINS.save(deps.storage, chain.chain_id.clone(), &chain)?;
     Ok(Response::new())
 }
