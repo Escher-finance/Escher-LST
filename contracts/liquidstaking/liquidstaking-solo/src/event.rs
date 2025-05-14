@@ -29,7 +29,7 @@ pub fn BondEvent(
     };
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", sender)
-        .add_attribute("staker", format!("{}", staker))
+        .add_attribute("staker", staker)
         .add_attribute("channel_id", channel_id)
         .add_attribute("bond_amount", bond_amount)
         .add_attribute("output_amount", minted_amount)
