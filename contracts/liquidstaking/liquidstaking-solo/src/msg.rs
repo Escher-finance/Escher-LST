@@ -100,6 +100,7 @@ pub enum ExecuteMsg {
         expected: Uint128,
         recipient: Option<String>,
         recipient_channel_id: Option<u32>,
+        salt: Option<String>,
     },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
@@ -170,6 +171,9 @@ pub enum ExecuteMsg {
     SetStatus(Status),
     SetChain {
         chain: crate::state::Chain,
+    },
+    RemoveChain {
+        channel_id: u32,
     },
 }
 
@@ -326,6 +330,8 @@ pub struct BondData {
     pub total_bond_amount: Uint128,
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
 }
 
 #[cw_serde]
@@ -336,6 +342,8 @@ pub struct UnbondData {
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
     pub record_id: u64,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
 }
 
 #[cw_serde]

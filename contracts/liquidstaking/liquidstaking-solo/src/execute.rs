@@ -15,14 +15,14 @@ use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
     Chain, QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
     QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
-    VALIDATORS_REGISTRY,
+    VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
 };
 use crate::types::ChannelId;
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::calculate_exchange_rate;
 use crate::utils::calc::calculate_fee_from_reward;
+use crate::utils::calc::{calculate_exchange_rate, normalize_withdraw_reward_queue};
 use crate::utils::delegation::{get_unbonding_ucs03_transfer_cosmos_msg, submit_pending_batch};
-use crate::utils::validation::validate_validators;
+use crate::utils::validation::{validate_recipient, validate_validators};
 use crate::utils::{
     self, calc::check_slippage, calc::to_uint128, delegation::get_actual_total_delegated,
     delegation::get_actual_total_reward,
@@ -43,16 +43,18 @@ pub fn bond(
     expected: Uint128,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    salt: Option<String>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
-    if recipient.is_some() && recipient_channel_id.is_none() {
-        deps.api
-            .addr_validate(recipient.clone().unwrap().as_str())?;
+    validate_recipient(&deps, recipient.clone(), recipient_channel_id, salt.clone())?;
+
+    // coin must have be sent along with transaction and it should be in underlying coin denom
+    if info.funds.len() > 1usize {
+        return Err(ContractError::InvalidAsset {});
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -60,11 +62,6 @@ pub fn bond(
     let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
     let delegator = env.contract.address;
-
-    // coin must have be sent along with transaction and it should be in underlying coin denom
-    if info.funds.len() > 1usize {
-        return Err(ContractError::InvalidAsset {});
-    }
 
     let payment = Coin {
         amount: info
@@ -92,7 +89,7 @@ pub fn bond(
         env.block.time.nanos(),
         params,
         validators_reg.clone(),
-        "".to_string(),
+        salt.unwrap_or("".into()),
         None,
         env.block.height,
         recipient.clone(),
@@ -114,8 +111,10 @@ pub fn bond(
         "".to_string(),
         env.block.time,
         coin_denom.clone(),
-        recipient,
+        recipient.clone(),
         recipient_channel_id,
+        bond_data.reward_balance,
+        bond_data.unclaimed_reward,
     );
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -129,8 +128,9 @@ pub fn bond(
         .add_attributes(vec![
             attr("action", "bond"),
             attr("from", sender.clone()),
-            attr("staker", sender),
-            attr("channel_id", "".to_string()),
+            attr("staker", sender.clone()),
+            attr("recipient", recipient.unwrap_or(sender.into())),
+            attr("channel_id", recipient_channel_id.unwrap_or(0).to_string()),
             attr("bond_amount", payment.amount.to_string()),
             attr("denom", coin_denom.to_string()),
             attr("minted", bond_data.mint_amount),
@@ -156,11 +156,12 @@ pub fn zkgm_unbond(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
-    if recipient.is_some() && recipient_channel_id.is_none() {
-        deps.api
-            .addr_validate(recipient.clone().unwrap().as_str())?;
-    }
+    validate_recipient(
+        &deps,
+        recipient.clone(),
+        recipient_channel_id,
+        Some("".into()),
+    )?; // salt is not required in unbond request
 
     let params = PARAMETERS.load(deps.storage)?;
 
@@ -213,11 +214,12 @@ pub fn zkgm_bond(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
-    if recipient.is_some() && recipient_channel_id.is_none() {
-        deps.api
-            .addr_validate(recipient.clone().unwrap().as_str())?;
-    }
+    validate_recipient(
+        &deps,
+        recipient.clone(),
+        recipient_channel_id,
+        Some(salt.clone()),
+    )?;
 
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -266,6 +268,8 @@ pub fn zkgm_bond(
         coin_denom.clone(),
         recipient,
         recipient_channel_id,
+        bond_data.reward_balance,
+        bond_data.unclaimed_reward,
     );
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
@@ -339,6 +343,13 @@ pub fn receive(
             recipient_channel_id,
         } => (recipient, recipient_channel_id),
     };
+
+    validate_recipient(
+        &deps,
+        recipient.clone(),
+        recipient_channel_id,
+        Some("".into()),
+    )?; // salt is not required in unbond request
 
     let unbond_amount = cw20_msg.amount;
 
@@ -565,6 +576,21 @@ pub fn process_rewards(
 
     let mut total_amount: Uint128 = Uint128::zero();
 
+    let reward_balance_state = crate::state::REWARD_BALANCE.load(deps.storage)?;
+    let reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
+    let supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
+
+    let (new_reward_balance, _) = normalize_withdraw_reward_queue(
+        env.block.height,
+        reward_balance_state,
+        reward_queue,
+        supply_queue.epoch_period,
+    );
+
+    crate::state::REWARD_BALANCE
+        .save(deps.storage, &new_reward_balance)
+        .unwrap();
+
     for validator in validators_reg.validators {
         let delegation_rewards = deps
             .querier
@@ -607,7 +633,7 @@ pub fn process_rewards(
         },
     )?;
 
-    let ev = ProcessRewardsEvent(total_amount);
+    let ev = ProcessRewardsEvent(total_amount, new_reward_balance);
     let res: Response = Response::new()
         .add_attributes(attrs)
         .add_event(ev)
@@ -1122,17 +1148,13 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     }
 
     // check total balance from reward
-    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    let reward_balance = REWARD_BALANCE.load(deps.storage)?;
 
     let mut balance_to_split = reward_balance;
 
     if balance.amount < balance_to_split {
         balance_to_split = balance.amount;
     }
-
-    //reset the reward balance
-    reward_balance = Uint128::zero();
-    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     let mut attrs: Vec<Attribute> = vec![
         attr("action", "split_reward"),
@@ -1192,6 +1214,16 @@ pub fn set_chain(
     chain: Chain,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    crate::state::CHAINS.save(deps.storage, chain.chain_id.clone(), &chain)?;
+    crate::state::CHAINS.save(deps.storage, chain.ucs03_channel_id, &chain)?;
+    Ok(Response::new())
+}
+
+pub fn remove_chain(
+    deps: DepsMut,
+    info: MessageInfo,
+    channel_id: u32,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::CHAINS.remove(deps.storage, channel_id);
     Ok(Response::new())
 }

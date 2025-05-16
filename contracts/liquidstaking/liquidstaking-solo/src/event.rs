@@ -17,6 +17,8 @@ pub fn BondEvent(
     denom: String,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    reward_balance: Uint128,
+    unclaimed_reward: Uint128,
 ) -> Event {
     let recipient = match recipient {
         Some(recipient) => recipient,
@@ -41,6 +43,8 @@ pub fn BondEvent(
         .add_attribute("denom", denom)
         .add_attribute("recipient", recipient)
         .add_attribute("recipient_channel_id", recipient_channel_id)
+        .add_attribute("reward_balance", reward_balance)
+        .add_attribute("unclaimed_reward", unclaimed_reward)
 }
 
 pub const UNBOND_EVENT: &str = "unbond";
@@ -87,6 +91,8 @@ pub fn SubmitBatchEvent(
     exchange_rate: Decimal,
     time: Timestamp,
     denom: String,
+    reward_balance: Uint128,
+    unclaimed_reward: Uint128,
 ) -> Event {
     Event::new(SUBMIT_BATCH_EVENT.to_string())
         .add_attribute("batch_id", format!("{}", batch_id))
@@ -99,6 +105,8 @@ pub fn SubmitBatchEvent(
         .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("denom", denom)
+        .add_attribute("reward_balance", reward_balance)
+        .add_attribute("unclaimed_reward", unclaimed_reward)
 }
 
 pub const UPDATE_VALIDATORS_EVENT: &str = "update_validators";
@@ -128,9 +136,10 @@ pub fn UpdateValidatorsEvent(
 pub const PROCESS_REWARDS_EVENT: &str = "process_rewards";
 
 #[allow(non_snake_case)]
-pub fn ProcessRewardsEvent(total_amount: Uint128) -> Event {
+pub fn ProcessRewardsEvent(total_amount: Uint128, balance_reward: Uint128) -> Event {
     Event::new(PROCESS_REWARDS_EVENT.to_string())
-        .add_attribute("total_amount", total_amount.to_string())
+        .add_attribute("withdraw_reward_amount", total_amount.to_string())
+        .add_attribute("balance_reward", balance_reward.to_string())
 }
 
 pub const PROCESS_UNBONDING_EVENT: &str = "process_unbonding";

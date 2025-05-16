@@ -11,6 +11,7 @@ use crate::state::{
     unbond_record, Config, OldParameters, Parameters, State, Status, SupplyQueue,
     ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
     REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    WITHDRAW_REWARD_QUEUE,
 };
 use cw2::set_contract_version;
 
@@ -163,6 +164,7 @@ pub fn execute(
             expected,
             recipient,
             recipient_channel_id,
+            salt,
         } => execute::bond(
             deps,
             env,
@@ -171,6 +173,7 @@ pub fn execute(
             expected,
             recipient,
             recipient_channel_id,
+            salt,
         ),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
@@ -256,6 +259,7 @@ pub fn execute(
         ),
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
         ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
+        ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
     }
 }
 
@@ -317,15 +321,19 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
         migrate_unbond_record(deps.storage)?;
     }
 
+    let reward_queue_res = deps.storage.get(b"withdraw_reward_queue");
+    if reward_queue_res.is_none() {
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![])?;
+    }
+
     Ok(Response::new()
         .add_attribute("action", "migrate")
         .add_attribute("version", CONTRACT_VERSION)
         .add_attribute("contract_name", CONTRACT_NAME))
 }
 
+/// Migrate the old unbond record to the new record with recipient and recipient_channel_id properties
 pub fn migrate_unbond_record(storage: &mut dyn cosmwasm_std::Storage) -> Result<(), ContractError> {
-    // Migrate the old unbond records to the new forma
-
     let old_unbond_records: Vec<(u64, crate::state::OldUnbondRecord)> =
         crate::state::old_unbond_record()
             .range(storage, None, None, cosmwasm_std::Order::Ascending)

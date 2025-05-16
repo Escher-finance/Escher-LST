@@ -433,23 +433,27 @@ pub fn process_bond(
     )?;
 
     let total_bond_amount: Uint128;
+    let reward_balance: Uint128;
+    let unclaimed_reward: Uint128;
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
-        let reward = get_actual_total_reward(
-            storage,
+        unclaimed_reward = get_unclaimed_reward(
             querier,
             delegator.to_string(),
             coin_denom.clone(),
             validators_list,
         )?;
 
+        reward_balance =
+            calc::normalize_reward_balance(storage, block_height, unclaimed_reward.into());
+
+        let reward = reward_balance + unclaimed_reward;
         let fee = calculate_fee_from_reward(reward, params.fee_rate);
         total_bond_amount = delegated_amount + reward - fee;
-
-        // Update reward balance with unclaimed reward because there is automatic reward withdrawal on delegate
-        REWARD_BALANCE.save(storage, &reward)?;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
+        reward_balance = Uint128::zero();
+        unclaimed_reward = Uint128::zero();
     }
 
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
@@ -498,7 +502,7 @@ pub fn process_bond(
         let mut recipient = delegator.to_string().clone();
 
         // if staker is from other chain, minted/staking token will be minted to transfer handler
-        if staker != sender && channel_id.is_some() {
+        if (staker != sender && channel_id.is_some()) || recipient_channel_id.is_some() {
             recipient = params.transfer_handler;
         }
         // Start to mint according to staked token only if it is not test
@@ -521,6 +525,8 @@ pub fn process_bond(
             total_bond_amount: state.total_bond_amount,
             exchange_rate,
             total_supply: state.total_supply,
+            reward_balance,
+            unclaimed_reward,
         },
     ))
 }
@@ -566,7 +572,8 @@ pub fn submit_pending_batch(
         validators_list,
     )?;
 
-    let contract_reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    let contract_reward_balance =
+        calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward.into());
     let reward = unclaimed_reward + contract_reward_balance;
 
     let fee = calculate_fee_from_reward(reward, params.fee_rate);
@@ -652,6 +659,8 @@ pub fn submit_pending_batch(
         current_exchange_rate,
         time,
         coin_denom,
+        contract_reward_balance,
+        unclaimed_reward,
     );
 
     events.push(ev);
@@ -664,12 +673,6 @@ pub fn submit_pending_batch(
     );
     batches().save(deps.storage, new_pending_batch.id, &new_pending_batch)?;
     PENDING_BATCH_ID.save(deps.storage, &new_pending_batch.id)?;
-
-    // increment the reward balance on this contract as there is automatic reward withdrawal on undelegation
-    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
-
-    reward_balance += unclaimed_reward;
-    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     Ok((msgs, events))
 }

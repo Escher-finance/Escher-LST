@@ -11,6 +11,9 @@ pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
 
+pub const WITHDRAW_REWARD_QUEUE: Item<Vec<WithdrawRewardQueue>> =
+    Item::new("withdraw_reward_queue");
+
 // Map of ucs03 channel id to the quote token and lst quote token of destination chain
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 
@@ -22,8 +25,8 @@ pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 // Queue of validator reward for executing split reward
 pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
 
-// Map of supported ucs03 chains with chain_id as key
-pub const CHAINS: Map<String, Chain> = Map::new("chains");
+// Map of supported ucs03 chains with channel_id as key
+pub const CHAINS: Map<u32, Chain> = Map::new("chains");
 
 #[cw_serde]
 pub struct Status {
@@ -295,7 +298,7 @@ pub struct SupplyQueue {
     /// the burn amount that is not substracted from real total supply, so total supply should be added with this burn amount value
     /// to get the total supply calculation for exchange rate
     pub burn: Vec<BurnQueue>,
-    /// epooch period in seconds
+    /// epooch period of block height
     pub epoch_period: u32,
 }
 
@@ -305,4 +308,13 @@ pub struct Chain {
     pub chain_id: String,
     pub ucs03_channel_id: u32,
     pub prefix: String,
+}
+
+/// the queued staking token mint amount
+#[cw_serde]
+pub struct WithdrawRewardQueue {
+    // amount of total withdraw reward
+    pub amount: Uint128,
+    // block height when it the withdraw reward is called
+    pub block: u64,
 }

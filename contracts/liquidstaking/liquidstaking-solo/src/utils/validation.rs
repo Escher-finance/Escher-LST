@@ -40,3 +40,31 @@ pub fn validate_quote_tokens(quote_tokens: &Vec<QuoteToken>) -> Result<(), Contr
 
     Ok(())
 }
+
+pub fn validate_recipient(
+    deps: &cosmwasm_std::DepsMut,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
+    salt: Option<String>,
+) -> Result<(), ContractError> {
+    // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
+    if recipient.is_some() && recipient_channel_id.is_none() {
+        deps.api
+            .addr_validate(recipient.clone().unwrap().as_str())?;
+    }
+
+    // if recipient_channel_id exists, must make sure the chain is supported
+    if recipient_channel_id.is_some() {
+        let channel_id = crate::state::CHAINS.load(deps.storage, recipient_channel_id.unwrap());
+        if channel_id.is_err() {
+            return Err(ContractError::InvalidChannelId {});
+        }
+
+        if salt.is_none() {
+            return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+                "missing salt",
+            )));
+        }
+    }
+    Ok(())
+}

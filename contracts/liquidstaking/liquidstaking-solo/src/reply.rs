@@ -4,13 +4,13 @@ use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
 use crate::state::{
     Parameters, WithdrawReward, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
+    WITHDRAW_REWARD_QUEUE,
 };
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, SubMsg, Uint128, WasmMsg,
+    Env, Reply, Response, StdError, SubMsg, Uint128, WasmMsg,
 };
 use unionlabs_primitives::Bytes;
-
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
@@ -70,7 +70,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         };
 
         let recipient = match payload.recipient.clone() {
-            Some(recipient) => recipient,
+            Some(rec) => rec,
             None => payload.staker.clone(),
         };
         let params = PARAMETERS.load(deps.storage)?;
@@ -98,6 +98,37 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
         quote_token_string = quote_token.lst_quote_token.clone();
 
+        let recipient_address = match Bytes::from_str(recipient.as_str()) {
+            Ok(rec) => rec,
+            Err(_) => {
+                return Err(ContractError::InvalidAddress {
+                    kind: "recipient".into(),
+                    address: recipient,
+                })
+            }
+        };
+        let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
+            Ok(token) => token,
+            Err(_) => {
+                return Err(ContractError::InvalidAddress {
+                    kind: "quote_token".into(),
+                    address: quote_token_string,
+                })
+            }
+        };
+
+        let salt: unionlabs_primitives::H256 =
+            match unionlabs_primitives::H256::from_str(payload.salt.as_str()) {
+                Ok(s) => s,
+                Err(e) => {
+                    return Err(ContractError::Std(StdError::generic_err(format!(
+                        "failed to parse salt: {}, reason: {}",
+                        payload.salt,
+                        e.to_string()
+                    ))))
+                }
+            };
+
         let authz_ucs03_msg = crate::utils::authz::get_authz_ucs03_transfer(
             params.cw20_address.to_string(),
             params.transfer_handler,
@@ -105,13 +136,13 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
             env.block.time,
             params.ucs03_relay_contract.clone(),
             channel_id,
-            Bytes::from_str(recipient.as_str()).unwrap(),
+            recipient_address,
             params.cw20_address.to_string(),
             amount,
-            Bytes::from_str(quote_token.lst_quote_token.as_str()).unwrap(),
+            quote_token,
             amount,
             funds.clone(),
-            unionlabs_primitives::H256::from_str(payload.salt.as_str()).unwrap(),
+            salt,
         )?;
 
         msgs.push(authz_ucs03_msg);
@@ -198,7 +229,8 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
 fn on_split_reward(deps: DepsMut, _env: Env, _msg: Reply) -> Result<Response, ContractError> {
     // reset reward balance after split reward call success
     REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
-
+    // reset withdraw reward queue as on process rewards contract already trigger withdraw all rewards from validators
+    WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![])?;
     let res: Response = Response::new().add_attribute("action", "on_split_reward");
 
     Ok(res)

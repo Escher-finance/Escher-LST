@@ -1089,7 +1089,9 @@ fn test_process_bond() {
             delegated_amount: updated_state.total_delegated_amount,
             total_bond_amount: updated_state.total_bond_amount,
             exchange_rate: Decimal::from_ratio(total_bond_amount, state.total_supply),
-            total_supply: updated_state.total_supply
+            total_supply: updated_state.total_supply,
+            reward_balance: Uint128::zero(),
+            unclaimed_reward: Uint128::zero(),
         }
     );
     assert_eq!(

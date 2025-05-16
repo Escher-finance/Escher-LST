@@ -1,4 +1,4 @@
-use crate::state::{BurnQueue, MintQueue, SupplyQueue};
+use crate::state::{BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue};
 use crate::ContractError;
 use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
 use cw20::TokenInfoResponse;
@@ -104,6 +104,62 @@ pub fn normalize_total_supply(
         new_supply += burn.amount;
     }
     new_supply
+}
+
+pub fn normalize_reward_balance(
+    storage: &mut dyn cosmwasm_std::Storage,
+    block: u64,
+    unclaimed_reward_balance: Uint128,
+) -> Uint128 {
+    let epoch_period: u32 = 200;
+    let reward_queue = crate::state::WITHDRAW_REWARD_QUEUE.load(storage).unwrap();
+
+    let reward_balance_state = crate::state::REWARD_BALANCE.load(storage).unwrap();
+
+    let (new_balance, mut new_queue) =
+        normalize_withdraw_reward_queue(block, reward_balance_state, reward_queue, epoch_period);
+
+    crate::state::REWARD_BALANCE
+        .save(storage, &new_balance)
+        .unwrap();
+
+    // store new reward balance from chain
+    new_queue.push(WithdrawRewardQueue {
+        amount: unclaimed_reward_balance,
+        block,
+    });
+
+    crate::state::WITHDRAW_REWARD_QUEUE
+        .save(storage, &new_queue)
+        .unwrap();
+
+    new_balance
+}
+
+pub fn normalize_withdraw_reward_queue(
+    current_block: u64,
+    current_reward_balance: Uint128,
+    withdraw_reward_queue: Vec<WithdrawRewardQueue>,
+    epoch_period: u32,
+) -> (Uint128, Vec<WithdrawRewardQueue>) {
+    let mut new_queue = vec![];
+    let last_epoch_block = get_last_epoch_block(current_block, epoch_period);
+    let mut processed_amount = Uint128::zero();
+
+    for withdraw_reward in withdraw_reward_queue {
+        if withdraw_reward.block > last_epoch_block {
+            new_queue.push(withdraw_reward)
+        } else {
+            // if the height of queue is lower than last epoch then the withdraw amount will be assumed already processed
+            // and we only take the biggest amount as we only care the "last" total withdraw reward amount
+            if withdraw_reward.amount > processed_amount {
+                processed_amount = withdraw_reward.amount;
+            }
+        }
+    }
+
+    let new_balance = current_reward_balance + processed_amount;
+    (new_balance, new_queue)
 }
 
 /// return how much is the exchange rate
