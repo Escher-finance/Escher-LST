@@ -746,6 +746,7 @@ pub fn unstake_request_in_batch(
         env.block.time,
         recipient,
         recipient_channel_id,
+        reward_balance,
     );
 
     Ok(event)

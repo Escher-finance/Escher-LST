@@ -207,6 +207,7 @@ pub fn UnstakeRequestEvent(
     time: Timestamp,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    reward_balance: Uint128,
 ) -> Event {
     let channel_id: String = match channel_id {
         Some(channel_id) => channel_id.to_string(),
@@ -233,6 +234,7 @@ pub fn UnstakeRequestEvent(
         .add_attribute("record_id", format!("{}", record_id))
         .add_attribute("recipient", recipient)
         .add_attribute("recipient_channel_id", recipient_channel_id)
+        .add_attribute("reward_balance", reward_balance)
 }
 
 pub const BATCH_RECEIVED_EVENT: &str = "batch_received";
