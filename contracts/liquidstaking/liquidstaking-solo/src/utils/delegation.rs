@@ -2,7 +2,9 @@ use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
 use crate::execute::StakerUndelegation;
 use crate::msg::ValidatorDelegation;
 use crate::proto;
-use crate::state::{ValidatorsRegistry, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE};
+use crate::state::{
+    ValidatorsRegistry, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, WITHDRAW_REWARD_QUEUE,
+};
 use crate::utils::{batch::batches, calc, delegation, token};
 use crate::ContractError;
 use crate::{
@@ -704,6 +706,19 @@ pub fn unstake_request_in_batch(
     pending_batch.total_liquid_stake += unstake_amount;
     pending_batch.unbond_records_count += 1;
     batches().save(storage, pending_batch_id, &pending_batch)?;
+
+    // adjust reward balance
+    let reward_balance = REWARD_BALANCE.load(storage)?;
+    let withdraw_reward_queue = WITHDRAW_REWARD_QUEUE.load(storage)?;
+    let supply = SUPPLY_QUEUE.load(storage)?;
+    let (new_balance, new_queue) = calc::normalize_withdraw_reward_queue(
+        env.block.height,
+        reward_balance,
+        withdraw_reward_queue,
+        supply.epoch_period,
+    );
+    REWARD_BALANCE.save(storage, &new_balance)?;
+    WITHDRAW_REWARD_QUEUE.save(storage, &new_queue)?;
 
     let id: u64 = increment_tokens(storage).unwrap();
     let record = UnbondRecord {
