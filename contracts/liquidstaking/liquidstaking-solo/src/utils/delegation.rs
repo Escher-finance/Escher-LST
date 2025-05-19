@@ -804,7 +804,7 @@ pub fn get_transfer_token_cosmos_msg(
 pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     storage: &mut dyn Storage,
     lst_contract: Addr,
-    staker: String,
+    recipient: String,
     channel_id: u32,
     time: Timestamp,
     ucs03_relay_contract: String,
@@ -825,6 +825,27 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     // get quote token of native base denom (muno) on specific channel id
     let quote_token = QUOTE_TOKEN.load(storage, channel_id)?;
 
+    let quote_token_string = quote_token.quote_token.clone();
+
+    let recipient_address = match Bytes::from_str(recipient.as_str()) {
+        Ok(rec) => rec,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "recipient".into(),
+                address: recipient,
+            })
+        }
+    };
+    let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
+        Ok(token) => token,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "quote_token".into(),
+                address: quote_token_string,
+            })
+        }
+    };
+
     let authz_ucs03_msg = get_authz_ucs03_transfer(
         params.cw20_address.to_string(),
         params.transfer_handler,  // granter
@@ -832,10 +853,10 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
         time,
         ucs03_relay_contract.as_str().into(),
         channel_id,
-        Bytes::from_str(staker.as_str()).unwrap(),
+        recipient_address,
         denom.clone(),
         total_amount,
-        Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
+        quote_token,
         undelegate_amount,
         funds,
         H256::from_str(salt.as_str()).unwrap(),
@@ -967,6 +988,7 @@ pub fn get_staker_undelegation(
                 channel_id: record.channel_id,
                 unstake_return_native_amount: None,
                 recipient: record.recipient.clone(),
+                recipient_channel_id: record.recipient_channel_id,
             });
 
         let user_to_total_unstake_ratio =
@@ -980,9 +1002,8 @@ pub fn get_staker_undelegation(
         record.released = true;
 
         record.released_height = block_height;
-        if cfg!(test) {
-            unbond_record().save(storage, record.id, &record)?;
-        }
+
+        unbond_record().save(storage, record.id, &record)?;
 
         unbond_record_ids.push(record.id);
     }
