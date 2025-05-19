@@ -27,7 +27,7 @@ pub fn BondEvent(
 
     let recipient_channel_id: String = match recipient_channel_id {
         Some(channel_id) => channel_id.to_string(),
-        None => "".to_string(),
+        None => "0".to_string(),
     };
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", sender)
@@ -162,7 +162,7 @@ pub fn ProcessUnbondingEvent(
 
     let recipient_channel_id: String = match recipient_channel_id {
         Some(channel_id) => channel_id.to_string(),
-        None => "".to_string(),
+        None => "0".to_string(),
     };
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
         .add_attribute("staker", staker)
@@ -232,7 +232,7 @@ pub fn UnstakeRequestEvent(
 
     let recipient_channel_id: String = match recipient_channel_id {
         Some(channel_id) => channel_id.to_string(),
-        None => "".to_string(),
+        None => "0".to_string(),
     };
 
     Event::new(UNSTAKE_REQUEST_EVENT.to_string())
