@@ -794,6 +794,7 @@ pub struct StakerUndelegation {
     pub channel_id: Option<u32>,
     pub unstake_return_native_amount: Option<Uint128>,
     pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
 }
 
 /// Process received batch to release the native token back to user so user doesn't need to manually withdraw token
@@ -853,9 +854,9 @@ pub fn process_batch_withdrawal(
     let mut send_msgs: Vec<CosmosMsg> = vec![];
     let mut i = 0;
     let transfer_handler = params.transfer_handler.clone();
-    for ((staker, unbond_recipient), undelegation) in staker_undelegation.iter() {
+    for ((staker, _), undelegation) in staker_undelegation.iter() {
         // if staker from same chain, we send bank transfer directly
-        if undelegation.channel_id.is_none() || undelegation.recipient.is_some() {
+        if undelegation.recipient_channel_id.is_none() && undelegation.channel_id.is_none() {
             let recipient = match undelegation.recipient.clone() {
                 Some(addr) => addr,
                 None => staker.clone(),
@@ -882,12 +883,21 @@ pub fn process_batch_withdrawal(
             let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
             send_msgs.push(msg);
 
+            let target_channel_id = match undelegation.recipient_channel_id {
+                Some(ch_id) => ch_id,
+                None => undelegation.channel_id.unwrap(),
+            };
+
+            let receiver = match undelegation.recipient.clone() {
+                Some(rec) => rec,
+                None => staker.clone(),
+            };
             //after send bank msg to transfer handler, then call ucs03 on behalf of transfer handler to send token back
             let msg = get_unbonding_ucs03_transfer_cosmos_msg(
                 deps.storage,
                 lst_contract.clone(),
-                staker.clone(),
-                undelegation.channel_id.unwrap(),
+                receiver,
+                target_channel_id,
                 time,
                 ucs03_relay_contract.clone(),
                 undelegation.unstake_return_native_amount.unwrap(),
@@ -902,10 +912,11 @@ pub fn process_batch_withdrawal(
             id,
             undelegation.channel_id,
             staker.to_string(),
-            unbond_recipient.to_string(),
             undelegation.unstake_return_native_amount.unwrap(),
             denom.clone(),
             env.block.time,
+            undelegation.recipient.clone(),
+            undelegation.recipient_channel_id,
         );
         events.push(ev);
 
