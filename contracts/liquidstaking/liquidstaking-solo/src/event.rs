@@ -149,19 +149,30 @@ pub fn ProcessUnbondingEvent(
     batch_id: u64,
     channel_id: Option<u32>,
     staker: String,
-    recipient: String,
     amount: Uint128,
     denom: String,
     time: Timestamp,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Event {
+    let recipient = match recipient {
+        Some(recipient) => recipient,
+        None => staker.to_string(),
+    };
+
+    let recipient_channel_id: String = match recipient_channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "".to_string(),
+    };
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
         .add_attribute("staker", staker)
-        .add_attribute("recipient", recipient)
         .add_attribute("amount", amount.to_string())
         .add_attribute("denom", denom)
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("channel_id", channel_id.unwrap_or(0).to_string())
+        .add_attribute("recipient", recipient)
+        .add_attribute("recipient_channel_id", recipient_channel_id)
 }
 
 pub const PROCESS_BATCH_UNBONDING_EVENT: &str = "process_batch_unbonding";
