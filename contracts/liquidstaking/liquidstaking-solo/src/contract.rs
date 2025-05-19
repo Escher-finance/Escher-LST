@@ -146,6 +146,8 @@ pub fn instantiate(
         },
     )?;
 
+    WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![])?;
+
     Ok(Response::new()
         .add_attribute("action", "instantiate")
         .add_messages(msgs))
