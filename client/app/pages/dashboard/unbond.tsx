@@ -75,6 +75,8 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
 
       // Encode the payload as base64 (Binary)
       const payloadJson = JSON.stringify(unbondingPayload);
+
+      console.log(payloadJson);
       const payloadBytes = new TextEncoder().encode(payloadJson); // Convert string to Uint8Array
       const payloadBinary = toBase64(payloadBytes); // Convert Uint8Array to base64 string
 

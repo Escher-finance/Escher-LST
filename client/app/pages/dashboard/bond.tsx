@@ -50,12 +50,14 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
     const encoder = new TextEncoder();
     const recipient_hex = toHex(encoder.encode(recipient));
 
+
+
     const msg = {
       bond: {
         salt: getSalt(),
         expected: expected.toString(),
-        recipient: recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
-        recipient_channel_id: recipient.indexOf("bbn") != -1 ? null : Number(recipient_channel_id),
+        recipient: recipient == "" ? null : recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
+        recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
       },
     };
 
@@ -94,16 +96,14 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
               defaultValue="10000"
             />
             <Input
-              isRequired
               name="recipient"
               label="Recipient"
-              defaultValue="xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds"
+              defaultValue=""
             />
             <Input
-              isRequired
               name="recipient_channel_id"
               label="Recipient Channel ID (4 for xion)"
-              defaultValue="4"
+              defaultValue="0"
             />
           </CardBody>
           <CardFooter>
