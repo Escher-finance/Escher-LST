@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::msg::{Balance, QueryMsg, StakingLiquidity};
-use crate::state::{unbond_record, Status, STATUS};
+use crate::state::{unbond_record, Status, WithdrawRewardQueue, STATUS, WITHDRAW_REWARD_QUEUE};
 use crate::state::{
     Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, ValidatorsRegistry, PARAMETERS,
     QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
@@ -54,6 +54,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Status {} => to_json_binary(&query_status(deps.storage)?),
         QueryMsg::Delegations {} => to_json_binary(&query_delegations(deps, env)?),
         QueryMsg::Chains {} => to_json_binary(&query_chains(deps.storage)?),
+        QueryMsg::RewardQueue {} => to_json_binary(&query_reward_queue(deps.storage)?),
     }?)
 }
 pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
@@ -321,4 +322,11 @@ pub fn query_chains(storage: &dyn Storage) -> Result<Vec<crate::state::Chain>, C
         .filter_map(|result| result.ok().map(|(_, chain)| chain))
         .collect();
     Ok(chains)
+}
+
+pub fn query_reward_queue(
+    storage: &dyn Storage,
+) -> Result<Vec<WithdrawRewardQueue>, ContractError> {
+    let queue = WITHDRAW_REWARD_QUEUE.load(storage)?;
+    Ok(queue)
 }

@@ -229,6 +229,8 @@ pub enum QueryMsg {
     Delegations {},
     #[returns(Vec<crate::state::Chain>)]
     Chains {},
+    #[returns(Vec<crate::state::WithdrawRewardQueue>)]
+    RewardQueue {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;
