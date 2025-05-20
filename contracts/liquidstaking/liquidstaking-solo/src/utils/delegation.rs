@@ -447,7 +447,7 @@ pub fn process_bond(
         )?;
 
         reward_balance =
-            calc::normalize_reward_balance(storage, block_height, unclaimed_reward.into());
+            calc::normalize_reward_balance(storage, block_height, unclaimed_reward.into()).unwrap();
 
         let reward = reward_balance + unclaimed_reward;
         let fee = calculate_fee_from_reward(reward, params.fee_rate);
@@ -575,7 +575,7 @@ pub fn submit_pending_batch(
     )?;
 
     let contract_reward_balance =
-        calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward.into());
+        calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward.into())?;
     let reward = unclaimed_reward + contract_reward_balance;
 
     let fee = calculate_fee_from_reward(reward, params.fee_rate);

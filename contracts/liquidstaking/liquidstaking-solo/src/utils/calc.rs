@@ -1,4 +1,4 @@
-use crate::state::{BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue};
+use crate::state::{BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue, SUPPLY_QUEUE};
 use crate::ContractError;
 use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
 use cw20::TokenInfoResponse;
@@ -111,18 +111,20 @@ pub fn normalize_reward_balance(
     storage: &mut dyn cosmwasm_std::Storage,
     block: u64,
     unclaimed_reward_balance: Uint128,
-) -> Uint128 {
-    let epoch_period: u32 = 200;
-    let reward_queue = crate::state::WITHDRAW_REWARD_QUEUE.load(storage).unwrap();
+) -> Result<Uint128, ContractError> {
+    let supply = SUPPLY_QUEUE.load(storage)?;
+    let reward_queue = crate::state::WITHDRAW_REWARD_QUEUE.load(storage)?;
 
-    let reward_balance_state = crate::state::REWARD_BALANCE.load(storage).unwrap();
+    let reward_balance_state = crate::state::REWARD_BALANCE.load(storage)?;
 
-    let (new_balance, mut new_queue) =
-        normalize_withdraw_reward_queue(block, reward_balance_state, reward_queue, epoch_period);
+    let (new_balance, mut new_queue) = normalize_withdraw_reward_queue(
+        block,
+        reward_balance_state,
+        reward_queue,
+        supply.epoch_period,
+    );
 
-    crate::state::REWARD_BALANCE
-        .save(storage, &new_balance)
-        .unwrap();
+    crate::state::REWARD_BALANCE.save(storage, &new_balance)?;
 
     // store new reward balance from chain
     new_queue.push(WithdrawRewardQueue {
@@ -130,11 +132,9 @@ pub fn normalize_reward_balance(
         block,
     });
 
-    crate::state::WITHDRAW_REWARD_QUEUE
-        .save(storage, &new_queue)
-        .unwrap();
+    crate::state::WITHDRAW_REWARD_QUEUE.save(storage, &new_queue)?;
 
-    new_balance
+    Ok(new_balance)
 }
 
 pub fn normalize_withdraw_reward_queue(

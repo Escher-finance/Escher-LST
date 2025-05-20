@@ -1,5 +1,8 @@
 use crate::{
-    state::{BurnQueue, MintQueue, SupplyQueue, REWARD_BALANCE, WITHDRAW_REWARD_QUEUE},
+    state::{
+        BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue, REWARD_BALANCE, SUPPLY_QUEUE,
+        WITHDRAW_REWARD_QUEUE,
+    },
     utils::calc::*,
 };
 use cosmwasm_std::{
@@ -338,16 +341,27 @@ fn test_normalize_reward_balance() {
         .save(&mut deps.storage, &vec![])
         .unwrap();
 
+    SUPPLY_QUEUE
+        .save(
+            &mut deps.storage,
+            &SupplyQueue {
+                mint: vec![],
+                burn: vec![],
+                epoch_period: 360,
+            },
+        )
+        .unwrap();
+
     // 1st bond at block 300
     // query reward on this block and assume we set to 100
     let block = 300;
     let unclaimed_reward_balance: u128 = 100;
-    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into());
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
     // 2nd bond at block 350
     // query reward on this block and assume we set to 150
     let block = 350;
     let unclaimed_reward_balance: u128 = 150;
-    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into());
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
 
     let reward_balance = REWARD_BALANCE.load(&deps.storage).unwrap();
     let reward_queue = WITHDRAW_REWARD_QUEUE.load(&deps.storage).unwrap();
@@ -363,12 +377,12 @@ fn test_normalize_reward_balance() {
     // query reward on this block and assume we set to 100
     let block = 500;
     let unclaimed_reward_balance: u128 = 200;
-    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into());
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
     // 4rd bond at block 350
     // query reward on this block and assume we set to 150
     let block = 550;
     let unclaimed_reward_balance: u128 = 250;
-    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into());
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
 
     let reward_balance = REWARD_BALANCE.load(&deps.storage).unwrap();
     let reward_queue = WITHDRAW_REWARD_QUEUE.load(&deps.storage).unwrap();
@@ -384,17 +398,17 @@ fn test_normalize_reward_balance() {
     // query reward on this block and assume we set to 100
     let block = 850;
     let unclaimed_reward_balance: u128 = 250;
-    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into());
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
     // 6rd bond at block 870
     // query reward on this block and assume we set to 150
     let block = 870;
     let unclaimed_reward_balance: u128 = 260;
-    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into());
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
     // 7rd bond at block 900
     // query reward on this block and assume we set to 150
     let block = 900;
     let unclaimed_reward_balance: u128 = 270;
-    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into());
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
 
     let reward_balance = REWARD_BALANCE.load(&deps.storage).unwrap();
     let reward_queue = WITHDRAW_REWARD_QUEUE.load(&deps.storage).unwrap();
@@ -403,4 +417,31 @@ fn test_normalize_reward_balance() {
     println!("==== after 3x transactions ==== at block 850,870 & 900");
     println!("reward_balance : {}", reward_balance);
     println!("reward queue: {:?}", reward_queue);
+}
+
+#[test]
+fn test_normalize_withdraw_reward_queue() {
+    let current_block_height = 1028176;
+    let current_reward_balance = Uint128::zero();
+
+    let reward_amount = Uint128::new(172786u128);
+
+    let reward_queue = vec![WithdrawRewardQueue {
+        amount: reward_amount,
+        block: 1028039,
+    }];
+
+    let epoch_period = 360;
+
+    let (new_balance, new_queue) = normalize_withdraw_reward_queue(
+        current_block_height,
+        current_reward_balance,
+        reward_queue,
+        epoch_period,
+    );
+
+    println!("new_balance: {}", new_balance);
+    println!("new_queue: {:?}", new_queue);
+    assert_eq!(new_balance, reward_amount);
+    assert_eq!(new_queue, vec![]);
 }
