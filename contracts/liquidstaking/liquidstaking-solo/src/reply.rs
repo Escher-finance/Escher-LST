@@ -36,7 +36,18 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let params: Parameters = PARAMETERS.load(deps.storage)?;
     let payload: MintTokensPayload = from_json(msg.payload)?;
 
-    let msg = if payload.channel_id.is_some() || payload.recipient_channel_id.is_some() {
+    // if recipient channel id is none, need to make sure recipient address is valid address on the chain where the contract is running
+    let is_on_chain_recipient = crate::utils::validation::is_on_chain_recipient(
+        &deps,
+        payload.recipient.clone(),
+        payload.recipient_channel_id,
+    );
+
+    // check to query balance of transfer handler or this contract
+    // transfer handler is used to transfer cw20 minted token to other chain
+    let msg = if !is_on_chain_recipient
+        && (payload.channel_id.is_some() || payload.recipient_channel_id.is_some())
+    {
         cw20::Cw20QueryMsg::Balance {
             address: params.transfer_handler.to_string(),
         }
@@ -61,13 +72,6 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     // also need to attach required funds
     let mut quote_token_string = String::new();
     let amount = payload.amount;
-
-    // if recipient channel id is none, need to make sure recipient is correct valid on chain address
-    let is_on_chain_recipient = crate::utils::validation::is_on_chain_recipient(
-        &deps,
-        payload.recipient.clone(),
-        payload.recipient_channel_id,
-    );
 
     // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
     // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
