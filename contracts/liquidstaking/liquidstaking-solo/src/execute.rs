@@ -50,7 +50,8 @@ pub fn bond(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    validate_recipient(&deps, recipient.clone(), recipient_channel_id, salt.clone())?;
+    let on_chain_recipient =
+        validate_recipient(&deps, recipient.clone(), recipient_channel_id, salt.clone())?;
 
     // coin must have be sent along with transaction and it should be in underlying coin denom
     if info.funds.len() > 1usize {
@@ -94,6 +95,7 @@ pub fn bond(
         env.block.height,
         recipient.clone(),
         recipient_channel_id,
+        on_chain_recipient,
     )?;
 
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
@@ -214,7 +216,7 @@ pub fn zkgm_bond(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    validate_recipient(
+    let on_chain_recipient = validate_recipient(
         &deps,
         recipient.clone(),
         recipient_channel_id,
@@ -247,6 +249,7 @@ pub fn zkgm_bond(
         env.block.height,
         recipient.clone(),
         recipient_channel_id,
+        on_chain_recipient,
     )?;
 
     if bond_data.mint_amount == Uint128::zero() {

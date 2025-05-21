@@ -404,6 +404,7 @@ pub fn process_bond(
     block_height: u64,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    on_chain_recipient: bool,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
@@ -503,9 +504,10 @@ pub fn process_bond(
         let mut recipient = delegator.to_string().clone();
 
         // if staker is from other chain, minted/staking token will be minted to transfer handler
-        if (staker != sender && channel_id.is_some()) || recipient_channel_id.is_some() {
+        if !on_chain_recipient && (channel_id.is_some() || recipient_channel_id.is_some()) {
             recipient = params.transfer_handler;
         }
+
         // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg = token::get_staked_token_submsg(
             recipient,

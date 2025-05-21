@@ -46,11 +46,13 @@ pub fn validate_recipient(
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     salt: Option<String>,
-) -> Result<(), ContractError> {
+) -> Result<bool, ContractError> {
+    let mut on_chain_recipient = false;
     // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
     if recipient.is_some() && recipient_channel_id.is_none() {
         deps.api
             .addr_validate(recipient.clone().unwrap().as_str())?;
+        on_chain_recipient = true;
     }
 
     // if recipient_channel_id exists, must make sure the chain is supported
@@ -66,7 +68,7 @@ pub fn validate_recipient(
             )));
         }
     }
-    Ok(())
+    Ok(on_chain_recipient)
 }
 
 pub fn is_on_chain_recipient(
