@@ -1,14 +1,15 @@
 [package]
 edition     = "2021"
 name         = "liquidstaking"
-version      = "0.1.180"
+version      = "0.1.182"
 
 [profile.dev]
 lto = "thin"  
 strip = true
+overflow-checks = true
 
 [profile.release]
-opt-level = 3
+opt-level = "z"
 debug = false
 rpath = false
 lto = true
@@ -17,6 +18,7 @@ codegen-units = 1
 panic = 'abort'
 incremental = false
 overflow-checks = true
+strip = true
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(nonunion)'] }
