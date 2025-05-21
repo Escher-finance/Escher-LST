@@ -62,11 +62,21 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let mut quote_token_string = String::new();
     let amount = payload.amount;
 
-    // if the channel id or recipient channel id is set, it means that the receiver/recipient is on other chain
-    if payload.channel_id.is_some() || payload.recipient_channel_id.is_some() {
+    // if recipient channel id is none, need to make sure recipient is correct valid on chain address
+    let is_on_chain_recipient = crate::utils::validation::is_on_chain_recipient(
+        &deps,
+        payload.recipient.clone(),
+        payload.recipient_channel_id,
+    );
+
+    // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
+    // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
+    if !is_on_chain_recipient
+        && (payload.channel_id.is_some() || payload.recipient_channel_id.is_some())
+    {
         let channel_id = match payload.recipient_channel_id {
             Some(channel_id) => channel_id,
-            None => payload.recipient_channel_id.unwrap(),
+            None => payload.channel_id.unwrap(),
         };
 
         let recipient = match payload.recipient.clone() {

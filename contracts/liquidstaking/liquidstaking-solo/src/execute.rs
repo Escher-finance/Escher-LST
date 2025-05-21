@@ -855,22 +855,19 @@ pub fn process_batch_withdrawal(
     let mut i = 0;
     let transfer_handler = params.transfer_handler.clone();
     for ((staker, _), undelegation) in staker_undelegation.iter() {
-        // if staker from same chain, we send bank transfer directly
-        if undelegation.recipient_channel_id.is_none() && undelegation.channel_id.is_none() {
-            let recipient = match undelegation.recipient.clone() {
-                Some(addr) => addr,
-                None => staker.clone(),
-            };
-            let bank_msg = BankMsg::Send {
-                to_address: recipient,
-                amount: vec![Coin {
-                    denom: denom.clone(),
-                    amount: undelegation.unstake_return_native_amount.unwrap(),
-                }],
-            };
-            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-            send_msgs.push(msg);
-        } else {
+        // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
+        // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
+        let is_on_chain_recipient = utils::validation::is_on_chain_recipient(
+            &deps,
+            undelegation.recipient.clone(),
+            undelegation.recipient_channel_id,
+        );
+
+        // if recipient channel id is set, it means that the receiver/recipient is on other chain
+        // but if channel_id is set but recipient also recipient_channel_id is none, it will send to staker
+        if !is_on_chain_recipient
+            && (undelegation.channel_id.is_some() || undelegation.recipient_channel_id.is_some())
+        {
             // if staker is from other chain
             // need to send transfer to transfer handler first before transfer to other chain via ucs03 contract
             let bank_msg = BankMsg::Send {
@@ -905,6 +902,20 @@ pub fn process_batch_withdrawal(
                 denom.clone(),
                 salt.get(i).unwrap().clone(),
             )?;
+            send_msgs.push(msg);
+        } else {
+            let recipient = match undelegation.recipient.clone() {
+                Some(addr) => addr,
+                None => staker.clone(),
+            };
+            let bank_msg = BankMsg::Send {
+                to_address: recipient,
+                amount: vec![Coin {
+                    denom: denom.clone(),
+                    amount: undelegation.unstake_return_native_amount.unwrap(),
+                }],
+            };
+            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
             send_msgs.push(msg);
         }
 

@@ -68,3 +68,19 @@ pub fn validate_recipient(
     }
     Ok(())
 }
+
+pub fn is_on_chain_recipient(
+    deps: &cosmwasm_std::DepsMut,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
+) -> bool {
+    let mut on_chain_recipient = false;
+    if recipient.is_some() && recipient_channel_id.is_none() {
+        let res = deps.api.addr_validate(recipient.clone().unwrap().as_str());
+        if res.is_ok() {
+            on_chain_recipient = true;
+        }
+    }
+
+    on_chain_recipient
+}

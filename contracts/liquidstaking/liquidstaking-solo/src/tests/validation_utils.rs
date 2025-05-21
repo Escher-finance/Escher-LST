@@ -88,3 +88,37 @@ fn test_validate_quote_tokens() {
         false
     });
 }
+
+#[test]
+fn test_is_on_chain_recipient() {
+    let mut deps = mock_dependencies();
+
+    let recipient_addr = deps.api.addr_make("isak");
+    let recipient = Some(recipient_addr.to_string());
+    let recipient_channel_id = None;
+    let is_same_chain_recipient = crate::utils::validation::is_on_chain_recipient(
+        &mut deps.as_mut(),
+        recipient,
+        recipient_channel_id,
+    );
+
+    println!("recipient_addr: {}", recipient_addr);
+    println!("is_same_chain_recipient: {}", is_same_chain_recipient);
+    assert_eq!(is_same_chain_recipient, true);
+
+    let recipient = Some("0xbb74285235846c9d98280ac92ab8007382e51234".to_string());
+    let is_same_chain_recipient = crate::utils::validation::is_on_chain_recipient(
+        &mut deps.as_mut(),
+        recipient,
+        recipient_channel_id,
+    );
+    assert_eq!(is_same_chain_recipient, false);
+
+    let recipient = Some("uniondefghabcuxz7l0vcusq5jc9zvzpm8ec2au39x123".to_string());
+    let is_same_chain_recipient = crate::utils::validation::is_on_chain_recipient(
+        &mut deps.as_mut(),
+        recipient,
+        recipient_channel_id,
+    );
+    assert_eq!(is_same_chain_recipient, false);
+}
