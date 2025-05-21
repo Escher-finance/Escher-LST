@@ -15,8 +15,8 @@ use crate::{
     },
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, Attribute, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    QuerierWrapper, StdResult, Storage, SubMsg, Uint128, Uint256,
+    to_json_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    QuerierWrapper, StdResult, Storage, SubMsg, Uint128,
 };
 use cosmwasm_std::{AnyMsg, Coin};
 use cosmwasm_std::{Event, Timestamp};
@@ -28,7 +28,6 @@ use unionlabs_primitives::{Bytes, H256};
 use super::authz::get_authz_ucs03_transfer;
 use super::batch::{Batch, BatchStatus};
 use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
-use super::protocol;
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
 
@@ -750,55 +749,6 @@ pub fn unstake_request_in_batch(
     );
 
     Ok(event)
-}
-
-pub fn get_transfer_token_cosmos_msg(
-    storage: &dyn Storage,
-    staker: String,
-    channel_id: Option<u32>,
-    time: Timestamp,
-    ucs03_relay_contract: String,
-    undelegate_amount: Uint128,
-    denom: String,
-    salt: String,
-) -> Result<CosmosMsg, ContractError> {
-    // if balance exists, send to staker (it can be on same chain or other chain like evm/bera)
-    let msg: CosmosMsg = {
-        if channel_id.is_some() {
-            let funds = vec![Coin {
-                denom: denom.clone(),
-                amount: undelegate_amount.clone(),
-            }];
-
-            // get quote token of native base denom (muno) on specific channel id
-            let quote_token = QUOTE_TOKEN.load(storage, channel_id.unwrap())?;
-            let wasm_msg = protocol::ucs03_transfer(
-                time,
-                ucs03_relay_contract.as_str().into(),
-                channel_id.unwrap(),
-                Bytes::from_str(staker.as_str()).unwrap(),
-                denom.clone(),
-                undelegate_amount,
-                Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
-                Uint256::from(undelegate_amount),
-                funds,
-                H256::from_str(salt.as_str()).unwrap(),
-            )?;
-            let msg: CosmosMsg = CosmosMsg::Wasm(wasm_msg);
-            msg
-        } else {
-            let bank_msg = BankMsg::Send {
-                to_address: staker.clone(),
-                amount: vec![Coin {
-                    denom: denom,
-                    amount: undelegate_amount,
-                }],
-            };
-            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-            msg
-        }
-    };
-    Ok(msg)
 }
 
 pub fn get_unbonding_ucs03_transfer_cosmos_msg(
