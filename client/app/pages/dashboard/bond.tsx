@@ -51,13 +51,13 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
     const recipient_hex = toHex(encoder.encode(recipient));
 
 
+    // recipient: recipient == "" ? null : recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
+    // recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
 
     const msg = {
       bond: {
         salt: getSalt(),
         expected: expected.toString(),
-        recipient: recipient == "" ? null : recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
-        recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
       },
     };
 
