@@ -175,6 +175,7 @@ pub enum ExecuteMsg {
     RemoveChain {
         channel_id: u32,
     },
+    NormalizeReward {},
 }
 
 #[cw_serde]

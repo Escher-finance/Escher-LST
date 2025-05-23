@@ -262,6 +262,7 @@ pub fn execute(
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
         ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
         ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
+        ExecuteMsg::NormalizeReward {} => execute::normalize_reward(deps, env),
     }
 }
 

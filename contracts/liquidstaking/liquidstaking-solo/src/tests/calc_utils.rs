@@ -445,3 +445,13 @@ fn test_normalize_withdraw_reward_queue() {
     assert_eq!(new_balance, reward_amount);
     assert_eq!(new_queue, vec![]);
 }
+
+#[test]
+fn test_normalize_reward() {
+    let block_height = 1044945;
+    let next_epoch = get_next_epoch(block_height, 360);
+
+    let epoch_diff = next_epoch - block_height;
+
+    println!("epoch diff: {}", epoch_diff);
+}

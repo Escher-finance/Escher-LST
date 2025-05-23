@@ -19,8 +19,10 @@ use crate::state::{
 };
 use crate::types::ChannelId;
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::calculate_fee_from_reward;
-use crate::utils::calc::{calculate_exchange_rate, normalize_withdraw_reward_queue};
+use crate::utils::calc::{
+    calculate_exchange_rate, get_next_epoch, normalize_withdraw_reward_queue,
+};
+use crate::utils::calc::{calculate_fee_from_reward, get_last_epoch_block};
 use crate::utils::delegation::{get_unbonding_ucs03_transfer_cosmos_msg, submit_pending_batch};
 use crate::utils::validation::{validate_recipient, validate_validators};
 use crate::utils::{
@@ -1251,4 +1253,48 @@ pub fn remove_chain(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     crate::state::CHAINS.remove(deps.storage, channel_id);
     Ok(Response::new())
+}
+
+pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
+    let supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
+
+    let block_height = env.block.height;
+    let next_epoch = get_next_epoch(block_height, supply_queue.epoch_period);
+
+    let epoch_diff = next_epoch - block_height;
+
+    if epoch_diff > 5 && epoch_diff < 360 {
+        return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+            format!(
+                "incorrect block height: current height: {}, next epoch: {}",
+                block_height, next_epoch,
+            ),
+        )));
+    }
+
+    let params = PARAMETERS.load(deps.storage)?;
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let validators_list: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    let delegator = env.contract.address;
+    let unclaimed_reward = utils::delegation::get_unclaimed_reward(
+        deps.querier,
+        delegator.to_string(),
+        params.underlying_coin_denom.clone(),
+        validators_list,
+    )?;
+
+    let reward_balance = utils::calc::normalize_reward_balance(
+        deps.storage,
+        env.block.height,
+        unclaimed_reward.into(),
+    )?;
+
+    Ok(Response::new()
+        .add_attribute("unclaimed_reward", unclaimed_reward)
+        .add_attribute("reward_balance", reward_balance))
 }

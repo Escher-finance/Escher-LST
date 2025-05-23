@@ -948,6 +948,7 @@ fn test_process_bond() {
         block_height,
         None,
         None,
+        true,
     )
     .unwrap();
 

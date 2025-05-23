@@ -61,6 +61,11 @@ pub fn get_last_epoch_block(block: u64, epoch_period: u32) -> u64 {
     block - remainder
 }
 
+pub fn get_next_epoch(block: u64, epoch_period: u32) -> u64 {
+    let remainder: u64 = block % epoch_period as u64;
+    block + (epoch_period as u64 - remainder)
+}
+
 fn get_elements_by_indices<T: Clone>(vec: &Vec<T>, indices: &[usize]) -> Vec<T> {
     let mut result = Vec::with_capacity(indices.len());
 
