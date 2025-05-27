@@ -278,7 +278,7 @@ pub fn get_restaking_msgs(
                         delegator.clone(),
                         surplus_validator.address.to_string(),
                         deficient_validator.address.clone(),
-                        deficient_validator.diff_amount.into(),
+                        redelegate_amount.to_string(),
                         denom.clone(),
                     ));
                 }

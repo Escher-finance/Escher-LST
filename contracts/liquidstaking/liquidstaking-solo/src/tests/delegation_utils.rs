@@ -1965,42 +1965,42 @@ fn validators_restaking_adjustment_8() {
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             figment.clone(),
-            Coin::new(Uint128::new(416545), denom.clone()),
+            Coin::new(Uint128::new(258586), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             blockhunters.clone(),
-            Coin::new(Uint128::new(300951), denom.clone()),
+            Coin::new(Uint128::new(315935), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             cosmosspaces.clone(),
-            Coin::new(Uint128::new(257958), denom.clone()),
+            Coin::new(Uint128::new(56967), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             everstake.clone(),
-            Coin::new(Uint128::new(243627), denom.clone()),
+            Coin::new(Uint128::new(215445), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             node01.clone(),
-            Coin::new(Uint128::new(185356), denom.clone()),
+            Coin::new(Uint128::new(445739), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             cryptocrew.clone(),
-            Coin::new(Uint128::new(28662), denom.clone()),
+            Coin::new(Uint128::new(143630), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
@@ -2034,27 +2034,27 @@ fn validators_restaking_adjustment_8() {
     ]);
     let validators = Vec::from([
         Validator {
-            weight: 15,
+            weight: 25,
             address: blockhunters.clone(),
         },
         Validator {
-            weight: 30,
+            weight: 25,
             address: node01.clone(),
         },
         Validator {
-            weight: 15,
+            weight: 10,
             address: everstake.clone(),
         },
         Validator {
-            weight: 15,
+            weight: 18,
             address: figment.clone(),
         },
         Validator {
-            weight: 15,
+            weight: 17,
             address: cosmosspaces.clone(),
         },
         Validator {
-            weight: 10,
+            weight: 5,
             address: cryptocrew.clone(),
         },
     ]);
@@ -2102,6 +2102,7 @@ fn validators_restaking_adjustment_8() {
         deficient_validators,
         denom.clone(),
     );
+    println!("msgs: {:#?}", msgs);
 
     let mut new_delegation_map: HashMap<String, Uint128> = validator_delegation_map.clone();
 
@@ -2111,7 +2112,6 @@ fn validators_restaking_adjustment_8() {
                 amount,
                 src_validator,
                 dst_validator,
-                ..
             }) => {
                 let amount = amount.amount;
                 let src_validator = src_validator.clone();
@@ -2133,10 +2133,10 @@ fn validators_restaking_adjustment_8() {
         }
     }
 
+    println!("new_delegation_map: {:#?}", new_delegation_map);
+
     assert_eq!(
         new_delegation_map.clone(),
         correct_validator_delegation_map.clone()
     );
-
-    println!("new_delegation_map: {:#?}", new_delegation_map);
 }
