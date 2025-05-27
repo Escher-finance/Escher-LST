@@ -13,16 +13,16 @@ use crate::msg::{
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    Chain, QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
+    Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, CONFIG, PARAMETERS,
+    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
     VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
 };
 use crate::types::ChannelId;
 use crate::utils::batch::{batches, BatchStatus};
+use crate::utils::calc::calculate_fee_from_reward;
 use crate::utils::calc::{
     calculate_exchange_rate, get_next_epoch, normalize_withdraw_reward_queue,
 };
-use crate::utils::calc::{calculate_fee_from_reward, get_last_epoch_block};
 use crate::utils::delegation::{get_unbonding_ucs03_transfer_cosmos_msg, submit_pending_batch};
 use crate::utils::validation::{validate_recipient, validate_validators};
 use crate::utils::{
@@ -1255,6 +1255,7 @@ pub fn remove_chain(
     Ok(Response::new())
 }
 
+// Normalize reward only run when there is withdraw reward queue entry to make sure the reward amount is normalized near end of epoch
 pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
     let supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
 
@@ -1270,6 +1271,11 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
                 block_height, next_epoch,
             ),
         )));
+    }
+
+    let mut reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
+    if reward_queue.is_empty() {
+        return Err(ContractError::NoRewardToNormalize {});
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -1288,13 +1294,57 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
         validators_list,
     )?;
 
-    let reward_balance = utils::calc::normalize_reward_balance(
-        deps.storage,
-        env.block.height,
-        unclaimed_reward.into(),
-    )?;
+    reward_queue.push(WithdrawRewardQueue {
+        amount: unclaimed_reward,
+        block: block_height,
+    });
+
+    WITHDRAW_REWARD_QUEUE.save(deps.storage, &reward_queue)?;
+
+    let reward_balance = REWARD_BALANCE.load(deps.storage)?;
 
     Ok(Response::new()
         .add_attribute("unclaimed_reward", unclaimed_reward)
         .add_attribute("reward_balance", reward_balance))
+}
+
+/// Restake some amount of underlying coin denom without minting new cw20 token
+pub fn restake(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let params = PARAMETERS.load(deps.storage)?;
+    let contract_addr: Addr = env.contract.address;
+    let balance = deps
+        .querier
+        .query_balance(contract_addr.clone(), params.underlying_coin_denom.clone())?;
+
+    if balance.amount < amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let (msgs, restake_data) = utils::delegation::restake(
+        deps.storage,
+        deps.querier,
+        contract_addr,
+        amount,
+        params,
+        env.block.height,
+    )?;
+
+    let restake_event = crate::event::RestakeEvent(
+        amount,
+        restake_data.reward_balance,
+        restake_data.unclaimed_reward,
+        restake_data.prev_exchange_rate,
+        restake_data.exchange_rate,
+    );
+
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_event(restake_event)
+        .add_attribute("action", "restake"))
 }

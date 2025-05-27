@@ -131,4 +131,7 @@ pub enum ContractError {
 
     #[error("invalid {kind} address: {address}")]
     InvalidAddress { kind: String, address: String },
+
+    #[error("no reward to normalize")]
+    NoRewardToNormalize {},
 }

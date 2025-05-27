@@ -300,3 +300,21 @@ pub fn UpdateConfigEvent(
         .add_attribute("fee_rate", fee_rate.to_string())
         .add_attribute("coin_denom", coin_denom)
 }
+
+pub const RESTAKE_EVENT: &str = "restake";
+
+#[allow(non_snake_case)]
+pub fn RestakeEvent(
+    amount: Uint128,
+    reward_balance: Uint128,
+    unclaimed_reward: Uint128,
+    prev_exchange_rate: Decimal,
+    exchange_rate: Decimal,
+) -> Event {
+    Event::new(UPDATE_CONFIG_EVENT.to_string())
+        .add_attribute("amount", amount)
+        .add_attribute("reward_balance", reward_balance)
+        .add_attribute("unclaimed_reward", unclaimed_reward.to_string())
+        .add_attribute("prev_exchange_rate", prev_exchange_rate.to_string())
+        .add_attribute("exchange_rate", exchange_rate.to_string())
+}

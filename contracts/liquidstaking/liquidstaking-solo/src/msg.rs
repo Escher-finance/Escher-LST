@@ -176,6 +176,9 @@ pub enum ExecuteMsg {
         channel_id: u32,
     },
     NormalizeReward {},
+    Restake {
+        amount: Uint128,
+    },
 }
 
 #[cw_serde]
@@ -357,3 +360,12 @@ pub struct MigrateMsg {
 
 #[cw_serde]
 pub struct RewardMigrateMsg {}
+
+#[cw_serde]
+pub struct RestakeData {
+    pub prev_exchange_rate: Decimal,
+    pub exchange_rate: Decimal,
+    pub total_supply: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
+}
