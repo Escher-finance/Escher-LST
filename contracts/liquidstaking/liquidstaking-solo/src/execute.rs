@@ -13,16 +13,18 @@ use crate::msg::{
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
+    Chain, QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
     QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
-    VALIDATORS_REGISTRY,
+    VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
 };
 use crate::types::ChannelId;
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::calculate_exchange_rate;
-use crate::utils::calc::calculate_fee_from_reward;
+use crate::utils::calc::{
+    calculate_exchange_rate, get_next_epoch, normalize_withdraw_reward_queue,
+};
+use crate::utils::calc::{calculate_fee_from_reward, get_last_epoch_block};
 use crate::utils::delegation::{get_unbonding_ucs03_transfer_cosmos_msg, submit_pending_batch};
-use crate::utils::validation::validate_validators;
+use crate::utils::validation::{validate_recipient, validate_validators};
 use crate::utils::{
     self, calc::check_slippage, calc::to_uint128, delegation::get_actual_total_delegated,
     delegation::get_actual_total_reward,
@@ -41,10 +43,21 @@ pub fn bond(
     info: MessageInfo,
     slippage: Option<Decimal>,
     expected: Uint128,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
+    salt: Option<String>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
+    let on_chain_recipient =
+        validate_recipient(&deps, recipient.clone(), recipient_channel_id, salt.clone())?;
+
+    // coin must have be sent along with transaction and it should be in underlying coin denom
+    if info.funds.len() > 1usize {
+        return Err(ContractError::InvalidAsset {});
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -52,11 +65,6 @@ pub fn bond(
     let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
     let delegator = env.contract.address;
-
-    // coin must have be sent along with transaction and it should be in underlying coin denom
-    if info.funds.len() > 1usize {
-        return Err(ContractError::InvalidAsset {});
-    }
 
     let payment = Coin {
         amount: info
@@ -84,9 +92,12 @@ pub fn bond(
         env.block.time.nanos(),
         params,
         validators_reg.clone(),
-        "".to_string(),
+        salt.unwrap_or("".into()),
         None,
         env.block.height,
+        recipient.clone(),
+        recipient_channel_id,
+        on_chain_recipient,
     )?;
 
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
@@ -104,6 +115,10 @@ pub fn bond(
         "".to_string(),
         env.block.time,
         coin_denom.clone(),
+        recipient.clone(),
+        recipient_channel_id,
+        bond_data.reward_balance,
+        bond_data.unclaimed_reward,
     );
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -117,8 +132,9 @@ pub fn bond(
         .add_attributes(vec![
             attr("action", "bond"),
             attr("from", sender.clone()),
-            attr("staker", sender),
-            attr("channel_id", "".to_string()),
+            attr("staker", sender.clone()),
+            attr("recipient", recipient.unwrap_or(sender.into())),
+            attr("channel_id", recipient_channel_id.unwrap_or(0).to_string()),
             attr("bond_amount", payment.amount.to_string()),
             attr("denom", coin_denom.to_string()),
             attr("minted", bond_data.mint_amount),
@@ -136,11 +152,20 @@ pub fn zkgm_unbond(
     channel_id: ChannelId,
     staker: String,
     amount: Uint128,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
+
+    validate_recipient(
+        &deps,
+        recipient.clone(),
+        recipient_channel_id,
+        Some("".into()),
+    )?; // salt is not required in unbond request
 
     let params = PARAMETERS.load(deps.storage)?;
 
@@ -165,6 +190,8 @@ pub fn zkgm_unbond(
         staker.clone(),
         amount,
         Some(channel_id.raw()),
+        recipient,
+        recipient_channel_id,
     )?;
 
     let res: Response = Response::new().add_event(unstake_request_event);
@@ -183,11 +210,20 @@ pub fn zkgm_bond(
     salt: String,
     slippage: Option<Decimal>,
     expected: Uint128,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
+
+    let on_chain_recipient = validate_recipient(
+        &deps,
+        recipient.clone(),
+        recipient_channel_id,
+        Some(salt.clone()),
+    )?;
 
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -213,6 +249,9 @@ pub fn zkgm_bond(
         salt,
         Some(channel_id.raw()),
         env.block.height,
+        recipient.clone(),
+        recipient_channel_id,
+        on_chain_recipient,
     )?;
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -232,6 +271,10 @@ pub fn zkgm_bond(
         format!("{}", channel_id),
         env.block.time,
         coin_denom.clone(),
+        recipient,
+        recipient_channel_id,
+        bond_data.reward_balance,
+        bond_data.unclaimed_reward,
     );
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
@@ -288,9 +331,30 @@ pub fn receive(
     let payload_msg: Cw20PayloadMsg = from_json(cw20_msg.msg)?;
 
     // make sure the payload is Unstake
-    if !matches!(payload_msg, Cw20PayloadMsg::Unstake {}) {
+    if !matches!(
+        payload_msg,
+        Cw20PayloadMsg::Unstake {
+            recipient: _,
+            recipient_channel_id: _
+        }
+    ) {
         return Err(ContractError::InvalidPayload {});
     }
+
+    // get the recipient and recipient channel id from payload_msg
+    let (recipient, recipient_channel_id) = match payload_msg {
+        Cw20PayloadMsg::Unstake {
+            recipient,
+            recipient_channel_id,
+        } => (recipient, recipient_channel_id),
+    };
+
+    validate_recipient(
+        &deps,
+        recipient.clone(),
+        recipient_channel_id,
+        Some("".into()),
+    )?; // salt is not required in unbond request
 
     let unbond_amount = cw20_msg.amount;
 
@@ -313,6 +377,8 @@ pub fn receive(
         the_staker.clone(),
         unbond_amount,
         None,
+        recipient,
+        recipient_channel_id,
     )?;
 
     let res: Response = Response::new().add_event(unstake_request_event);
@@ -515,6 +581,21 @@ pub fn process_rewards(
 
     let mut total_amount: Uint128 = Uint128::zero();
 
+    let reward_balance_state = crate::state::REWARD_BALANCE.load(deps.storage)?;
+    let reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
+    let supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
+
+    let (new_reward_balance, _) = normalize_withdraw_reward_queue(
+        env.block.height,
+        reward_balance_state,
+        reward_queue,
+        supply_queue.epoch_period,
+    );
+
+    crate::state::REWARD_BALANCE
+        .save(deps.storage, &new_reward_balance)
+        .unwrap();
+
     for validator in validators_reg.validators {
         let delegation_rewards = deps
             .querier
@@ -557,7 +638,7 @@ pub fn process_rewards(
         },
     )?;
 
-    let ev = ProcessRewardsEvent(total_amount);
+    let ev = ProcessRewardsEvent(total_amount, new_reward_balance);
     let res: Response = Response::new()
         .add_attributes(attrs)
         .add_event(ev)
@@ -717,6 +798,8 @@ pub struct StakerUndelegation {
     pub unstake_amount: Uint128,
     pub channel_id: Option<u32>,
     pub unstake_return_native_amount: Option<Uint128>,
+    pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
 }
 
 /// Process received batch to release the native token back to user so user doesn't need to manually withdraw token
@@ -776,19 +859,20 @@ pub fn process_batch_withdrawal(
     let mut send_msgs: Vec<CosmosMsg> = vec![];
     let mut i = 0;
     let transfer_handler = params.transfer_handler.clone();
-    for (key, undelegation) in staker_undelegation.iter() {
-        // if staker from same chain, we send bank transfer directly
-        if undelegation.channel_id.is_none() {
-            let bank_msg = BankMsg::Send {
-                to_address: key.clone(),
-                amount: vec![Coin {
-                    denom: denom.clone(),
-                    amount: undelegation.unstake_return_native_amount.unwrap(),
-                }],
-            };
-            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-            send_msgs.push(msg);
-        } else {
+    for ((staker, _), undelegation) in staker_undelegation.iter() {
+        // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
+        // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
+        let is_on_chain_recipient = utils::validation::is_on_chain_recipient(
+            &deps,
+            undelegation.recipient.clone(),
+            undelegation.recipient_channel_id,
+        );
+
+        // if recipient channel id is set, it means that the receiver/recipient is on other chain
+        // but if channel_id is set but recipient also recipient_channel_id is none, it will send to staker
+        if !is_on_chain_recipient
+            && (undelegation.channel_id.is_some() || undelegation.recipient_channel_id.is_some())
+        {
             // if staker is from other chain
             // need to send transfer to transfer handler first before transfer to other chain via ucs03 contract
             let bank_msg = BankMsg::Send {
@@ -801,12 +885,21 @@ pub fn process_batch_withdrawal(
             let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
             send_msgs.push(msg);
 
+            let target_channel_id = match undelegation.recipient_channel_id {
+                Some(ch_id) => ch_id,
+                None => undelegation.channel_id.unwrap(),
+            };
+
+            let receiver = match undelegation.recipient.clone() {
+                Some(rec) => rec,
+                None => staker.clone(),
+            };
             //after send bank msg to transfer handler, then call ucs03 on behalf of transfer handler to send token back
             let msg = get_unbonding_ucs03_transfer_cosmos_msg(
                 deps.storage,
                 lst_contract.clone(),
-                key.clone(),
-                undelegation.channel_id.unwrap(),
+                receiver,
+                target_channel_id,
                 time,
                 ucs03_relay_contract.clone(),
                 undelegation.unstake_return_native_amount.unwrap(),
@@ -815,15 +908,31 @@ pub fn process_batch_withdrawal(
                 salt.get(i).unwrap().clone(),
             )?;
             send_msgs.push(msg);
+        } else {
+            let recipient = match undelegation.recipient.clone() {
+                Some(addr) => addr,
+                None => staker.clone(),
+            };
+            let bank_msg = BankMsg::Send {
+                to_address: recipient,
+                amount: vec![Coin {
+                    denom: denom.clone(),
+                    amount: undelegation.unstake_return_native_amount.unwrap(),
+                }],
+            };
+            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
+            send_msgs.push(msg);
         }
 
         let ev = ProcessUnbondingEvent(
             id,
             undelegation.channel_id,
-            key.to_string(),
+            staker.to_string(),
             undelegation.unstake_return_native_amount.unwrap(),
             denom.clone(),
             env.block.time,
+            undelegation.recipient.clone(),
+            undelegation.recipient_channel_id,
         );
         events.push(ev);
 
@@ -892,6 +1001,8 @@ pub fn on_zkgm(
             salt,
             slippage,
             expected,
+            recipient,
+            recipient_channel_id,
         } => {
             return zkgm_bond(
                 deps,
@@ -903,10 +1014,25 @@ pub fn on_zkgm(
                 salt,
                 slippage,
                 expected,
+                recipient,
+                recipient_channel_id,
             )
         }
-        ZkgmMessage::Unbond { amount } => {
-            return zkgm_unbond(deps, env, info, channel_id, format!("{}", sender), amount)
+        ZkgmMessage::Unbond {
+            amount,
+            recipient,
+            recipient_channel_id,
+        } => {
+            return zkgm_unbond(
+                deps,
+                env,
+                info,
+                channel_id,
+                format!("{}", sender),
+                amount,
+                recipient,
+                recipient_channel_id,
+            )
         }
     }
 }
@@ -1049,17 +1175,13 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     }
 
     // check total balance from reward
-    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    let reward_balance = REWARD_BALANCE.load(deps.storage)?;
 
     let mut balance_to_split = reward_balance;
 
     if balance.amount < balance_to_split {
         balance_to_split = balance.amount;
     }
-
-    //reset the reward balance
-    reward_balance = Uint128::zero();
-    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     let mut attrs: Vec<Attribute> = vec![
         attr("action", "split_reward"),
@@ -1111,4 +1233,68 @@ pub fn set_status(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     STATUS.save(deps.storage, &status)?;
     Ok(Response::new())
+}
+
+pub fn set_chain(
+    deps: DepsMut,
+    info: MessageInfo,
+    chain: Chain,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::CHAINS.save(deps.storage, chain.ucs03_channel_id, &chain)?;
+    Ok(Response::new())
+}
+
+pub fn remove_chain(
+    deps: DepsMut,
+    info: MessageInfo,
+    channel_id: u32,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::CHAINS.remove(deps.storage, channel_id);
+    Ok(Response::new())
+}
+
+pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
+    let supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
+
+    let block_height = env.block.height;
+    let next_epoch = get_next_epoch(block_height, supply_queue.epoch_period);
+
+    let epoch_diff = next_epoch - block_height;
+
+    if epoch_diff > 5 && epoch_diff < 360 {
+        return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+            format!(
+                "incorrect block height: current height: {}, next epoch: {}",
+                block_height, next_epoch,
+            ),
+        )));
+    }
+
+    let params = PARAMETERS.load(deps.storage)?;
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let validators_list: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    let delegator = env.contract.address;
+    let unclaimed_reward = utils::delegation::get_unclaimed_reward(
+        deps.querier,
+        delegator.to_string(),
+        params.underlying_coin_denom.clone(),
+        validators_list,
+    )?;
+
+    let reward_balance = utils::calc::normalize_reward_balance(
+        deps.storage,
+        env.block.height,
+        unclaimed_reward.into(),
+    )?;
+
+    Ok(Response::new()
+        .add_attribute("unclaimed_reward", unclaimed_reward)
+        .add_attribute("reward_balance", reward_balance))
 }

@@ -83,7 +83,10 @@ pub enum ExecuteRewardMsg {
 
 #[cw_serde]
 pub enum Cw20PayloadMsg {
-    Unstake {},
+    Unstake {
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+    },
 }
 
 #[cw_ownable_execute]
@@ -95,6 +98,9 @@ pub enum ExecuteMsg {
     Bond {
         slippage: Option<Decimal>,
         expected: Uint128,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+        salt: Option<String>,
     },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
@@ -163,6 +169,13 @@ pub enum ExecuteMsg {
         coin_denom: Option<String>,
     },
     SetStatus(Status),
+    SetChain {
+        chain: crate::state::Chain,
+    },
+    RemoveChain {
+        channel_id: u32,
+    },
+    NormalizeReward {},
 }
 
 #[cw_serde]
@@ -215,6 +228,10 @@ pub enum QueryMsg {
     Status {},
     #[returns(Vec<cosmwasm_std::FullDelegation>)]
     Delegations {},
+    #[returns(Vec<crate::state::Chain>)]
+    Chains {},
+    #[returns(Vec<crate::state::WithdrawRewardQueue>)]
+    RewardQueue {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;
@@ -263,6 +280,8 @@ pub struct MintTokensPayload {
     pub amount: Uint128,
     pub salt: String,
     pub channel_id: Option<u32>,
+    pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
 }
 
 #[cw_serde]
@@ -295,11 +314,15 @@ pub enum ZkgmMessage {
     Bond {
         amount: Uint128,
         salt: String,
-        slippage: Option<Decimal>,
         expected: Uint128,
+        slippage: Option<Decimal>,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
     },
     Unbond {
         amount: Uint128,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
     },
 }
 
@@ -310,6 +333,8 @@ pub struct BondData {
     pub total_bond_amount: Uint128,
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
 }
 
 #[cw_serde]
@@ -320,6 +345,8 @@ pub struct UnbondData {
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
     pub record_id: u64,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
 }
 
 #[cw_serde]

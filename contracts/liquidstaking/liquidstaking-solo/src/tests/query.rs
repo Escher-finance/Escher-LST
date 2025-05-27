@@ -24,6 +24,8 @@ fn test_query_unbond_record() {
             // These bellow are just to create some variation in the data
             released: i > (total / 2),
             batch_id: if i % 2 == 0 { 1 } else { 2 },
+            recipient: None,
+            recipient_channel_id: None,
         };
         unbond_record()
             .save(deps.as_mut().storage, i, &unbond_rec)
@@ -86,4 +88,33 @@ fn test_query_unbond_record_should_return_err_if_invalid_query() {
         false
     };
     assert!(has_right_error);
+}
+
+#[test]
+fn test_query_chains() {
+    let mut deps = cosmwasm_std::testing::mock_dependencies();
+
+    for i in 1..10 {
+        let chain_id = format!("chain-{}", i);
+        let data = crate::state::Chain {
+            chain_id: chain_id.clone(),
+            name: format!("chain{}", i),
+            ucs03_channel_id: i,
+            prefix: format!("b{}", i),
+        };
+        crate::state::CHAINS
+            .save(&mut deps.storage, 1, &data)
+            .unwrap();
+    }
+
+    let chains: Vec<crate::state::Chain> = crate::state::CHAINS
+        .range(&deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .filter_map(|result| result.ok().map(|(_, chain)| chain))
+        .collect();
+
+    let chain_1: &crate::state::Chain = chains.get(0).unwrap();
+    assert_eq!(chain_1.ucs03_channel_id, 1);
+
+    let chain_9: &crate::state::Chain = chains.get(8).unwrap();
+    assert_eq!(chain_9.name, "chain9")
 }

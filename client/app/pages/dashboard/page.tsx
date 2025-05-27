@@ -1,7 +1,7 @@
 "use client";
 
-import ExecuteBond from "../utils/execute_bond";
-import Unbond from "../utils/unbond";
+import Bond from "./bond";
+import Unbond from "./unbond";
 import Assets from "./assets";
 import { Tabs, Tab, Chip, Link } from "@nextui-org/react";
 import UnbondingRecords from "./unbonding_records";
@@ -42,7 +42,7 @@ export default function Dashboard() {
 
           <Tabs aria-label="Tabs sizes" className="mt-10 p-3">
             <Tab key="bond" title="Bond">
-              <ExecuteBond stateKey={stateKey} setStateKey={setStateKey} />
+              <Bond stateKey={stateKey} setStateKey={setStateKey} />
             </Tab>
             <Tab key="unbond" title="Unbond" >
               <Unbond stateKey={stateKey} setStateKey={setStateKey} />

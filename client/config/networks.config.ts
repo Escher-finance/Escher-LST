@@ -35,7 +35,7 @@ export type ChainConfig = {
   gasPrice: string;
 };
 
-type SupportedNetworks = "uniontestnet" | "babylontestnet";
+type SupportedNetworks = "uniontestnet" | "babylontestnet" | "babylon";
 
 
 const currency: Record<SupportedNetworks, Currency> = {
@@ -53,7 +53,15 @@ const currency: Record<SupportedNetworks, Currency> = {
     liquidStakingDenom: "ebbn",
     liquidStakingDenomDisplay: "eBABY"
   },
+  "babylon": {
+    coinDenom: "BABY",
+    coinMinimalDenom: "ubbn",
+    coinDecimals: 6,
+    liquidStakingDenom: "ebbn",
+    liquidStakingDenomDisplay: "eBABY"
+  }
 };
+
 
 const Networks: Record<SupportedNetworks, ChainConfig> = {
 
@@ -109,11 +117,38 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     },
     gasPrice: "0.0025ubbn",
   },
+  "babylon": {
+    chainId: "bbn-1",
+    chainName: "babylon-mainnet",
+    rest: "https://babylon-api.polkachu.com/",
+    rpc: "https://babylon-rpc.polkachu.com/",
+    stakeCurrency: currency["babylon"],
+    bip44: {
+      coinType: 118
+    },
+    bech32Config: {
+      bech32PrefixAccAddr: "bbn",
+      bech32PrefixAccPub: "bbnpub",
+      bech32PrefixValAddr: "bbnvaloper",
+      bech32PrefixValPub: "bbnvaloperpub",
+      bech32PrefixConsAddr: "bbnvalcons",
+      bech32PrefixConsPub: "bbnvalconspub",
+    },
+    currencies: [currency["babylon"]],
+    feeCurrencies: [currency["babylon"]],
+    contracts: {
+      lst: "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g",
+      cw20: "bbn1s7jzz7cyuqmy5xpr07yepka5ngktexsferu2cr4xeww897ftj77sv30f5s",
+      reward: "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g",
+    },
+    gasPrice: "0.0025ubbn",
+  },
 };
 
 export const BaseNetworks: Record<SupportedNetworks, ChainConfig> = {
   "uniontestnet": Networks["uniontestnet"],
   "babylontestnet": Networks["babylontestnet"],
+  "babylon": Networks["babylon"],
 };
 
 export default Networks;
