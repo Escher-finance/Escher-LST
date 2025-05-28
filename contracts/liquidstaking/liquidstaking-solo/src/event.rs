@@ -19,6 +19,7 @@ pub fn BondEvent(
     recipient_channel_id: Option<u32>,
     reward_balance: Uint128,
     unclaimed_reward: Uint128,
+    ibc_channel_id: Option<String>,
 ) -> Event {
     let recipient = match recipient {
         Some(recipient) => recipient,
@@ -29,6 +30,12 @@ pub fn BondEvent(
         Some(channel_id) => channel_id.to_string(),
         None => "0".to_string(),
     };
+
+    let ibc_channel_id: String = match ibc_channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "".to_string(),
+    };
+
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", staker)
@@ -45,6 +52,7 @@ pub fn BondEvent(
         .add_attribute("recipient_channel_id", recipient_channel_id)
         .add_attribute("reward_balance", reward_balance)
         .add_attribute("unclaimed_reward", unclaimed_reward)
+        .add_attribute("ibc_channel_id", ibc_channel_id)
 }
 
 pub const UNBOND_EVENT: &str = "unbond";
@@ -301,20 +309,22 @@ pub fn UpdateConfigEvent(
         .add_attribute("coin_denom", coin_denom)
 }
 
-pub const RESTAKE_EVENT: &str = "restake";
+pub const INJECT_EVENT: &str = "inject";
 
 #[allow(non_snake_case)]
-pub fn RestakeEvent(
+pub fn InjectEvent(
     amount: Uint128,
     reward_balance: Uint128,
     unclaimed_reward: Uint128,
     prev_exchange_rate: Decimal,
     exchange_rate: Decimal,
+    time: Timestamp,
 ) -> Event {
-    Event::new(UPDATE_CONFIG_EVENT.to_string())
+    Event::new(INJECT_EVENT.to_string())
         .add_attribute("amount", amount)
         .add_attribute("reward_balance", reward_balance)
         .add_attribute("unclaimed_reward", unclaimed_reward.to_string())
         .add_attribute("prev_exchange_rate", prev_exchange_rate.to_string())
         .add_attribute("exchange_rate", exchange_rate.to_string())
+        .add_attribute("time", format!("{}", time.nanos()))
 }
