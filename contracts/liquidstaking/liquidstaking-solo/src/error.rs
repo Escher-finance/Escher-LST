@@ -134,4 +134,10 @@ pub enum ContractError {
 
     #[error("no reward to normalize")]
     NoRewardToNormalize {},
+
+    #[error("missing amount from payload")]
+    MissingAmount {},
+
+    #[error("not enough fund to pay transfer fee")]
+    NotEnoughFundForTransfer {},
 }

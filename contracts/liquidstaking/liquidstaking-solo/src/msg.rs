@@ -96,6 +96,7 @@ pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
     /// Issue `amount` / exchange_rate for the user.
     Bond {
+        amount: Option<Uint128>,
         slippage: Option<Decimal>,
         expected: Uint128,
         recipient: Option<String>,

@@ -162,6 +162,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Bond {
+            amount,
             slippage,
             expected,
             recipient,
@@ -171,6 +172,7 @@ pub fn execute(
             deps,
             env,
             info,
+            amount,
             slippage,
             expected,
             recipient,

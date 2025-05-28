@@ -41,6 +41,7 @@ pub fn bond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    amount: Option<Uint128>,
     slippage: Option<Decimal>,
     expected: Uint128,
     recipient: Option<String>,
@@ -77,9 +78,26 @@ pub fn bond(
         denom: coin_denom.clone(),
     };
 
+    if recipient_channel_id.is_some() && amount.is_none() {
+        return Err(ContractError::MissingAmount {});
+    }
+
+    if recipient_channel_id.is_some() && amount.is_some() {
+        let required_amount = amount.unwrap() + params.transfer_fee;
+
+        if payment.amount < required_amount {
+            return Err(ContractError::NotEnoughFundForTransfer {});
+        }
+    }
+
     let slippage_rate = match slippage {
         Some(rate) => rate,
         None => Decimal::from_str("0.01").unwrap(),
+    };
+
+    let bond_amount = match amount {
+        Some(amount) => amount,
+        None => payment.amount,
     };
 
     let (msgs, sub_msgs, bond_data) = utils::delegation::process_bond(
@@ -88,7 +106,7 @@ pub fn bond(
         sender.to_string(),
         sender.to_string(),
         delegator.clone(),
-        payment.amount,
+        bond_amount,
         env.block.time.nanos(),
         params,
         validators_reg.clone(),
@@ -106,7 +124,7 @@ pub fn bond(
     let bond_event = BondEvent(
         sender.to_string(),
         sender.to_string(),
-        payment.amount.clone(),
+        bond_amount.clone(),
         bond_data.delegated_amount.clone(),
         bond_data.mint_amount,
         bond_data.total_bond_amount.clone(),
@@ -136,7 +154,7 @@ pub fn bond(
             attr("staker", sender.clone()),
             attr("recipient", recipient.unwrap_or(sender.into())),
             attr("channel_id", recipient_channel_id.unwrap_or(0).to_string()),
-            attr("bond_amount", payment.amount.to_string()),
+            attr("bond_amount", bond_amount.to_string()),
             attr("denom", coin_denom.to_string()),
             attr("minted", bond_data.mint_amount),
             attr("exchange_rate", bond_data.exchange_rate.to_string()),
@@ -350,6 +368,29 @@ pub fn receive(
             recipient_channel_id,
         } => (recipient, recipient_channel_id),
     };
+
+    // if the recipient on other chain, need to check attached funds to covers transfer fee
+    if recipient_channel_id.is_some() {
+        // coin must have be sent along with transaction and it should be in underlying coin denom
+        if info.funds.len() > 1usize {
+            return Err(ContractError::InvalidAsset {});
+        }
+
+        let payment = Coin {
+            amount: info
+                .funds
+                .iter()
+                .find(|x| x.denom == params.underlying_coin_denom && x.amount > Uint128::zero())
+                .ok_or_else(|| ContractError::NoAsset {})?
+                .amount
+                .clone(),
+            denom: params.underlying_coin_denom.clone(),
+        };
+
+        if payment.amount < params.transfer_fee {
+            return Err(ContractError::NotEnoughFundForTransfer {});
+        }
+    }
 
     validate_recipient(
         &deps,
