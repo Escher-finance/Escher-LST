@@ -1337,7 +1337,7 @@ pub fn inject(
         env.block.height,
     )?;
 
-    let restake_event = crate::event::InjectEvent(
+    let inject_event = crate::event::InjectEvent(
         amount,
         inject_data.reward_balance,
         inject_data.unclaimed_reward,
@@ -1348,7 +1348,7 @@ pub fn inject(
 
     Ok(Response::new()
         .add_messages(msgs)
-        .add_event(restake_event)
+        .add_event(inject_event)
         .add_attribute("action", "inject")
         .add_attribute("amount", amount))
 }
