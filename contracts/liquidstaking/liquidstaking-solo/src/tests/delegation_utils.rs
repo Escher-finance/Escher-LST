@@ -949,6 +949,7 @@ fn test_process_bond() {
         None,
         None,
         true,
+        None,
     )
     .unwrap();
 

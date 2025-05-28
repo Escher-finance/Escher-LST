@@ -119,6 +119,7 @@ pub fn bond(
         recipient_channel_id,
         bond_data.reward_balance,
         bond_data.unclaimed_reward,
+        None,
     );
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -275,6 +276,7 @@ pub fn zkgm_bond(
         recipient_channel_id,
         bond_data.reward_balance,
         bond_data.unclaimed_reward,
+        None,
     );
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
@@ -1308,8 +1310,8 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
         .add_attribute("reward_balance", reward_balance))
 }
 
-/// Restake some amount of underlying coin denom without minting new cw20 token
-pub fn restake(
+/// Inject some amount of underlying coin denom to be staked without minting new cw20 token
+pub fn inject(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -1326,7 +1328,7 @@ pub fn restake(
         return Err(ContractError::NotEnoughAvailableFund {});
     }
 
-    let (msgs, restake_data) = utils::delegation::restake(
+    let (msgs, inject_data) = utils::delegation::inject(
         deps.storage,
         deps.querier,
         contract_addr,
@@ -1335,16 +1337,18 @@ pub fn restake(
         env.block.height,
     )?;
 
-    let restake_event = crate::event::RestakeEvent(
+    let restake_event = crate::event::InjectEvent(
         amount,
-        restake_data.reward_balance,
-        restake_data.unclaimed_reward,
-        restake_data.prev_exchange_rate,
-        restake_data.exchange_rate,
+        inject_data.reward_balance,
+        inject_data.unclaimed_reward,
+        inject_data.prev_exchange_rate,
+        inject_data.exchange_rate,
+        env.block.time,
     );
 
     Ok(Response::new()
         .add_messages(msgs)
         .add_event(restake_event)
-        .add_attribute("action", "restake"))
+        .add_attribute("action", "inject")
+        .add_attribute("amount", amount))
 }

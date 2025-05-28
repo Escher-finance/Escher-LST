@@ -1,6 +1,6 @@
 use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
 use crate::execute::StakerUndelegation;
-use crate::msg::{RestakeData, ValidatorDelegation};
+use crate::msg::{InjectData, ValidatorDelegation};
 use crate::proto;
 use crate::state::{
     ValidatorsRegistry, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, WITHDRAW_REWARD_QUEUE,
@@ -1001,14 +1001,14 @@ pub fn get_staker_undelegation(
 }
 
 /// Restake to delegate base on amount and update exchange rate
-pub fn restake(
+pub fn inject(
     storage: &mut dyn Storage,
     querier: QuerierWrapper,
     delegator: Addr,
     amount: Uint128,
     params: Parameters,
     block_height: u64,
-) -> Result<(Vec<CosmosMsg>, RestakeData), ContractError> {
+) -> Result<(Vec<CosmosMsg>, InjectData), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
     }
@@ -1072,7 +1072,7 @@ pub fn restake(
     state.exchange_rate = exchange_rate;
     STATE.save(storage, &state)?;
 
-    let data = RestakeData {
+    let data = InjectData {
         prev_exchange_rate,
         exchange_rate,
         total_supply: state.total_supply.clone(),
