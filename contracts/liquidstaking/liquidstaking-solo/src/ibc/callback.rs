@@ -6,7 +6,7 @@ use ibc::apps::transfer::types::proto::transfer::v2::FungibleTokenPacketData;
 
 use crate::{
     state::{PARAMETERS, VALIDATORS_REGISTRY},
-    utils::delegation::process_bond,
+    utils,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -45,57 +45,114 @@ pub fn ibc_destination_callback(
     // We only care about this chain's native token in this example.
     // The `packet_data.denom` is formatted as `{port id}/{channel id}/{denom}`,
     // where the port id and channel id are the source chain's identifiers.
-    // Please note that the denom is not formatted like that when you transfer untrn
-    // from Neutron to some other chain. In that case, the denom is just the native
-    // token of the source chain (ubbn).
     let native_denom_on_source_chain = format!(
         "{}/{}/{}",
         msg.packet.src.port_id, msg.packet.src.channel_id, params.underlying_coin_denom
     );
 
+    ensure_eq!(
+        packet_data.denom,
+        native_denom_on_source_chain,
+        StdError::generic_err("unsupported coin denom")
+    );
+
     let memo = packet_data.memo;
     let payload: Result<crate::msg::IBCCallbackPayload, StdError> = from_json(memo.as_bytes());
 
-    if payload.is_ok() {
-        let payload = payload.unwrap();
-        let amount = packet_data
-            .amount
-            .parse::<u128>()
-            .map(Uint128::new)
-            .map_err(|_| StdError::generic_err("failed to parse amount as u128"))?;
-        let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
-        let channel_id = msg.packet.dest.channel_id.parse::<u32>().map_err(|_| {
-            StdError::generic_err(format!(
-                "Failed to parse '{}' as u32",
-                msg.packet.dest.channel_id
-            ))
-        })?;
+    let channel_id: String = msg.packet.dest.channel_id;
 
-        let salt = payload.salt;
-
-        // if the denom is native token then do the bond
-        if packet_data.denom == native_denom_on_source_chain {
-            let (_msgs, _sub_msgs, _bond_data) = process_bond(
-                deps.storage,
-                deps.querier,
-                env.contract.address.to_string(),
-                packet_data.sender,
-                env.contract.address,
-                amount,
-                env.block.time.nanos(),
-                params,
-                validators_reg,
-                salt,
-                Some(channel_id),
-                env.block.height,
-            )
-            .map_err(|err| StdError::generic_err(format!("process_bond failed: {}", err)))?;
-        }
-
-        // TODO
-        // handle unbond
-        // process msgs and submsgs
+    if payload.is_err() {
+        return Err(StdError::generic_err("invalid payload"));
     }
 
-    Ok(IbcBasicResponse::new().add_attribute("action", "ibc_destination_callback"))
+    let payload = payload.unwrap();
+    let amount = packet_data
+        .amount
+        .parse::<u128>()
+        .map(Uint128::new)
+        .map_err(|_| StdError::generic_err("failed to parse amount as u128"))?;
+
+    // check amount
+
+    let mut required_amount = payload.amount;
+    // if recipient on other chain, need to add transfer fee to required amount
+    if payload.recipient_channel_id.is_some() {
+        required_amount += params.transfer_fee;
+    }
+
+    if amount < required_amount {
+        return Err(StdError::generic_err("not enough fund"));
+    }
+
+    let salt = payload.salt;
+
+    let delegator = env.contract.address;
+    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+
+    let on_chain_recipient = utils::validation::validate_recipient(
+        &deps,
+        Some(payload.recipient.clone()),
+        payload.recipient_channel_id,
+        Some(salt.clone()),
+    );
+
+    if on_chain_recipient.is_err() {
+        return Err(StdError::generic_err(format!(
+            "invalid recipient, reason: {}",
+            on_chain_recipient.unwrap_err().to_string()
+        )));
+    }
+
+    let coin_denom = params.underlying_coin_denom.clone();
+    let process_bond_result = utils::delegation::process_bond(
+        deps.storage,
+        deps.querier,
+        packet_data.sender.clone(),
+        packet_data.sender.clone(),
+        delegator.clone(),
+        payload.amount.clone(),
+        env.block.time.nanos(),
+        params,
+        validators_reg.clone(),
+        salt,
+        None,
+        env.block.height,
+        Some(payload.recipient.clone()),
+        payload.recipient_channel_id,
+        on_chain_recipient.unwrap(),
+    );
+
+    if process_bond_result.is_err() {
+        return Err(StdError::generic_err(format!(
+            "process_bond failed, reason: {}",
+            process_bond_result.unwrap_err().to_string()
+        )));
+    }
+
+    let (msgs, submsgs, bond_data) = process_bond_result.unwrap();
+
+    // create bond event here
+    let bond_event = crate::event::BondEvent(
+        packet_data.sender.to_string(),
+        packet_data.sender.clone(),
+        payload.amount.clone(),
+        bond_data.delegated_amount.clone(),
+        bond_data.mint_amount,
+        bond_data.total_bond_amount.clone(),
+        bond_data.total_supply,
+        bond_data.exchange_rate,
+        "0".into(),
+        env.block.time,
+        coin_denom,
+        Some(payload.recipient),
+        payload.recipient_channel_id,
+        bond_data.reward_balance,
+        bond_data.unclaimed_reward,
+        Some(channel_id),
+    );
+
+    Ok(IbcBasicResponse::new()
+        .add_event(bond_event)
+        .add_messages(msgs)
+        .add_submessages(submsgs))
 }
