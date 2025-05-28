@@ -8,9 +8,10 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Config, OldParameters, Parameters, State, Status, SupplyQueue, ValidatorsRegistry,
-    WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE,
-    SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    unbond_record, Config, OldParameters, Parameters, State, Status, SupplyQueue,
+    ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+    REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    WITHDRAW_REWARD_QUEUE,
 };
 use cw2::set_contract_version;
 
@@ -145,6 +146,8 @@ pub fn instantiate(
         },
     )?;
 
+    WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![])?;
+
     Ok(Response::new()
         .add_attribute("action", "instantiate")
         .add_messages(msgs))
@@ -158,9 +161,22 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Bond { slippage, expected } => {
-            execute::bond(deps, env, info, slippage, expected)
-        }
+        ExecuteMsg::Bond {
+            slippage,
+            expected,
+            recipient,
+            recipient_channel_id,
+            salt,
+        } => execute::bond(
+            deps,
+            env,
+            info,
+            slippage,
+            expected,
+            recipient,
+            recipient_channel_id,
+            salt,
+        ),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
@@ -244,6 +260,10 @@ pub fn execute(
             coin_denom,
         ),
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
+        ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
+        ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
+        ExecuteMsg::NormalizeReward {} => execute::normalize_reward(deps, env),
+        ExecuteMsg::Restake { amount } => execute::restake(deps, env, info, amount),
     }
 }
 
@@ -295,14 +315,101 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
                 zkgm_token_minter,
             };
 
-            // Serialize the new data
+            // Serialize the new dataya
             let new_data = cosmwasm_std::to_json_vec(&new_params)?;
             deps.storage.set(b"parameters", &new_data);
         }
+    }
+
+    if CONTRACT_VERSION == "0.1.163" {
+        migrate_unbond_record(deps.storage)?;
+    }
+
+    let reward_queue_res = deps.storage.get(b"withdraw_reward_queue");
+    if reward_queue_res.is_none() {
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![])?;
     }
 
     Ok(Response::new()
         .add_attribute("action", "migrate")
         .add_attribute("version", CONTRACT_VERSION)
         .add_attribute("contract_name", CONTRACT_NAME))
+}
+
+/// Migrate the old unbond record to the new record with recipient and recipient_channel_id properties
+pub fn migrate_unbond_record(storage: &mut dyn cosmwasm_std::Storage) -> Result<(), ContractError> {
+    let old_unbond_records: Vec<(u64, crate::state::OldUnbondRecord)> =
+        crate::state::old_unbond_record()
+            .range(storage, None, None, cosmwasm_std::Order::Ascending)
+            .map(|item| {
+                item.map_err(|_| {
+                    ContractError::Std(StdError::generic_err("Failed to load old unbond records"))
+                })
+            })
+            .collect::<Result<_, _>>()?;
+
+    for (id, old_record) in old_unbond_records {
+        let new_record = crate::state::UnbondRecord {
+            id,
+            staker: old_record.staker,
+            amount: old_record.amount,
+            channel_id: old_record.channel_id,
+            batch_id: old_record.batch_id,
+            height: old_record.height,
+            sender: old_record.sender,
+            released_height: old_record.released_height,
+            released: old_record.released,
+            recipient: None,
+            recipient_channel_id: None,
+        };
+
+        unbond_record().save(storage, id, &new_record)?;
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_migrate_unbond_record() {
+    let mut deps = cosmwasm_std::testing::mock_dependencies();
+    let sender = "sender".to_string();
+    let staker = "staker".to_string();
+    let unstake_amount = Uint128::new(10000);
+    let pending_batch_id = 1;
+    let token_count = 5;
+    let channel_id = Some(1);
+    // Populate old storage
+    let old_store = crate::state::old_unbond_record();
+
+    for i in 1..10 {
+        let data = crate::state::OldUnbondRecord {
+            id: i,
+            height: 1000 + i,
+            sender: sender.clone(),
+            staker: staker.clone(),
+            channel_id: channel_id,
+            amount: unstake_amount,
+            released_height: 0,
+            released: i > (token_count / 2),
+            batch_id: pending_batch_id,
+        };
+        old_store.save(&mut deps.storage, i, &data).unwrap();
+    }
+
+    // Run migration
+    migrate_unbond_record(deps.as_mut().storage).unwrap();
+
+    // Verify new storage
+    let new_store = unbond_record();
+    let new_data: crate::state::UnbondRecord = new_store.load(&deps.storage, 1).unwrap();
+    assert_eq!(new_data.id, 1);
+    assert_eq!(new_data.height, 1001);
+    assert_eq!(new_data.recipient, None);
+
+    let new_data: crate::state::UnbondRecord = new_store.load(&deps.storage, 8).unwrap();
+    assert_eq!(new_data.id, 8);
+    assert_eq!(new_data.height, 1008);
+    assert_eq!(new_data.recipient, None);
+
+    println!("{:#?}", new_data);
 }

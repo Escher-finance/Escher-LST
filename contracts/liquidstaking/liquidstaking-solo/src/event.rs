@@ -15,10 +15,23 @@ pub fn BondEvent(
     channel_id: String,
     time: Timestamp,
     denom: String,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
+    reward_balance: Uint128,
+    unclaimed_reward: Uint128,
 ) -> Event {
+    let recipient = match recipient {
+        Some(recipient) => recipient,
+        None => "".to_string(),
+    };
+
+    let recipient_channel_id: String = match recipient_channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "0".to_string(),
+    };
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", sender)
-        .add_attribute("staker", format!("{}", staker))
+        .add_attribute("staker", staker)
         .add_attribute("channel_id", channel_id)
         .add_attribute("bond_amount", bond_amount)
         .add_attribute("output_amount", minted_amount)
@@ -28,6 +41,10 @@ pub fn BondEvent(
         .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("denom", denom)
+        .add_attribute("recipient", recipient)
+        .add_attribute("recipient_channel_id", recipient_channel_id)
+        .add_attribute("reward_balance", reward_balance)
+        .add_attribute("unclaimed_reward", unclaimed_reward)
 }
 
 pub const UNBOND_EVENT: &str = "unbond";
@@ -74,6 +91,8 @@ pub fn SubmitBatchEvent(
     exchange_rate: Decimal,
     time: Timestamp,
     denom: String,
+    reward_balance: Uint128,
+    unclaimed_reward: Uint128,
 ) -> Event {
     Event::new(SUBMIT_BATCH_EVENT.to_string())
         .add_attribute("batch_id", format!("{}", batch_id))
@@ -86,6 +105,8 @@ pub fn SubmitBatchEvent(
         .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("denom", denom)
+        .add_attribute("reward_balance", reward_balance)
+        .add_attribute("unclaimed_reward", unclaimed_reward)
 }
 
 pub const UPDATE_VALIDATORS_EVENT: &str = "update_validators";
@@ -115,9 +136,10 @@ pub fn UpdateValidatorsEvent(
 pub const PROCESS_REWARDS_EVENT: &str = "process_rewards";
 
 #[allow(non_snake_case)]
-pub fn ProcessRewardsEvent(total_amount: Uint128) -> Event {
+pub fn ProcessRewardsEvent(total_amount: Uint128, balance_reward: Uint128) -> Event {
     Event::new(PROCESS_REWARDS_EVENT.to_string())
-        .add_attribute("total_amount", total_amount.to_string())
+        .add_attribute("withdraw_reward_amount", total_amount.to_string())
+        .add_attribute("balance_reward", balance_reward.to_string())
 }
 
 pub const PROCESS_UNBONDING_EVENT: &str = "process_unbonding";
@@ -130,7 +152,18 @@ pub fn ProcessUnbondingEvent(
     amount: Uint128,
     denom: String,
     time: Timestamp,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
 ) -> Event {
+    let recipient = match recipient {
+        Some(recipient) => recipient,
+        None => staker.to_string(),
+    };
+
+    let recipient_channel_id: String = match recipient_channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "0".to_string(),
+    };
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
         .add_attribute("staker", staker)
         .add_attribute("amount", amount.to_string())
@@ -138,6 +171,8 @@ pub fn ProcessUnbondingEvent(
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("channel_id", channel_id.unwrap_or(0).to_string())
+        .add_attribute("recipient", recipient)
+        .add_attribute("recipient_channel_id", recipient_channel_id)
 }
 
 pub const PROCESS_BATCH_UNBONDING_EVENT: &str = "process_batch_unbonding";
@@ -181,21 +216,36 @@ pub fn UnstakeRequestEvent(
     record_id: u64,
     batch_id: u64,
     time: Timestamp,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
+    reward_balance: Uint128,
 ) -> Event {
-    let mut channel_id_str = "".to_string();
+    let channel_id: String = match channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "".to_string(),
+    };
 
-    if channel_id.is_some() {
-        channel_id_str = format!("{}", channel_id.unwrap());
-    }
+    let recipient = match recipient {
+        Some(recipient) => recipient,
+        None => "".to_string(),
+    };
+
+    let recipient_channel_id: String = match recipient_channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "0".to_string(),
+    };
 
     Event::new(UNSTAKE_REQUEST_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", staker)
-        .add_attribute("channel_id", channel_id_str)
+        .add_attribute("channel_id", channel_id)
         .add_attribute("unbond_amount", amount)
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("record_id", format!("{}", record_id))
+        .add_attribute("recipient", recipient)
+        .add_attribute("recipient_channel_id", recipient_channel_id)
+        .add_attribute("reward_balance", reward_balance)
 }
 
 pub const BATCH_RECEIVED_EVENT: &str = "batch_received";
@@ -249,4 +299,22 @@ pub fn UpdateConfigEvent(
         .add_attribute("fee_receiver", fee_receiver)
         .add_attribute("fee_rate", fee_rate.to_string())
         .add_attribute("coin_denom", coin_denom)
+}
+
+pub const RESTAKE_EVENT: &str = "restake";
+
+#[allow(non_snake_case)]
+pub fn RestakeEvent(
+    amount: Uint128,
+    reward_balance: Uint128,
+    unclaimed_reward: Uint128,
+    prev_exchange_rate: Decimal,
+    exchange_rate: Decimal,
+) -> Event {
+    Event::new(UPDATE_CONFIG_EVENT.to_string())
+        .add_attribute("amount", amount)
+        .add_attribute("reward_balance", reward_balance)
+        .add_attribute("unclaimed_reward", unclaimed_reward.to_string())
+        .add_attribute("prev_exchange_rate", prev_exchange_rate.to_string())
+        .add_attribute("exchange_rate", exchange_rate.to_string())
 }

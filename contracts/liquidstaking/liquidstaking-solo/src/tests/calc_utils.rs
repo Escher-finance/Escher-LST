@@ -1,10 +1,14 @@
 use crate::{
-    state::{BurnQueue, MintQueue, SupplyQueue},
+    state::{
+        BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue, REWARD_BALANCE, SUPPLY_QUEUE,
+        WITHDRAW_REWARD_QUEUE,
+    },
     utils::calc::*,
 };
 use cosmwasm_std::{
-    from_json, testing::MockQuerier, to_json_binary, Decimal, Empty, QuerierWrapper, SystemError,
-    SystemResult, Uint128, Uint256,
+    from_json,
+    testing::{mock_dependencies, MockQuerier},
+    to_json_binary, Decimal, Empty, QuerierWrapper, SystemError, SystemResult, Uint128, Uint256,
 };
 use cw20::TokenInfoResponse;
 use std::str::FromStr;
@@ -273,6 +277,8 @@ fn test_staker_undelegation_with_dust_distribution() {
         released_height: 0,
         released: false,
         batch_id: 27,
+        recipient: None,
+        recipient_channel_id: None,
     };
 
     let unbond_record_2 = crate::state::UnbondRecord {
@@ -285,6 +291,8 @@ fn test_staker_undelegation_with_dust_distribution() {
         released_height: 0,
         released: false,
         batch_id: 27,
+        recipient: None,
+        recipient_channel_id: None,
     };
 
     let unbond_record_3 = crate::state::UnbondRecord {
@@ -297,6 +305,8 @@ fn test_staker_undelegation_with_dust_distribution() {
         released_height: 0,
         released: false,
         batch_id: 27,
+        recipient: None,
+        recipient_channel_id: None,
     };
 
     let mut unbond_records = vec![unbond_record_1, unbond_record_2, unbond_record_3];
@@ -318,4 +328,130 @@ fn test_staker_undelegation_with_dust_distribution() {
         unbond_record_ids,
         unbond_records.iter().map(|u| u.id).collect::<Vec<u64>>()
     );
+}
+
+#[test]
+fn test_normalize_reward_balance() {
+    let mut deps = mock_dependencies();
+
+    REWARD_BALANCE
+        .save(&mut deps.storage, &Uint128::zero())
+        .unwrap();
+    crate::state::WITHDRAW_REWARD_QUEUE
+        .save(&mut deps.storage, &vec![])
+        .unwrap();
+
+    SUPPLY_QUEUE
+        .save(
+            &mut deps.storage,
+            &SupplyQueue {
+                mint: vec![],
+                burn: vec![],
+                epoch_period: 360,
+            },
+        )
+        .unwrap();
+
+    // 1st bond at block 300
+    // query reward on this block and assume we set to 100
+    let block = 300;
+    let unclaimed_reward_balance: u128 = 100;
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
+    // 2nd bond at block 350
+    // query reward on this block and assume we set to 150
+    let block = 350;
+    let unclaimed_reward_balance: u128 = 150;
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
+
+    let reward_balance = REWARD_BALANCE.load(&deps.storage).unwrap();
+    let reward_queue = WITHDRAW_REWARD_QUEUE.load(&deps.storage).unwrap();
+
+    println!("==== after 2x transactions ==== at block 300 & 350");
+    println!("reward_balance : {}", reward_balance);
+    println!("reward queue: {:?}", reward_queue);
+    assert_eq!(reward_balance, Uint128::new(0u128));
+
+    // EPOCH HAPPEN at 401
+
+    // 3rd bond at block 500
+    // query reward on this block and assume we set to 100
+    let block = 500;
+    let unclaimed_reward_balance: u128 = 200;
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
+    // 4rd bond at block 350
+    // query reward on this block and assume we set to 150
+    let block = 550;
+    let unclaimed_reward_balance: u128 = 250;
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
+
+    let reward_balance = REWARD_BALANCE.load(&deps.storage).unwrap();
+    let reward_queue = WITHDRAW_REWARD_QUEUE.load(&deps.storage).unwrap();
+
+    println!("==== after 2x transactions ==== at block 500 & 550");
+    println!("reward_balance : {}", reward_balance);
+    println!("reward queue: {:?}", reward_queue);
+    assert_eq!(reward_balance, Uint128::new(150u128));
+
+    // EPOCH HAPPEN at 801
+
+    // 5rd bond at block 850
+    // query reward on this block and assume we set to 100
+    let block = 850;
+    let unclaimed_reward_balance: u128 = 250;
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
+    // 6rd bond at block 870
+    // query reward on this block and assume we set to 150
+    let block = 870;
+    let unclaimed_reward_balance: u128 = 260;
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
+    // 7rd bond at block 900
+    // query reward on this block and assume we set to 150
+    let block = 900;
+    let unclaimed_reward_balance: u128 = 270;
+    normalize_reward_balance(&mut deps.storage, block, unclaimed_reward_balance.into()).unwrap();
+
+    let reward_balance = REWARD_BALANCE.load(&deps.storage).unwrap();
+    let reward_queue = WITHDRAW_REWARD_QUEUE.load(&deps.storage).unwrap();
+
+    assert_eq!(reward_balance, Uint128::new(400u128));
+    println!("==== after 3x transactions ==== at block 850,870 & 900");
+    println!("reward_balance : {}", reward_balance);
+    println!("reward queue: {:?}", reward_queue);
+}
+
+#[test]
+fn test_normalize_withdraw_reward_queue() {
+    let current_block_height = 1028176;
+    let current_reward_balance = Uint128::zero();
+
+    let reward_amount = Uint128::new(172786u128);
+
+    let reward_queue = vec![WithdrawRewardQueue {
+        amount: reward_amount,
+        block: 1028039,
+    }];
+
+    let epoch_period = 360;
+
+    let (new_balance, new_queue) = normalize_withdraw_reward_queue(
+        current_block_height,
+        current_reward_balance,
+        reward_queue,
+        epoch_period,
+    );
+
+    println!("new_balance: {}", new_balance);
+    println!("new_queue: {:?}", new_queue);
+    assert_eq!(new_balance, reward_amount);
+    assert_eq!(new_queue, vec![]);
+}
+
+#[test]
+fn test_normalize_reward() {
+    let block_height = 1044945;
+    let next_epoch = get_next_epoch(block_height, 360);
+
+    let epoch_diff = next_epoch - block_height;
+
+    println!("epoch diff: {}", epoch_diff);
 }

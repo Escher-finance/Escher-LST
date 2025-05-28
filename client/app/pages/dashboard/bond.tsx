@@ -9,14 +9,14 @@ import {
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
 import { useState } from "react";
-import { getSalt } from "@/app/lib/salt";
+import { getSalt, toHex } from "@/app/lib/salt";
 
 interface KeyProps {
   stateKey: number;
   setStateKey: (key: number) => void;
 }
 
-export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
+export default function Bond({ stateKey, setStateKey }: KeyProps) {
   const { userAddress, client, network } = useGlobalContext();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -43,13 +43,24 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const amount = formEntries.amount.toString();
+    const recipient = formEntries.recipient.toString();
+    const recipient_channel_id = formEntries.recipient_channel_id.toString();
 
     const expected = Math.floor(Number(amount) / liquidity.exchange_rate);
+    const encoder = new TextEncoder();
+    const recipient_hex = toHex(encoder.encode(recipient));
+
+
+    // recipient: recipient == "" ? null : recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
+    // recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
 
     const msg = {
       bond: {
         salt: getSalt(),
         expected: expected.toString(),
+        recipient: recipient == "" ? null : recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
+        recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
+
       },
     };
 
@@ -85,6 +96,16 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
               isRequired
               name="amount"
               label="Amount"
+              defaultValue="10000"
+            />
+            <Input
+              name="recipient"
+              label="Recipient"
+              defaultValue=""
+            />
+            <Input
+              name="recipient_channel_id"
+              label="Recipient Channel ID (4 for xion)"
               defaultValue="0"
             />
           </CardBody>
@@ -96,3 +117,6 @@ export default function ExecuteBond({ stateKey, setStateKey }: KeyProps) {
     </div>
   );
 }
+
+//bbn1fh0yyvuxz7l0vcusq5jc9zvzpm8ec2auvvkh44
+//xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds
