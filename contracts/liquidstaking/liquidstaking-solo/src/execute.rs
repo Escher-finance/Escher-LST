@@ -369,29 +369,6 @@ pub fn receive(
         } => (recipient, recipient_channel_id),
     };
 
-    // if the recipient on other chain, need to check attached funds to covers transfer fee
-    if recipient_channel_id.is_some() {
-        // coin must have be sent along with transaction and it should be in underlying coin denom
-        if info.funds.len() > 1usize {
-            return Err(ContractError::InvalidAsset {});
-        }
-
-        let payment = Coin {
-            amount: info
-                .funds
-                .iter()
-                .find(|x| x.denom == params.underlying_coin_denom && x.amount > Uint128::zero())
-                .ok_or_else(|| ContractError::NoAsset {})?
-                .amount
-                .clone(),
-            denom: params.underlying_coin_denom.clone(),
-        };
-
-        if payment.amount < params.transfer_fee {
-            return Err(ContractError::NotEnoughFundForTransfer {});
-        }
-    }
-
     validate_recipient(
         &deps,
         recipient.clone(),
