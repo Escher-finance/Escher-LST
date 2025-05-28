@@ -1078,6 +1078,8 @@ pub fn inject(
         total_supply: state.total_supply.clone(),
         reward_balance,
         unclaimed_reward,
+        delegated_amount: state.total_delegated_amount,
+        total_bond_amount: state.total_bond_amount,
     };
 
     Ok((msgs, data))

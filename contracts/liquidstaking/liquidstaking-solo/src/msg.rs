@@ -375,4 +375,6 @@ pub struct InjectData {
     pub total_supply: Uint128,
     pub reward_balance: Uint128,
     pub unclaimed_reward: Uint128,
+    pub delegated_amount: Uint128,
+    pub total_bond_amount: Uint128,
 }

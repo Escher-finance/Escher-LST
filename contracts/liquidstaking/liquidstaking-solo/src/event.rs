@@ -318,6 +318,9 @@ pub fn InjectEvent(
     unclaimed_reward: Uint128,
     prev_exchange_rate: Decimal,
     exchange_rate: Decimal,
+    delegated_amount: Uint128,
+    total_bond_amount: Uint128,
+    total_supply: Uint128,
     time: Timestamp,
 ) -> Event {
     Event::new(INJECT_EVENT.to_string())
@@ -326,5 +329,8 @@ pub fn InjectEvent(
         .add_attribute("unclaimed_reward", unclaimed_reward.to_string())
         .add_attribute("prev_exchange_rate", prev_exchange_rate.to_string())
         .add_attribute("exchange_rate", exchange_rate.to_string())
+        .add_attribute("delegated_amount", delegated_amount.to_string())
+        .add_attribute("total_bond_amount", total_bond_amount.to_string())
+        .add_attribute("total_supply", total_supply.to_string())
         .add_attribute("time", format!("{}", time.nanos()))
 }

@@ -1343,6 +1343,9 @@ pub fn inject(
         inject_data.unclaimed_reward,
         inject_data.prev_exchange_rate,
         inject_data.exchange_rate,
+        inject_data.delegated_amount,
+        inject_data.total_bond_amount,
+        inject_data.total_supply,
         env.block.time,
     );
 
