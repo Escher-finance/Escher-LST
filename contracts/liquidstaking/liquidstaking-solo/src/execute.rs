@@ -1342,7 +1342,7 @@ pub fn inject(
         inject_data.reward_balance,
         inject_data.unclaimed_reward,
         inject_data.prev_exchange_rate,
-        inject_data.exchange_rate,
+        inject_data.new_exchange_rate,
         inject_data.delegated_amount,
         inject_data.total_bond_amount,
         inject_data.total_supply,

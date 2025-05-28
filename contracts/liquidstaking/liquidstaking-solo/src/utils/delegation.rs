@@ -1032,7 +1032,6 @@ pub fn inject(
     // logic to mint token and update the supply and total_bond_amount
     let mut state = STATE.load(storage)?;
 
-    let prev_exchange_rate = state.exchange_rate.clone();
     let delegated_amount = get_actual_total_delegated(
         querier,
         delegator.to_string(),
@@ -1067,14 +1066,22 @@ pub fn inject(
         return Err(ContractError::InvalidExchangeRate {});
     }
 
-    state.total_bond_amount = total_bond_amount + amount;
+    let prev_exchange_rate = exchange_rate.clone();
+    let new_bond_amount = total_bond_amount + amount;
+    let new_exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(new_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
+
+    state.total_bond_amount = new_bond_amount;
     state.total_delegated_amount += amount;
     state.exchange_rate = exchange_rate;
     STATE.save(storage, &state)?;
 
     let data = InjectData {
         prev_exchange_rate,
-        exchange_rate,
+        new_exchange_rate,
         total_supply: state.total_supply.clone(),
         reward_balance,
         unclaimed_reward,

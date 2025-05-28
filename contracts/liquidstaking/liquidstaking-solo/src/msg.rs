@@ -371,7 +371,7 @@ pub struct IBCCallbackPayload {
 
 pub struct InjectData {
     pub prev_exchange_rate: Decimal,
-    pub exchange_rate: Decimal,
+    pub new_exchange_rate: Decimal,
     pub total_supply: Uint128,
     pub reward_balance: Uint128,
     pub unclaimed_reward: Uint128,
