@@ -1,11 +1,11 @@
 use crate::{
     event::{SUBMIT_BATCH_EVENT, UNBOND_EVENT, UNSTAKE_REQUEST_EVENT},
-    msg::{BondData, DelegationDiff, Ucs03ExecuteMsg, ValidatorDelegation},
+    msg::{BondData, DelegationDiff, ValidatorDelegation},
     proto,
     state::{
-        unbond_record, BurnQueue, MintQueue, QuoteToken, State, SupplyQueue, UnbondRecord,
-        Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE,
-        STATE, SUPPLY_QUEUE, TOKEN_COUNT,
+        unbond_record, BurnQueue, MintQueue, State, SupplyQueue, UnbondRecord, Validator,
+        ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE, STATE, SUPPLY_QUEUE,
+        TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
     },
     tests::mock_parameters,
     utils::{
@@ -18,12 +18,11 @@ use cosmwasm_std::{
     assert_approx_eq, from_json,
     testing::{mock_dependencies, mock_env, MockQuerier},
     Addr, AnyMsg, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
-    StakingMsg, Timestamp, Uint128, Uint256,
+    StakingMsg, Timestamp, Uint128,
 };
 use cw_multi_test::App;
 use prost::Message;
 use std::{collections::HashMap, str::FromStr};
-use unionlabs_primitives::{encoding::HexPrefixed, Bytes, H256};
 
 #[test]
 fn test_get_validator_delegation_map_base_on_weight() {
@@ -775,6 +774,22 @@ fn test_unstake_request_in_batch() {
         .unwrap();
     let params = mock_parameters();
     PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+    WITHDRAW_REWARD_QUEUE
+        .save(deps.as_mut().storage, &vec![])
+        .unwrap();
+    REWARD_BALANCE
+        .save(deps.as_mut().storage, &Uint128::zero())
+        .unwrap();
+    SUPPLY_QUEUE
+        .save(
+            deps.as_mut().storage,
+            &SupplyQueue {
+                mint: vec![],
+                burn: vec![],
+                epoch_period: 360,
+            },
+        )
+        .unwrap();
 
     let unstake_request_event = unstake_request_in_batch(
         env.clone(),
@@ -948,8 +963,7 @@ fn test_process_bond() {
         block_height,
         None,
         None,
-        true,
-        None,
+        false,
     )
     .unwrap();
 
@@ -1128,6 +1142,10 @@ fn test_submit_pending_batch() {
     let reward_balance = Uint128::new(100_000);
     REWARD_BALANCE
         .save(deps.as_mut().storage, &reward_balance)
+        .unwrap();
+
+    WITHDRAW_REWARD_QUEUE
+        .save(deps.as_mut().storage, &vec![])
         .unwrap();
 
     let (msgs, events) = submit_pending_batch(

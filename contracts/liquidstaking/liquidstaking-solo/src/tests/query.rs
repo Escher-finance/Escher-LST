@@ -103,7 +103,7 @@ fn test_query_chains() {
             prefix: format!("b{}", i),
         };
         crate::state::CHAINS
-            .save(&mut deps.storage, 1, &data)
+            .save(&mut deps.storage, i, &data)
             .unwrap();
     }
 
