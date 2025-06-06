@@ -19,10 +19,10 @@ use crate::state::{
 };
 use crate::types::ChannelId;
 use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::calculate_fee_from_reward;
 use crate::utils::calc::{
     calculate_exchange_rate, get_next_epoch, normalize_withdraw_reward_queue,
 };
+use crate::utils::calc::{calculate_fee_from_reward, get_last_epoch_block};
 use crate::utils::delegation::{get_unbonding_ucs03_transfer_cosmos_msg, submit_pending_batch};
 use crate::utils::validation::{validate_recipient, validate_validators};
 use crate::utils::{
@@ -1257,7 +1257,7 @@ pub fn remove_chain(
     Ok(Response::new())
 }
 
-// Normalize reward only run when there is withdraw reward queue entry to make sure the reward amount is normalized near end of epoch
+// Normalize reward only run when there is withdraw reward queue entry on active epoch period range to make sure the reward amount is normalized near end of epoch
 pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
     let supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
 
@@ -1280,6 +1280,15 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
         return Err(ContractError::NoRewardToNormalize {});
     }
 
+    let last_epoch = get_last_epoch_block(block_height, supply_queue.epoch_period);
+    let mut valid = true;
+    for queue in reward_queue.iter_mut() {
+        if queue.block < last_epoch {
+            valid = false;
+            break;
+        }
+    }
+
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let validators_list: Vec<String> = validators_reg
@@ -1295,17 +1304,20 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
         params.underlying_coin_denom.clone(),
         validators_list,
     )?;
-
-    reward_queue.push(WithdrawRewardQueue {
-        amount: unclaimed_reward,
-        block: block_height,
-    });
-
-    WITHDRAW_REWARD_QUEUE.save(deps.storage, &reward_queue)?;
-
     let reward_balance = REWARD_BALANCE.load(deps.storage)?;
 
+    if valid {
+        // only add to withdraw reward queue if it contains queue on active epoch period
+        reward_queue.push(WithdrawRewardQueue {
+            amount: unclaimed_reward,
+            block: block_height,
+        });
+
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &reward_queue)?;
+    }
+
     Ok(Response::new()
+        .add_attribute("action", "normalize_reward")
         .add_attribute("unclaimed_reward", unclaimed_reward)
         .add_attribute("reward_balance", reward_balance))
 }
