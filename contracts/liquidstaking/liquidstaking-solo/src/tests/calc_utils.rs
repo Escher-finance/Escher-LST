@@ -1,14 +1,18 @@
 use crate::{
+    execute,
     state::{
-        BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue, REWARD_BALANCE, SUPPLY_QUEUE,
+        BurnQueue, MintQueue, State, SupplyQueue, Validator, ValidatorsRegistry,
+        WithdrawRewardQueue, PARAMETERS, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
         WITHDRAW_REWARD_QUEUE,
     },
+    tests::mock_parameters,
     utils::calc::*,
 };
 use cosmwasm_std::{
     from_json,
-    testing::{mock_dependencies, MockQuerier},
-    to_json_binary, Decimal, Empty, QuerierWrapper, SystemError, SystemResult, Uint128, Uint256,
+    testing::{mock_dependencies, mock_env, MockQuerier},
+    to_json_binary, Coin, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper, SystemError,
+    SystemResult, Uint128, Uint256,
 };
 use cw20::TokenInfoResponse;
 use std::str::FromStr;
@@ -448,10 +452,149 @@ fn test_normalize_withdraw_reward_queue() {
 
 #[test]
 fn test_normalize_reward() {
-    let block_height = 1044945;
-    let next_epoch = get_next_epoch(block_height, 360);
+    let mut deps = mock_dependencies();
+    let delegator = deps.api.addr_make("delegator");
+    let state = State {
+        exchange_rate: Decimal::from_str("1.1").unwrap(),
+        total_bond_amount: Uint128::new(20_000),
+        total_delegated_amount: Uint128::new(15_000),
+        total_supply: Uint128::new(10_000),
+        bond_counter: 5,
+        last_bond_time: 50000,
+    };
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+    let supply_queue = SupplyQueue {
+        mint: vec![],
+        burn: vec![],
+        epoch_period: 200,
+    };
+    SUPPLY_QUEUE
+        .save(deps.as_mut().storage, &supply_queue)
+        .unwrap();
+    let params = mock_parameters();
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+    REWARD_BALANCE
+        .save(deps.as_mut().storage, &Uint128::zero())
+        .unwrap();
 
-    let epoch_diff = next_epoch - block_height;
+    let validator_addr_a = "a".to_string();
+    let validator_addr_b = "b".to_string();
+    let validators = Vec::from([
+        Validator {
+            weight: 10,
+            address: validator_addr_a.clone(),
+        },
+        Validator {
+            weight: 20,
+            address: validator_addr_b.clone(),
+        },
+    ]);
+    let registry = ValidatorsRegistry {
+        validators: validators.clone(),
+    };
+    VALIDATORS_REGISTRY
+        .save(deps.as_mut().storage, &registry)
+        .unwrap();
+    let validators_cosm: &[cosmwasm_std::Validator; 2] = &[
+        cosmwasm_std::Validator::create(
+            validator_addr_a.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+        cosmwasm_std::Validator::create(
+            validator_addr_b.clone(),
+            Decimal::default(),
+            Decimal::default(),
+            Decimal::default(),
+        ),
+    ];
+    let delegations = &[
+        cosmwasm_std::FullDelegation::create(
+            delegator.clone(),
+            validator_addr_a.clone(),
+            Coin::new(Uint128::new(1000), params.underlying_coin_denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+        cosmwasm_std::FullDelegation::create(
+            delegator.clone(),
+            validator_addr_b.clone(),
+            Coin::new(Uint128::new(2000), params.underlying_coin_denom.clone()),
+            Coin::default(),
+            Vec::default(),
+        ),
+    ];
+    let mut querier = MockQuerier::default();
+    querier.staking.update(
+        params.underlying_coin_denom.clone(),
+        validators_cosm,
+        delegations,
+    );
+    querier.distribution.set_rewards(
+        validator_addr_a.clone(),
+        delegator.clone(),
+        Vec::from([DecCoin::new(
+            Decimal256::from_str("20.0").unwrap(),
+            params.underlying_coin_denom.clone(),
+        )]),
+    );
+    querier.distribution.set_rewards(
+        validator_addr_b.clone(),
+        delegator.clone(),
+        Vec::from([DecCoin::new(
+            Decimal256::from_str("10.0").unwrap(),
+            params.underlying_coin_denom.clone(),
+        )]),
+    );
+    deps.querier = querier;
 
-    println!("epoch diff: {}", epoch_diff);
+    let queue = vec![WithdrawRewardQueue {
+        amount: Uint128::new(100),
+        block: 900,
+    }];
+
+    WITHDRAW_REWARD_QUEUE
+        .save(deps.as_mut().storage, &queue)
+        .unwrap();
+    let mut env = mock_env();
+    env.block.height = 1100;
+
+    let res = execute::normalize_reward(deps.as_mut(), env);
+    assert_eq!(res.is_err(), true);
+
+    let queue = vec![WithdrawRewardQueue {
+        amount: Uint128::new(100),
+        block: 1100,
+    }];
+
+    WITHDRAW_REWARD_QUEUE
+        .save(deps.as_mut().storage, &queue)
+        .unwrap();
+    let mut env = mock_env();
+    env.block.height = 1150;
+
+    let res = execute::normalize_reward(deps.as_mut(), env);
+    println!("res: {:?}", res);
+    assert_eq!(res.is_err(), true);
+
+    let mut env = mock_env();
+    env.block.height = 1199;
+
+    let res = execute::normalize_reward(deps.as_mut(), env);
+    assert_eq!(res.is_ok(), true);
+
+    let mut env = mock_env();
+    env.block.height = 1200;
+
+    let res = execute::normalize_reward(deps.as_mut(), env);
+    println!("res: {:?}", res);
+    assert_eq!(res.is_ok(), true);
+
+    let mut env: cosmwasm_std::Env = mock_env();
+    env.block.height = 1400;
+
+    let res = execute::normalize_reward(deps.as_mut(), env);
+    println!("res: {:?}", res);
+    assert_eq!(res.is_err(), true);
 }

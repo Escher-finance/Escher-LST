@@ -575,9 +575,18 @@ pub fn submit_pending_batch(
         validators_list,
     )?;
 
-    let contract_reward_balance =
-        calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward.into())?;
-    let reward = unclaimed_reward + contract_reward_balance;
+    let reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    let withdraw_reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
+    let supply = SUPPLY_QUEUE.load(deps.storage)?;
+    let (new_balance, new_queue) = calc::normalize_withdraw_reward_queue(
+        block_height,
+        reward_balance,
+        withdraw_reward_queue,
+        supply.epoch_period,
+    );
+    REWARD_BALANCE.save(deps.storage, &new_balance)?;
+    WITHDRAW_REWARD_QUEUE.save(deps.storage, &new_queue)?;
+    let reward: Uint128 = unclaimed_reward + new_balance;
 
     let fee = calculate_fee_from_reward(reward, params.fee_rate);
     let total_bond_amount = delegated_amount + reward - fee;
@@ -662,7 +671,7 @@ pub fn submit_pending_batch(
         current_exchange_rate,
         time,
         coin_denom,
-        contract_reward_balance,
+        new_balance,
         unclaimed_reward,
     );
 

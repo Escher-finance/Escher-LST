@@ -111,7 +111,7 @@ pub fn normalize_total_supply(
     new_supply
 }
 
-/// this only trigger on bond and submit batch that trigger automatic reward withdrawal
+/// this only trigger on bond/delegate/staking that trigger automatic reward withdrawal
 pub fn normalize_reward_balance(
     storage: &mut dyn cosmwasm_std::Storage,
     block: u64,

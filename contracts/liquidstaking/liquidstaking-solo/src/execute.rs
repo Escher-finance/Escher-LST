@@ -1262,14 +1262,20 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
     let supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
 
     let block_height = env.block.height;
-    let next_epoch = get_next_epoch(block_height, supply_queue.epoch_period);
+    let mut next_epoch = get_next_epoch(block_height, supply_queue.epoch_period);
 
     let epoch_diff = next_epoch - block_height;
 
-    if epoch_diff > 5 && epoch_diff < 360 {
+    let mut last_epoch = get_last_epoch_block(block_height, supply_queue.epoch_period);
+
+    if epoch_diff % supply_queue.epoch_period as u64 == 0 {
+        last_epoch = last_epoch - supply_queue.epoch_period as u64;
+        next_epoch = next_epoch - supply_queue.epoch_period as u64;
+    }
+    if epoch_diff > 5 && epoch_diff < supply_queue.epoch_period as u64 {
         return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
             format!(
-                "incorrect block height: current height: {}, next epoch: {}",
+                "incorrect block height: current height: {}, next epoch: {}, only can normalize reward on end of epoch period range",
                 block_height, next_epoch,
             ),
         )));
@@ -1280,12 +1286,16 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
         return Err(ContractError::NoRewardToNormalize {});
     }
 
-    let last_epoch = get_last_epoch_block(block_height, supply_queue.epoch_period);
-    let mut valid = true;
+    // only normalize(add unclaimed reward to withdraw reward queue) if the existing queue is in the current epoch period
     for queue in reward_queue.iter_mut() {
         if queue.block < last_epoch {
-            valid = false;
-            break;
+            // if not valid, we will not add to withdraw reward queue
+            return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+                format!(
+                    "the block height: {} is belong to previous epoch, last executed epoch: {}, next epoch: {}",
+                    queue.block, last_epoch, next_epoch,
+                ),
+            )));
         }
     }
 
@@ -1306,20 +1316,22 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
     )?;
     let reward_balance = REWARD_BALANCE.load(deps.storage)?;
 
-    if valid {
-        // only add to withdraw reward queue if it contains queue on active epoch period
+    if unclaimed_reward != Uint128::zero() {
         reward_queue.push(WithdrawRewardQueue {
             amount: unclaimed_reward,
             block: block_height,
         });
-
-        WITHDRAW_REWARD_QUEUE.save(deps.storage, &reward_queue)?;
     }
+
+    WITHDRAW_REWARD_QUEUE.save(deps.storage, &reward_queue)?;
 
     Ok(Response::new()
         .add_attribute("action", "normalize_reward")
         .add_attribute("unclaimed_reward", unclaimed_reward)
-        .add_attribute("reward_balance", reward_balance))
+        .add_attribute("reward_balance", reward_balance)
+        .add_attribute("current_height", block_height.to_string())
+        .add_attribute("last_epoch", last_epoch.to_string())
+        .add_attribute("next_epoch", next_epoch.to_string()))
 }
 
 /// Inject some amount of underlying coin denom to be staked without minting new cw20 token

@@ -1164,23 +1164,10 @@ fn test_submit_pending_batch() {
         PENDING_BATCH_ID.load(&deps.storage).unwrap(),
         pending_batch_id + 1
     );
-    let querier_wrapper = QuerierWrapper::<Empty>::new(&deps.querier);
-    let total_reward = get_unclaimed_reward(
-        querier_wrapper,
-        delegator.to_string(),
-        params.underlying_coin_denom.clone(),
-        validators_reg
-            .validators
-            .iter()
-            .map(|v| v.address.clone())
-            .collect(),
-    )
-    .unwrap();
-    assert!(!total_reward.is_zero());
-    assert_eq!(
-        REWARD_BALANCE.load(&deps.storage).unwrap(),
-        reward_balance + total_reward
-    );
+
+    let queue: Vec<crate::state::WithdrawRewardQueue> = vec![];
+    assert_eq!(queue, WITHDRAW_REWARD_QUEUE.load(&deps.storage).unwrap());
+
     let updated_batch = batches().load(&deps.storage, pending_batch.id).unwrap();
     assert!(matches!(updated_batch.status, BatchStatus::Submitted));
     assert!(updated_batch.next_batch_action_time.is_some());
