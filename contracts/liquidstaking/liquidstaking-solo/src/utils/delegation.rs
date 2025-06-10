@@ -576,16 +576,27 @@ pub fn submit_pending_batch(
     )?;
 
     let reward_balance = REWARD_BALANCE.load(deps.storage)?;
-    let withdraw_reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
-    let supply = SUPPLY_QUEUE.load(deps.storage)?;
-    let (new_balance, new_queue) = calc::normalize_withdraw_reward_queue(
-        block_height,
-        reward_balance,
-        withdraw_reward_queue,
-        supply.epoch_period,
-    );
-    REWARD_BALANCE.save(deps.storage, &new_balance)?;
-    WITHDRAW_REWARD_QUEUE.save(deps.storage, &new_queue)?;
+
+    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
+
+    // if there is no unstake/liquid stake amount in batch then no need to normalize reward balance
+    let new_balance = if batch.total_liquid_stake.is_zero() {
+        let withdraw_reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
+        let (new_balance, new_queue) = calc::normalize_withdraw_reward_queue(
+            block_height,
+            reward_balance,
+            withdraw_reward_queue,
+            supply_queue.epoch_period,
+        );
+        REWARD_BALANCE.save(deps.storage, &new_balance)?;
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &new_queue)?;
+        new_balance
+    } else {
+        let new_balance =
+            calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward.into())?;
+        new_balance
+    };
+
     let reward: Uint128 = unclaimed_reward + new_balance;
 
     let fee = calculate_fee_from_reward(reward, params.fee_rate);
@@ -594,8 +605,6 @@ pub fn submit_pending_batch(
     if total_bond_amount.is_zero() || state.total_supply.is_zero() {
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
     }
-
-    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
 
     calc::normalize_supply_queue(&mut supply_queue, block_height);
     let current_exchange_rate = if total_bond_amount != Uint128::zero() {

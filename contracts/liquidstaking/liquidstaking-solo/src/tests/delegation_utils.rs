@@ -4,8 +4,8 @@ use crate::{
     proto,
     state::{
         unbond_record, BurnQueue, MintQueue, State, SupplyQueue, UnbondRecord, Validator,
-        ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE, STATE, SUPPLY_QUEUE,
-        TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
+        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE,
+        STATE, SUPPLY_QUEUE, TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
     },
     tests::mock_parameters,
     utils::{
@@ -1165,7 +1165,10 @@ fn test_submit_pending_batch() {
         pending_batch_id + 1
     );
 
-    let queue: Vec<crate::state::WithdrawRewardQueue> = vec![];
+    let queue: Vec<crate::state::WithdrawRewardQueue> = vec![WithdrawRewardQueue {
+        amount: Uint128::new(30u128),
+        block: 10000,
+    }];
     assert_eq!(queue, WITHDRAW_REWARD_QUEUE.load(&deps.storage).unwrap());
 
     let updated_batch = batches().load(&deps.storage, pending_batch.id).unwrap();
