@@ -1273,29 +1273,27 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
         next_epoch = next_epoch - supply_queue.epoch_period as u64;
     }
     if epoch_diff > 5 && epoch_diff < supply_queue.epoch_period as u64 {
-        return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
-            format!(
+        return Err(ContractError::NoRewardToNormalize {
+                msg: format!(
                 "incorrect block height: current height: {}, next epoch: {}, only can normalize reward on end of epoch period range",
                 block_height, next_epoch,
-            ),
-        )));
+            )
+            });
     }
 
     let mut reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
     if reward_queue.is_empty() {
-        return Err(ContractError::NoRewardToNormalize {});
+        return Err(ContractError::NoRewardToNormalize {
+            msg: "withdraw reward queue is empty".to_string(),
+        });
     }
 
     // only normalize(add unclaimed reward to withdraw reward queue) if the existing queue is in the current epoch period
     for queue in reward_queue.iter_mut() {
         if queue.block < last_epoch {
-            // if not valid, we will not add to withdraw reward queue
-            return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
-                format!(
-                    "the block height: {} is belong to previous epoch, last executed epoch: {}, next epoch: {}",
-                    queue.block, last_epoch, next_epoch,
-                ),
-            )));
+            return Err(ContractError::NoRewardToNormalize {
+                msg: "withdraw reward queue belongs to previous epoch".to_string(),
+            });
         }
     }
 
