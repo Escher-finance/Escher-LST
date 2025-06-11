@@ -176,6 +176,9 @@ pub enum ExecuteMsg {
         channel_id: u32,
     },
     NormalizeReward {},
+    Inject {
+        amount: Uint128,
+    },
 }
 
 #[cw_serde]
@@ -357,3 +360,21 @@ pub struct MigrateMsg {
 
 #[cw_serde]
 pub struct RewardMigrateMsg {}
+
+#[cw_serde]
+pub struct IBCCallbackPayload {
+    pub amount: Uint128,
+    pub salt: String,
+    pub recipient: String,
+    pub recipient_channel_id: Option<u32>,
+}
+
+pub struct InjectData {
+    pub prev_exchange_rate: Decimal,
+    pub new_exchange_rate: Decimal,
+    pub total_supply: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
+    pub delegated_amount: Uint128,
+    pub total_bond_amount: Uint128,
+}

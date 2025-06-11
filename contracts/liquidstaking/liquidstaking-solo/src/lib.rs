@@ -4,6 +4,7 @@ pub mod execute;
 
 pub mod event;
 pub mod helpers;
+pub mod ibc;
 /// Various identifier types used throughout the IBC stack.
 pub mod instantiate;
 pub mod msg;

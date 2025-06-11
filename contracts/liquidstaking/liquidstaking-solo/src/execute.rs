@@ -13,8 +13,8 @@ use crate::msg::{
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    Chain, QuoteToken, Status, Validator, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
+    Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, CONFIG, PARAMETERS,
+    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
     VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
 };
 use crate::types::ChannelId;
@@ -119,6 +119,7 @@ pub fn bond(
         recipient_channel_id,
         bond_data.reward_balance,
         bond_data.unclaimed_reward,
+        None,
     );
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -275,6 +276,7 @@ pub fn zkgm_bond(
         recipient_channel_id,
         bond_data.reward_balance,
         bond_data.unclaimed_reward,
+        None,
     );
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
 
@@ -1255,21 +1257,44 @@ pub fn remove_chain(
     Ok(Response::new())
 }
 
+// Normalize reward only run when there is withdraw reward queue entry on active epoch period range to make sure the reward amount is normalized near end of epoch
 pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
     let supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
 
     let block_height = env.block.height;
-    let next_epoch = get_next_epoch(block_height, supply_queue.epoch_period);
+    let mut next_epoch = get_next_epoch(block_height, supply_queue.epoch_period);
 
     let epoch_diff = next_epoch - block_height;
 
-    if epoch_diff > 5 && epoch_diff < 360 {
-        return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
-            format!(
-                "incorrect block height: current height: {}, next epoch: {}",
+    let mut last_epoch = get_last_epoch_block(block_height, supply_queue.epoch_period);
+
+    if epoch_diff % supply_queue.epoch_period as u64 == 0 {
+        last_epoch = last_epoch - supply_queue.epoch_period as u64;
+        next_epoch = next_epoch - supply_queue.epoch_period as u64;
+    }
+    if epoch_diff > 5 && epoch_diff < supply_queue.epoch_period as u64 {
+        return Err(ContractError::NoRewardToNormalize {
+                msg: format!(
+                "incorrect block height: current height: {}, next epoch: {}, only can normalize reward on end of epoch period range",
                 block_height, next_epoch,
-            ),
-        )));
+            )
+            });
+    }
+
+    let mut reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
+    if reward_queue.is_empty() {
+        return Err(ContractError::NoRewardToNormalize {
+            msg: "withdraw reward queue is empty".to_string(),
+        });
+    }
+
+    // only normalize(add unclaimed reward to withdraw reward queue) if the existing queue is in the current epoch period
+    for queue in reward_queue.iter_mut() {
+        if queue.block < last_epoch {
+            return Err(ContractError::NoRewardToNormalize {
+                msg: "withdraw reward queue belongs to previous epoch".to_string(),
+            });
+        }
     }
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -1287,14 +1312,68 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
         params.underlying_coin_denom.clone(),
         validators_list,
     )?;
+    let reward_balance = REWARD_BALANCE.load(deps.storage)?;
 
-    let reward_balance = utils::calc::normalize_reward_balance(
-        deps.storage,
-        env.block.height,
-        unclaimed_reward.into(),
-    )?;
+    if unclaimed_reward != Uint128::zero() {
+        reward_queue.push(WithdrawRewardQueue {
+            amount: unclaimed_reward,
+            block: block_height,
+        });
+    }
+
+    WITHDRAW_REWARD_QUEUE.save(deps.storage, &reward_queue)?;
 
     Ok(Response::new()
+        .add_attribute("action", "normalize_reward")
         .add_attribute("unclaimed_reward", unclaimed_reward)
-        .add_attribute("reward_balance", reward_balance))
+        .add_attribute("reward_balance", reward_balance)
+        .add_attribute("current_height", block_height.to_string())
+        .add_attribute("last_epoch", last_epoch.to_string())
+        .add_attribute("next_epoch", next_epoch.to_string()))
+}
+
+/// Inject some amount of underlying coin denom to be staked without minting new cw20 token
+pub fn inject(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let params = PARAMETERS.load(deps.storage)?;
+    let contract_addr: Addr = env.contract.address;
+    let balance = deps
+        .querier
+        .query_balance(contract_addr.clone(), params.underlying_coin_denom.clone())?;
+
+    if balance.amount < amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let (msgs, inject_data) = utils::delegation::inject(
+        deps.storage,
+        deps.querier,
+        contract_addr,
+        amount,
+        params,
+        env.block.height,
+    )?;
+
+    let inject_event = crate::event::InjectEvent(
+        amount,
+        inject_data.reward_balance,
+        inject_data.unclaimed_reward,
+        inject_data.prev_exchange_rate,
+        inject_data.new_exchange_rate,
+        inject_data.delegated_amount,
+        inject_data.total_bond_amount,
+        inject_data.total_supply,
+        env.block.time,
+    );
+
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_event(inject_event)
+        .add_attribute("action", "inject")
+        .add_attribute("amount", amount))
 }

@@ -1,11 +1,11 @@
 use crate::{
     event::{SUBMIT_BATCH_EVENT, UNBOND_EVENT, UNSTAKE_REQUEST_EVENT},
-    msg::{BondData, DelegationDiff, Ucs03ExecuteMsg, ValidatorDelegation},
+    msg::{BondData, DelegationDiff, ValidatorDelegation},
     proto,
     state::{
-        unbond_record, BurnQueue, MintQueue, QuoteToken, State, SupplyQueue, UnbondRecord,
-        Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE,
-        STATE, SUPPLY_QUEUE, TOKEN_COUNT,
+        unbond_record, BurnQueue, MintQueue, State, SupplyQueue, UnbondRecord, Validator,
+        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE,
+        STATE, SUPPLY_QUEUE, TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
     },
     tests::mock_parameters,
     utils::{
@@ -18,12 +18,11 @@ use cosmwasm_std::{
     assert_approx_eq, from_json,
     testing::{mock_dependencies, mock_env, MockQuerier},
     Addr, AnyMsg, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
-    StakingMsg, Timestamp, Uint128, Uint256,
+    StakingMsg, Timestamp, Uint128,
 };
 use cw_multi_test::App;
 use prost::Message;
 use std::{collections::HashMap, str::FromStr};
-use unionlabs_primitives::{encoding::HexPrefixed, Bytes, H256};
 
 #[test]
 fn test_get_validator_delegation_map_base_on_weight() {
@@ -775,6 +774,22 @@ fn test_unstake_request_in_batch() {
         .unwrap();
     let params = mock_parameters();
     PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+    WITHDRAW_REWARD_QUEUE
+        .save(deps.as_mut().storage, &vec![])
+        .unwrap();
+    REWARD_BALANCE
+        .save(deps.as_mut().storage, &Uint128::zero())
+        .unwrap();
+    SUPPLY_QUEUE
+        .save(
+            deps.as_mut().storage,
+            &SupplyQueue {
+                mint: vec![],
+                burn: vec![],
+                epoch_period: 360,
+            },
+        )
+        .unwrap();
 
     let unstake_request_event = unstake_request_in_batch(
         env.clone(),
@@ -948,7 +963,7 @@ fn test_process_bond() {
         block_height,
         None,
         None,
-        true,
+        false,
     )
     .unwrap();
 
@@ -1129,6 +1144,10 @@ fn test_submit_pending_batch() {
         .save(deps.as_mut().storage, &reward_balance)
         .unwrap();
 
+    WITHDRAW_REWARD_QUEUE
+        .save(deps.as_mut().storage, &vec![])
+        .unwrap();
+
     let (msgs, events) = submit_pending_batch(
         deps.as_mut(),
         block_height,
@@ -1145,23 +1164,13 @@ fn test_submit_pending_batch() {
         PENDING_BATCH_ID.load(&deps.storage).unwrap(),
         pending_batch_id + 1
     );
-    let querier_wrapper = QuerierWrapper::<Empty>::new(&deps.querier);
-    let total_reward = get_unclaimed_reward(
-        querier_wrapper,
-        delegator.to_string(),
-        params.underlying_coin_denom.clone(),
-        validators_reg
-            .validators
-            .iter()
-            .map(|v| v.address.clone())
-            .collect(),
-    )
-    .unwrap();
-    assert!(!total_reward.is_zero());
-    assert_eq!(
-        REWARD_BALANCE.load(&deps.storage).unwrap(),
-        reward_balance + total_reward
-    );
+
+    let queue: Vec<crate::state::WithdrawRewardQueue> = vec![WithdrawRewardQueue {
+        amount: Uint128::new(30u128),
+        block: 10000,
+    }];
+    assert_eq!(queue, WITHDRAW_REWARD_QUEUE.load(&deps.storage).unwrap());
+
     let updated_batch = batches().load(&deps.storage, pending_batch.id).unwrap();
     assert!(matches!(updated_batch.status, BatchStatus::Submitted));
     assert!(updated_batch.next_batch_action_time.is_some());

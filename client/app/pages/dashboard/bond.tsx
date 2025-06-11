@@ -58,6 +58,9 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
       bond: {
         salt: getSalt(),
         expected: expected.toString(),
+        recipient: recipient == "" ? null : recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
+        recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
+
       },
     };
 

@@ -1,6 +1,6 @@
 use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
 use crate::execute::StakerUndelegation;
-use crate::msg::ValidatorDelegation;
+use crate::msg::{InjectData, ValidatorDelegation};
 use crate::proto;
 use crate::state::{
     ValidatorsRegistry, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, WITHDRAW_REWARD_QUEUE,
@@ -575,9 +575,29 @@ pub fn submit_pending_batch(
         validators_list,
     )?;
 
-    let contract_reward_balance =
-        calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward.into())?;
-    let reward = unclaimed_reward + contract_reward_balance;
+    let reward_balance = REWARD_BALANCE.load(deps.storage)?;
+
+    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
+
+    // if there is no unstake/liquid stake amount in batch then no need to normalize reward balance
+    let new_balance = if batch.total_liquid_stake.is_zero() {
+        let withdraw_reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
+        let (new_balance, new_queue) = calc::normalize_withdraw_reward_queue(
+            block_height,
+            reward_balance,
+            withdraw_reward_queue,
+            supply_queue.epoch_period,
+        );
+        REWARD_BALANCE.save(deps.storage, &new_balance)?;
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &new_queue)?;
+        new_balance
+    } else {
+        let new_balance =
+            calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward.into())?;
+        new_balance
+    };
+
+    let reward: Uint128 = unclaimed_reward + new_balance;
 
     let fee = calculate_fee_from_reward(reward, params.fee_rate);
     let total_bond_amount = delegated_amount + reward - fee;
@@ -585,8 +605,6 @@ pub fn submit_pending_batch(
     if total_bond_amount.is_zero() || state.total_supply.is_zero() {
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
     }
-
-    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
 
     calc::normalize_supply_queue(&mut supply_queue, block_height);
     let current_exchange_rate = if total_bond_amount != Uint128::zero() {
@@ -662,7 +680,7 @@ pub fn submit_pending_batch(
         current_exchange_rate,
         time,
         coin_denom,
-        contract_reward_balance,
+        new_balance,
         unclaimed_reward,
     );
 
@@ -998,4 +1016,96 @@ pub fn get_staker_undelegation(
         unbond_record_ids,
         total_released_amount,
     ))
+}
+
+/// Restake to delegate base on amount and update exchange rate
+pub fn inject(
+    storage: &mut dyn Storage,
+    querier: QuerierWrapper,
+    delegator: Addr,
+    amount: Uint128,
+    params: Parameters,
+    block_height: u64,
+) -> Result<(Vec<CosmosMsg>, InjectData), ContractError> {
+    if amount < params.min_bond {
+        return Err(ContractError::BondAmountTooLow {});
+    }
+
+    let validators_reg = crate::state::VALIDATORS_REGISTRY.load(storage)?;
+
+    let coin_denom = params.underlying_coin_denom.to_string();
+    let msgs = delegation::get_delegate_to_validator_msgs(
+        delegator.to_string(),
+        amount,
+        coin_denom.to_string(),
+        validators_reg.validators.clone(),
+    );
+
+    let validators_list: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    // logic to mint token and update the supply and total_bond_amount
+    let mut state = STATE.load(storage)?;
+
+    let delegated_amount = get_actual_total_delegated(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    )?;
+
+    state.total_delegated_amount = delegated_amount;
+    let unclaimed_reward = get_unclaimed_reward(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list,
+    )?;
+
+    let reward_balance =
+        calc::normalize_reward_balance(storage, block_height, unclaimed_reward.into()).unwrap();
+
+    let reward = reward_balance + unclaimed_reward;
+    let fee = calculate_fee_from_reward(reward, params.fee_rate);
+    let total_bond_amount = delegated_amount + reward - fee;
+
+    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
+    calc::normalize_supply_queue(&mut supply_queue, block_height);
+    let exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
+
+    if exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
+    let prev_exchange_rate = exchange_rate.clone();
+    let new_bond_amount = total_bond_amount + amount;
+    let new_exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(new_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
+
+    state.total_bond_amount = new_bond_amount;
+    state.total_delegated_amount += amount;
+    state.exchange_rate = exchange_rate;
+    STATE.save(storage, &state)?;
+
+    let data = InjectData {
+        prev_exchange_rate,
+        new_exchange_rate,
+        total_supply: state.total_supply.clone(),
+        reward_balance,
+        unclaimed_reward,
+        delegated_amount: state.total_delegated_amount,
+        total_bond_amount: state.total_bond_amount,
+    };
+
+    Ok((msgs, data))
 }
