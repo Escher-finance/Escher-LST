@@ -9,8 +9,8 @@ use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMs
 use crate::query::query_unreleased_unbond_record_from_batch;
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    QuoteToken, Status, Validator, WithdrawReward, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-    REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
+    Chain, QuoteToken, Status, Validator, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
 };
 use crate::types::ChannelId;
 use crate::utils::batch::{batches, BatchStatus};
@@ -1096,4 +1096,64 @@ pub fn set_status(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     STATUS.save(deps.storage, &status)?;
     Ok(Response::new())
+}
+
+pub fn set_chain(
+    deps: DepsMut,
+    info: MessageInfo,
+    chain: Chain,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::CHAINS.save(deps.storage, chain.ucs03_channel_id, &chain)?;
+    Ok(Response::new())
+}
+
+pub fn remove_chain(
+    deps: DepsMut,
+    info: MessageInfo,
+    channel_id: u32,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::CHAINS.remove(deps.storage, channel_id);
+    Ok(Response::new())
+}
+
+/// Inject some amount of underlying coin denom to be staked without minting new cw20 token
+pub fn inject(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let params = PARAMETERS.load(deps.storage)?;
+    let contract_addr: Addr = env.contract.address;
+    let balance = deps
+        .querier
+        .query_balance(contract_addr.clone(), params.underlying_coin_denom.clone())?;
+
+    if balance.amount < amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let (msgs, inject_data) =
+        utils::delegation::inject(deps.storage, deps.querier, contract_addr, amount, params)?;
+
+    let inject_event = crate::event::InjectEvent(
+        amount,
+        inject_data.reward_balance,
+        inject_data.unclaimed_reward,
+        inject_data.prev_exchange_rate,
+        inject_data.new_exchange_rate,
+        inject_data.delegated_amount,
+        inject_data.total_bond_amount,
+        inject_data.total_supply,
+        env.block.time,
+    );
+
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_event(inject_event)
+        .add_attribute("action", "inject")
+        .add_attribute("amount", amount))
 }

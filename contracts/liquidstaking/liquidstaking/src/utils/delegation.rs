@@ -2,7 +2,6 @@ use crate::event::SubmitBatchEvent;
 use crate::event::UnbondEventsFromAtts;
 use crate::event::UnstakeRequestEvent;
 use crate::execute::StakerUndelegation;
-use crate::msg::ValidatorDelegation;
 use crate::utils::authz::get_authz_ucs03_transfer;
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc;
@@ -10,7 +9,7 @@ use crate::utils::calc::to_uint128;
 use crate::utils::token;
 use crate::ContractError;
 use crate::{
-    msg::{BondData, DelegationDiff, MintTokensPayload},
+    msg::{BondData, DelegationDiff, InjectData, MintTokensPayload, ValidatorDelegation},
     state::{
         increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, ValidatorsRegistry,
         PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
@@ -905,4 +904,90 @@ pub fn get_staker_undelegation(
         unbond_record_ids,
         total_released_amount,
     ))
+}
+
+/// Restake to delegate base on amount and update exchange rate
+pub fn inject(
+    storage: &mut dyn Storage,
+    querier: QuerierWrapper,
+    delegator: Addr,
+    amount: Uint128,
+    params: Parameters,
+) -> Result<(Vec<CosmosMsg>, InjectData), ContractError> {
+    if amount < params.min_bond {
+        return Err(ContractError::BondAmountTooLow {});
+    }
+
+    let validators_reg = crate::state::VALIDATORS_REGISTRY.load(storage)?;
+
+    let coin_denom = params.underlying_coin_denom.to_string();
+    let msgs = get_delegate_to_validator_msgs(
+        amount,
+        coin_denom.to_string(),
+        validators_reg.validators.clone(),
+    );
+
+    let validators_list: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    // logic to mint token and update the supply and total_bond_amount
+    let mut state = STATE.load(storage)?;
+
+    let delegated_amount = get_actual_total_delegated(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    )?;
+
+    state.total_delegated_amount = delegated_amount;
+    let unclaimed_reward = get_unclaimed_reward(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list,
+    )?;
+
+    let reward_balance = REWARD_BALANCE.load(storage)?;
+    let reward = reward_balance + unclaimed_reward;
+    let fee = calc::calc_with_rate(reward, params.fee_rate);
+    let total_bond_amount = delegated_amount + reward - fee;
+
+    let mut exchange_rate = state.exchange_rate;
+
+    if !total_bond_amount.is_zero() && !state.total_supply.is_zero() {
+        exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
+    }
+
+    if exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
+    let prev_exchange_rate = exchange_rate.clone();
+    let new_bond_amount = total_bond_amount + amount;
+    let new_exchange_rate = if total_bond_amount != Uint128::zero() {
+        Decimal::from_ratio(new_bond_amount, state.total_supply)
+    } else {
+        Decimal::one()
+    };
+
+    state.total_bond_amount = new_bond_amount;
+    state.total_delegated_amount += amount;
+    state.exchange_rate = exchange_rate;
+    STATE.save(storage, &state)?;
+
+    let data = InjectData {
+        prev_exchange_rate,
+        new_exchange_rate,
+        total_supply: state.total_supply.clone(),
+        reward_balance,
+        unclaimed_reward,
+        delegated_amount: state.total_delegated_amount,
+        total_bond_amount: state.total_bond_amount,
+    };
+
+    Ok((msgs, data))
 }

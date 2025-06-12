@@ -270,3 +270,29 @@ pub fn BatchReleasedEvent(batch_id: u64, time: Timestamp) -> Event {
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("time", format!("{}", time.nanos()))
 }
+
+pub const INJECT_EVENT: &str = "inject";
+
+#[allow(non_snake_case)]
+pub fn InjectEvent(
+    amount: Uint128,
+    reward_balance: Uint128,
+    unclaimed_reward: Uint128,
+    prev_exchange_rate: Decimal,
+    exchange_rate: Decimal,
+    delegated_amount: Uint128,
+    total_bond_amount: Uint128,
+    total_supply: Uint128,
+    time: Timestamp,
+) -> Event {
+    Event::new(INJECT_EVENT.to_string())
+        .add_attribute("amount", amount)
+        .add_attribute("reward_balance", reward_balance)
+        .add_attribute("unclaimed_reward", unclaimed_reward.to_string())
+        .add_attribute("prev_exchange_rate", prev_exchange_rate.to_string())
+        .add_attribute("exchange_rate", exchange_rate.to_string())
+        .add_attribute("delegated_amount", delegated_amount.to_string())
+        .add_attribute("total_bond_amount", total_bond_amount.to_string())
+        .add_attribute("total_supply", total_supply.to_string())
+        .add_attribute("time", format!("{}", time.nanos()))
+}

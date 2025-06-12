@@ -207,6 +207,9 @@ pub fn execute(
         } => execute::on_zkgm(deps, env, info, destination_channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
+        ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
+        ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
+        ExecuteMsg::Inject { amount } => execute::inject(deps, env, info, amount),
     }
 }
 

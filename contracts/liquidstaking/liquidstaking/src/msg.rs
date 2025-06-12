@@ -156,6 +156,15 @@ pub enum ExecuteMsg {
         code_id: u64,
     },
     SetStatus(Status),
+    SetChain {
+        chain: crate::state::Chain,
+    },
+    RemoveChain {
+        channel_id: u32,
+    },
+    Inject {
+        amount: Uint128,
+    },
 }
 
 #[cw_ownable_query]
@@ -302,3 +311,13 @@ pub struct UnbondData {
 
 #[cw_serde]
 pub struct MigrateMsg {}
+
+pub struct InjectData {
+    pub prev_exchange_rate: Decimal,
+    pub new_exchange_rate: Decimal,
+    pub total_supply: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
+    pub delegated_amount: Uint128,
+    pub total_bond_amount: Uint128,
+}
