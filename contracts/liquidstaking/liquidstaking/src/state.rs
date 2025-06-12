@@ -15,8 +15,9 @@ pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 
 // Queue of validator reward for executing split reward
 pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
-// Executor address that is allowed to execute the backend functions
-pub const EXECUTOR: Item<Addr> = Item::new("executor");
+
+// Map of supported ucs03 chains with channel_id as key
+pub const CHAINS: Map<u32, Chain> = Map::new("chains");
 
 #[cw_serde]
 pub struct Status {
@@ -85,6 +86,12 @@ pub struct Parameters {
     // limit per batch
     // this is the max number of unbonding records that can be processed in one batch
     pub batch_limit: u32,
+    // handler of cw20 staking token transfer, as ucs03 fee payer address and also minted cw20 staking token receiver
+    pub transfer_handler: String,
+    // ucs03 transfer fee from babylon to other
+    pub transfer_fee: Uint128,
+    // zkgm token_minter address as cw20 allowance spender
+    pub zkgm_token_minter: String,
 }
 
 impl State {
@@ -121,6 +128,8 @@ pub struct UnbondRecord {
     pub released_height: u64,
     pub released: bool,
     pub batch_id: u64,
+    pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
 }
 
 pub struct UnbondRecordIndexes<'a> {
@@ -175,4 +184,12 @@ pub struct QuoteToken {
     pub channel_id: u32,
     pub quote_token: String,
     pub lst_quote_token: String,
+}
+
+#[cw_serde]
+pub struct Chain {
+    pub name: String,
+    pub chain_id: String,
+    pub ucs03_channel_id: u32,
+    pub prefix: String,
 }

@@ -67,6 +67,9 @@ pub fn instantiate(
         min_bond: msg.min_bond,
         min_unbond: msg.min_unbond,
         batch_limit: msg.batch_limit,
+        transfer_fee: msg.transfer_fee,
+        transfer_handler: msg.transfer_handler,
+        zkgm_token_minter: msg.zkgm_token_minter,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -122,9 +125,22 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Bond { slippage, expected } => {
-            execute::bond(deps, env, info, slippage, expected)
-        }
+        ExecuteMsg::Bond {
+            slippage,
+            expected,
+            recipient,
+            recipient_channel_id,
+            salt,
+        } => execute::bond(
+            deps,
+            env,
+            info,
+            slippage,
+            expected,
+            recipient,
+            recipient_channel_id,
+            salt,
+        ),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
@@ -151,6 +167,9 @@ pub fn execute(
             min_bond,
             min_unbond,
             batch_limit,
+            transfer_handler,
+            transfer_fee,
+            zkgm_token_minter,
         } => execute::set_parameters(
             deps,
             env,
@@ -167,13 +186,15 @@ pub fn execute(
             min_bond,
             min_unbond,
             batch_limit,
+            transfer_handler,
+            transfer_fee,
+            zkgm_token_minter,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
-        ExecuteMsg::SetExecutor { executor } => execute::set_executor(deps, info, executor),
         ExecuteMsg::OnZkgm {
             caller: _caller,
             path: _path,

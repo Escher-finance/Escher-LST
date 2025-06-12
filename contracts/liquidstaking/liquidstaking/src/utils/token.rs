@@ -2,15 +2,14 @@ use crate::reply::MINT_CW20_TOKENS_REPLY_ID;
 use cosmwasm_std::{to_json_binary, Addr, Binary, CosmosMsg, SubMsg, Uint128, WasmMsg};
 
 pub fn get_staked_token_submsg(
-    _delegator: String,
-    staker: String,
+    recipient: String,
     mint_amount: Uint128,
     _liquidstaking_denom: String,
     payload_bin: Binary,
     cw20_address: Addr,
 ) -> SubMsg {
     let mint = cw20::Cw20ExecuteMsg::Mint {
-        recipient: staker,
+        recipient,
         amount: mint_amount,
     };
     let mint_bin = to_json_binary(&mint).unwrap();

@@ -8,7 +8,7 @@ use crate::{
     utils::batch::{Batch, BatchStatus},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
+use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256, Uint64};
 use cw2::ContractVersion;
 use cw20::Cw20ReceiveMsg;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
@@ -48,6 +48,12 @@ pub struct InstantiateMsg {
     // limit per batch
     // this is the max number of unbonding records that can be processed in one batch
     pub batch_limit: u32,
+    // handler of cw20 staking token transfer, as ucs03 fee payer address and also minted cw20 staking token receiver
+    pub transfer_handler: String,
+    // ucs03 transfer fee from babylon to other
+    pub transfer_fee: Uint128,
+    // zkgm token_minter address as cw20 allowance spender
+    pub zkgm_token_minter: String,
 }
 
 #[cw_serde]
@@ -72,7 +78,10 @@ pub enum ExecuteRewardMsg {
 
 #[cw_serde]
 pub enum Cw20PayloadMsg {
-    Unstake {},
+    Unstake {
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+    },
 }
 
 #[cw_ownable_execute]
@@ -84,6 +93,9 @@ pub enum ExecuteMsg {
     Bond {
         slippage: Option<Decimal>,
         expected: Uint128,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+        salt: Option<String>,
     },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
@@ -114,6 +126,9 @@ pub enum ExecuteMsg {
         min_bond: Option<Uint128>,
         min_unbond: Option<Uint128>,
         batch_limit: Option<u32>,
+        transfer_handler: Option<String>,
+        transfer_fee: Option<Uint128>,
+        zkgm_token_minter: Option<String>,
     },
     /// Update quote token
     UpdateQuoteToken {
@@ -139,9 +154,6 @@ pub enum ExecuteMsg {
     /// Call migrate to reward contract
     MigrateReward {
         code_id: u64,
-    },
-    SetExecutor {
-        executor: Addr,
     },
     SetStatus(Status),
 }
@@ -185,8 +197,6 @@ pub enum QueryMsg {
         min: Option<u64>,
         max: Option<u64>,
     },
-    #[returns(Executor)]
-    Executor {},
     #[returns(Status)]
     Status {},
 }
@@ -194,17 +204,13 @@ pub enum QueryMsg {
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Ucs03ExecuteMsg {
-    /// This allows us to transfer via ucs03 relayer
-    Transfer {
-        channel_id: u32,
-        receiver: Bytes,
-        base_token: String,
-        base_amount: Uint128,
-        quote_token: Bytes,
-        quote_amount: Uint256,
-        timeout_height: u64,
-        timeout_timestamp: u64,
+    /// This allows us to send packet via ucs03
+    Send {
+        channel_id: ChannelId,
+        timeout_height: Uint64,
+        timeout_timestamp: Timestamp,
         salt: H256,
+        instruction: Bytes,
     },
 }
 
@@ -231,6 +237,8 @@ pub struct MintTokensPayload {
     pub amount: Uint128,
     pub salt: String,
     pub channel_id: Option<u32>,
+    pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
 }
 
 #[cw_serde]
@@ -257,11 +265,15 @@ pub enum ZkgmMessage {
     Bond {
         amount: Uint128,
         salt: String,
-        slippage: Option<Decimal>,
         expected: Uint128,
+        slippage: Option<Decimal>,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
     },
     Unbond {
         amount: Uint128,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
     },
 }
 
@@ -272,6 +284,8 @@ pub struct BondData {
     pub total_bond_amount: Uint128,
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
 }
 
 #[cw_serde]
@@ -282,6 +296,8 @@ pub struct UnbondData {
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
     pub record_id: u64,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
 }
 
 #[cw_serde]
