@@ -808,6 +808,10 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
         undelegate_amount,
         funds,
         H256::from_str(salt.as_str()).unwrap(),
+        params.underlying_coin_denom.clone(),
+        params.underlying_coin_denom_symbol.clone(),
+        params.liquidstaking_denom.clone(),
+        params.liquidstaking_denom_symbol.clone(),
     )?;
 
     Ok(authz_ucs03_msg)

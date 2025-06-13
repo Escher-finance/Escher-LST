@@ -22,19 +22,23 @@ pub fn ucs03_transfer(
     quote_token: Bytes,
     quote_amount: Uint128,
     salt: H256,
+    underlying_denom: String,
+    underlying_denom_symbol: String,
+    liquidstaking_denom: String,
+    liquidstaking_denom_symbol: String,
 ) -> Result<Binary, ContractError> {
     let base_token_decimals = 6;
 
     let base_token_symbol = if base_token == cw20_contract {
-        "eU"
+        liquidstaking_denom_symbol
     } else {
-        "muno"
+        underlying_denom_symbol
     };
 
     let base_token_name = if base_token == cw20_contract {
-        "emuno"
+        liquidstaking_denom
     } else {
-        "muno"
+        underlying_denom
     };
 
     let base_token_path = U256::ZERO;

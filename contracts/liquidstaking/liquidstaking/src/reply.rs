@@ -104,8 +104,8 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         let mut funds = vec![];
         if params.transfer_fee > Uint128::zero() {
             funds.push(Coin {
-                amount: params.transfer_fee, // need to add transfer fee
-                denom: params.underlying_coin_denom,
+                amount: params.transfer_fee,
+                denom: params.underlying_coin_denom.clone(),
             });
         }
 
@@ -157,6 +157,10 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
             amount,
             funds.clone(),
             salt,
+            params.underlying_coin_denom.clone(),
+            params.underlying_coin_denom_symbol.clone(),
+            params.liquidstaking_denom.clone(),
+            params.liquidstaking_denom_symbol.clone(),
         )?;
 
         msgs.push(authz_ucs03_msg);

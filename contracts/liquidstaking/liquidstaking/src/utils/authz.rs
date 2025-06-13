@@ -83,6 +83,10 @@ pub fn get_authz_ucs03_transfer(
     quote_amount: Uint128,
     funds: Vec<Coin>,
     salt: H256,
+    underlying_denom: String,
+    underlying_denom_symbol: String,
+    liquidstaking_denom: String,
+    liquidstaking_denom_symbol: String,
 ) -> Result<CosmosMsg, ContractError> {
     let ucs03_transfer_msg_bin = ucs03_transfer(
         cw20_contract,
@@ -95,6 +99,10 @@ pub fn get_authz_ucs03_transfer(
         quote_token,
         quote_amount,
         salt,
+        underlying_denom,
+        underlying_denom_symbol,
+        liquidstaking_denom,
+        liquidstaking_denom_symbol,
     )?;
 
     let msg = cosmos_msg_for_contract_execution(
