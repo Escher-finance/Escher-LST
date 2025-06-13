@@ -660,7 +660,9 @@ pub fn set_parameters(
     _env: Env,
     info: MessageInfo,
     underlying_coin_denom: Option<String>,
+    underlying_coin_denom_symbol: Option<String>,
     liquidstaking_denom: Option<String>,
+    liquidstaking_denom_symbol: Option<String>,
     ucs03_relay_contract: Option<String>,
     unbonding_time: Option<u64>,
     cw20_address: Option<Addr>,
@@ -712,6 +714,13 @@ pub fn set_parameters(
     params.zkgm_token_minter = zkgm_token_minter
         .clone()
         .unwrap_or_else(|| params.zkgm_token_minter);
+    params.underlying_coin_denom_symbol = underlying_coin_denom_symbol
+        .clone()
+        .unwrap_or_else(|| params.underlying_coin_denom_symbol);
+
+    params.liquidstaking_denom_symbol = liquidstaking_denom_symbol
+        .clone()
+        .unwrap_or_else(|| params.liquidstaking_denom_symbol);
 
     if batch_period.is_some() {
         params.batch_period = batch_period.unwrap();
@@ -751,6 +760,10 @@ pub fn set_parameters(
         msgs.push(msg);
     }
 
+    let transfer_fee_str = match transfer_fee {
+        Some(fee) => fee.to_string(),
+        None => "".to_string(),
+    };
     let res: Response = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "set_parameters")
@@ -767,8 +780,24 @@ pub fn set_parameters(
             ucs03_relay_contract.unwrap_or_else(|| "".to_string()),
         )
         .add_attribute("cw20_address", cw20_addr_string)
-        .add_attribute("reward_address", reward_address_str);
-
+        .add_attribute("reward_address", reward_address_str)
+        .add_attribute("transfer_fee", transfer_fee_str)
+        .add_attribute(
+            "transfer_handler",
+            transfer_handler.unwrap_or_else(|| "".to_string()),
+        )
+        .add_attribute(
+            "zkgm_token_minter",
+            zkgm_token_minter.unwrap_or_else(|| "".to_string()),
+        )
+        .add_attribute(
+            "underlying_coin_denom_symbol",
+            underlying_coin_denom_symbol.unwrap_or_else(|| "".to_string()),
+        )
+        .add_attribute(
+            "liquidstaking_denom_symbol",
+            liquidstaking_denom_symbol.unwrap_or_else(|| "".to_string()),
+        );
     Ok(res)
 }
 

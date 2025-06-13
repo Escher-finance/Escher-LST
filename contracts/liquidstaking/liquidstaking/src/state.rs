@@ -16,7 +16,7 @@ pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 // Queue of validator reward for executing split reward
 pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
 
-// Map of supported ucs03 chains with channel_id as key
+// Map of supported ucs03 chains with ucs03 channel_id as key
 pub const CHAINS: Map<u32, Chain> = Map::new("chains");
 
 #[cw_serde]
@@ -65,8 +65,14 @@ pub struct ValidatorsRegistry {
 // Parameter is required data to instantiate and run contract
 #[cw_serde]
 pub struct Parameters {
+    /// native coin denom like ubbn, emuno, etc.
     pub underlying_coin_denom: String,
+    /// native coin denom symbol that will be used for ucs03 transfer like ubbn, emuno, etc.
+    pub underlying_coin_denom_symbol: String,
+    /// liquid staking cw20 denom name that will be used for ucs03 transfer like ebbn, emuno, etc.
     pub liquidstaking_denom: String,
+    /// liquid staking cw20 denom symbol that will be used for ucs03 transfer like eBABY
+    pub liquidstaking_denom_symbol: String,
     pub ucs03_relay_contract: String,
     pub unbonding_time: u64,
     // liquid_staking denom/cw20 contract address

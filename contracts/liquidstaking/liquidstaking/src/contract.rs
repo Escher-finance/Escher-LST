@@ -1,4 +1,11 @@
+use crate::error::ContractError;
+use crate::execute;
 use crate::instantiate::create_reward;
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
+use crate::state::{
+    Parameters, State, Status, ValidatorsRegistry, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
+};
 use crate::utils::batch::{batches, Batch};
 use crate::utils::validation::{validate_quote_tokens, validate_validators};
 use cosmwasm_std::entry_point;
@@ -6,14 +13,6 @@ use cosmwasm_std::{
     CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
 };
 use cw2::set_contract_version;
-
-use crate::error::ContractError;
-use crate::execute;
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
-use crate::state::{
-    Parameters, State, Status, ValidatorsRegistry, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
-};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:evm_union_liquid_staking";
@@ -56,7 +55,9 @@ pub fn instantiate(
 
     let params = Parameters {
         underlying_coin_denom: msg.underlying_coin_denom,
+        underlying_coin_denom_symbol: msg.underlying_coin_denom_symbol,
         liquidstaking_denom: msg.liquidstaking_denom,
+        liquidstaking_denom_symbol: msg.liquidstaking_denom_symbol,
         ucs03_relay_contract: msg.ucs03_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
@@ -104,6 +105,7 @@ pub fn instantiate(
         },
     )?;
 
+    // initialize the batch
     let pending_batch = Batch::new(
         1,
         Uint128::zero(),
@@ -111,6 +113,15 @@ pub fn instantiate(
     );
     batches().save(deps.storage, pending_batch.id, &pending_batch)?;
     PENDING_BATCH_ID.save(deps.storage, &pending_batch.id)?;
+
+    // initialize the status
+    STATUS.save(
+        deps.storage,
+        &Status {
+            bond_is_paused: false,
+            unbond_is_paused: false,
+        },
+    )?;
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
@@ -156,7 +167,9 @@ pub fn execute(
         }
         ExecuteMsg::SetParameters {
             underlying_coin_denom,
+            underlying_coin_denom_symbol,
             liquidstaking_denom,
+            liquidstaking_denom_symbol,
             ucs03_relay_contract,
             unbonding_time,
             cw20_address,
@@ -175,7 +188,9 @@ pub fn execute(
             env,
             info,
             underlying_coin_denom,
+            underlying_coin_denom_symbol,
             liquidstaking_denom,
+            liquidstaking_denom_symbol,
             ucs03_relay_contract,
             unbonding_time,
             cw20_address,
@@ -216,12 +231,5 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    STATUS.save(
-        deps.storage,
-        &Status {
-            bond_is_paused: false,
-            unbond_is_paused: false,
-        },
-    )?;
     Ok(Response::default())
 }

@@ -17,12 +17,16 @@ use unionlabs_primitives::{Bytes, H256};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    /// native coin denom
+    /// native coin denom like ubbn, emuno, etc.
     pub underlying_coin_denom: String,
+    /// native coin denom symbol that will be used for ucs03 transfer like ubbn, emuno, etc.
+    pub underlying_coin_denom_symbol: String,
+    /// liquid staking cw20 denom name that will be used for ucs03 transfer like ebbn, emuno, etc.
+    pub liquidstaking_denom: String,
+    /// liquid staking cw20 denom symbol that will be used for ucs03 transfer like eBABY
+    pub liquidstaking_denom_symbol: String,
     /// list of validator address with weight
     pub validators: Vec<Validator>,
-    /// liquid staking denom name
-    pub liquidstaking_denom: String,
     /// ucs03 relay contract address
     pub ucs03_relay_contract: String,
     /// fee/revenue receiver address
@@ -73,7 +77,6 @@ pub enum ExecuteRewardMsg {
         lst_contract_address: Option<Addr>,
         coin_denom: Option<String>,
     },
-    TransferToOwner {},
 }
 
 #[cw_serde]
@@ -116,6 +119,8 @@ pub enum ExecuteMsg {
     SetParameters {
         underlying_coin_denom: Option<String>,
         liquidstaking_denom: Option<String>,
+        underlying_coin_denom_symbol: Option<String>,
+        liquidstaking_denom_symbol: Option<String>,
         ucs03_relay_contract: Option<String>,
         unbonding_time: Option<u64>,
         cw20_address: Option<Addr>,
@@ -139,6 +144,7 @@ pub enum ExecuteMsg {
     UpdateValidators {
         validators: Vec<Validator>,
     },
+    // Zkgm protocal handler
     OnZkgm {
         caller: Addr,
         path: Uint256,
@@ -155,13 +161,17 @@ pub enum ExecuteMsg {
     MigrateReward {
         code_id: u64,
     },
+    // Set maintenance status
     SetStatus(Status),
+    // Set supported ucs03 chain
     SetChain {
         chain: crate::state::Chain,
     },
+    // Remove ucs03 chain
     RemoveChain {
         channel_id: u32,
     },
+    // Inject by staking without minting liquid staking token
     Inject {
         amount: Uint128,
     },
