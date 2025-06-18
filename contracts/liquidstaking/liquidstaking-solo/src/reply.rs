@@ -3,9 +3,10 @@ use std::str::FromStr;
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
 use crate::state::{
-    Parameters, WithdrawReward, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
-    WITHDRAW_REWARD_QUEUE,
+    Parameters, WithdrawReward, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE,
+    SPLIT_REWARD_QUEUE, SUPPLY_QUEUE, WITHDRAW_REWARD_QUEUE,
 };
+use crate::utils::calc::get_next_epoch;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
     Env, Reply, Response, StdError, SubMsg, Uint128, WasmMsg,
@@ -240,11 +241,27 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
 }
 
 /// Handle split reward call to reward contract reply
-fn on_split_reward(deps: DepsMut, _env: Env, _msg: Reply) -> Result<Response, ContractError> {
+fn on_split_reward(deps: DepsMut, env: Env, _msg: Reply) -> Result<Response, ContractError> {
     // reset reward balance after split reward call success
     REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
-    // reset withdraw reward queue as on process rewards contract already trigger withdraw all rewards from validators
-    WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![])?;
+    let supply = SUPPLY_QUEUE.load(deps.storage)?;
+    let block_height = env.block.height;
+
+    let next_epoch = get_next_epoch(block_height, supply.epoch_period);
+    let epoch_diff = next_epoch - block_height;
+
+    // Only add one withdraw reward queue entry if epoch diff > 3 to trigger normalize reward
+    if epoch_diff > 0 && epoch_diff != supply.epoch_period as u64 {
+        let reward_queue = WithdrawRewardQueue {
+            amount: Uint128::zero(),
+            block: block_height,
+        };
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![reward_queue])?;
+    } else {
+        // reset withdraw reward queue if epoch diff is 0 or equal to epoch period
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![])?;
+    }
+
     let res: Response = Response::new().add_attribute("action", "on_split_reward");
 
     Ok(res)

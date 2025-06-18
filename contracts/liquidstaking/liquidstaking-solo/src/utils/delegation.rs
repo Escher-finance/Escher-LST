@@ -501,16 +501,16 @@ pub fn process_bond(
     SUPPLY_QUEUE.save(storage, &supply_queue)?;
 
     if !cfg!(test) {
-        let mut recipient = delegator.to_string().clone();
-
-        // if staker is from other chain, minted/staking token will be minted to transfer handler
-        if !on_chain_recipient && (channel_id.is_some() || recipient_channel_id.is_some()) {
-            recipient = params.transfer_handler;
-        }
+        let minted_token_recipient =
+            if !on_chain_recipient && (channel_id.is_some() || recipient_channel_id.is_some()) {
+                params.transfer_handler
+            } else {
+                delegator.to_string()
+            };
 
         // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg = token::get_staked_token_submsg(
-            recipient,
+            minted_token_recipient,
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,
