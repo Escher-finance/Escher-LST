@@ -93,6 +93,7 @@ pub fn ibc_destination_callback(
         &deps,
         Some(payload.recipient.clone()),
         payload.recipient_channel_id,
+        None,
         Some(salt.clone()),
     );
 

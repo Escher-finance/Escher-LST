@@ -100,6 +100,7 @@ fn test_is_on_chain_recipient() {
         &mut deps.as_mut(),
         recipient,
         recipient_channel_id,
+        None,
     );
 
     println!("recipient_addr: {}", recipient_addr);
@@ -111,6 +112,7 @@ fn test_is_on_chain_recipient() {
         &mut deps.as_mut(),
         recipient,
         recipient_channel_id,
+        None,
     );
     assert_eq!(is_same_chain_recipient, false);
 
@@ -119,6 +121,7 @@ fn test_is_on_chain_recipient() {
         &mut deps.as_mut(),
         recipient,
         recipient_channel_id,
+        None,
     );
     assert_eq!(is_same_chain_recipient, false);
 }

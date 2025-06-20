@@ -23,7 +23,8 @@ use crate::utils::calc::{
     calculate_exchange_rate, get_next_epoch, normalize_withdraw_reward_queue,
 };
 use crate::utils::calc::{calculate_fee_from_reward, get_last_epoch_block};
-use crate::utils::delegation::{get_unbonding_ucs03_transfer_cosmos_msg, submit_pending_batch};
+use crate::utils::delegation::submit_pending_batch;
+use crate::utils::transfer::{self, get_send_bank_msg, ibc_transfer_msg};
 use crate::utils::validation::{validate_recipient, validate_validators};
 use crate::utils::{
     self, calc::check_slippage, calc::to_uint128, delegation::get_actual_total_delegated,
@@ -52,8 +53,13 @@ pub fn bond(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    let on_chain_recipient =
-        validate_recipient(&deps, recipient.clone(), recipient_channel_id, salt.clone())?;
+    let on_chain_recipient = validate_recipient(
+        &deps,
+        recipient.clone(),
+        recipient_channel_id,
+        None,
+        salt.clone(),
+    )?;
 
     // coin must have be sent along with transaction and it should be in underlying coin denom
     if info.funds.len() > 1usize {
@@ -155,6 +161,7 @@ pub fn zkgm_unbond(
     amount: Uint128,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    recipient_ibc_channel_id: Option<String>,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
@@ -165,6 +172,7 @@ pub fn zkgm_unbond(
         &deps,
         recipient.clone(),
         recipient_channel_id,
+        recipient_ibc_channel_id.clone(),
         Some("".into()),
     )?; // salt is not required in unbond request
 
@@ -193,6 +201,7 @@ pub fn zkgm_unbond(
         Some(channel_id.raw()),
         recipient,
         recipient_channel_id,
+        recipient_ibc_channel_id,
     )?;
 
     let res: Response = Response::new().add_event(unstake_request_event);
@@ -223,6 +232,7 @@ pub fn zkgm_bond(
         &deps,
         recipient.clone(),
         recipient_channel_id,
+        None,
         Some(salt.clone()),
     )?;
 
@@ -337,24 +347,27 @@ pub fn receive(
         payload_msg,
         Cw20PayloadMsg::Unstake {
             recipient: _,
-            recipient_channel_id: _
+            recipient_channel_id: _,
+            recipient_ibc_channel_id: _,
         }
     ) {
         return Err(ContractError::InvalidPayload {});
     }
 
-    // get the recipient and recipient channel id from payload_msg
-    let (recipient, recipient_channel_id) = match payload_msg {
+    // get the recipient, recipient channel id and recipient_ibc_channel_id from payload_msg
+    let (recipient, recipient_channel_id, recipient_ibc_channel_id) = match payload_msg {
         Cw20PayloadMsg::Unstake {
             recipient,
             recipient_channel_id,
-        } => (recipient, recipient_channel_id),
+            recipient_ibc_channel_id,
+        } => (recipient, recipient_channel_id, recipient_ibc_channel_id),
     };
 
     validate_recipient(
         &deps,
         recipient.clone(),
         recipient_channel_id,
+        recipient_ibc_channel_id.clone(),
         Some("".into()),
     )?; // salt is not required in unbond request
 
@@ -381,6 +394,7 @@ pub fn receive(
         None,
         recipient,
         recipient_channel_id,
+        recipient_ibc_channel_id,
     )?;
 
     let res: Response = Response::new().add_event(unstake_request_event);
@@ -802,6 +816,7 @@ pub struct StakerUndelegation {
     pub unstake_return_native_amount: Option<Uint128>,
     pub recipient: Option<String>,
     pub recipient_channel_id: Option<u32>,
+    pub recipient_ibc_channel_id: Option<String>,
 }
 
 /// Process received batch to release the native token back to user so user doesn't need to manually withdraw token
@@ -860,7 +875,6 @@ pub fn process_batch_withdrawal(
 
     let mut send_msgs: Vec<CosmosMsg> = vec![];
     let mut i = 0;
-    let transfer_handler = params.transfer_handler.clone();
     for ((staker, _), undelegation) in staker_undelegation.iter() {
         // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
         // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
@@ -868,61 +882,48 @@ pub fn process_batch_withdrawal(
             &deps,
             undelegation.recipient.clone(),
             undelegation.recipient_channel_id,
+            undelegation.recipient_ibc_channel_id.clone(),
         );
 
-        // if recipient channel id is set, it means that the receiver/recipient is on other chain
-        // but if channel_id is set but recipient also recipient_channel_id is none, it will send to staker
-        if !is_on_chain_recipient
-            && (undelegation.channel_id.is_some() || undelegation.recipient_channel_id.is_some())
-        {
-            // if staker is from other chain
-            // need to send transfer to transfer handler first before transfer to other chain via ucs03 contract
-            let bank_msg = BankMsg::Send {
-                to_address: transfer_handler.clone(),
-                amount: vec![Coin {
-                    denom: denom.clone(),
-                    amount: undelegation.unstake_return_native_amount.unwrap(),
-                }],
-            };
-            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-            send_msgs.push(msg);
+        if !is_on_chain_recipient {
+            // if recipient channel id is set, it means that the receiver/recipient is on other chain
+            // but if channel_id is set but recipient also recipient_channel_id is none, it will send to staker
+            if undelegation.recipient_channel_id.is_some() {
+                // send native token back via ucs03
+                let (bank_msg, ucs03_msg) = transfer::send_back_token_via_ucs03(
+                    deps.storage,
+                    lst_contract.clone(),
+                    staker,
+                    denom.clone(),
+                    params.transfer_handler.clone(),
+                    params.transfer_fee,
+                    ucs03_relay_contract.clone(),
+                    undelegation,
+                    time,
+                    salt.get(i).unwrap().clone(),
+                )?;
 
-            let target_channel_id = match undelegation.recipient_channel_id {
-                Some(ch_id) => ch_id,
-                None => undelegation.channel_id.unwrap(),
-            };
-
-            let receiver = match undelegation.recipient.clone() {
-                Some(rec) => rec,
-                None => staker.clone(),
-            };
-            //after send bank msg to transfer handler, then call ucs03 on behalf of transfer handler to send token back
-            let msg = get_unbonding_ucs03_transfer_cosmos_msg(
-                deps.storage,
-                lst_contract.clone(),
-                receiver,
-                target_channel_id,
-                time,
-                ucs03_relay_contract.clone(),
-                undelegation.unstake_return_native_amount.unwrap(),
-                params.transfer_fee,
-                denom.clone(),
-                salt.get(i).unwrap().clone(),
-            )?;
-            send_msgs.push(msg);
+                send_msgs.push(bank_msg);
+                send_msgs.push(ucs03_msg);
+            } else if undelegation.recipient.is_some()
+                && undelegation.recipient_ibc_channel_id.is_some()
+            {
+                let msg = ibc_transfer_msg(
+                    undelegation.recipient_ibc_channel_id.clone().unwrap(),
+                    undelegation.recipient.clone().unwrap(),
+                    undelegation.unstake_return_native_amount.unwrap(),
+                    denom.clone(),
+                    time,
+                );
+                send_msgs.push(msg);
+            }
         } else {
-            let recipient = match undelegation.recipient.clone() {
-                Some(addr) => addr,
-                None => staker.clone(),
-            };
-            let bank_msg = BankMsg::Send {
-                to_address: recipient,
-                amount: vec![Coin {
-                    denom: denom.clone(),
-                    amount: undelegation.unstake_return_native_amount.unwrap(),
-                }],
-            };
-            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
+            let msg = get_send_bank_msg(
+                staker,
+                undelegation.recipient.clone(),
+                denom.clone(),
+                undelegation.unstake_return_native_amount.unwrap(),
+            );
             send_msgs.push(msg);
         }
 
@@ -935,6 +936,7 @@ pub fn process_batch_withdrawal(
             env.block.time,
             undelegation.recipient.clone(),
             undelegation.recipient_channel_id,
+            undelegation.recipient_ibc_channel_id.clone(),
         );
         events.push(ev);
 
@@ -1024,6 +1026,7 @@ pub fn on_zkgm(
             amount,
             recipient,
             recipient_channel_id,
+            recipient_ibc_channel_id,
         } => {
             return zkgm_unbond(
                 deps,
@@ -1034,6 +1037,7 @@ pub fn on_zkgm(
                 amount,
                 recipient,
                 recipient_channel_id,
+                recipient_ibc_channel_id,
             )
         }
     }
@@ -1376,4 +1380,25 @@ pub fn inject(
         .add_event(inject_event)
         .add_attribute("action", "inject")
         .add_attribute("amount", amount))
+}
+
+pub fn add_ibc_channel(
+    deps: DepsMut,
+    info: MessageInfo,
+    ibc_channel_id: String,
+    prefix: String,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::IBC_CHANNELS.save(deps.storage, ibc_channel_id, &prefix)?;
+    Ok(Response::new())
+}
+
+pub fn remove_ibc_channel(
+    deps: DepsMut,
+    info: MessageInfo,
+    ibc_channel_id: String,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::IBC_CHANNELS.remove(deps.storage, ibc_channel_id);
+    Ok(Response::new())
 }

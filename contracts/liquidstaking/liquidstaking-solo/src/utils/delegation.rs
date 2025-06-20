@@ -711,6 +711,7 @@ pub fn unstake_request_in_batch(
     channel_id: Option<u32>,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    recipient_ibc_channel_id: Option<String>,
 ) -> Result<Event, ContractError> {
     let params = PARAMETERS.load(storage)?;
 
@@ -752,6 +753,7 @@ pub fn unstake_request_in_batch(
         released: false,
         recipient: recipient.clone(),
         recipient_channel_id,
+        recipient_ibc_channel_id: recipient_ibc_channel_id.clone(),
     };
     unbond_record().save(storage, id, &record)?;
 
@@ -766,6 +768,7 @@ pub fn unstake_request_in_batch(
         recipient,
         recipient_channel_id,
         reward_balance,
+        recipient_ibc_channel_id, // todo: need to set it if we implement send unstake native token output via IBC
     );
 
     Ok(event)
@@ -959,6 +962,7 @@ pub fn get_staker_undelegation(
                 unstake_return_native_amount: None,
                 recipient: record.recipient.clone(),
                 recipient_channel_id: record.recipient_channel_id,
+                recipient_ibc_channel_id: record.recipient_ibc_channel_id.clone(),
             });
 
         let user_to_total_unstake_ratio =

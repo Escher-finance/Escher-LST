@@ -126,8 +126,11 @@ pub enum ContractError {
     #[error("error encode any msg")]
     EncodeAnyMsgError {},
 
-    #[error("invalid channel id")]
+    #[error("invalid recipient channel id")]
     InvalidChannelId {},
+
+    #[error("invalid recipient ibc channel id")]
+    InvalidIBCChannelId {},
 
     #[error("invalid {kind} address: {address}")]
     InvalidAddress { kind: String, address: String },

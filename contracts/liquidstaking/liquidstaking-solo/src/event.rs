@@ -162,6 +162,7 @@ pub fn ProcessUnbondingEvent(
     time: Timestamp,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    recipient_ibc_channel_id: Option<String>,
 ) -> Event {
     let recipient = match recipient {
         Some(recipient) => recipient,
@@ -172,6 +173,12 @@ pub fn ProcessUnbondingEvent(
         Some(channel_id) => channel_id.to_string(),
         None => "0".to_string(),
     };
+
+    let recipient_ibc_channel_id: String = match recipient_ibc_channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "".to_string(),
+    };
+
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
         .add_attribute("staker", staker)
         .add_attribute("amount", amount.to_string())
@@ -181,6 +188,7 @@ pub fn ProcessUnbondingEvent(
         .add_attribute("channel_id", channel_id.unwrap_or(0).to_string())
         .add_attribute("recipient", recipient)
         .add_attribute("recipient_channel_id", recipient_channel_id)
+        .add_attribute("recipient_ibc_channel_id", recipient_ibc_channel_id)
 }
 
 pub const PROCESS_BATCH_UNBONDING_EVENT: &str = "process_batch_unbonding";
@@ -227,6 +235,7 @@ pub fn UnstakeRequestEvent(
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     reward_balance: Uint128,
+    recipient_ibc_channel_id: Option<String>,
 ) -> Event {
     let channel_id: String = match channel_id {
         Some(channel_id) => channel_id.to_string(),
@@ -243,6 +252,11 @@ pub fn UnstakeRequestEvent(
         None => "0".to_string(),
     };
 
+    let recipient_ibc_channel_id: String = match recipient_ibc_channel_id {
+        Some(channel_id) => channel_id.to_string(),
+        None => "0".to_string(),
+    };
+
     Event::new(UNSTAKE_REQUEST_EVENT.to_string())
         .add_attribute("sender", sender)
         .add_attribute("staker", staker)
@@ -254,6 +268,7 @@ pub fn UnstakeRequestEvent(
         .add_attribute("recipient", recipient)
         .add_attribute("recipient_channel_id", recipient_channel_id)
         .add_attribute("reward_balance", reward_balance)
+        .add_attribute("recipient_ibc_channel_id", recipient_ibc_channel_id)
 }
 
 pub const BATCH_RECEIVED_EVENT: &str = "batch_received";

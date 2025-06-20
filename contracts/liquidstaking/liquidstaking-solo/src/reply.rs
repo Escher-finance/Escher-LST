@@ -42,6 +42,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         &deps,
         payload.recipient.clone(),
         payload.recipient_channel_id,
+        None,
     );
 
     // check to query balance of transfer handler or this contract

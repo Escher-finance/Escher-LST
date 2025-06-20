@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::msg::{Balance, QueryMsg, StakingLiquidity};
+use crate::msg::{Balance, IBCChannel, QueryMsg, StakingLiquidity};
 use crate::state::{unbond_record, Status, WithdrawRewardQueue, STATUS, WITHDRAW_REWARD_QUEUE};
 use crate::state::{
     Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, ValidatorsRegistry, PARAMETERS,
@@ -55,6 +55,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Delegations {} => to_json_binary(&query_delegations(deps, env)?),
         QueryMsg::Chains {} => to_json_binary(&query_chains(deps.storage)?),
         QueryMsg::RewardQueue {} => to_json_binary(&query_reward_queue(deps.storage)?),
+        QueryMsg::IBCChannels {} => to_json_binary(&query_ibc_channels(deps.storage)?),
     }?)
 }
 pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
@@ -329,4 +330,17 @@ pub fn query_reward_queue(
 ) -> Result<Vec<WithdrawRewardQueue>, ContractError> {
     let queue = WITHDRAW_REWARD_QUEUE.load(storage)?;
     Ok(queue)
+}
+
+pub fn query_ibc_channels(storage: &dyn Storage) -> Result<Vec<IBCChannel>, ContractError> {
+    let channels: Vec<IBCChannel> = crate::state::IBC_CHANNELS
+        .range(storage, None, None, cosmwasm_std::Order::Ascending)
+        .filter_map(|result| {
+            result.ok().map(|(ibc_channel_id, prefix)| IBCChannel {
+                ibc_channel_id,
+                prefix,
+            })
+        })
+        .collect();
+    Ok(channels)
 }

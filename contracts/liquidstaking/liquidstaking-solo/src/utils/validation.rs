@@ -45,11 +45,12 @@ pub fn validate_recipient(
     deps: &cosmwasm_std::DepsMut,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    recipient_ibc_channel_id: Option<String>,
     salt: Option<String>,
 ) -> Result<bool, ContractError> {
     let mut on_chain_recipient = false;
     // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
-    if recipient.is_some() && recipient_channel_id.is_none() {
+    if recipient.is_some() && recipient_channel_id.is_none() && recipient_ibc_channel_id.is_none() {
         deps.api
             .addr_validate(recipient.clone().unwrap().as_str())?;
         on_chain_recipient = true;
@@ -68,6 +69,36 @@ pub fn validate_recipient(
             )));
         }
     }
+
+    if recipient_channel_id.is_some() {
+        let chain = crate::state::CHAINS.load(deps.storage, recipient_channel_id.unwrap());
+        if chain.is_err() {
+            return Err(ContractError::InvalidChannelId {});
+        }
+
+        if salt.is_none() {
+            return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+                "missing salt",
+            )));
+        }
+    }
+
+    if recipient_ibc_channel_id.is_some() {
+        let prefix: Result<String, cosmwasm_std::StdError> =
+            crate::state::IBC_CHANNELS.load(deps.storage, recipient_ibc_channel_id.unwrap());
+        if prefix.is_err() {
+            return Err(ContractError::InvalidChannelId {});
+        }
+
+        let prefix = prefix.unwrap();
+
+        if !recipient.clone().unwrap().starts_with(&prefix) {
+            return Err(ContractError::InvalidAddress {
+                kind: "recipient".into(),
+                address: recipient.unwrap(),
+            });
+        }
+    }
     Ok(on_chain_recipient)
 }
 
@@ -75,9 +106,10 @@ pub fn is_on_chain_recipient(
     deps: &cosmwasm_std::DepsMut,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    recipient_ibc_channel_id: Option<String>,
 ) -> bool {
     let mut on_chain_recipient = false;
-    if recipient.is_some() && recipient_channel_id.is_none() {
+    if recipient.is_some() && recipient_channel_id.is_none() && recipient_ibc_channel_id.is_none() {
         let res = deps.api.addr_validate(recipient.clone().unwrap().as_str());
         if res.is_ok() {
             on_chain_recipient = true;

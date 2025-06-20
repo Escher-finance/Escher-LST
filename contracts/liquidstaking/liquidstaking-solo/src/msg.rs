@@ -86,6 +86,7 @@ pub enum Cw20PayloadMsg {
     Unstake {
         recipient: Option<String>,
         recipient_channel_id: Option<u32>,
+        recipient_ibc_channel_id: Option<String>,
     },
 }
 
@@ -179,6 +180,13 @@ pub enum ExecuteMsg {
     Inject {
         amount: Uint128,
     },
+    AddIBCChannel {
+        ibc_channel_id: String,
+        prefix: String,
+    },
+    RemoveIBCChannel {
+        ibc_channel_id: String,
+    },
 }
 
 #[cw_serde]
@@ -235,6 +243,8 @@ pub enum QueryMsg {
     Chains {},
     #[returns(Vec<crate::state::WithdrawRewardQueue>)]
     RewardQueue {},
+    #[returns(Vec<IBCChannel>)]
+    IBCChannels {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;
@@ -326,6 +336,7 @@ pub enum ZkgmMessage {
         amount: Uint128,
         recipient: Option<String>,
         recipient_channel_id: Option<u32>,
+        recipient_ibc_channel_id: Option<String>,
     },
 }
 
@@ -377,4 +388,10 @@ pub struct InjectData {
     pub unclaimed_reward: Uint128,
     pub delegated_amount: Uint128,
     pub total_bond_amount: Uint128,
+}
+
+#[cw_serde]
+pub struct IBCChannel {
+    pub ibc_channel_id: String,
+    pub prefix: String,
 }

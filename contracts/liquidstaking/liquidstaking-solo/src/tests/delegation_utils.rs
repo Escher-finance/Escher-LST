@@ -800,6 +800,7 @@ fn test_unstake_request_in_batch() {
         channel_id,
         None,
         None,
+        None,
     )
     .unwrap();
 
@@ -834,6 +835,7 @@ fn test_unstake_request_in_batch() {
             released: false,
             recipient: None,
             recipient_channel_id: None,
+            recipient_ibc_channel_id: None,
         }
     );
     assert_eq!(unstake_request_event.ty, UNSTAKE_REQUEST_EVENT);
