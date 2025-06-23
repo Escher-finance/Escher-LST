@@ -264,11 +264,11 @@ pub fn execute(
         ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
         ExecuteMsg::NormalizeReward {} => execute::normalize_reward(deps, env),
         ExecuteMsg::Inject { amount } => execute::inject(deps, env, info, amount),
-        ExecuteMsg::AddIBCChannel {
+        ExecuteMsg::AddIbcChannel {
             ibc_channel_id,
             prefix,
         } => execute::add_ibc_channel(deps, info, ibc_channel_id, prefix),
-        ExecuteMsg::RemoveIBCChannel { ibc_channel_id } => {
+        ExecuteMsg::RemoveIbcChannel { ibc_channel_id } => {
             execute::remove_ibc_channel(deps, info, ibc_channel_id)
         }
     }

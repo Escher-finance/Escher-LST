@@ -321,7 +321,7 @@ pub fn receive(
     }
 
     let params = PARAMETERS.load(deps.storage)?;
-    // make sure only cw20 contract can call this function
+    // make sure the sender is the cw20 contract because only cw20 contract can call this function
     if info.sender != params.cw20_address {
         return Err(ContractError::Unauthorized {});
     }
@@ -334,11 +334,6 @@ pub fn receive(
     let sender = cw20_msg.sender.to_string();
     let the_staker: String = sender.clone();
     let delegator = env.contract.address.clone();
-
-    // make sure the sender is the cw20 contract
-    if info.sender != params.cw20_address {
-        return Err(ContractError::Unauthorized {});
-    }
 
     let payload_msg: Cw20PayloadMsg = from_json(cw20_msg.msg)?;
 

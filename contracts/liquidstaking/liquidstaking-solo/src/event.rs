@@ -254,7 +254,7 @@ pub fn UnstakeRequestEvent(
 
     let recipient_ibc_channel_id: String = match recipient_ibc_channel_id {
         Some(channel_id) => channel_id.to_string(),
-        None => "0".to_string(),
+        None => "".to_string(),
     };
 
     Event::new(UNSTAKE_REQUEST_EVENT.to_string())

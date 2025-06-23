@@ -56,24 +56,19 @@ pub fn validate_recipient(
         on_chain_recipient = true;
     }
 
-    // if recipient_channel_id exists, must make sure the chain is supported
+    // if recipient_channel_id exists, must make sure the chain is supported and recipient address is in hex
     if recipient_channel_id.is_some() {
         let channel_id = crate::state::CHAINS.load(deps.storage, recipient_channel_id.unwrap());
         if channel_id.is_err() {
             return Err(ContractError::InvalidChannelId {});
         }
 
-        if salt.is_none() {
-            return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
-                "missing salt",
-            )));
-        }
-    }
-
-    if recipient_channel_id.is_some() {
-        let chain = crate::state::CHAINS.load(deps.storage, recipient_channel_id.unwrap());
-        if chain.is_err() {
-            return Err(ContractError::InvalidChannelId {});
+        if !recipient.clone().unwrap().starts_with("0x") {
+            return Err(ContractError::InvalidAddress {
+                kind: "recipient".into(),
+                address: recipient.unwrap(),
+                reason: "address must be in hex and starts with 0x".to_string(),
+            });
         }
 
         if salt.is_none() {
@@ -84,18 +79,19 @@ pub fn validate_recipient(
     }
 
     if recipient_ibc_channel_id.is_some() {
-        let prefix: Result<String, cosmwasm_std::StdError> =
+        let ibc_channel_result: Result<String, cosmwasm_std::StdError> =
             crate::state::IBC_CHANNELS.load(deps.storage, recipient_ibc_channel_id.unwrap());
-        if prefix.is_err() {
-            return Err(ContractError::InvalidChannelId {});
+        if ibc_channel_result.is_err() {
+            return Err(ContractError::InvalidIBCChannelId {});
         }
 
-        let prefix = prefix.unwrap();
+        let prefix = ibc_channel_result.unwrap();
 
         if !recipient.clone().unwrap().starts_with(&prefix) {
             return Err(ContractError::InvalidAddress {
                 kind: "recipient".into(),
                 address: recipient.unwrap(),
+                reason: format!("address prefix must starts with {}", prefix),
             });
         }
     }

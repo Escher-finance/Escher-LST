@@ -120,6 +120,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                 return Err(ContractError::InvalidAddress {
                     kind: "recipient".into(),
                     address: recipient,
+                    reason: "address must be in hex and starts with 0x".to_string(),
                 })
             }
         };
@@ -129,6 +130,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                 return Err(ContractError::InvalidAddress {
                     kind: "quote_token".into(),
                     address: quote_token_string,
+                    reason: "address must be in hex and starts with 0x".to_string(),
                 })
             }
         };

@@ -55,7 +55,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Delegations {} => to_json_binary(&query_delegations(deps, env)?),
         QueryMsg::Chains {} => to_json_binary(&query_chains(deps.storage)?),
         QueryMsg::RewardQueue {} => to_json_binary(&query_reward_queue(deps.storage)?),
-        QueryMsg::IBCChannels {} => to_json_binary(&query_ibc_channels(deps.storage)?),
+        QueryMsg::IbcChannels {} => to_json_binary(&query_ibc_channels(deps.storage)?),
     }?)
 }
 pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {

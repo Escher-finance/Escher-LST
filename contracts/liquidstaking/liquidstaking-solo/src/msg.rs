@@ -180,11 +180,11 @@ pub enum ExecuteMsg {
     Inject {
         amount: Uint128,
     },
-    AddIBCChannel {
+    AddIbcChannel {
         ibc_channel_id: String,
         prefix: String,
     },
-    RemoveIBCChannel {
+    RemoveIbcChannel {
         ibc_channel_id: String,
     },
 }
@@ -244,7 +244,7 @@ pub enum QueryMsg {
     #[returns(Vec<crate::state::WithdrawRewardQueue>)]
     RewardQueue {},
     #[returns(Vec<IBCChannel>)]
-    IBCChannels {},
+    IbcChannels {},
 }
 
 pub type Fees = BTreeMap<String, Coin>;
