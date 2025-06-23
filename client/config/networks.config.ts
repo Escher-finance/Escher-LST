@@ -35,7 +35,7 @@ export type ChainConfig = {
   gasPrice: string;
 };
 
-type SupportedNetworks = "uniontestnet" | "babylontestnet" | "babylon";
+type SupportedNetworks = "uniontestnet" | "babylontestnet" | "babylon" | "osmosis-testnet";
 
 
 const currency: Record<SupportedNetworks, Currency> = {
@@ -59,7 +59,14 @@ const currency: Record<SupportedNetworks, Currency> = {
     coinDecimals: 6,
     liquidStakingDenom: "ebbn",
     liquidStakingDenomDisplay: "eBABY"
-  }
+  },
+  "osmosis-testnet": {
+    coinDenom: "OSMO",
+    coinMinimalDenom: "uosmo",
+    coinDecimals: 6,
+    liquidStakingDenom: "ebbn",
+    liquidStakingDenomDisplay: "eBABY"
+  },
 };
 
 
@@ -143,12 +150,39 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     },
     gasPrice: "0.0025ubbn",
   },
+  "osmosis-testnet": {
+    chainId: "osmo-test-5",
+    chainName: "Osmosis (Testnet)",
+    rpc: "https://rpc.osmotest5.osmosis.zone",
+    rest: "https://lcd.osmotest5.osmosis.zone",
+    stakeCurrency: currency["osmosis-testnet"],
+    bech32Config: {
+      bech32PrefixAccAddr: "osmo",
+      bech32PrefixAccPub: "osmopub",
+      bech32PrefixValAddr: "osmovaloper",
+      bech32PrefixValPub: "osmovaloperpub",
+      bech32PrefixConsAddr: "osmovalcons",
+      bech32PrefixConsPub: "osmovalconspub",
+    },
+    currencies: [currency["osmosis-testnet"]],
+    feeCurrencies: [currency["osmosis-testnet"]],
+    "bip44": {
+      "coinType": 118
+    },
+    contracts: {
+      lst: "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss",
+      cw20: "bbn1s7jzz7cyuqmy5xpr07yepka5ngktexsferu2cr4xeww897ftj77sv30f5s",
+      reward: "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g",
+    },
+    gasPrice: "0.025uosmo",
+  },
 };
 
 export const BaseNetworks: Record<SupportedNetworks, ChainConfig> = {
   "uniontestnet": Networks["uniontestnet"],
   "babylontestnet": Networks["babylontestnet"],
   "babylon": Networks["babylon"],
+  "osmosis-testnet": Networks["osmosis-testnet"],
 };
 
 export default Networks;

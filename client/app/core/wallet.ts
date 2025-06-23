@@ -76,17 +76,17 @@ export async function setClientNomos(
     case "keplr":
       (window as any).wallet = (window as any).keplr;
       console.log("NETWORK", network);
-      offlineSigner = await (window as any).wallet.getOfflineSignerAuto(network.chainId, { disableBalanceCheck: false });
+      offlineSigner = await (window as any).wallet.getOfflineSignerAuto(network?.chainId, { disableBalanceCheck: false });
       break;
     case "leap":
       (window as any).wallet = (window as any).leap;
-      offlineSigner = await (window as any).wallet.getOfflineSignerAuto(network.chainId, { disableBalanceCheck: false });
+      offlineSigner = await (window as any).wallet.getOfflineSignerAuto(network?.chainId, { disableBalanceCheck: false });
       break;
   }
 
   if (offlineSigner) {
-    const cosmosClient = await SigningCosmWasmClient.connectWithSigner(network.rpc, offlineSigner, {
-      gasPrice: GasPrice.fromString(network.gasPrice),
+    const cosmosClient = await SigningCosmWasmClient.connectWithSigner(network?.rpc, offlineSigner, {
+      gasPrice: GasPrice.fromString(network?.gasPrice),
     });
     console.log("setClientNomos");
     setCient(cosmosClient);

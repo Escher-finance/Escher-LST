@@ -10,9 +10,11 @@ import RevenueAssets from "./revenue_assets";
 import { useState } from "react";
 import Liquidity from "./liquidity";
 import TransactionHistory from "./transaction_history";
+import { useGlobalContext } from "@/app/core/context";
+import IbcBond from "./ibc_bond";
 
 export default function Dashboard() {
-
+  const { network } = useGlobalContext();
 
   const [stateKey, setStateKey] = useState(1);
 
@@ -28,37 +30,43 @@ export default function Dashboard() {
           <h1 className="p-3 text-2xl">Escher Liquid Staking</h1>
           <Chip><Link color="warning" onPress={refresh}>Refresh</Link></Chip>
         </div>
+        {network?.chainId.indexOf("osmo") == -1 &&
+          <div className="flex flex-col">
 
-        <div className="flex flex-col">
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <Assets stateKey={stateKey} />
-              <RevenueAssets stateKey={stateKey} />
-              <RewardAsset stateKey={stateKey} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <Assets stateKey={stateKey} />
+                <RevenueAssets stateKey={stateKey} />
+                <RewardAsset stateKey={stateKey} />
+              </div>
+              <Liquidity stateKey={stateKey} />
             </div>
-            <Liquidity stateKey={stateKey} />
+
+            <Tabs aria-label="Tabs sizes" className="mt-10 p-3">
+              <Tab key="bond" title="Bond">
+                <Bond stateKey={stateKey} setStateKey={setStateKey} />
+              </Tab>
+
+
+              <Tab key="unbond" title="Unbond" >
+                <Unbond stateKey={stateKey} setStateKey={setStateKey} />
+              </Tab>
+              <Tab key="records" title="Unbonding Process">
+                <UnbondingRecords />
+              </Tab>
+              <Tab key="history" title="Transactions History">
+                <TransactionHistory />
+              </Tab>
+            </Tabs>
+
           </div>
+        }
 
-          <Tabs aria-label="Tabs sizes" className="mt-10 p-3">
-            <Tab key="bond" title="Bond">
-              <Bond stateKey={stateKey} setStateKey={setStateKey} />
-            </Tab>
-            <Tab key="unbond" title="Unbond" >
-              <Unbond stateKey={stateKey} setStateKey={setStateKey} />
-            </Tab>
-            <Tab key="records" title="Unbonding Process">
-              <UnbondingRecords />
-            </Tab>
-            <Tab key="history" title="Transactions History">
-              <TransactionHistory />
-            </Tab>
-          </Tabs>
-
-
-        </div>
+        {network?.chainId.indexOf("osmo") != -1 &&
+          <IbcBond stateKey={stateKey} setStateKey={setStateKey} />
+        }
 
       </div>
-    </div>
+    </div >
   );
 }

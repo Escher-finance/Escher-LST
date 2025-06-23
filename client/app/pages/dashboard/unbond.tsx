@@ -33,7 +33,7 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
     const amount = formEntries.amount.toString();
     const recipient = formEntries.recipient.toString();
     const recipient_channel_id = formEntries.recipient_channel_id.toString();
-
+    const recipient_ibc_channel_id = formEntries.recipient_ibc_channel_id.toString();
     const encoder = new TextEncoder();
     const recipient_hex = toHex(encoder.encode(recipient));
 
@@ -68,8 +68,9 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
       const unbondingPayload = {
         unstake: {
           amount,
-          recipient: recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
-          recipient_channel_id: recipient.indexOf("bbn") != -1 ? null : Number(recipient_channel_id),
+          recipient: recipient.indexOf("bbn") != -1 ? recipient : recipient_ibc_channel_id != "" ? recipient : recipient_hex,
+          recipient_channel_id: recipient_channel_id == "" ? null : Number(recipient_channel_id),
+          recipient_ibc_channel_id: recipient_ibc_channel_id == "" ? null : recipient_ibc_channel_id,
         }
       };
 
@@ -120,14 +121,18 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
             <Input
               isRequired
               name="recipient"
-              label="Recipient"
+              label="Recipient (example: xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds for xion via zkgm, osmo1vnglhewf3w66cquy6hr7urjv3589srhelhn6df for osmosis via IBC)"
               defaultValue="xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds"
             />
             <Input
-              isRequired
               name="recipient_channel_id"
-              label="Recipient Channel ID (4 for xion)"
-              defaultValue="4"
+              label="Recipient Channel ID (4 for xion) (set blank to make it null)"
+              defaultValue=""
+            />
+            <Input
+              name="recipient_ibc_channel_id"
+              label="Recipient IBC Channel ID (channel-21 for osmosis) (set blank to make it null)"
+              defaultValue=""
             />
           </CardBody>
           <CardFooter>
