@@ -375,6 +375,8 @@ pub struct RewardMigrateMsg {}
 #[cw_serde]
 pub struct IBCCallbackPayload {
     pub amount: Uint128,
+    pub slippage: Option<Decimal>,
+    pub expected: Uint128,
     pub salt: String,
     pub recipient: String,
     pub recipient_channel_id: Option<u32>,
