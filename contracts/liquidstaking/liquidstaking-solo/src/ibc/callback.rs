@@ -66,17 +66,26 @@ pub fn ibc_destination_callback(
     let payload: Result<crate::msg::IBCCallbackPayload, StdError> = from_json(memo.as_bytes());
 
     let channel_id: String = msg.packet.dest.channel_id;
-
-    if payload.is_err() {
-        return Err(StdError::generic_err("invalid payload"));
-    }
-
-    let payload = payload.unwrap();
+    let coin_denom = params.underlying_coin_denom.clone();
     let amount = packet_data
         .amount
         .parse::<u128>()
         .map(Uint128::new)
         .map_err(|_| StdError::generic_err("failed to parse amount as u128"))?;
+
+    if payload.is_err() {
+        return failure_handler(
+            env,
+            None,
+            packet_data.clone(),
+            channel_id,
+            amount,
+            coin_denom,
+            payload.unwrap_err().to_string(),
+        );
+    }
+
+    let payload = payload.unwrap();
 
     let mut required_amount = payload.amount;
     // if recipient on other chain, need to add transfer fee to required amount
@@ -84,7 +93,6 @@ pub fn ibc_destination_callback(
         required_amount += params.transfer_fee;
     }
 
-    let coin_denom = params.underlying_coin_denom.clone();
     let salt = payload.salt.clone();
 
     if amount < required_amount {
