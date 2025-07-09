@@ -14,14 +14,23 @@ import { getSalt, transferAndCallInstruction, TransferAndCallIntent, getTimeoutI
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { Instruction } from "@unionlabs/sdk/ucs03";
+import { useState } from "react";
 
 const baby_lst_contract = "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss";
 const ucs03_contract = "osmo1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292qs2uecc";
 
 const ebaby_denom = "factory/osmo13ulc6pqhm60qnx58ss7s3cft8cqfycexq3uy3dd2v0l8qsnkvk4sj22sn6/5dDrk51st6AKJwxbyFwe8wydD417XHRDAAx9JSJN7c9a";
 
+interface KeyProps {
+    stateKey: number;
+    setStateKey: (key: number) => void;
+}
 
-export default function ZkgmUnbond() {
+export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
+
+
+    const [isLoading, setIsLoading] = useState(false);
+
     const { userAddress, client } = useGlobalContext();
 
     const handleSubmit = async (e: any) => {
@@ -102,14 +111,20 @@ export default function ZkgmUnbond() {
         try {
             const res = await client?.signAndBroadcast(userAddress, [executeBondMsg], "auto", "unbond from osmosis to babylon");
             alert(res?.transactionHash);
-
+            let newKey = stateKey + 1;
+            setStateKey(newKey);
+            setIsLoading(false);
         } catch (err) {
+            setIsLoading(false);
             console.log(err);
         }
     };
 
     return (
-        <div className="w-full flex flex-row gap-4">
+        <div className="w-full flex flex-col gap-4">
+            <div className="p-1 text-xl">
+                ZKGM UNBOND
+            </div>
             <form onSubmit={handleSubmit} className="w-full flex">
                 <Card className="w-full flex">
                     <CardBody className="gap-4">
@@ -133,7 +148,7 @@ export default function ZkgmUnbond() {
                         />
                     </CardBody>
                     <CardFooter>
-                        <Button type="submit">Submit</Button>
+                        <Button type="submit" isLoading={isLoading}>Submit</Button>
                     </CardFooter>
                 </Card>
             </form>

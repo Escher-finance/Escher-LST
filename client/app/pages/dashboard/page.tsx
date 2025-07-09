@@ -12,6 +12,7 @@ import Liquidity from "./liquidity";
 import TransactionHistory from "./transaction_history";
 import { useGlobalContext } from "@/app/core/context";
 import IbcBond from "./ibc_bond";
+import ZkgmUnbond from "./zkgm_unbond";
 
 export default function Dashboard() {
   const { network } = useGlobalContext();
@@ -63,7 +64,11 @@ export default function Dashboard() {
         }
 
         {network?.chainId.indexOf("osmo") != -1 &&
-          <IbcBond stateKey={stateKey} setStateKey={setStateKey} />
+          <>
+            <IbcBond stateKey={stateKey} setStateKey={setStateKey} />
+            <br />
+            <ZkgmUnbond stateKey={stateKey} setStateKey={setStateKey} />
+          </>
         }
 
       </div>
