@@ -104,6 +104,7 @@ pub fn bond(
         recipient.clone(),
         recipient_channel_id,
         on_chain_recipient,
+        None,
     )?;
 
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
@@ -263,6 +264,7 @@ pub fn zkgm_bond(
         recipient.clone(),
         recipient_channel_id,
         on_chain_recipient,
+        None,
     )?;
 
     if bond_data.mint_amount == Uint128::zero() {

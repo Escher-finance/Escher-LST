@@ -405,6 +405,7 @@ pub fn process_bond(
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     on_chain_recipient: bool,
+    transfer_fee: Option<Uint128>,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
@@ -491,6 +492,7 @@ pub fn process_bond(
         channel_id,
         recipient,
         recipient_channel_id,
+        transfer_fee,
     };
     let payload_bin = to_json_binary(&payload)?;
 

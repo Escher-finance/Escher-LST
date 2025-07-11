@@ -295,6 +295,7 @@ pub struct MintTokensPayload {
     pub channel_id: Option<u32>,
     pub recipient: Option<String>,
     pub recipient_channel_id: Option<u32>,
+    pub transfer_fee: Option<Uint128>,
 }
 
 #[cw_serde]
@@ -380,6 +381,7 @@ pub struct IBCCallbackPayload {
     pub salt: String,
     pub recipient: String,
     pub recipient_channel_id: Option<u32>,
+    pub transfer_fee: Option<Uint128>,
 }
 
 pub struct InjectData {

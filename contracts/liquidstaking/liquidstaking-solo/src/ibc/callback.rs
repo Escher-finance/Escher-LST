@@ -86,11 +86,17 @@ pub fn ibc_destination_callback(
     }
 
     let payload = payload.unwrap();
-
     let mut required_amount = payload.amount;
+
+    // if payload transfer fee is set, use it, otherwise use params.transfer_fee
+    let transfer_fee = match payload.transfer_fee {
+        Some(fee) => fee,
+        None => params.transfer_fee,
+    };
+
     // if recipient on other chain, need to add transfer fee to required amount
     if payload.recipient_channel_id.is_some() {
-        required_amount += params.transfer_fee;
+        required_amount += transfer_fee;
     }
 
     let salt = payload.salt.clone();
@@ -160,6 +166,7 @@ pub fn ibc_destination_callback(
         Some(payload.recipient.clone()),
         payload.recipient_channel_id,
         on_chain_recipient.unwrap(),
+        payload.transfer_fee,
     );
 
     if process_bond_result.is_err() {
@@ -220,6 +227,7 @@ pub fn ibc_destination_callback(
         true,
         "".to_string(),
         env.block.time,
+        transfer_fee,
     );
 
     Ok(IbcBasicResponse::new()
@@ -262,8 +270,13 @@ fn failure_handler(
     };
 
     let salt = match payload {
-        Some(p) => p.salt,
+        Some(ref p) => p.salt.clone(),
         None => "".to_string(),
+    };
+
+    let transfer_fee = match payload {
+        Some(ref p) => p.transfer_fee.unwrap_or(Uint128::zero()),
+        None => Uint128::zero(),
     };
 
     let ibc_callback_event = IbcCallbackEvent(
@@ -277,6 +290,7 @@ fn failure_handler(
         false,
         error_message,
         env.block.time,
+        transfer_fee,
     );
 
     Ok(IbcBasicResponse::new()
