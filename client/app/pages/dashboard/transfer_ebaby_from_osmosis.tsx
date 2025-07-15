@@ -8,28 +8,23 @@ import {
     Input,
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
-import { encodeAbiParameters, Hex, toHex } from "viem";
+import { encodeAbiParameters, toHex } from "viem";
 import { instructionAbi } from "@unionlabs/sdk/evm/abi";
-import { getSalt, transferAndCallInstruction, TransferAndCallIntent, getTimeoutInNanoseconds24HoursFromNow } from "../utils/ucs03";
+import { getSalt, transferInstruction, TransferIntent } from "../utils/ucs03";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { Instruction } from "@unionlabs/sdk/ucs03";
-import { useState } from "react";
 import { BaseNetworks } from "@/config/networks.config";
+import { getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/ibc";
 
-interface KeyProps {
-    stateKey: number;
-    setStateKey: (key: number) => void;
-}
-
-export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
-    const [isLoading, setIsLoading] = useState(false);
-
+export default function TransferEbabyFromOsmosis() {
     const { userAddress, client, network } = useGlobalContext();
+
+    const base_denom = network?.escher.ebabyDenom;
+
     const ucs03_contract = network?.escher.ucs03;
     const channel_id = network?.escher.channel["babylon"]?.sourceChannelId;
-    const baby_lst_contract = network?.escher.lst;
-    const ebaby_denom = network?.escher.ebabyDenom;
+    const default_receiver = "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz"; // Default receiver address for Babylon
 
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
@@ -37,28 +32,19 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
         const form = e.target;
         const formData = new FormData(form);
         const formEntries = Object.fromEntries(formData.entries());
+        const receiver = formEntries.receiver.toString() || default_receiver;
         const amount = BigInt(formEntries.amount.toString());
-        const recipient = formEntries.recipient.toString();
-
 
         if (userAddress === undefined || userAddress === null) {
             alert("Please connect your wallet");
             return;
         }
 
-        let payload = {
-            unbond: {
-                amount: amount.toString(),
-                recipient,
-                recipient_ibc_channel_id: network?.escher.channel["babylon"]?.destinationIbcChannelId,
-            }
-        };
-
         let testnet = network?.chainName?.toLowerCase().includes("testnet");
 
-        const cosmosIntent: TransferAndCallIntent = {
+        const cosmosIntent: TransferIntent = {
             sender: userAddress,
-            receiver: baby_lst_contract,
+            receiver,
             baseToken: formEntries.denom.toString(),
             baseAmount: BigInt(amount),
             baseTokenSymbol: "eBABY",
@@ -66,12 +52,13 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
             quoteToken: testnet ? toHex(BaseNetworks["babylon-testnet"].escher.ebabyDenom) : toHex(BaseNetworks["babylon-mainnet"].escher.ebabyDenom),
             quoteAmount: BigInt(amount),
             baseTokenPath: BigInt(network?.escher.channel["babylon"]?.sourceChannelId),
-            payload
+            baseTokenDecimals: 6
         } as const
 
-        const batch_instruction = transferAndCallInstruction(cosmosIntent);
+        console.log("cosmosIntent", JSON.stringify(cosmosIntent));
+        const batch_instruction = transferInstruction(cosmosIntent);
 
-        console.log(JSON.stringify(batch_instruction));
+        console.log("batch_instruction", JSON.stringify(batch_instruction));
 
         const timeout_timestamp = getTimeoutInNanoseconds24HoursFromNow().toString();
 
@@ -89,6 +76,9 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
             },
         }
 
+
+
+
         let funds = [
             {
                 amount: amount.toString(),
@@ -96,7 +86,12 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
             }
         ];
 
-        const executeBondMsg = {
+
+
+        console.log(JSON.stringify(funds));
+        console.log(userAddress);
+
+        const transferMsg = {
             typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
             value: MsgExecuteContract.fromPartial({
                 sender: userAddress,
@@ -106,22 +101,18 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
             }),
         };
 
-
         console.log(JSON.stringify(msg));
         try {
-            const res = await client?.signAndBroadcast(userAddress, [executeBondMsg], "auto", "unbond from osmosis to babylon");
-            alert(res?.transactionHash);
-            let newKey = stateKey + 1;
-            setStateKey(newKey);
-            setIsLoading(false);
+            const res = await client.signAndBroadcast(userAddress, [transferMsg], "auto", "transfer ebaby from osmosis to babylon");
+            alert(res.transactionHash);
+
         } catch (err) {
             console.log(err);
-            setIsLoading(false);
         }
     };
 
     return (
-        <div className="w-full flex flex-col gap-4">
+        <div className="w-full flex flex-row gap-4">
             <form onSubmit={handleSubmit} className="w-full flex">
                 <Card className="w-full flex">
                     <CardBody className="gap-4">
@@ -129,23 +120,23 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
                             isRequired
                             name="amount"
                             label="Amount"
-                            defaultValue="10000"
+                            defaultValue="100"
                         />
                         <Input
                             isRequired
                             name="denom"
                             label="Denom"
-                            defaultValue={ebaby_denom}
+                            defaultValue={base_denom}
                         />
                         <Input
                             isRequired
-                            name="recipient"
-                            label="Recipient"
-                            defaultValue={userAddress}
+                            name="receiver"
+                            label="Receiver (babylon address)"
+                            defaultValue={default_receiver}
                         />
                     </CardBody>
                     <CardFooter>
-                        <Button type="submit" isLoading={isLoading}>Submit</Button>
+                        <Button type="submit">Submit</Button>
                     </CardFooter>
                 </Card>
             </form>
@@ -154,5 +145,7 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
 }
 
 
+// https://btc.union.build/explorer/packets/0xce8c32b71b5a7608b6b1afdea4fbb53c66cb026ed68916891d557277adbcfd4c
 
-//https://btc.union.build/explorer/packets/0xce8c32b71b5a7608b6b1afdea4fbb53c66cb026ed68916891d557277adbcfd4c
+// https://btc.union.build/explorer/transfers/0x0c3399bc587f9a6934d19d82fc1fef512c0f035c72858b83534b6919feaf36a0
+

@@ -92,9 +92,6 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
     return (
 
         <div className="w-full flex flex-col">
-            <div className="text-lg">
-                IBC Bond
-            </div>
             <form onSubmit={handleSubmit} className="w-full flex">
                 <Card className="w-full flex">
                     <CardBody className="gap-4">
