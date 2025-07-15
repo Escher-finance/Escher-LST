@@ -245,6 +245,8 @@ pub enum QueryMsg {
     RewardQueue {},
     #[returns(Vec<IBCChannel>)]
     IbcChannels {},
+    #[returns(IbcChannelId)]
+    RecipientIbcChannel { unbond_record_id: u64 },
 }
 
 pub type Fees = BTreeMap<String, Coin>;
@@ -398,4 +400,9 @@ pub struct InjectData {
 pub struct IBCChannel {
     pub ibc_channel_id: String,
     pub prefix: String,
+}
+
+#[cw_serde]
+pub struct IbcChannelId {
+    pub channel_id: String,
 }

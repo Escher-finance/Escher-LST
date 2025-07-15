@@ -1,10 +1,11 @@
 use std::marker::PhantomData;
 
-use crate::msg::{Balance, IBCChannel, QueryMsg, StakingLiquidity};
+use crate::msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity};
 use crate::state::{unbond_record, Status, WithdrawRewardQueue, STATUS, WITHDRAW_REWARD_QUEUE};
 use crate::state::{
     Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, ValidatorsRegistry, PARAMETERS,
-    QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL,
+    VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc::{self, calculate_fee_from_reward, calculate_query_bounds};
@@ -56,6 +57,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Chains {} => to_json_binary(&query_chains(deps.storage)?),
         QueryMsg::RewardQueue {} => to_json_binary(&query_reward_queue(deps.storage)?),
         QueryMsg::IbcChannels {} => to_json_binary(&query_ibc_channels(deps.storage)?),
+        QueryMsg::RecipientIbcChannel { unbond_record_id } => to_json_binary(
+            &query_recipient_ibc_channel(deps.storage, unbond_record_id)?,
+        ),
     }?)
 }
 pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
@@ -343,4 +347,19 @@ pub fn query_ibc_channels(storage: &dyn Storage) -> Result<Vec<IBCChannel>, Cont
         })
         .collect();
     Ok(channels)
+}
+
+pub fn query_recipient_ibc_channel(
+    storage: &dyn Storage,
+    id: u64,
+) -> Result<IbcChannelId, ContractError> {
+    let channel_id = UNBOND_RECIPIENT_IBC_CHANNEL
+        .load(storage, id)
+        .unwrap_or(None);
+
+    let ibc_channel_id: IbcChannelId = match channel_id {
+        Some(channel_id) => IbcChannelId { channel_id },
+        None => return Err(ContractError::UnbondRecordIbcChannelNotFound { id }),
+    };
+    Ok(ibc_channel_id)
 }

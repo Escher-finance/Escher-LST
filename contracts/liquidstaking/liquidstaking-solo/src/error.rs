@@ -141,4 +141,7 @@ pub enum ContractError {
 
     #[error("no reward to normalize: {msg}")]
     NoRewardToNormalize { msg: String },
+
+    #[error("recipient ibc channel id not found for unbond record with id: {id}")]
+    UnbondRecordIbcChannelNotFound { id: u64 },
 }

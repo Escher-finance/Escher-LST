@@ -31,6 +31,10 @@ pub const CHAINS: Map<u32, Chain> = Map::new("chains");
 // Map of supported ibc channels with channel_id as key and address prefix as value, like bbn, union, osmo
 pub const IBC_CHANNELS: Map<String, String> = Map::new("ibc_channels");
 
+// Map of unbond record id and the recipient ibc channel id
+pub const UNBOND_RECIPIENT_IBC_CHANNEL: Map<u64, Option<String>> =
+    Map::new("unbond_record_recipient_ibc_channel");
+
 #[cw_serde]
 pub struct Status {
     pub bond_is_paused: bool,
@@ -201,68 +205,7 @@ pub fn old_unbond_record<'a>() -> IndexedMap<u64, OldUnbondRecord, OldUnbondReco
     IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
 }
 
-#[cw_serde]
-pub struct UnbondRecordV0_1_163 {
-    pub id: u64,
-    pub height: u64,
-    pub sender: String,
-    pub staker: String,
-    pub channel_id: Option<u32>,
-    pub amount: Uint128,
-    pub released_height: u64,
-    pub released: bool,
-    pub batch_id: u64,
-    pub recipient: Option<String>,
-    pub recipient_channel_id: Option<u32>,
-}
-
-pub struct UnbondRecordV0_1_163Indexes<'a> {
-    pub staker: MultiIndex<'a, String, UnbondRecordV0_1_163, u64>,
-    pub released: MultiIndex<'a, String, UnbondRecordV0_1_163, u64>,
-    pub staker_released: MultiIndex<'a, String, UnbondRecordV0_1_163, u64>,
-    pub batch: MultiIndex<'a, String, UnbondRecordV0_1_163, u64>,
-}
-
-impl<'a> IndexList<UnbondRecordV0_1_163> for UnbondRecordV0_1_163Indexes<'a> {
-    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecordV0_1_163>> + '_> {
-        let v: Vec<&dyn Index<UnbondRecordV0_1_163>> = vec![
-            &self.staker,
-            &self.released,
-            &self.staker_released,
-            &self.batch,
-        ];
-        Box::new(v.into_iter())
-    }
-}
-
 const UNBOND_RECORD_NAMESPACE: &str = "unbond_record";
-
-pub fn unbond_record_v0_1_163<'a>(
-) -> IndexedMap<u64, UnbondRecordV0_1_163, UnbondRecordV0_1_163Indexes<'a>> {
-    let indexes = UnbondRecordV0_1_163Indexes {
-        staker: MultiIndex::new(
-            |_pk, d: &UnbondRecordV0_1_163| d.staker.clone(),
-            UNBOND_RECORD_NAMESPACE,
-            "unbond_record__staker",
-        ),
-        released: MultiIndex::new(
-            |_pk, d: &UnbondRecordV0_1_163| d.released.to_string(),
-            UNBOND_RECORD_NAMESPACE,
-            "unbond_record__released",
-        ),
-        staker_released: MultiIndex::new(
-            |_pk, d: &UnbondRecordV0_1_163| format!("{}-{}", d.staker, d.released),
-            UNBOND_RECORD_NAMESPACE,
-            "unbond_record__staker_released",
-        ),
-        batch: MultiIndex::new(
-            |_pk, d: &UnbondRecordV0_1_163| d.batch_id.to_string(),
-            UNBOND_RECORD_NAMESPACE,
-            "unbond_record__batch",
-        ),
-    };
-    IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
-}
 
 #[cw_serde]
 pub struct UnbondRecord {
@@ -277,7 +220,6 @@ pub struct UnbondRecord {
     pub batch_id: u64,
     pub recipient: Option<String>,
     pub recipient_channel_id: Option<u32>,
-    pub recipient_ibc_channel_id: Option<String>,
 }
 
 pub struct UnbondRecordIndexes<'a> {

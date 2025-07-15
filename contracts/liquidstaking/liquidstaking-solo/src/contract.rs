@@ -8,9 +8,9 @@ use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    unbond_record, unbond_record_v0_1_163, Config, OldParameters, Parameters, State, Status,
-    SupplyQueue, ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
+    unbond_record, Config, OldParameters, Parameters, State, Status, SupplyQueue,
+    ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+    REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL,
     VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
 };
 use cw2::set_contract_version;
@@ -361,7 +361,7 @@ pub fn migrate_unbond_record_v0_1_163(
             .collect::<Result<_, _>>()?;
 
     for (id, old_record) in old_unbond_records {
-        let new_record = crate::state::UnbondRecordV0_1_163 {
+        let new_record = crate::state::UnbondRecord {
             id,
             staker: old_record.staker,
             amount: old_record.amount,
@@ -375,7 +375,7 @@ pub fn migrate_unbond_record_v0_1_163(
             recipient_channel_id: None,
         };
 
-        unbond_record_v0_1_163().save(storage, id, &new_record)?;
+        unbond_record().save(storage, id, &new_record)?;
     }
 
     Ok(())
@@ -385,35 +385,7 @@ pub fn migrate_unbond_record_v0_1_163(
 pub fn migrate_unbond_record_v0_1_192(
     storage: &mut dyn cosmwasm_std::Storage,
 ) -> Result<(), ContractError> {
-    let old_unbond_records: Vec<(u64, crate::state::UnbondRecordV0_1_163)> =
-        crate::state::unbond_record_v0_1_163()
-            .range(storage, None, None, cosmwasm_std::Order::Ascending)
-            .map(|item| {
-                item.map_err(|_| {
-                    ContractError::Std(StdError::generic_err("Failed to load old unbond records"))
-                })
-            })
-            .collect::<Result<_, _>>()?;
-
-    for (id, old_record) in old_unbond_records {
-        let new_record = crate::state::UnbondRecord {
-            id,
-            staker: old_record.staker,
-            amount: old_record.amount,
-            channel_id: old_record.channel_id,
-            batch_id: old_record.batch_id,
-            height: old_record.height,
-            sender: old_record.sender,
-            released_height: old_record.released_height,
-            released: old_record.released,
-            recipient: old_record.recipient,
-            recipient_channel_id: old_record.recipient_channel_id,
-            recipient_ibc_channel_id: None,
-        };
-
-        unbond_record().save(storage, id, &new_record)?;
-    }
-
+    UNBOND_RECIPIENT_IBC_CHANNEL.save(storage, 126, &Some("channel-21".to_string()))?;
     Ok(())
 }
 
@@ -458,57 +430,6 @@ fn test_migrate_unbond_record_v0_1_163() {
     assert_eq!(new_data.id, 8);
     assert_eq!(new_data.height, 1008);
     assert_eq!(new_data.recipient, None);
-
-    println!("{:#?}", new_data);
-}
-
-#[test]
-fn test_migrate_unbond_record_v0_1_192() {
-    let mut deps = cosmwasm_std::testing::mock_dependencies();
-    let sender = "sender".to_string();
-    let staker = "staker".to_string();
-    let unstake_amount = Uint128::new(10000);
-    let pending_batch_id = 1;
-    let token_count = 5;
-    let channel_id = Some(1);
-    // Populate old storage
-    let old_store = crate::state::unbond_record_v0_1_163();
-
-    for i in 1..10 {
-        let data = crate::state::UnbondRecordV0_1_163 {
-            id: i,
-            height: 1000 + i,
-            sender: sender.clone(),
-            staker: staker.clone(),
-            channel_id: channel_id,
-            amount: unstake_amount,
-            released_height: 0,
-            released: i > (token_count / 2),
-            batch_id: pending_batch_id,
-            recipient: Some(staker.clone()),
-            recipient_channel_id: Some(i as u32),
-        };
-        old_store.save(&mut deps.storage, i, &data).unwrap();
-    }
-
-    // Run migration
-    migrate_unbond_record_v0_1_192(deps.as_mut().storage).unwrap();
-
-    // Verify new storage
-    let new_store = unbond_record();
-    let new_data: crate::state::UnbondRecord = new_store.load(&deps.storage, 1).unwrap();
-    assert_eq!(new_data.id, 1);
-    assert_eq!(new_data.height, 1001);
-    assert_eq!(new_data.recipient, Some(staker.clone()));
-    assert_eq!(new_data.recipient_channel_id, Some(1));
-    assert_eq!(new_data.recipient_ibc_channel_id, None);
-
-    let new_data: crate::state::UnbondRecord = new_store.load(&deps.storage, 8).unwrap();
-    assert_eq!(new_data.id, 8);
-    assert_eq!(new_data.height, 1008);
-    assert_eq!(new_data.recipient, Some(staker.clone()));
-    assert_eq!(new_data.recipient_channel_id, Some(8));
-    assert_eq!(new_data.recipient_ibc_channel_id, None);
 
     println!("{:#?}", new_data);
 }

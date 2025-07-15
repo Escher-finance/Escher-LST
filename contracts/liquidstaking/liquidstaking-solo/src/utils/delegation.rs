@@ -2,16 +2,14 @@ use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
 use crate::execute::StakerUndelegation;
 use crate::msg::{InjectData, ValidatorDelegation};
 use crate::proto;
-use crate::state::{
-    ValidatorsRegistry, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, WITHDRAW_REWARD_QUEUE,
-};
 use crate::utils::{batch::batches, calc, delegation, token};
 use crate::ContractError;
 use crate::{
     msg::{BondData, DelegationDiff, MintTokensPayload},
     state::{
         increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
-        UnbondRecord, Validator, PARAMETERS, STATE, SUPPLY_QUEUE,
+        UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, WITHDRAW_REWARD_QUEUE,
     },
 };
 use cosmwasm_std::{
@@ -755,9 +753,10 @@ pub fn unstake_request_in_batch(
         released: false,
         recipient: recipient.clone(),
         recipient_channel_id,
-        recipient_ibc_channel_id: recipient_ibc_channel_id.clone(),
     };
     unbond_record().save(storage, id, &record)?;
+
+    UNBOND_RECIPIENT_IBC_CHANNEL.save(storage, id, &recipient_ibc_channel_id)?;
 
     let event = UnstakeRequestEvent(
         sender,
@@ -770,7 +769,7 @@ pub fn unstake_request_in_batch(
         recipient,
         recipient_channel_id,
         reward_balance,
-        recipient_ibc_channel_id, // todo: need to set it if we implement send unstake native token output via IBC
+        recipient_ibc_channel_id,
     );
 
     Ok(event)
@@ -954,6 +953,10 @@ pub fn get_staker_undelegation(
     let mut staker_undelegation: HashMap<(String, String), StakerUndelegation> = HashMap::new();
 
     for record in unbonding_records.iter_mut() {
+        let record_recipient_ibc_channel_id = UNBOND_RECIPIENT_IBC_CHANNEL
+            .load(storage, record.id)
+            .unwrap_or(None);
+
         let entry = staker_undelegation
             .entry((
                 record.staker.clone(),
@@ -966,7 +969,7 @@ pub fn get_staker_undelegation(
                 unstake_return_native_amount: None,
                 recipient: record.recipient.clone(),
                 recipient_channel_id: record.recipient_channel_id,
-                recipient_ibc_channel_id: record.recipient_ibc_channel_id.clone(),
+                recipient_ibc_channel_id: record_recipient_ibc_channel_id,
             });
 
         let user_to_total_unstake_ratio =
