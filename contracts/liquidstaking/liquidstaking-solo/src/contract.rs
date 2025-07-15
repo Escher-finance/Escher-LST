@@ -10,8 +10,8 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
     unbond_record, Config, OldParameters, Parameters, State, Status, SupplyQueue,
     ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-    REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL,
-    VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
+    REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    WITHDRAW_REWARD_QUEUE,
 };
 use cw2::set_contract_version;
 
@@ -331,9 +331,6 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
     if CONTRACT_VERSION == "0.1.163" {
         migrate_unbond_record_v0_1_163(deps.storage)?;
     }
-    if CONTRACT_VERSION == "0.1.192" {
-        migrate_unbond_record_v0_1_192(deps.storage)?;
-    }
 
     let reward_queue_res = deps.storage.get(b"withdraw_reward_queue");
     if reward_queue_res.is_none() {
@@ -378,14 +375,6 @@ pub fn migrate_unbond_record_v0_1_163(
         unbond_record().save(storage, id, &new_record)?;
     }
 
-    Ok(())
-}
-
-/// Migrate the old unbond record to the new record with recipient and recipient_channel_id properties
-pub fn migrate_unbond_record_v0_1_192(
-    storage: &mut dyn cosmwasm_std::Storage,
-) -> Result<(), ContractError> {
-    UNBOND_RECIPIENT_IBC_CHANNEL.save(storage, 126, &Some("channel-21".to_string()))?;
     Ok(())
 }
 
