@@ -29,7 +29,7 @@ export default function Dashboard() {
       <div className="w-full mt-2 ">
         <div className="flex flex-row items-center pb-2">
           <h1 className="p-3 text-2xl">Escher Liquid Staking</h1>
-          <Chip><Link color="warning" onPress={refresh}>Refresh</Link></Chip>
+          <Chip><Link onPress={refresh}>Refresh</Link></Chip>
         </div>
         {network?.chainId.indexOf("osmo") == -1 &&
           <div className="flex flex-col">
@@ -64,11 +64,11 @@ export default function Dashboard() {
         }
 
         {network?.chainId.indexOf("osmo") != -1 &&
-          <>
+          <div className="w-full flex flex-row gap-2">
             <IbcBond stateKey={stateKey} setStateKey={setStateKey} />
             <br />
             <ZkgmUnbond stateKey={stateKey} setStateKey={setStateKey} />
-          </>
+          </div>
         }
 
       </div>

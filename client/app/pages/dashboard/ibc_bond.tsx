@@ -9,27 +9,28 @@ import {
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
 import { createSendIBCMsg, getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/ibc";
-import { getSalt } from "@/app/lib/salt";
-import { useState } from "react";
 import { toHex } from "viem";
+import { getSalt } from "../utils/ucs03";
+import { BaseNetworks } from "@/config/networks.config";
+import { useState } from "react";
 
 
-const baby_denom = "ibc/D538E142FC525F8CE0937169ED4645AE6E5BFC37F9C2C5CB178603F5DF1FEDF3"; // testnet denom
-// const baby_denom = "ibc/EC3A4ACBA1CFBEE698472D3563B70985AEA5A7144C319B61B3EBDFB57B5E1535"; // Replace with the actual baby denom on Osmosis
-
-const sourceChannel = "channel-10366"; // Testnet ibc channel id from osmosis to babylon testnet
-// const sourceChannel = "channel-101635"; // Replace with the actual source channel
-
-const default_recipient = "osmo1vnglhewf3w66cquy6hr7urjv3589srhelhn6df"; // Replace with the actual recipient address
-
+const transfer_fee = BigInt(0);
 interface KeyProps {
     stateKey: number;
     setStateKey: (key: number) => void;
 }
 
 export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
-    const { userAddress, client, network } = useGlobalContext();
     const [isLoading, setIsLoading] = useState(false);
+    const { userAddress, client, network } = useGlobalContext();
+
+    const baby_denom = network?.escher?.babyDenom;
+
+
+    const testnet = network?.chainName.includes("testnet") ? true : false;
+    const baby_lst_contract = testnet ? BaseNetworks["babylon-testnet"].escher.lst : BaseNetworks["babylon-mainnet"].escher.lst;
+    const sourceChannel = network?.escher?.channel["babylon"]?.sourceIbcChannelId;
 
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
@@ -37,42 +38,44 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
         const form = e.target;
         const formData = new FormData(form);
         const formEntries = Object.fromEntries(formData.entries());
-        const recipient_channel_id = formEntries.recipient_channel_id.toString();
-        const recipient = formEntries.recipient.toString();
-
         const amount = BigInt(formEntries.amount.toString());
+        const recipient = formEntries.recipient.toString();
+        const recipient_channel_id = formEntries.recipient_channel_id.toString();
 
         if (userAddress === undefined || userAddress === null) {
             alert("Please connect your wallet");
             return;
         }
 
-        const rate = 1.509253;
+        const exchange_rate = Number(formEntries.exchange_rate);
+        console.log("Exchange Rate:", exchange_rate);
+        const expected = Math.floor(Number(amount) / exchange_rate).toString();
 
         let payload = {
             dest_callback: {
-                address: network?.contracts.lst
+                address: baby_lst_contract
             },
             salt: getSalt(),
             amount: amount.toString(),
-            recipient: recipient_channel_id == "0" ? recipient : toHex(recipient),
-            recipient_channel_id: recipient_channel_id == "0" ? null : recipient_channel_id,
-            expected: (Number(amount) / rate).toFixed().toString(),
+            recipient: recipient_channel_id == "" ? recipient : toHex(recipient),
+            recipient_channel_id: recipient_channel_id == "" ? null : Number(recipient_channel_id),
+            expected,
+            transfer_fee: transfer_fee.toString(),
         };
 
-        console.log("Payload:", JSON.stringify(payload));
-
+        console.log("payload", JSON.stringify(payload));
 
         const msg = createSendIBCMsg({
             sender: userAddress,
             denom: baby_denom,
-            amount: (Number(amount) + 10000).toString(),
+            amount: recipient_channel_id != "" ? (amount + transfer_fee).toString() : amount.toString(),
             sourceChannel,
-            receiver: network?.contracts.lst,
+            receiver: baby_lst_contract,
             timeoutTimestamp: getTimeoutInNanoseconds24HoursFromNow(),
             memo: JSON.stringify(payload),
         });
 
+        console.log(JSON.stringify(msg));
         try {
             const res = await client?.signAndBroadcast(userAddress, [msg], "auto", "stake to babylon from osmosis");
             alert(res?.transactionHash);
@@ -81,15 +84,16 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
             setStateKey(newKey);
             setIsLoading(false);
         } catch (err) {
-            setIsLoading(false);
             console.log(err);
+            setIsLoading(false);
         }
-    }
+    };
 
     return (
-        <div className="w-full flex flex-col gap-4">
-            <div className="p-1 text-xl">
-                IBC BOND
+
+        <div className="w-full flex flex-col">
+            <div className="text-lg">
+                IBC Bond
             </div>
             <form onSubmit={handleSubmit} className="w-full flex">
                 <Card className="w-full flex">
@@ -108,15 +112,27 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
                         />
                         <Input
                             isRequired
+                            name="Contract"
+                            label="LST Contract"
+                            defaultValue={baby_lst_contract}
+                        />
+                        <Input
+                            isRequired
                             name="recipient"
                             label="Recipient Address"
-                            defaultValue={default_recipient}
+                            defaultValue="osmo1vnglhewf3w66cquy6hr7urjv3589srhelhn6df"
                         />
                         <Input
                             isRequired
                             name="recipient_channel_id"
-                            label="Recipient Channel ID (set to 0 if recipient is at babylon)"
-                            defaultValue="5"
+                            label="Recipient UCS03 Channel ID"
+                            defaultValue="4"
+                        />
+                        <Input
+                            isRequired
+                            name="exchange_rate"
+                            label="Exchange rate"
+                            defaultValue="1.056"
                         />
                     </CardBody>
                     <CardFooter>
@@ -127,3 +143,11 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
         </div>
     );
 }
+
+
+//https://btc.union.build/explorer/packets/0xce8c32b71b5a7608b6b1afdea4fbb53c66cb026ed68916891d557277adbcfd4c
+
+// - amount: "81427"
+//   denom: factory/osmo13ulc6pqhm60qnx58ss7s3cft8cqfycexq3uy3dd2v0l8qsnkvk4sj22sn6/5dDrk51st6AKJwxbyFwe8wydD417XHRDAAx9JSJN7c9a
+// - amount: "10000"
+//   denom: factory/osmo13ulc6pqhm60qnx58ss7s3cft8cqfycexq3uy3dd2v0l8qsnkvk4sj22sn6/F7BfSnXtmfRa3CGUAG8APpUWkByDvhdEpnFHtiKY9EB

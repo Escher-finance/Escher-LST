@@ -15,11 +15,7 @@ import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { Instruction } from "@unionlabs/sdk/ucs03";
 import { useState } from "react";
-
-const baby_lst_contract = "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss";
-const ucs03_contract = "osmo1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292qs2uecc";
-
-const ebaby_denom = "factory/osmo13ulc6pqhm60qnx58ss7s3cft8cqfycexq3uy3dd2v0l8qsnkvk4sj22sn6/5dDrk51st6AKJwxbyFwe8wydD417XHRDAAx9JSJN7c9a";
+import { BaseNetworks } from "@/config/networks.config";
 
 interface KeyProps {
     stateKey: number;
@@ -27,11 +23,13 @@ interface KeyProps {
 }
 
 export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
-
-
     const [isLoading, setIsLoading] = useState(false);
 
-    const { userAddress, client } = useGlobalContext();
+    const { userAddress, client, network } = useGlobalContext();
+    const ucs03_contract = network?.escher.ucs03;
+    const channel_id = network?.escher.channel["babylon"]?.sourceChannelId;
+    const baby_lst_contract = network?.escher.lst;
+    const ebaby_denom = network?.escher.ebabyDenom;
 
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
@@ -42,6 +40,7 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
         const amount = BigInt(formEntries.amount.toString());
         const recipient = formEntries.recipient.toString();
 
+
         if (userAddress === undefined || userAddress === null) {
             alert("Please connect your wallet");
             return;
@@ -51,10 +50,11 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
             unbond: {
                 amount: amount.toString(),
                 recipient,
-                recipient_ibc_channel_id: "channel-21"
+                recipient_ibc_channel_id: network?.escher.channel["babylon"]?.destinationIbcChannelId,
             }
         };
 
+        let testnet = network?.chainName?.toLowerCase().includes("testnet");
 
         const cosmosIntent: TransferAndCallIntent = {
             sender: userAddress,
@@ -63,9 +63,9 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
             baseAmount: BigInt(amount),
             baseTokenSymbol: "eBABY",
             baseTokenName: "ebbn",
-            quoteToken: toHex("bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9"),
+            quoteToken: testnet ? toHex(BaseNetworks["babylon-testnet"].escher.ebabyDenom) : toHex(BaseNetworks["babylon-mainnet"].escher.ebabyDenom),
             quoteAmount: BigInt(amount),
-            baseTokenPath: BigInt(3),
+            baseTokenPath: BigInt(network?.escher.channel["babylon"]?.sourceChannelId),
             payload
         } as const
 
@@ -77,7 +77,7 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
 
         let msg = {
             send: {
-                channel_id: 3,
+                channel_id,
                 timeout_height: "0",
                 timeout_timestamp,
                 salt: getSalt(),
@@ -92,7 +92,7 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
         let funds = [
             {
                 amount: amount.toString(),
-                denom: "factory/osmo13ulc6pqhm60qnx58ss7s3cft8cqfycexq3uy3dd2v0l8qsnkvk4sj22sn6/5dDrk51st6AKJwxbyFwe8wydD417XHRDAAx9JSJN7c9a"
+                denom: network?.escher.ebabyDenom
             }
         ];
 
@@ -115,15 +115,15 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
             setStateKey(newKey);
             setIsLoading(false);
         } catch (err) {
-            setIsLoading(false);
             console.log(err);
+            setIsLoading(false);
         }
     };
 
     return (
         <div className="w-full flex flex-col gap-4">
-            <div className="p-1 text-xl">
-                ZKGM UNBOND
+            <div className="text-lg">
+                Zkgm Unbond
             </div>
             <form onSubmit={handleSubmit} className="w-full flex">
                 <Card className="w-full flex">
@@ -155,6 +155,7 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
         </div>
     );
 }
+
 
 
 //https://btc.union.build/explorer/packets/0xce8c32b71b5a7608b6b1afdea4fbb53c66cb026ed68916891d557277adbcfd4c
