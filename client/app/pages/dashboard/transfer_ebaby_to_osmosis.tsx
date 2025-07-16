@@ -130,7 +130,7 @@ export default function TransferEbabyToOsmosis() {
         console.log(JSON.stringify(msg));
         try {
             const res = await client?.signAndBroadcast(userAddress, [executeAllowanceMsg, executeBondMsg], "auto", "transfer ebaby from babylon to osmosis");
-            alert(res.transactionHash);
+            alert(res?.transactionHash);
 
         } catch (err) {
             console.log(err);

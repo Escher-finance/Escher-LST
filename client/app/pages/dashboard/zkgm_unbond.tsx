@@ -143,7 +143,7 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
                             isRequired
                             name="recipient"
                             label="Recipient"
-                            defaultValue={userAddress}
+                            defaultValue={userAddress ? userAddress : ""}
                         />
                     </CardBody>
                     <CardFooter>
