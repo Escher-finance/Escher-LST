@@ -54,6 +54,8 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
             }
         };
 
+        console.log("Payload: ", JSON.stringify(payload));
+
         let testnet = network?.chainName?.toLowerCase().includes("testnet");
 
         const cosmosIntent: TransferAndCallIntent = {

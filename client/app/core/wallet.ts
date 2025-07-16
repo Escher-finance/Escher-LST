@@ -1,8 +1,8 @@
-import Networks, { ChainConfig } from "../../config/networks.config";
+import { ChainConfig } from "../../config/networks.config";
 import { LocalStorage } from "../lib/localstorage";
 import { CosmWasmClient, SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { GasPrice } from "@cosmjs/stargate";
-import { type OfflineSigner } from "@unionlabs/client"
+import { OfflineSigner } from "@cosmjs/proto-signing";
 
 export async function initializeKeplr(
   network: ChainConfig | null,
@@ -103,10 +103,5 @@ export async function setClientNomos(
     const cosmosQueryClient = await CosmWasmClient.connect(network?.rpc);
     setQueryClient(cosmosQueryClient);
 
-
-    // console.log("setWalletAndAddress", {
-    //   offlineSigner: offlineSigner,
-    //   cosmosClient: cosmosClient,
-    // });
   }
 }
