@@ -100,12 +100,12 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
             />
             <Input
               name="recipient"
-              label="Recipient"
+              label="Recipient (example: xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds for xion via zkgm)"
               defaultValue=""
             />
             <Input
               name="recipient_channel_id"
-              label="Recipient Channel ID (4 for xion)"
+              label="Recipient Channel ID (4 for osmosis on mainnet)"
               defaultValue="0"
             />
           </CardBody>

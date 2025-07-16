@@ -86,6 +86,7 @@ pub enum Cw20PayloadMsg {
     Unstake {
         recipient: Option<String>,
         recipient_channel_id: Option<u32>,
+        recipient_ibc_channel_id: Option<String>,
     },
 }
 
@@ -179,6 +180,13 @@ pub enum ExecuteMsg {
     Inject {
         amount: Uint128,
     },
+    AddIbcChannel {
+        ibc_channel_id: String,
+        prefix: String,
+    },
+    RemoveIbcChannel {
+        ibc_channel_id: String,
+    },
 }
 
 #[cw_serde]
@@ -235,6 +243,10 @@ pub enum QueryMsg {
     Chains {},
     #[returns(Vec<crate::state::WithdrawRewardQueue>)]
     RewardQueue {},
+    #[returns(Vec<IBCChannel>)]
+    IbcChannels {},
+    #[returns(IbcChannelId)]
+    RecipientIbcChannel { unbond_record_id: u64 },
 }
 
 pub type Fees = BTreeMap<String, Coin>;
@@ -285,6 +297,7 @@ pub struct MintTokensPayload {
     pub channel_id: Option<u32>,
     pub recipient: Option<String>,
     pub recipient_channel_id: Option<u32>,
+    pub transfer_fee: Option<Uint128>,
 }
 
 #[cw_serde]
@@ -326,6 +339,7 @@ pub enum ZkgmMessage {
         amount: Uint128,
         recipient: Option<String>,
         recipient_channel_id: Option<u32>,
+        recipient_ibc_channel_id: Option<String>,
     },
 }
 
@@ -364,9 +378,12 @@ pub struct RewardMigrateMsg {}
 #[cw_serde]
 pub struct IBCCallbackPayload {
     pub amount: Uint128,
+    pub slippage: Option<Decimal>,
+    pub expected: Uint128,
     pub salt: String,
     pub recipient: String,
     pub recipient_channel_id: Option<u32>,
+    pub transfer_fee: Option<Uint128>,
 }
 
 pub struct InjectData {
@@ -377,4 +394,15 @@ pub struct InjectData {
     pub unclaimed_reward: Uint128,
     pub delegated_amount: Uint128,
     pub total_bond_amount: Uint128,
+}
+
+#[cw_serde]
+pub struct IBCChannel {
+    pub ibc_channel_id: String,
+    pub prefix: String,
+}
+
+#[cw_serde]
+pub struct IbcChannelId {
+    pub channel_id: String,
 }

@@ -126,12 +126,22 @@ pub enum ContractError {
     #[error("error encode any msg")]
     EncodeAnyMsgError {},
 
-    #[error("invalid channel id")]
+    #[error("invalid recipient channel id")]
     InvalidChannelId {},
 
-    #[error("invalid {kind} address: {address}")]
-    InvalidAddress { kind: String, address: String },
+    #[error("invalid/unsupported recipient ibc channel id")]
+    InvalidIBCChannelId {},
+
+    #[error("invalid {kind} address: {address} because: {reason}")]
+    InvalidAddress {
+        kind: String,
+        address: String,
+        reason: String,
+    },
 
     #[error("no reward to normalize: {msg}")]
     NoRewardToNormalize { msg: String },
+
+    #[error("recipient ibc channel id not found for unbond record with id: {id}")]
+    UnbondRecordIbcChannelNotFound { id: u64 },
 }

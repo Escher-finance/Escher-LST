@@ -264,6 +264,13 @@ pub fn execute(
         ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
         ExecuteMsg::NormalizeReward {} => execute::normalize_reward(deps, env),
         ExecuteMsg::Inject { amount } => execute::inject(deps, env, info, amount),
+        ExecuteMsg::AddIbcChannel {
+            ibc_channel_id,
+            prefix,
+        } => execute::add_ibc_channel(deps, info, ibc_channel_id, prefix),
+        ExecuteMsg::RemoveIbcChannel { ibc_channel_id } => {
+            execute::remove_ibc_channel(deps, info, ibc_channel_id)
+        }
     }
 }
 
@@ -322,7 +329,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
     }
 
     if CONTRACT_VERSION == "0.1.163" {
-        migrate_unbond_record(deps.storage)?;
+        migrate_unbond_record_v0_1_163(deps.storage)?;
     }
 
     let reward_queue_res = deps.storage.get(b"withdraw_reward_queue");
@@ -337,7 +344,9 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
 }
 
 /// Migrate the old unbond record to the new record with recipient and recipient_channel_id properties
-pub fn migrate_unbond_record(storage: &mut dyn cosmwasm_std::Storage) -> Result<(), ContractError> {
+pub fn migrate_unbond_record_v0_1_163(
+    storage: &mut dyn cosmwasm_std::Storage,
+) -> Result<(), ContractError> {
     let old_unbond_records: Vec<(u64, crate::state::OldUnbondRecord)> =
         crate::state::old_unbond_record()
             .range(storage, None, None, cosmwasm_std::Order::Ascending)
@@ -370,7 +379,7 @@ pub fn migrate_unbond_record(storage: &mut dyn cosmwasm_std::Storage) -> Result<
 }
 
 #[test]
-fn test_migrate_unbond_record() {
+fn test_migrate_unbond_record_v0_1_163() {
     let mut deps = cosmwasm_std::testing::mock_dependencies();
     let sender = "sender".to_string();
     let staker = "staker".to_string();
@@ -397,7 +406,7 @@ fn test_migrate_unbond_record() {
     }
 
     // Run migration
-    migrate_unbond_record(deps.as_mut().storage).unwrap();
+    migrate_unbond_record_v0_1_163(deps.as_mut().storage).unwrap();
 
     // Verify new storage
     let new_store = unbond_record();

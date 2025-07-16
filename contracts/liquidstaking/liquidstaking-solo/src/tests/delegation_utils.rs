@@ -800,6 +800,7 @@ fn test_unstake_request_in_batch() {
         channel_id,
         None,
         None,
+        None,
     )
     .unwrap();
 
@@ -964,6 +965,7 @@ fn test_process_bond() {
         None,
         None,
         false,
+        None,
     )
     .unwrap();
 

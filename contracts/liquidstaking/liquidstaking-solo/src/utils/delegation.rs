@@ -2,16 +2,14 @@ use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
 use crate::execute::StakerUndelegation;
 use crate::msg::{InjectData, ValidatorDelegation};
 use crate::proto;
-use crate::state::{
-    ValidatorsRegistry, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, WITHDRAW_REWARD_QUEUE,
-};
 use crate::utils::{batch::batches, calc, delegation, token};
 use crate::ContractError;
 use crate::{
     msg::{BondData, DelegationDiff, MintTokensPayload},
     state::{
         increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
-        UnbondRecord, Validator, PARAMETERS, STATE, SUPPLY_QUEUE,
+        UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, WITHDRAW_REWARD_QUEUE,
     },
 };
 use cosmwasm_std::{
@@ -29,7 +27,7 @@ use super::authz::get_authz_ucs03_transfer;
 use super::batch::{Batch, BatchStatus};
 use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
 
-pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
+pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 900;
 
 /// get total delegated token value from validators in native token
 pub fn get_actual_total_delegated(
@@ -405,6 +403,7 @@ pub fn process_bond(
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     on_chain_recipient: bool,
+    transfer_fee: Option<Uint128>,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
@@ -491,6 +490,7 @@ pub fn process_bond(
         channel_id,
         recipient,
         recipient_channel_id,
+        transfer_fee,
     };
     let payload_bin = to_json_binary(&payload)?;
 
@@ -711,6 +711,7 @@ pub fn unstake_request_in_batch(
     channel_id: Option<u32>,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
+    recipient_ibc_channel_id: Option<String>,
 ) -> Result<Event, ContractError> {
     let params = PARAMETERS.load(storage)?;
 
@@ -755,6 +756,8 @@ pub fn unstake_request_in_batch(
     };
     unbond_record().save(storage, id, &record)?;
 
+    UNBOND_RECIPIENT_IBC_CHANNEL.save(storage, id, &recipient_ibc_channel_id)?;
+
     let event = UnstakeRequestEvent(
         sender,
         staker,
@@ -766,6 +769,7 @@ pub fn unstake_request_in_batch(
         recipient,
         recipient_channel_id,
         reward_balance,
+        recipient_ibc_channel_id,
     );
 
     Ok(event)
@@ -803,6 +807,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
             return Err(ContractError::InvalidAddress {
                 kind: "recipient".into(),
                 address: recipient,
+                reason: "address must be in hex and starts with 0x".to_string(),
             })
         }
     };
@@ -812,6 +817,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
             return Err(ContractError::InvalidAddress {
                 kind: "quote_token".into(),
                 address: quote_token_string,
+                reason: "address must be in hex and starts with 0x".to_string(),
             })
         }
     };
@@ -947,6 +953,10 @@ pub fn get_staker_undelegation(
     let mut staker_undelegation: HashMap<(String, String), StakerUndelegation> = HashMap::new();
 
     for record in unbonding_records.iter_mut() {
+        let record_recipient_ibc_channel_id = UNBOND_RECIPIENT_IBC_CHANNEL
+            .load(storage, record.id)
+            .unwrap_or(None);
+
         let entry = staker_undelegation
             .entry((
                 record.staker.clone(),
@@ -959,6 +969,7 @@ pub fn get_staker_undelegation(
                 unstake_return_native_amount: None,
                 recipient: record.recipient.clone(),
                 recipient_channel_id: record.recipient_channel_id,
+                recipient_ibc_channel_id: record_recipient_ibc_channel_id,
             });
 
         let user_to_total_unstake_ratio =

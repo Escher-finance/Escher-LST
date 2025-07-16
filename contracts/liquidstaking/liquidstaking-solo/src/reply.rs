@@ -42,6 +42,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         &deps,
         payload.recipient.clone(),
         payload.recipient_channel_id,
+        None,
     );
 
     // check to query balance of transfer handler or this contract
@@ -73,6 +74,11 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     // also need to attach required funds
     let mut quote_token_string = String::new();
     let amount = payload.amount;
+    // check if payload has transfer fee, use it, otherwise use default transfer fee from parameters
+    let transfer_fee = match payload.transfer_fee {
+        Some(fee) => fee,
+        None => params.transfer_fee,
+    };
 
     // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
     // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
@@ -103,10 +109,11 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         msgs.push(allowance_msg);
 
         let mut funds = vec![];
-        if params.transfer_fee > Uint128::zero() {
+
+        if transfer_fee > Uint128::zero() {
             funds.push(Coin {
-                amount: params.transfer_fee, // need to add transfer fee
-                denom: params.underlying_coin_denom,
+                amount: transfer_fee,
+                denom: params.underlying_coin_denom.clone(),
             });
         }
 
@@ -119,6 +126,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                 return Err(ContractError::InvalidAddress {
                     kind: "recipient".into(),
                     address: recipient,
+                    reason: "address must be in hex and starts with 0x".to_string(),
                 })
             }
         };
@@ -128,6 +136,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                 return Err(ContractError::InvalidAddress {
                     kind: "quote_token".into(),
                     address: quote_token_string,
+                    reason: "address must be in hex and starts with 0x".to_string(),
                 })
             }
         };
@@ -184,7 +193,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         .add_attribute("base_denom", params.cw20_address)
         .add_attribute("quote_token", quote_token_string)
         .add_attribute("transfer_handler", params.transfer_handler)
-        .add_attribute("transfer_fee", params.transfer_fee)
+        .add_attribute("transfer_fee", transfer_fee)
         .add_attribute("staked_token_balance", balance.balance.to_string());
 
     Ok(res)

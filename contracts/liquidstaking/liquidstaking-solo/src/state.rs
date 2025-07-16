@@ -28,6 +28,13 @@ pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_que
 // Map of supported ucs03 chains with channel_id as key
 pub const CHAINS: Map<u32, Chain> = Map::new("chains");
 
+// Map of supported ibc channels with channel_id as key and address prefix as value, like bbn, union, osmo
+pub const IBC_CHANNELS: Map<String, String> = Map::new("ibc_channels");
+
+// Map of unbond record id and the recipient ibc channel id
+pub const UNBOND_RECIPIENT_IBC_CHANNEL: Map<u64, Option<String>> =
+    Map::new("unbond_record_recipient_ibc_channel");
+
 #[cw_serde]
 pub struct Status {
     pub bond_is_paused: bool,
@@ -198,6 +205,8 @@ pub fn old_unbond_record<'a>() -> IndexedMap<u64, OldUnbondRecord, OldUnbondReco
     IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
 }
 
+const UNBOND_RECORD_NAMESPACE: &str = "unbond_record";
+
 #[cw_serde]
 pub struct UnbondRecord {
     pub id: u64,
@@ -231,8 +240,6 @@ impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
         Box::new(v.into_iter())
     }
 }
-
-const UNBOND_RECORD_NAMESPACE: &str = "unbond_record";
 
 pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<'a>> {
     let indexes = UnbondRecordIndexes {
