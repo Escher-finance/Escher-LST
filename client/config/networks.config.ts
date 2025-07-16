@@ -250,7 +250,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
           sourceIbcChannelId: "channel-101635",
           sourceChannelId: 1,
           destinationChannelId: 4,
-          destinationIbcChannelId: "channel-1"
+          destinationIbcChannelId: "channel-3"
         }
       }
     }
