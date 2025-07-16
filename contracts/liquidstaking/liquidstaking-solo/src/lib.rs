@@ -4,18 +4,17 @@ pub mod execute;
 
 pub mod event;
 pub mod helpers;
+pub mod ibc;
+/// Various identifier types used throughout the IBC stack.
 pub mod instantiate;
-#[allow(unused_imports)]
 pub mod msg;
 pub mod query;
 pub mod reply;
 pub mod state;
-
-// #[cfg(test)]
-// pub mod tests;
-
+pub mod tests;
+pub mod types;
 pub mod utils;
-
+pub mod zkgm;
 pub use crate::error::ContractError;
 // Include the generated code
 pub mod proto {

@@ -1,4 +1,4 @@
-use crate::state::{BurnQueue, MintQueue, SupplyQueue};
+use crate::state::{BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue, SUPPLY_QUEUE};
 use crate::ContractError;
 use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
 use cw20::TokenInfoResponse;
@@ -61,6 +61,11 @@ pub fn get_last_epoch_block(block: u64, epoch_period: u32) -> u64 {
     block - remainder
 }
 
+pub fn get_next_epoch(block: u64, epoch_period: u32) -> u64 {
+    let remainder: u64 = block % epoch_period as u64;
+    block + (epoch_period as u64 - remainder)
+}
+
 fn get_elements_by_indices<T: Clone>(vec: &Vec<T>, indices: &[usize]) -> Vec<T> {
     let mut result = Vec::with_capacity(indices.len());
 
@@ -106,6 +111,63 @@ pub fn normalize_total_supply(
     new_supply
 }
 
+/// this only trigger on bond/delegate/staking that trigger automatic reward withdrawal
+pub fn normalize_reward_balance(
+    storage: &mut dyn cosmwasm_std::Storage,
+    block: u64,
+    unclaimed_reward_balance: Uint128,
+) -> Result<Uint128, ContractError> {
+    let supply = SUPPLY_QUEUE.load(storage)?;
+    let reward_queue = crate::state::WITHDRAW_REWARD_QUEUE.load(storage)?;
+
+    let reward_balance_state = crate::state::REWARD_BALANCE.load(storage)?;
+
+    let (new_balance, mut new_queue) = normalize_withdraw_reward_queue(
+        block,
+        reward_balance_state,
+        reward_queue,
+        supply.epoch_period,
+    );
+
+    crate::state::REWARD_BALANCE.save(storage, &new_balance)?;
+
+    // store new reward balance from chain
+    new_queue.push(WithdrawRewardQueue {
+        amount: unclaimed_reward_balance,
+        block,
+    });
+
+    crate::state::WITHDRAW_REWARD_QUEUE.save(storage, &new_queue)?;
+
+    Ok(new_balance)
+}
+
+pub fn normalize_withdraw_reward_queue(
+    current_block: u64,
+    current_reward_balance: Uint128,
+    withdraw_reward_queue: Vec<WithdrawRewardQueue>,
+    epoch_period: u32,
+) -> (Uint128, Vec<WithdrawRewardQueue>) {
+    let mut new_queue = vec![];
+    let last_epoch_block = get_last_epoch_block(current_block, epoch_period);
+    let mut processed_amount = Uint128::zero();
+
+    for withdraw_reward in withdraw_reward_queue {
+        if withdraw_reward.block > last_epoch_block {
+            new_queue.push(withdraw_reward)
+        } else {
+            // if the height of queue is lower than last epoch then the withdraw amount will be assumed already processed
+            // and we only take the biggest amount as we only care the "last" total withdraw reward amount
+            if withdraw_reward.amount > processed_amount {
+                processed_amount = withdraw_reward.amount;
+            }
+        }
+    }
+
+    let new_balance = current_reward_balance + processed_amount;
+    (new_balance, new_queue)
+}
+
 /// return how much is the exchange rate
 pub fn calculate_exchange_rate(
     total_bond_amount: Uint128,
@@ -113,106 +175,12 @@ pub fn calculate_exchange_rate(
     queue: &SupplyQueue,
 ) -> Decimal {
     let mut exchange_rate: Decimal = Decimal::one();
-    if total_bond_amount != Uint128::zero() && total_supply != Uint128::zero() {
+    if total_bond_amount != Uint128::zero() {
         let normalize_total_supply = normalize_total_supply(total_supply, &queue.mint, &queue.burn);
 
         exchange_rate = Decimal::from_ratio(total_bond_amount, normalize_total_supply);
     }
     exchange_rate
-}
-
-#[cfg(test)]
-#[test]
-fn test_normalize_supply_queue() {
-    let mint_queue = vec![
-        MintQueue {
-            amount: Uint128::new(40),
-            block: 700,
-        },
-        MintQueue {
-            amount: Uint128::new(50),
-            block: 650,
-        },
-        MintQueue {
-            amount: Uint128::new(20),
-            block: 730,
-        },
-    ];
-
-    let burn_queue = vec![
-        BurnQueue {
-            amount: Uint128::new(10),
-            block: 700,
-        },
-        BurnQueue {
-            amount: Uint128::new(20),
-            block: 730,
-        },
-        BurnQueue {
-            amount: Uint128::new(30),
-            block: 650,
-        },
-    ];
-
-    let mut supply_queue = SupplyQueue {
-        mint: mint_queue,
-        burn: burn_queue,
-        epoch_period: 3600,
-    };
-
-    let current_block = 740;
-    normalize_supply_queue(&mut supply_queue, current_block);
-    println!(">> new_supply_queue::: {:?} ", supply_queue);
-}
-
-#[test]
-fn test_normalize_total_supply() {
-    let mint_queue = vec![
-        MintQueue {
-            amount: Uint128::new(40),
-            block: 700,
-        },
-        MintQueue {
-            amount: Uint128::new(50),
-            block: 171168541,
-        },
-        MintQueue {
-            amount: Uint128::new(20),
-            block: 700,
-        },
-    ];
-
-    let burn_queue = vec![
-        BurnQueue {
-            amount: Uint128::new(10),
-            block: 700,
-        },
-        BurnQueue {
-            amount: Uint128::new(20),
-            block: 171168541,
-        },
-        BurnQueue {
-            amount: Uint128::new(30),
-            block: 700,
-        },
-    ];
-
-    let mut supply_queue = SupplyQueue {
-        mint: mint_queue,
-        burn: burn_queue,
-        epoch_period: 360,
-    };
-
-    let current_supply = Uint128::from(20000u128);
-    let current_block = 1000;
-
-    normalize_supply_queue(&mut supply_queue, current_block);
-
-    let new_supply = normalize_total_supply(current_supply, &supply_queue.mint, &supply_queue.burn);
-    println!(
-        "current_supply :{} >> new_supply::: {} ",
-        current_supply, new_supply
-    );
 }
 
 pub fn calculate_query_bounds(min: Option<u64>, max: Option<u64>) -> (u64, u64) {
@@ -224,4 +192,20 @@ pub fn calculate_query_bounds(min: Option<u64>, max: Option<u64>) -> (u64, u64) 
         None => min_bound + max_dist,
     };
     (min_bound, max_bound)
+}
+
+pub fn calculate_dust_distribution(dust_amount: Uint128, receivers_len: Uint128) -> Vec<Uint128> {
+    if receivers_len.is_zero() {
+        return Vec::new();
+    }
+    let min_for_each = dust_amount / receivers_len;
+    let mut extra = dust_amount % receivers_len;
+    (0..receivers_len.into())
+        .map(|_| {
+            let one = Uint128::one();
+            let dust = min_for_each + if extra >= one { one } else { Uint128::zero() };
+            extra = extra.saturating_sub(one);
+            dust
+        })
+        .collect()
 }

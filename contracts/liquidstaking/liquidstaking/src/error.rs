@@ -89,7 +89,7 @@ pub enum ContractError {
         expected: BatchStatus,
     },
 
-    #[error("batch is not ready to be executed")]
+    #[error("batch is not ready to be executed, actual: {actual}, expected: {expected}")]
     BatchNotReady { actual: u64, expected: u64 },
 
     #[error("batch unbonding not yet complete")]
@@ -101,9 +101,33 @@ pub enum ContractError {
     #[error("InvalidContractName")]
     InvalidPayload {},
 
+    #[error("cannot migrate reward contract that is equal with current contract")]
+    InvalidRewardContractMigration {},
+
     #[error("bond amount is less than minimum bond amount")]
     BondAmountTooLow {},
 
     #[error("unbond amount is less than minimum unbond amount")]
     UnbondAmountTooLow {},
+
+    #[error("This functionality is currently disabled for maintenance")]
+    FunctionalityUnderMaintenance {},
+
+    #[error("invalid fee rate")]
+    InvalidFeeRate {},
+
+    #[error("Invalid exchange rate")]
+    InvalidExchangeRate {},
+
+    #[error("error encode any msg")]
+    EncodeAnyMsgError {},
+
+    #[error("invalid channel id")]
+    InvalidChannelId {},
+
+    #[error("invalid {kind} address: {address}")]
+    InvalidAddress { kind: String, address: String },
+
+    #[error("no reward to normalize: {msg}")]
+    NoRewardToNormalize { msg: String },
 }

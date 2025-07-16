@@ -21,7 +21,7 @@ export default function ContractAssets({ stateKey }: AssetsProps) {
     } = useGlobalContext();
 
     const getNativeBalance = async () => {
-        let bal = await client?.getBalance(network?.contracts.lst, "stake");
+        let bal = await client?.getBalance(network?.contracts.lst, "ubbn");
         if (bal) {
             setStakeBalance(bal.amount);
         }

@@ -1,32 +1,33 @@
 use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
-use crate::msg::ValidatorDelegation;
+use crate::execute::StakerUndelegation;
+use crate::msg::{InjectData, ValidatorDelegation};
 use crate::proto;
-use crate::state::{ValidatorsRegistry, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE};
 use crate::utils::{batch::batches, calc, delegation, token};
 use crate::ContractError;
 use crate::{
     msg::{BondData, DelegationDiff, MintTokensPayload},
     state::{
         increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
-        UnbondRecord, Validator, PARAMETERS, STATE, SUPPLY_QUEUE,
+        UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, WITHDRAW_REWARD_QUEUE,
     },
 };
 use cosmwasm_std::{
     to_json_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    QuerierWrapper, StdResult, Storage, SubMsg, Uint128, Uint256,
+    QuerierWrapper, StdResult, Storage, SubMsg, Uint128,
 };
-use cosmwasm_std::{AnyMsg, BankMsg, Coin};
+use cosmwasm_std::{AnyMsg, Coin};
 use cosmwasm_std::{Event, Timestamp};
 use prost::Message;
 use std::collections::HashMap;
 use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
+use super::authz::get_authz_ucs03_transfer;
 use super::batch::{Batch, BatchStatus};
-use super::calc::calculate_fee_from_reward;
-use super::protocol;
+use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
 
-pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
+pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 900;
 
 /// get total delegated token value from validators in native token
 pub fn get_actual_total_delegated(
@@ -119,50 +120,6 @@ pub fn get_undelegate_msgs(
     }
 
     (total_undelegate_amount, msgs, atts)
-}
-
-pub fn get_undelegate_from_validator_msgs(
-    delegator: String,
-    undelegate_amount: Uint128,
-    coin_denom: String,
-    validators: Vec<Validator>,
-) -> (Uint128, Vec<CosmosMsg>, Vec<Attribute>) {
-    let mut msgs: Vec<CosmosMsg> = vec![];
-
-    let total_weight = Uint128::from(
-        validators
-            .iter()
-            .map(|v| v.weight)
-            .reduce(|a, b| (a + b))
-            .unwrap_or(0),
-    );
-
-    let mut atts = vec![];
-    let mut total_undelegated: Uint128 = Uint128::from(0u32);
-
-    for validator in validators.into_iter() {
-        let ratio = Decimal::from_ratio(Uint128::from(validator.weight), total_weight);
-
-        let undelegate_amount_dec = Decimal::from_ratio(undelegate_amount, Uint128::one());
-        let undelegate_amount_for_validator = (undelegate_amount_dec * ratio).to_uint_floor();
-
-        let undelegate_staking_msg = get_babylon_undelegate_cosmos_msg(
-            delegator.to_string(),
-            validator.address.to_string(),
-            undelegate_amount_for_validator.to_string(),
-            coin_denom.clone(),
-        );
-
-        msgs.push(undelegate_staking_msg);
-
-        atts.push(Attribute {
-            key: validator.address.to_string(),
-            value: undelegate_amount_for_validator.to_string(),
-        });
-        total_undelegated += undelegate_amount_for_validator;
-    }
-
-    (total_undelegated, msgs, atts)
 }
 
 pub fn get_validator_delegation_map_with_total_bond(
@@ -282,43 +239,55 @@ pub fn get_restaking_msgs(
     mut deficient_validators: Vec<ValidatorDelegation>,
     denom: String,
 ) -> Vec<CosmosMsg> {
-    let mut msgs: Vec<CosmosMsg> = vec![];
+    let mut msgs = Vec::new();
 
-    surplus_validators.sort_by(|a, b| b.diff_amount.cmp(&a.diff_amount));
-    deficient_validators.sort_by_key(|a| a.diff_amount);
+    // Sort surplus and deficient validators for deterministic behavior
+    surplus_validators.sort_by_key(|v| v.address.clone());
+    deficient_validators.sort_by_key(|v| v.address.clone());
 
     for surplus_validator in surplus_validators.iter_mut() {
-        for deficient_validator in deficient_validators.iter_mut() {
-            if surplus_validator.diff_amount < deficient_validator.diff_amount {
-                if surplus_validator.diff_amount == Uint128::from(0u32) {
-                    break;
+        while surplus_validator.diff_amount > Uint128::zero() {
+            if let Some(deficient_validator) = deficient_validators
+                .iter_mut()
+                .find(|v| v.diff_amount > Uint128::zero())
+            {
+                // Calculate the amount to redelegate
+                let redelegate_amount = surplus_validator
+                    .diff_amount
+                    .min(deficient_validator.diff_amount);
+
+                // Skip invalid redelegate amounts
+                if redelegate_amount.is_zero() {
+                    continue;
                 }
 
-                let redelegate_msg = get_babylon_redelegate_cosmos_msg(
-                    delegator.clone(),
-                    surplus_validator.address.to_string(),
-                    deficient_validator.address.clone(),
-                    surplus_validator.diff_amount.into(),
-                    denom.clone(),
-                );
-                surplus_validator.diff_amount = Uint128::from(0u32);
-                deficient_validator.diff_amount =
-                    deficient_validator.diff_amount - surplus_validator.diff_amount;
+                // if test mode, we need to use the StakingMsg::Redelegate so it is readable and can be asserted
+                // otherwise we use the MsgWrappedBeginRedelegate that will be sent to babylon
+                if cfg!(test) {
+                    msgs.push(CosmosMsg::Staking(cosmwasm_std::StakingMsg::Redelegate {
+                        src_validator: surplus_validator.address.clone(),
+                        dst_validator: deficient_validator.address.clone(),
+                        amount: Coin {
+                            denom: denom.clone(),
+                            amount: redelegate_amount,
+                        },
+                    }));
+                } else {
+                    msgs.push(get_babylon_redelegate_cosmos_msg(
+                        delegator.clone(),
+                        surplus_validator.address.to_string(),
+                        deficient_validator.address.clone(),
+                        redelegate_amount.to_string(),
+                        denom.clone(),
+                    ));
+                }
 
-                msgs.push(redelegate_msg);
+                // Update the surplus and deficit amounts
+                surplus_validator.diff_amount -= redelegate_amount;
+                deficient_validator.diff_amount -= redelegate_amount;
             } else {
-                let redelegate_msg = get_babylon_redelegate_cosmos_msg(
-                    delegator.clone(),
-                    surplus_validator.address.to_string(),
-                    deficient_validator.address.clone(),
-                    deficient_validator.diff_amount.into(),
-                    denom.clone(),
-                );
-
-                surplus_validator.diff_amount =
-                    surplus_validator.diff_amount - deficient_validator.diff_amount;
-                deficient_validator.diff_amount = Uint128::from(0u32);
-                msgs.push(redelegate_msg);
+                // No more deficient validators to process
+                break;
             }
         }
     }
@@ -431,6 +400,10 @@ pub fn process_bond(
     salt: String,
     channel_id: Option<u32>,
     block_height: u64,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
+    on_chain_recipient: bool,
+    transfer_fee: Option<Uint128>,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
@@ -461,28 +434,39 @@ pub fn process_bond(
     )?;
 
     let total_bond_amount: Uint128;
+    let reward_balance: Uint128;
+    let unclaimed_reward: Uint128;
     if !cfg!(test) {
         state.total_delegated_amount = delegated_amount;
-        let reward = get_actual_total_reward(
-            storage,
+        unclaimed_reward = get_unclaimed_reward(
             querier,
             delegator.to_string(),
             coin_denom.clone(),
             validators_list,
         )?;
 
+        reward_balance =
+            calc::normalize_reward_balance(storage, block_height, unclaimed_reward.into()).unwrap();
+
+        let reward = reward_balance + unclaimed_reward;
         let fee = calculate_fee_from_reward(reward, params.fee_rate);
         total_bond_amount = delegated_amount + reward - fee;
     } else {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
+        reward_balance = Uint128::zero();
+        unclaimed_reward = Uint128::zero();
     }
 
-    let mut exchange_rate = state.exchange_rate;
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        calc::normalize_supply_queue(&mut supply_queue, block_height);
-        exchange_rate =
-            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
+    calc::normalize_supply_queue(&mut supply_queue, block_height);
+    let exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
+
+    if exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
     }
 
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
@@ -504,6 +488,9 @@ pub fn process_bond(
         amount: mint_amount,
         salt,
         channel_id,
+        recipient,
+        recipient_channel_id,
+        transfer_fee,
     };
     let payload_bin = to_json_binary(&payload)?;
 
@@ -514,9 +501,16 @@ pub fn process_bond(
     SUPPLY_QUEUE.save(storage, &supply_queue)?;
 
     if !cfg!(test) {
+        let minted_token_recipient =
+            if !on_chain_recipient && (channel_id.is_some() || recipient_channel_id.is_some()) {
+                params.transfer_handler
+            } else {
+                delegator.to_string()
+            };
+
         // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg = token::get_staked_token_submsg(
-            delegator.to_string(),
+            minted_token_recipient,
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,
@@ -534,6 +528,8 @@ pub fn process_bond(
             total_bond_amount: state.total_bond_amount,
             exchange_rate,
             total_supply: state.total_supply,
+            reward_balance,
+            unclaimed_reward,
         },
     ))
 }
@@ -579,8 +575,29 @@ pub fn submit_pending_batch(
         validators_list,
     )?;
 
-    let contract_reward_balance = REWARD_BALANCE.load(deps.storage)?;
-    let reward = unclaimed_reward + contract_reward_balance;
+    let reward_balance = REWARD_BALANCE.load(deps.storage)?;
+
+    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
+
+    // if there is no unstake/liquid stake amount in batch then no need to normalize reward balance
+    let new_balance = if batch.total_liquid_stake.is_zero() {
+        let withdraw_reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;
+        let (new_balance, new_queue) = calc::normalize_withdraw_reward_queue(
+            block_height,
+            reward_balance,
+            withdraw_reward_queue,
+            supply_queue.epoch_period,
+        );
+        REWARD_BALANCE.save(deps.storage, &new_balance)?;
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &new_queue)?;
+        new_balance
+    } else {
+        let new_balance =
+            calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward.into())?;
+        new_balance
+    };
+
+    let reward: Uint128 = unclaimed_reward + new_balance;
 
     let fee = calculate_fee_from_reward(reward, params.fee_rate);
     let total_bond_amount = delegated_amount + reward - fee;
@@ -589,14 +606,12 @@ pub fn submit_pending_batch(
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
     }
 
-    let mut current_exchange_rate = state.exchange_rate;
-    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
-
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
-        calc::normalize_supply_queue(&mut supply_queue, block_height);
-        current_exchange_rate =
-            calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue);
-    }
+    calc::normalize_supply_queue(&mut supply_queue, block_height);
+    let current_exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
     let undelegate_amount: Uint128 = calc::calculate_native_token_from_staking_token(
@@ -639,7 +654,8 @@ pub fn submit_pending_batch(
     state.total_bond_amount = total_bond_amount - total_undelegate_amount;
     state.total_supply = state.total_supply - batch.total_liquid_stake;
     state.total_delegated_amount = delegated_amount - total_undelegate_amount;
-    state.update_exchange_rate();
+    state.exchange_rate =
+        calculate_exchange_rate(state.total_bond_amount, state.total_supply, &supply_queue);
     STATE.save(deps.storage, &state)?;
 
     batch.expected_native_unstaked = Some(total_undelegate_amount);
@@ -664,6 +680,8 @@ pub fn submit_pending_batch(
         current_exchange_rate,
         time,
         coin_denom,
+        new_balance,
+        unclaimed_reward,
     );
 
     events.push(ev);
@@ -676,12 +694,6 @@ pub fn submit_pending_batch(
     );
     batches().save(deps.storage, new_pending_batch.id, &new_pending_batch)?;
     PENDING_BATCH_ID.save(deps.storage, &new_pending_batch.id)?;
-
-    // increment the reward balance on this contract as there is automatic reward withdrawal on undelegation
-    let mut reward_balance = REWARD_BALANCE.load(deps.storage)?;
-
-    reward_balance += unclaimed_reward;
-    REWARD_BALANCE.save(deps.storage, &reward_balance)?;
 
     Ok((msgs, events))
 }
@@ -697,6 +709,9 @@ pub fn unstake_request_in_batch(
     staker: String,
     unstake_amount: Uint128,
     channel_id: Option<u32>,
+    recipient: Option<String>,
+    recipient_channel_id: Option<u32>,
+    recipient_ibc_channel_id: Option<String>,
 ) -> Result<Event, ContractError> {
     let params = PARAMETERS.load(storage)?;
 
@@ -712,6 +727,19 @@ pub fn unstake_request_in_batch(
     pending_batch.unbond_records_count += 1;
     batches().save(storage, pending_batch_id, &pending_batch)?;
 
+    // adjust reward balance
+    let reward_balance = REWARD_BALANCE.load(storage)?;
+    let withdraw_reward_queue = WITHDRAW_REWARD_QUEUE.load(storage)?;
+    let supply = SUPPLY_QUEUE.load(storage)?;
+    let (new_balance, new_queue) = calc::normalize_withdraw_reward_queue(
+        env.block.height,
+        reward_balance,
+        withdraw_reward_queue,
+        supply.epoch_period,
+    );
+    REWARD_BALANCE.save(storage, &new_balance)?;
+    WITHDRAW_REWARD_QUEUE.save(storage, &new_queue)?;
+
     let id: u64 = increment_tokens(storage).unwrap();
     let record = UnbondRecord {
         id,
@@ -723,8 +751,12 @@ pub fn unstake_request_in_batch(
         amount: unstake_amount,
         released_height: 0,
         released: false,
+        recipient: recipient.clone(),
+        recipient_channel_id,
     };
     unbond_record().save(storage, id, &record)?;
+
+    UNBOND_RECIPIENT_IBC_CHANNEL.save(storage, id, &recipient_ibc_channel_id)?;
 
     let event = UnstakeRequestEvent(
         sender,
@@ -734,62 +766,83 @@ pub fn unstake_request_in_batch(
         record.id,
         pending_batch.id,
         env.block.time,
+        recipient,
+        recipient_channel_id,
+        reward_balance,
+        recipient_ibc_channel_id,
     );
 
     Ok(event)
 }
 
-pub fn get_transfer_token_cosmos_msg(
+pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     storage: &mut dyn Storage,
-    staker: String,
-    channel_id: Option<u32>,
+    lst_contract: Addr,
+    recipient: String,
+    channel_id: u32,
     time: Timestamp,
     ucs03_relay_contract: String,
     undelegate_amount: Uint128,
+    transfer_fee: Uint128,
     denom: String,
     salt: String,
 ) -> Result<CosmosMsg, ContractError> {
-    // if balance exists, send to staker (it can be on same chain or other chain like evm/bera)
-    let msg: CosmosMsg = {
-        if channel_id.is_some() {
-            let funds = vec![Coin {
-                denom: denom.clone(),
-                amount: undelegate_amount.clone(),
-            }];
+    let total_amount = undelegate_amount + transfer_fee;
 
-            // get quote token of native base denom (muno) on specific channel id
-            let quote_token = QUOTE_TOKEN.load(storage, channel_id.unwrap())?;
-            let wasm_msg = protocol::ucs03_transfer(
-                time,
-                ucs03_relay_contract.as_str().into(),
-                channel_id.unwrap(),
-                Bytes::from_str(staker.as_str()).unwrap(),
-                denom.clone(),
-                undelegate_amount,
-                Bytes::from_str(quote_token.quote_token.as_str()).unwrap(),
-                Uint256::from(undelegate_amount),
-                funds,
-                H256::from_str(salt.as_str()).unwrap(),
-            )?;
-            let msg: CosmosMsg = CosmosMsg::Wasm(wasm_msg);
-            msg
-        } else {
-            let bank_msg = BankMsg::Send {
-                to_address: staker.clone(),
-                amount: vec![Coin {
-                    denom: denom,
-                    amount: undelegate_amount,
-                }],
-            };
-            let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-            msg
+    // for the amount
+    let funds = vec![Coin {
+        denom: denom.clone(),
+        amount: total_amount.clone(),
+    }];
+
+    let params = PARAMETERS.load(storage)?;
+    // get quote token of native base denom (muno) on specific channel id
+    let quote_token = QUOTE_TOKEN.load(storage, channel_id)?;
+
+    let quote_token_string = quote_token.quote_token.clone();
+
+    let recipient_address = match Bytes::from_str(recipient.as_str()) {
+        Ok(rec) => rec,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "recipient".into(),
+                address: recipient,
+                reason: "address must be in hex and starts with 0x".to_string(),
+            })
         }
     };
-    Ok(msg)
+    let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
+        Ok(token) => token,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "quote_token".into(),
+                address: quote_token_string,
+                reason: "address must be in hex and starts with 0x".to_string(),
+            })
+        }
+    };
+
+    let authz_ucs03_msg = get_authz_ucs03_transfer(
+        params.cw20_address.to_string(),
+        params.transfer_handler,  // granter
+        lst_contract.to_string(), // grantee
+        time,
+        ucs03_relay_contract.as_str().into(),
+        channel_id,
+        recipient_address,
+        denom.clone(),
+        total_amount,
+        quote_token,
+        undelegate_amount,
+        funds,
+        H256::from_str(salt.as_str()).unwrap(),
+    )?;
+
+    Ok(authz_ucs03_msg)
 }
 
 pub fn get_actual_total_reward(
-    storage: &mut dyn Storage,
+    storage: &dyn Storage,
     querier: QuerierWrapper,
     delegator: String,
     denom: String,
@@ -876,4 +929,194 @@ pub fn get_babylon_redelegate_cosmos_msg(
         value: Binary::from(restaking_msg.encode_to_vec()),
     });
     redelegate
+}
+
+pub fn get_staker_undelegation(
+    storage: &mut dyn Storage,
+    total_received_amount: Uint128,
+    unbonding_records: &mut Vec<UnbondRecord>,
+    total_liquid_stake: Uint128,
+    block_height: u64,
+) -> Result<
+    (
+        HashMap<(String, String), StakerUndelegation>,
+        Vec<u64>,
+        Uint128,
+    ),
+    ContractError,
+> {
+    let total_received_amount_in_decimal =
+        Decimal::from_ratio(total_received_amount, Uint128::one());
+    let mut unbond_record_ids = vec![];
+
+    // hash map with tuple of staker and recipient as key
+    let mut staker_undelegation: HashMap<(String, String), StakerUndelegation> = HashMap::new();
+
+    for record in unbonding_records.iter_mut() {
+        let record_recipient_ibc_channel_id = UNBOND_RECIPIENT_IBC_CHANNEL
+            .load(storage, record.id)
+            .unwrap_or(None);
+
+        let entry = staker_undelegation
+            .entry((
+                record.staker.clone(),
+                record.recipient.clone().unwrap_or("".to_string()),
+            ))
+            .and_modify(|e| e.unstake_amount += record.amount)
+            .or_insert(StakerUndelegation {
+                unstake_amount: record.amount,
+                channel_id: record.channel_id,
+                unstake_return_native_amount: None,
+                recipient: record.recipient.clone(),
+                recipient_channel_id: record.recipient_channel_id,
+                recipient_ibc_channel_id: record_recipient_ibc_channel_id,
+            });
+
+        let user_to_total_unstake_ratio =
+            Decimal::from_ratio(entry.unstake_amount, total_liquid_stake);
+
+        let unstake_return_native_amount =
+            (user_to_total_unstake_ratio * total_received_amount_in_decimal).to_uint_floor();
+
+        entry.unstake_return_native_amount = Some(unstake_return_native_amount);
+
+        record.released = true;
+
+        record.released_height = block_height;
+
+        unbond_record().save(storage, record.id, &record)?;
+
+        unbond_record_ids.push(record.id);
+    }
+
+    // released amount before adjusted with dust distribution, sometime it can be lower than total received amount
+    let released_amount: Uint128 = staker_undelegation
+        .values()
+        .map(|item| item.unstake_return_native_amount.unwrap())
+        .sum();
+
+    let dust_amount = (total_received_amount_in_decimal
+        - Decimal::from_ratio(released_amount, Uint128::one()))
+    .to_uint_floor();
+
+    let mut total_released_amount = Uint128::zero();
+    let dust_distribution = calc::calculate_dust_distribution(
+        dust_amount,
+        Uint128::new(unbonding_records.len() as u128),
+    );
+    for (i, record) in unbonding_records.iter_mut().enumerate() {
+        let recipient = match record.recipient.clone() {
+            Some(recipient) => recipient,
+            None => "".to_string(),
+        };
+        let staker_undelegation =
+            match staker_undelegation.get_mut(&(record.staker.clone(), recipient)) {
+                Some(x) => x,
+                None => continue,
+            };
+        let dust = dust_distribution[i];
+        staker_undelegation.unstake_return_native_amount = staker_undelegation
+            .unstake_return_native_amount
+            .map(|x| x + dust);
+
+        total_released_amount += staker_undelegation.unstake_return_native_amount.unwrap();
+    }
+
+    Ok((
+        staker_undelegation,
+        unbond_record_ids,
+        total_released_amount,
+    ))
+}
+
+/// Restake to delegate base on amount and update exchange rate
+pub fn inject(
+    storage: &mut dyn Storage,
+    querier: QuerierWrapper,
+    delegator: Addr,
+    amount: Uint128,
+    params: Parameters,
+    block_height: u64,
+) -> Result<(Vec<CosmosMsg>, InjectData), ContractError> {
+    if amount < params.min_bond {
+        return Err(ContractError::BondAmountTooLow {});
+    }
+
+    let validators_reg = crate::state::VALIDATORS_REGISTRY.load(storage)?;
+
+    let coin_denom = params.underlying_coin_denom.to_string();
+    let msgs = delegation::get_delegate_to_validator_msgs(
+        delegator.to_string(),
+        amount,
+        coin_denom.to_string(),
+        validators_reg.validators.clone(),
+    );
+
+    let validators_list: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    // logic to mint token and update the supply and total_bond_amount
+    let mut state = STATE.load(storage)?;
+
+    let delegated_amount = get_actual_total_delegated(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    )?;
+
+    state.total_delegated_amount = delegated_amount;
+    let unclaimed_reward = get_unclaimed_reward(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list,
+    )?;
+
+    let reward_balance =
+        calc::normalize_reward_balance(storage, block_height, unclaimed_reward.into()).unwrap();
+
+    let reward = reward_balance + unclaimed_reward;
+    let fee = calculate_fee_from_reward(reward, params.fee_rate);
+    let total_bond_amount = delegated_amount + reward - fee;
+
+    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
+    calc::normalize_supply_queue(&mut supply_queue, block_height);
+    let exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
+
+    if exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
+    let prev_exchange_rate = exchange_rate.clone();
+    let new_bond_amount = total_bond_amount + amount;
+    let new_exchange_rate = if total_bond_amount != Uint128::zero() {
+        calc::calculate_exchange_rate(new_bond_amount, state.total_supply, &supply_queue)
+    } else {
+        Decimal::one()
+    };
+
+    state.total_bond_amount = new_bond_amount;
+    state.total_delegated_amount += amount;
+    state.exchange_rate = exchange_rate;
+    STATE.save(storage, &state)?;
+
+    let data = InjectData {
+        prev_exchange_rate,
+        new_exchange_rate,
+        total_supply: state.total_supply.clone(),
+        reward_balance,
+        unclaimed_reward,
+        delegated_amount: state.total_delegated_amount,
+        total_bond_amount: state.total_bond_amount,
+    };
+
+    Ok((msgs, data))
 }

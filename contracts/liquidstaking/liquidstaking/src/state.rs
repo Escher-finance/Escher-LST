@@ -5,6 +5,7 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
+pub const STATUS: Item<Status> = Item::new("status");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
 pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
 
@@ -13,7 +14,22 @@ pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 
 // Queue of validator reward for executing split reward
-pub const SPLIT_REWARD_QUEUE: Item<Vec<String>> = Item::new("redelegate_batch");
+pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
+
+// Map of supported ucs03 chains with ucs03 channel_id as key
+pub const CHAINS: Map<u32, Chain> = Map::new("chains");
+
+#[cw_serde]
+pub struct Status {
+    pub bond_is_paused: bool,
+    pub unbond_is_paused: bool,
+}
+
+#[cw_serde]
+pub struct WithdrawReward {
+    pub withdrawed_amount: Uint128,
+    pub target_amount: Uint128,
+}
 
 #[cw_serde]
 pub struct Balance {
@@ -49,8 +65,14 @@ pub struct ValidatorsRegistry {
 // Parameter is required data to instantiate and run contract
 #[cw_serde]
 pub struct Parameters {
+    /// native coin denom like ubbn, emuno, etc.
     pub underlying_coin_denom: String,
+    /// native coin denom symbol that will be used for ucs03 transfer like ubbn, emuno, etc.
+    pub underlying_coin_denom_symbol: String,
+    /// liquid staking cw20 denom name that will be used for ucs03 transfer like ebbn, emuno, etc.
     pub liquidstaking_denom: String,
+    /// liquid staking cw20 denom symbol that will be used for ucs03 transfer like eBABY
+    pub liquidstaking_denom_symbol: String,
     pub ucs03_relay_contract: String,
     pub unbonding_time: u64,
     // liquid_staking denom/cw20 contract address
@@ -70,6 +92,12 @@ pub struct Parameters {
     // limit per batch
     // this is the max number of unbonding records that can be processed in one batch
     pub batch_limit: u32,
+    // handler of cw20 staking token transfer, as ucs03 fee payer address and also minted cw20 staking token receiver
+    pub transfer_handler: String,
+    // ucs03 transfer fee from babylon to other
+    pub transfer_fee: Uint128,
+    // zkgm token_minter address as cw20 allowance spender
+    pub zkgm_token_minter: String,
 }
 
 impl State {
@@ -106,6 +134,8 @@ pub struct UnbondRecord {
     pub released_height: u64,
     pub released: bool,
     pub batch_id: u64,
+    pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
 }
 
 pub struct UnbondRecordIndexes<'a> {
@@ -160,4 +190,12 @@ pub struct QuoteToken {
     pub channel_id: u32,
     pub quote_token: String,
     pub lst_quote_token: String,
+}
+
+#[cw_serde]
+pub struct Chain {
+    pub name: String,
+    pub chain_id: String,
+    pub ucs03_channel_id: u32,
+    pub prefix: String,
 }

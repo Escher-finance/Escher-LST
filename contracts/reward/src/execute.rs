@@ -1,4 +1,4 @@
-use crate::event::SplitRewardEvent;
+use crate::event::{SplitRewardEvent, UpdateConfigEvent};
 use crate::msg::{Balance, LSTQueryMsg};
 use crate::{error::ContractError, msg::ExecuteLstMsg};
 
@@ -91,6 +91,10 @@ pub fn set_config(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let mut config = CONFIG.load(deps.storage)?;
 
+    if fee_rate.is_some() && fee_rate.unwrap() > Decimal::one() {
+        return Err(ContractError::InvalidFeeRate {});
+    }
+
     config.lst_contract_address = lst_contract_address
         .clone()
         .unwrap_or_else(|| config.lst_contract_address);
@@ -99,7 +103,22 @@ pub fn set_config(
     config.coin_denom = coin_denom.clone().unwrap_or_else(|| config.coin_denom);
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(Response::default())
+    let event = UpdateConfigEvent(
+        config.lst_contract_address.clone(),
+        config.fee_receiver.clone(),
+        config.fee_rate,
+        config.coin_denom.clone(),
+    );
+
+    let attrs = Vec::from([
+        attr("action", "set_config"),
+        attr("lst_contract_address", config.lst_contract_address),
+        attr("fee_receiver", config.fee_receiver),
+        attr("fee_rate", config.fee_rate.to_string()),
+        attr("coin_denom", config.coin_denom),
+    ]);
+
+    Ok(Response::new().add_attributes(attrs).add_event(event))
 }
 
 pub fn transfer_to_owner(

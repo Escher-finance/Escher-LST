@@ -29,4 +29,7 @@ pub enum ContractError {
 
     #[error("this contract must have an owner")]
     OwnershipCannotBeRenounced,
+
+    #[error("invalid fee rate")]
+    InvalidFeeRate {},
 }

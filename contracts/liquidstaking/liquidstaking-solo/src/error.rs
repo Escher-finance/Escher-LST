@@ -93,7 +93,7 @@ pub enum ContractError {
         expected: BatchStatus,
     },
 
-    #[error("batch is not ready to be executed")]
+    #[error("batch is not ready to be executed, actual: {actual}, expected: {expected}")]
     BatchNotReady { actual: u64, expected: u64 },
 
     #[error("batch unbonding not yet complete")]
@@ -113,4 +113,35 @@ pub enum ContractError {
 
     #[error("unbond amount is less than minimum unbond amount")]
     UnbondAmountTooLow {},
+
+    #[error("This functionality is currently disabled for maintenance")]
+    FunctionalityUnderMaintenance {},
+
+    #[error("invalid fee rate")]
+    InvalidFeeRate {},
+
+    #[error("Invalid exchange rate")]
+    InvalidExchangeRate {},
+
+    #[error("error encode any msg")]
+    EncodeAnyMsgError {},
+
+    #[error("invalid recipient channel id")]
+    InvalidChannelId {},
+
+    #[error("invalid/unsupported recipient ibc channel id")]
+    InvalidIBCChannelId {},
+
+    #[error("invalid {kind} address: {address} because: {reason}")]
+    InvalidAddress {
+        kind: String,
+        address: String,
+        reason: String,
+    },
+
+    #[error("no reward to normalize: {msg}")]
+    NoRewardToNormalize { msg: String },
+
+    #[error("recipient ibc channel id not found for unbond record with id: {id}")]
+    UnbondRecordIbcChannelNotFound { id: u64 },
 }

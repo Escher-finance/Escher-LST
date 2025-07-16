@@ -1,8 +1,8 @@
-import Networks, { ChainConfig } from "../../config/networks.config";
+import { ChainConfig } from "../../config/networks.config";
 import { LocalStorage } from "../lib/localstorage";
 import { CosmWasmClient, SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { GasPrice } from "@cosmjs/stargate";
-import { type OfflineSigner } from "@unionlabs/client"
+import { OfflineSigner } from "@cosmjs/proto-signing";
 
 export async function initializeKeplr(
   network: ChainConfig | null,
@@ -76,17 +76,17 @@ export async function setClientNomos(
     case "keplr":
       (window as any).wallet = (window as any).keplr;
       console.log("NETWORK", network);
-      offlineSigner = await (window as any).wallet.getOfflineSignerAuto(network.chainId, { disableBalanceCheck: false });
+      offlineSigner = await (window as any).wallet.getOfflineSignerAuto(network?.chainId, { disableBalanceCheck: false });
       break;
     case "leap":
       (window as any).wallet = (window as any).leap;
-      offlineSigner = await (window as any).wallet.getOfflineSignerAuto(network.chainId, { disableBalanceCheck: false });
+      offlineSigner = await (window as any).wallet.getOfflineSignerAuto(network?.chainId, { disableBalanceCheck: false });
       break;
   }
 
   if (offlineSigner) {
-    const cosmosClient = await SigningCosmWasmClient.connectWithSigner(network.rpc, offlineSigner, {
-      gasPrice: GasPrice.fromString(network.gasPrice),
+    const cosmosClient = await SigningCosmWasmClient.connectWithSigner(network?.rpc, offlineSigner, {
+      gasPrice: GasPrice.fromString(network?.gasPrice),
     });
     console.log("setClientNomos");
     setCient(cosmosClient);
@@ -103,10 +103,5 @@ export async function setClientNomos(
     const cosmosQueryClient = await CosmWasmClient.connect(network?.rpc);
     setQueryClient(cosmosQueryClient);
 
-
-    // console.log("setWalletAndAddress", {
-    //   offlineSigner: offlineSigner,
-    //   cosmosClient: cosmosClient,
-    // });
   }
 }

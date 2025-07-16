@@ -10,6 +10,7 @@ import {
 import { useGlobalContext } from "@/app/core/context";
 import { getExecuteContractMessage } from "@/utils/msg";
 import { useState } from "react";
+import { toHex } from "@/app/lib/salt";
 const { toBase64 } = require("@cosmjs/encoding");
 
 interface KeyProps {
@@ -25,10 +26,16 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
     // Prevent the browser from reloading the page
     e.preventDefault();
     setIsLoading(true);
+
     const form = e.target;
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const amount = formEntries.amount.toString();
+    const recipient = formEntries.recipient.toString();
+    const recipient_channel_id = formEntries.recipient_channel_id.toString();
+    const recipient_ibc_channel_id = formEntries.recipient_ibc_channel_id.toString();
+    const encoder = new TextEncoder();
+    const recipient_hex = toHex(encoder.encode(recipient));
 
     const msg: any = {
       staking_liquidity: {}
@@ -49,6 +56,7 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
       return;
     }
 
+
     try {
       if (!userAddress) {
         alert("no user wallet");
@@ -57,10 +65,19 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
       }
 
       // Define the Unbonding payload
-      const unbondingPayload = { unstake: { amount } };
+      const unbondingPayload = {
+        unstake: {
+          amount,
+          recipient: recipient.indexOf("bbn") != -1 ? recipient : recipient_ibc_channel_id != "" ? recipient : recipient_hex,
+          recipient_channel_id: recipient_channel_id == "" ? null : Number(recipient_channel_id),
+          recipient_ibc_channel_id: recipient_ibc_channel_id == "" ? null : recipient_ibc_channel_id,
+        }
+      };
 
       // Encode the payload as base64 (Binary)
       const payloadJson = JSON.stringify(unbondingPayload);
+
+      console.log(payloadJson);
       const payloadBytes = new TextEncoder().encode(payloadJson); // Convert string to Uint8Array
       const payloadBinary = toBase64(payloadBytes); // Convert Uint8Array to base64 string
 
@@ -99,7 +116,23 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
               isRequired
               name="amount"
               label="Amount"
-              defaultValue="0"
+              defaultValue="10000"
+            />
+            <Input
+              isRequired
+              name="recipient"
+              label="Recipient (example: xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds for xion via zkgm, osmo1vnglhewf3w66cquy6hr7urjv3589srhelhn6df for osmosis via IBC)"
+              defaultValue="xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds"
+            />
+            <Input
+              name="recipient_channel_id"
+              label="Recipient Channel ID (4 for osmosis mainnet) (set blank to make it null)"
+              defaultValue=""
+            />
+            <Input
+              name="recipient_ibc_channel_id"
+              label="Recipient IBC Channel ID (channel-3 for osmosis mainnet) (set blank to make it null)"
+              defaultValue=""
             />
           </CardBody>
           <CardFooter>

@@ -1,16 +1,17 @@
 use std::marker::PhantomData;
 
-use crate::msg::{Balance, QueryMsg, StakingLiquidity};
-use crate::state::unbond_record;
+use crate::msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity};
+use crate::state::{unbond_record, Status, WithdrawRewardQueue, STATUS, WITHDRAW_REWARD_QUEUE};
 use crate::state::{
     Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, ValidatorsRegistry, PARAMETERS,
-    QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+    QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL,
+    VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc::{self, calculate_fee_from_reward, calculate_query_bounds};
 use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
 use crate::ContractError;
-use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
+use cosmwasm_std::{entry_point, to_json_binary, Decimal, FullDelegation, Order, Uint128};
 use cosmwasm_std::{Binary, Deps, Env, Storage};
 use cw2::ContractVersion;
 use cw_ownable::get_ownership;
@@ -51,7 +52,18 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
             max,
         } => to_json_binary(&query_batch(deps.storage, id, status, min, max)?),
         QueryMsg::SupplyQueue {} => to_json_binary(&query_supply_queue(deps.storage)?),
+        QueryMsg::Status {} => to_json_binary(&query_status(deps.storage)?),
+        QueryMsg::Delegations {} => to_json_binary(&query_delegations(deps, env)?),
+        QueryMsg::Chains {} => to_json_binary(&query_chains(deps.storage)?),
+        QueryMsg::RewardQueue {} => to_json_binary(&query_reward_queue(deps.storage)?),
+        QueryMsg::IbcChannels {} => to_json_binary(&query_ibc_channels(deps.storage)?),
+        QueryMsg::RecipientIbcChannel { unbond_record_id } => to_json_binary(
+            &query_recipient_ibc_channel(deps.storage, unbond_record_id)?,
+        ),
     }?)
+}
+pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
+    Ok(STATUS.load(storage)?)
 }
 
 pub fn query_reward_balance(storage: &dyn Storage) -> Result<Balance, ContractError> {
@@ -137,7 +149,7 @@ pub fn query_staking_liquidity(
     let state: State = STATE.load(deps.storage)?;
     let mut exchange_rate: Decimal = Decimal::one();
     let mut adjusted_supply = state.total_supply;
-    if total_bond_amount != Uint128::zero() && state.total_supply != Uint128::zero() {
+    if total_bond_amount != Uint128::zero() {
         let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(deps.storage)?;
         calc::normalize_supply_queue(&mut supply_queue, env.block.height);
         adjusted_supply = calc::normalize_total_supply(
@@ -179,12 +191,13 @@ pub fn query_unbond_record(
     let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
     let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
 
+    // unbond record query with specific batch id skip min and max bound
     let unbonded_range = if let Some(batch_id) = batch_id {
         unbond_record()
             .idx
             .batch
             .prefix(batch_id.to_string())
-            .range(storage, min_bound, max_bound, Order::Ascending)
+            .range(storage, None, None, Order::Ascending)
     } else {
         match (staker, released) {
             (Some(staker), None) => unbond_record().idx.staker.prefix(staker).range(
@@ -245,6 +258,8 @@ pub fn query_unreleased_unbond_record_from_batch(
     unbonded_list
 }
 
+// query batch by id or status
+// min bound and max bound only used when status filter is released
 pub fn query_batch(
     storage: &dyn Storage,
     id: Option<u64>,
@@ -263,22 +278,15 @@ pub fn query_batch(
         None => BatchStatus::Pending,
     };
 
-    let min_bound = match min {
-        Some(min) => Some(cw_storage_plus::Bound::Inclusive((min, PhantomData))),
-        None => Some(cw_storage_plus::Bound::Inclusive((1, PhantomData))),
-    };
-    let max_bound = match max {
-        Some(max) => {
-            let max_id = if min.is_some() && max > min.unwrap() + 50 {
-                min.unwrap() + 50
-            } else {
-                max
-            };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
-        }
-        None => {
-            let max_id = if min.is_some() { min.unwrap() + 50 } else { 50 };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
+    let (min_bound, max_bound) = match batch_status {
+        BatchStatus::Pending => (None, None),
+        BatchStatus::Submitted => (None, None),
+        BatchStatus::Received => (None, None),
+        BatchStatus::Released => {
+            let (min_id, max_id) = calculate_query_bounds(min, max);
+            let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
+            let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
+            (min_bound, max_bound)
         }
     };
 
@@ -289,11 +297,69 @@ pub fn query_batch(
         max_bound,
         Order::Ascending,
     );
-
     for batch in batches {
         if batch.is_ok() {
             batch_list.push(batch.unwrap().1);
         }
     }
     Ok(batch_list)
+}
+
+pub fn query_delegations(deps: Deps, env: Env) -> Result<Vec<FullDelegation>, ContractError> {
+    let validators_registry = VALIDATORS_REGISTRY.load(deps.storage)?;
+    let delegator = env.contract.address.clone();
+    let mut delegations = vec![];
+    for validator in validators_registry.validators.iter() {
+        let validator_bond = deps
+            .querier
+            .query_delegation(delegator.clone(), validator.address.clone())?;
+
+        if validator_bond.is_some() {
+            delegations.push(validator_bond.unwrap());
+        }
+    }
+    Ok(delegations)
+}
+
+pub fn query_chains(storage: &dyn Storage) -> Result<Vec<crate::state::Chain>, ContractError> {
+    let chains: Vec<crate::state::Chain> = crate::state::CHAINS
+        .range(storage, None, None, cosmwasm_std::Order::Ascending)
+        .filter_map(|result| result.ok().map(|(_, chain)| chain))
+        .collect();
+    Ok(chains)
+}
+
+pub fn query_reward_queue(
+    storage: &dyn Storage,
+) -> Result<Vec<WithdrawRewardQueue>, ContractError> {
+    let queue = WITHDRAW_REWARD_QUEUE.load(storage)?;
+    Ok(queue)
+}
+
+pub fn query_ibc_channels(storage: &dyn Storage) -> Result<Vec<IBCChannel>, ContractError> {
+    let channels: Vec<IBCChannel> = crate::state::IBC_CHANNELS
+        .range(storage, None, None, cosmwasm_std::Order::Ascending)
+        .filter_map(|result| {
+            result.ok().map(|(ibc_channel_id, prefix)| IBCChannel {
+                ibc_channel_id,
+                prefix,
+            })
+        })
+        .collect();
+    Ok(channels)
+}
+
+pub fn query_recipient_ibc_channel(
+    storage: &dyn Storage,
+    id: u64,
+) -> Result<IbcChannelId, ContractError> {
+    let channel_id = UNBOND_RECIPIENT_IBC_CHANNEL
+        .load(storage, id)
+        .unwrap_or(None);
+
+    let ibc_channel_id: IbcChannelId = match channel_id {
+        Some(channel_id) => IbcChannelId { channel_id },
+        None => return Err(ContractError::UnbondRecordIbcChannelNotFound { id }),
+    };
+    Ok(ibc_channel_id)
 }

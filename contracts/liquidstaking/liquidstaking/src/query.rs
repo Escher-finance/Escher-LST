@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::msg::{QueryMsg, StakingLiquidity};
-use crate::state::unbond_record;
+use crate::state::{unbond_record, Status, STATUS};
 use crate::state::{
     Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, PARAMETERS,
     QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
@@ -51,7 +51,12 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
             min,
             max,
         } => to_json_binary(&query_batch(deps.storage, id, status, min, max)?),
+        QueryMsg::Status {} => to_json_binary(&query_status(deps.storage)?),
     }?)
+}
+
+pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {
+    Ok(STATUS.load(storage)?)
 }
 
 pub fn query_quote_token(
@@ -251,24 +256,9 @@ pub fn query_batch(
         None => BatchStatus::Pending,
     };
 
-    let min_bound = match min {
-        Some(min) => Some(cw_storage_plus::Bound::Inclusive((min, PhantomData))),
-        None => Some(cw_storage_plus::Bound::Inclusive((1, PhantomData))),
-    };
-    let max_bound = match max {
-        Some(max) => {
-            let max_id = if min.is_some() && max > min.unwrap() + 50 {
-                min.unwrap() + 50
-            } else {
-                max
-            };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
-        }
-        None => {
-            let max_id = if min.is_some() { min.unwrap() + 50 } else { 50 };
-            Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)))
-        }
-    };
+    let (min_id, max_id) = calculate_query_bounds(min, max);
+    let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
+    let max_bound = Some(cw_storage_plus::Bound::Inclusive((max_id, PhantomData)));
 
     let mut batch_list: Vec<Batch> = vec![];
     let batches = batches().idx.status.prefix(batch_status.to_string()).range(

@@ -5,12 +5,16 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, MultiIndex};
 
 pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
+pub const STATUS: Item<Status> = Item::new("status");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
 pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
 
-// Map of channel id to the quote token and lst quote token of destination chain
+pub const WITHDRAW_REWARD_QUEUE: Item<Vec<WithdrawRewardQueue>> =
+    Item::new("withdraw_reward_queue");
+
+// Map of ucs03 channel id to the quote token and lst quote token of destination chain
 pub const QUOTE_TOKEN: Map<u32, QuoteToken> = Map::new("quote_token");
 
 // mint and burn queue of staking token
@@ -20,6 +24,22 @@ pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 
 // Queue of validator reward for executing split reward
 pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
+
+// Map of supported ucs03 chains with channel_id as key
+pub const CHAINS: Map<u32, Chain> = Map::new("chains");
+
+// Map of supported ibc channels with channel_id as key and address prefix as value, like bbn, union, osmo
+pub const IBC_CHANNELS: Map<String, String> = Map::new("ibc_channels");
+
+// Map of unbond record id and the recipient ibc channel id
+pub const UNBOND_RECIPIENT_IBC_CHANNEL: Map<u64, Option<String>> =
+    Map::new("unbond_record_recipient_ibc_channel");
+
+#[cw_serde]
+pub struct Status {
+    pub bond_is_paused: bool,
+    pub unbond_is_paused: bool,
+}
 
 #[cw_serde]
 pub struct WithdrawReward {
@@ -55,6 +75,36 @@ pub struct ValidatorsRegistry {
 
 // Parameter is required data to instantiate and run contract
 #[cw_serde]
+pub struct OldParameters {
+    pub underlying_coin_denom: String,
+    pub liquidstaking_denom: String,
+    pub ucs03_relay_contract: String,
+    pub unbonding_time: u64,
+    // liquid_staking denom/cw20 contract address
+    pub cw20_address: Addr,
+    // reward contract address
+    pub reward_address: Addr,
+    // fee fee_rate
+    pub fee_rate: Decimal,
+    // fee receiver
+    pub fee_receiver: Addr,
+    // batch period range in seconds to execute batch
+    pub batch_period: u64,
+    // minimum bond/stake amount
+    pub min_bond: Uint128,
+    // minimum unbond/unstake amount
+    pub min_unbond: Uint128,
+    // limit per batch
+    // this is the max number of unbonding records that can be processed in one batch
+    pub batch_limit: u32,
+    // handler of cw20 staking token transfer, as ucs03 fee payer address and also minted cw20 staking token receiver
+    pub transfer_handler: String,
+    // ucs03 transfer fee from babylon to other
+    pub transfer_fee: Uint128,
+}
+
+// Parameter is required data to instantiate and run contract
+#[cw_serde]
 pub struct Parameters {
     pub underlying_coin_denom: String,
     pub liquidstaking_denom: String,
@@ -77,14 +127,12 @@ pub struct Parameters {
     // limit per batch
     // this is the max number of unbonding records that can be processed in one batch
     pub batch_limit: u32,
-}
-
-impl State {
-    pub fn update_exchange_rate(&mut self) {
-        if self.total_bond_amount != Uint128::new(0) && self.total_supply != Uint128::new(0) {
-            self.exchange_rate = Decimal::from_ratio(self.total_bond_amount, self.total_supply);
-        }
-    }
+    // handler of cw20 staking token transfer, as ucs03 fee payer address and also minted cw20 staking token receiver
+    pub transfer_handler: String,
+    // ucs03 transfer fee from babylon to other
+    pub transfer_fee: Uint128,
+    // zkgm token_minter address as cw20 allowance spender
+    pub zkgm_token_minter: String,
 }
 
 pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
@@ -100,6 +148,66 @@ pub fn num_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
 }
 
 #[cw_serde]
+pub struct OldUnbondRecord {
+    pub id: u64,
+    pub height: u64,
+    pub sender: String,
+    pub staker: String,
+    pub channel_id: Option<u32>,
+    pub amount: Uint128,
+    pub released_height: u64,
+    pub released: bool,
+    pub batch_id: u64,
+}
+
+pub struct OldUnbondRecordIndexes<'a> {
+    pub staker: MultiIndex<'a, String, OldUnbondRecord, u64>,
+    pub released: MultiIndex<'a, String, OldUnbondRecord, u64>,
+    pub staker_released: MultiIndex<'a, String, OldUnbondRecord, u64>,
+    pub batch: MultiIndex<'a, String, OldUnbondRecord, u64>,
+}
+
+impl<'a> IndexList<OldUnbondRecord> for OldUnbondRecordIndexes<'a> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<OldUnbondRecord>> + '_> {
+        let v: Vec<&dyn Index<OldUnbondRecord>> = vec![
+            &self.staker,
+            &self.released,
+            &self.staker_released,
+            &self.batch,
+        ];
+        Box::new(v.into_iter())
+    }
+}
+
+pub fn old_unbond_record<'a>() -> IndexedMap<u64, OldUnbondRecord, OldUnbondRecordIndexes<'a>> {
+    let indexes = OldUnbondRecordIndexes {
+        staker: MultiIndex::new(
+            |_pk, d: &OldUnbondRecord| d.staker.clone(),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__staker",
+        ),
+        released: MultiIndex::new(
+            |_pk, d: &OldUnbondRecord| d.released.to_string(),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__released",
+        ),
+        staker_released: MultiIndex::new(
+            |_pk, d: &OldUnbondRecord| format!("{}-{}", d.staker, d.released),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__staker_released",
+        ),
+        batch: MultiIndex::new(
+            |_pk, d: &OldUnbondRecord| d.batch_id.to_string(),
+            UNBOND_RECORD_NAMESPACE,
+            "unbond_record__batch",
+        ),
+    };
+    IndexedMap::new(UNBOND_RECORD_NAMESPACE, indexes)
+}
+
+const UNBOND_RECORD_NAMESPACE: &str = "unbond_record";
+
+#[cw_serde]
 pub struct UnbondRecord {
     pub id: u64,
     pub height: u64,
@@ -110,6 +218,8 @@ pub struct UnbondRecord {
     pub released_height: u64,
     pub released: bool,
     pub batch_id: u64,
+    pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
 }
 
 pub struct UnbondRecordIndexes<'a> {
@@ -130,8 +240,6 @@ impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
         Box::new(v.into_iter())
     }
 }
-
-const UNBOND_RECORD_NAMESPACE: &str = "unbond_record";
 
 pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<'a>> {
     let indexes = UnbondRecordIndexes {
@@ -197,6 +305,23 @@ pub struct SupplyQueue {
     /// the burn amount that is not substracted from real total supply, so total supply should be added with this burn amount value
     /// to get the total supply calculation for exchange rate
     pub burn: Vec<BurnQueue>,
-    /// epooch period in seconds
+    /// epooch period of block height
     pub epoch_period: u32,
+}
+
+#[cw_serde]
+pub struct Chain {
+    pub name: String,
+    pub chain_id: String,
+    pub ucs03_channel_id: u32,
+    pub prefix: String,
+}
+
+/// the queued staking token mint amount
+#[cw_serde]
+pub struct WithdrawRewardQueue {
+    // amount of total withdraw reward
+    pub amount: Uint128,
+    // block height when it the withdraw reward is called
+    pub block: u64,
 }
