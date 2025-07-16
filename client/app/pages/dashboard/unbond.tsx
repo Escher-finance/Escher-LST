@@ -126,12 +126,12 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
             />
             <Input
               name="recipient_channel_id"
-              label="Recipient Channel ID (4 for xion) (set blank to make it null)"
+              label="Recipient Channel ID (4 for osmosis mainnet) (set blank to make it null)"
               defaultValue=""
             />
             <Input
               name="recipient_ibc_channel_id"
-              label="Recipient IBC Channel ID (channel-21 for osmosis) (set blank to make it null)"
+              label="Recipient IBC Channel ID (channel-3 for osmosis mainnet) (set blank to make it null)"
               defaultValue=""
             />
           </CardBody>
