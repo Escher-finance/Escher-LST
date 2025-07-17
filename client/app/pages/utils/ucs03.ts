@@ -36,6 +36,21 @@ export interface TransferIntent {
     baseTokenDecimals: number;
 }
 
+export interface TransferFwdIntent {
+    sender: string;
+    receiver: string;
+    baseAmount: bigint;
+    baseToken: string
+    baseTokenSymbol: string;
+    baseTokenName: string;
+    quoteToken: `0x${string}`;
+    quoteAmount: bigint,
+    baseTokenPath: bigint;
+    baseTokenDecimals: number;
+    quoteTokenPath: bigint;
+}
+
+
 
 export const transferAndCallInstruction = ({
     sender,
@@ -127,6 +142,71 @@ export const transferInstruction = ({
         ]
     });
 }
+
+
+export const transferForwardInstruction = ({
+    baseTokenPath,
+    sender,
+    receiver,
+    baseToken,
+    baseAmount,
+    baseTokenSymbol,
+    baseTokenName,
+    quoteToken,
+    quoteAmount,
+    baseTokenDecimals,
+    quoteTokenPath,
+}: TransferFwdIntent
+) => {
+    let senderHex = sender.startsWith("0x") ? sender as Hex : toHex(sender);
+    let receiverHex = receiver.startsWith("0x") ? receiver as Hex : toHex(receiver);
+    let baseTokenHex = baseToken.startsWith("0x") ? baseToken as Hex : toHex(baseToken);
+
+    let fungibleAssetOrder = Instruction.FungibleAssetOrder.make({
+        operand: [
+            senderHex,
+            receiverHex,
+            baseTokenHex,
+            baseAmount,
+            baseTokenSymbol,
+            baseTokenName,
+            baseTokenDecimals,
+            baseTokenPath,
+            quoteToken,
+            quoteAmount,
+        ]
+    });
+
+    let fwdInstruction = new Instruction.Forward({
+        operand: [
+            0n,
+            10000000n,
+            0n,
+            new Instruction.FungibleAssetOrder({
+                operand: [
+                    receiverHex,
+                    senderHex,
+                    quoteToken,
+                    baseAmount,
+                    baseTokenSymbol,
+                    baseTokenName,
+                    baseTokenDecimals,
+                    quoteTokenPath,
+                    baseTokenHex,
+                    quoteAmount,
+                ],
+            }),
+        ],
+    });
+
+    return new Instruction.Batch({
+        operand: [
+            fungibleAssetOrder,
+            fwdInstruction
+        ]
+    });
+}
+
 
 
 export function getSalt() {

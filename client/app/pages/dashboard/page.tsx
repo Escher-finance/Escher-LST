@@ -13,6 +13,7 @@ import IbcBond from "./ibc_bond";
 import ZkgmUnbond from "./zkgm_unbond";
 import TransferEbabyFromOsmosis from "./transfer_ebaby_from_osmosis";
 import TransferEbabyToOsmosis from "./transfer_ebaby_to_osmosis";
+import DualTransferToOsmosis from "./dual_transfer_to_osmosis";
 
 export default function Dashboard() {
   const { network } = useGlobalContext();
@@ -53,8 +54,12 @@ export default function Dashboard() {
                 <Unbond stateKey={stateKey} setStateKey={setStateKey} />
               </Tab>
 
-              <Tab key="transfer_to_osmosis" title="Transfer eBaby to Osmosis" >
+              <Tab key="ebaby_transfer_to_osmosis" title="Transfer eBaby to Osmosis" >
                 <TransferEbabyToOsmosis />
+              </Tab>
+
+              <Tab key="dual_transfer_to_osmosis" title="Transfer Baby & eBaby to Osmosis" >
+                <DualTransferToOsmosis />
               </Tab>
 
             </Tabs>

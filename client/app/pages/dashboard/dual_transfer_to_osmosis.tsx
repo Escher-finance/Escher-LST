@@ -8,22 +8,17 @@ import {
     Input,
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
-import { encodeAbiParameters, Hex, toHex } from "viem";
+import { encodeAbiParameters, toHex } from "viem";
 import { instructionAbi } from "@unionlabs/sdk/evm/abi";
 import { getSalt, transferInstruction, TransferIntent } from "../utils/ucs03";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
-import { getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/ibc";
 import { Instruction } from "@unionlabs/sdk/ucs03";
 import { BaseNetworks } from "@/config/networks.config";
-
-
-// Get quote token of baby in osmosis 
-// osmosisd query wasm contract-state smart osmo1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292qs2uecc '{"predict_wrapped_token":{"channel_id":3, "path":"0", "token":"0x7562626e"}}'
-// data:
-// wrapped_token: 0x666163746f72792f6f736d6f3133756c63367071686d3630716e78353873733773336366743863716679636578713375793364643276306c3871736e6b766b34736a3232736e362f46374266536e58746d6652613343475541473841507055576b42794476686445706e464874694b59394542
+import { createSendIBCMsg, getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/ibc";
 
 const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
+
     let allowanceMsg = {
         increase_allowance: {
             spender,
@@ -45,15 +40,16 @@ const getExecuteAllowanceMsg = (contract: string, sender: string, spender: strin
 }
 
 
-export default function TransferEbabyToOsmosis() {
+export default function DualTransferToOsmosis() {
     const { userAddress, client, network } = useGlobalContext();
 
-    const base_denom = network?.escher?.ebabyDenom;
+    const base_denom = network?.escher.ebabyDenom;
+    const baby_denom = network?.escher.babyDenom;
+
     const ucs03_contract = network?.escher?.ucs03;
     const channel_id = network?.escher?.channel["osmosis"]?.sourceChannelId;
-    const receiver = "osmo1vnglhewf3w66cquy6hr7urjv3589srhelhn6df"
-    const zkgm_token_minter = network?.escher?.tokenMinter;
 
+    const default_receiver = "osmo1vnglhewf3w66cquy6hr7urjv3589srhelhn6df"; // Default receiver address for Babylon
 
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
@@ -61,13 +57,15 @@ export default function TransferEbabyToOsmosis() {
         const form = e.target;
         const formData = new FormData(form);
         const formEntries = Object.fromEntries(formData.entries());
+        const receiver = formEntries.receiver.toString() || default_receiver;
         const amount = BigInt(formEntries.amount.toString());
+        const zkgm_token_minter = network?.escher?.tokenMinter;
+
 
         if (userAddress === undefined || userAddress === null) {
             alert("Please connect your wallet");
             return;
         }
-
 
         let testnet = network?.chainName?.toLowerCase().includes("testnet");
 
@@ -85,14 +83,13 @@ export default function TransferEbabyToOsmosis() {
         } as const
 
         console.log("cosmosIntent", JSON.stringify(cosmosIntent));
-
         const batch_instruction = transferInstruction(cosmosIntent);
 
         console.log("batch_instruction", JSON.stringify(batch_instruction));
 
         const timeout_timestamp = getTimeoutInNanoseconds24HoursFromNow().toString();
 
-        let msg = {
+        let ucs03_msg = {
             send: {
                 channel_id,
                 timeout_height: "0",
@@ -106,29 +103,38 @@ export default function TransferEbabyToOsmosis() {
             },
         }
 
-        console.log("msg", JSON.stringify(msg));
 
-        let funds = [{
-            denom: "ubbn",
-            amount: testnet ? "10000" : "100"
-        }]
-
-        const executeTransferMsg = {
-            typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
-            value: MsgExecuteContract.fromPartial({
-                sender: userAddress,
-                contract: ucs03_contract,
-                msg: toUtf8(JSON.stringify(msg)),
-                funds
-            }),
-        };
+        console.log(userAddress);
 
         const executeAllowanceMsg = getExecuteAllowanceMsg(formEntries.denom.toString(), userAddress, zkgm_token_minter, amount.toString());
 
 
-        console.log(JSON.stringify(msg));
+
+        const executeUcs03Msg = {
+            typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+            value: MsgExecuteContract.fromPartial({
+                sender: userAddress,
+                contract: ucs03_contract,
+                msg: toUtf8(JSON.stringify(ucs03_msg)),
+                funds: []
+            }),
+        };
+        console.log(JSON.stringify(executeUcs03Msg));
+
+        const ibcTransferMsg = createSendIBCMsg({
+            sender: userAddress,
+            denom: baby_denom,
+            amount: amount.toString(),
+            sourceChannel: network?.escher.channel["osmosis"]?.sourceIbcChannelId,
+            receiver,
+            timeoutTimestamp: getTimeoutInNanoseconds24HoursFromNow(),
+            memo: "Transfer baby from babylon to osmosis",
+        });
+
+
+        console.log(JSON.stringify(ibcTransferMsg));
         try {
-            const res = await client?.signAndBroadcast(userAddress, [executeAllowanceMsg, executeTransferMsg], "auto", "transfer ebaby from babylon to osmosis");
+            const res = await client?.signAndBroadcast(userAddress, [executeAllowanceMsg, executeUcs03Msg, ibcTransferMsg], "auto", "transfer baby and ebaby from babylon to osmosis");
             alert(res?.transactionHash);
 
         } catch (err) {
@@ -145,19 +151,19 @@ export default function TransferEbabyToOsmosis() {
                             isRequired
                             name="amount"
                             label="Amount"
-                            defaultValue="1000"
+                            defaultValue="100"
                         />
                         <Input
                             isRequired
                             name="denom"
-                            label="Denom"
+                            label="eBaby Denom"
                             defaultValue={base_denom}
                         />
                         <Input
                             isRequired
                             name="receiver"
                             label="Receiver (osmosis address)"
-                            defaultValue={receiver}
+                            defaultValue={default_receiver}
                         />
                     </CardBody>
                     <CardFooter>
