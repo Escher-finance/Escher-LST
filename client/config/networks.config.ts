@@ -53,7 +53,7 @@ export type ChainConfig = {
   escher: EscherConfig;
 };
 
-type SupportedNetworks = "babylon-testnet" | "babylon-mainnet" | "osmosis-testnet" | "osmosis-mainnet";
+type SupportedNetworks = "babylon-testnet" | "babylon-mainnet" | "osmosis-testnet" | "osmosis-mainnet" | "union-testnet";
 
 
 
@@ -85,12 +85,18 @@ const currency: Record<SupportedNetworks, Currency> = {
     coinDecimals: 6,
     liquidStakingDenom: "ebbn",
     liquidStakingDenomDisplay: "eBABY",
+  },
+  "union-testnet": {
+    coinDenom: "UNO",
+    coinMinimalDenom: "muno",
+    coinDecimals: 6,
+    liquidStakingDenom: "ebbn",
+    liquidStakingDenomDisplay: "eBABY",
   }
 };
 
 
 const Networks: Record<SupportedNetworks, ChainConfig> = {
-
   "babylon-testnet": {
     chainId: "bbn-test-5",
     chainName: "babylon-testnet",
@@ -168,7 +174,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
           sourceChannelId: 4,
           destinationChannelId: 1,
           sourceIbcChannelId: "channel-3",
-          destinationIbcChannelId: "channel-1"
+          destinationIbcChannelId: "channel-101635"
         }
       }
     }
@@ -254,7 +260,48 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
         }
       }
     }
-  }
+  },
+  "union-testnet": {
+    chainId: "union-testnet-9",
+    chainName: "uniontestnet",
+    rest: "https://rest.testnet-9.union.build",
+    rpc: "https://rpc.testnet-9.union.build",
+    stakeCurrency: currency["union-testnet"],
+    bip44: {
+      coinType: 118
+    },
+    bech32Config: {
+      bech32PrefixAccAddr: "union",
+      bech32PrefixAccPub: "unionpub",
+      bech32PrefixValAddr: "unionvaloper",
+      bech32PrefixValPub: "unionvaloperpub",
+      bech32PrefixConsAddr: "unionvalcons",
+      bech32PrefixConsPub: "unionvalconspub",
+    },
+    currencies: [currency["union-testnet"]],
+    feeCurrencies: [currency["union-testnet"]],
+    contracts: {
+      lst: "union1mdsv9vd9f0gjte83vauwjqsahxg4gte2mdkcxxex68p97h8a4txqq0k5ct",
+      cw20: "union1uf2jmjgaxwdxl5ttnwcef829lm2hgcxcxczyn93leuuhs4jrtm8sgse85m",
+      reward: "union14nt98pl3edsgd4lu56m3yndervtp9z3qvyp0wmqkx6tmmse5ufnsrct8pc",
+    },
+    gasPrice: "0.0025muno",
+    escher: {
+      lst: "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g",
+      ucs03: "osmo1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292qs2uecc",
+      babyDenom: "ibc/EC3A4ACBA1CFBEE698472D3563B70985AEA5A7144C319B61B3EBDFB57B5E1535",
+      ebabyDenom: "factory/osmo12r3yc76u9lxe33yemstatnw8602culdjzrtr8lmnpycmd3z7d4jsxx60kc/FwNhFaW3zLxoLUgXCdWjqBzcvGNPaB7B2XZqm2xgrB93",
+      tokenMinter: "osmo12r3yc76u9lxe33yemstatnw8602culdjzrtr8lmnpycmd3z7d4jsxx60kc",
+      channel: {
+        "holesky": {
+          sourceIbcChannelId: "channel-101635",
+          sourceChannelId: 1,
+          destinationChannelId: 4,
+          destinationIbcChannelId: "channel-3"
+        }
+      }
+    }
+  },
 };
 
 export const BaseNetworks: Record<SupportedNetworks, ChainConfig> = {
@@ -262,6 +309,7 @@ export const BaseNetworks: Record<SupportedNetworks, ChainConfig> = {
   "babylon-mainnet": Networks["babylon-mainnet"],
   "osmosis-testnet": Networks["osmosis-testnet"],
   "osmosis-mainnet": Networks["osmosis-mainnet"],
+  "union-testnet": Networks["union-testnet"],
 };
 
 export default Networks;
@@ -269,30 +317,3 @@ export default Networks;
 //old babylon cw20: bbn1s5qwgvzzvs5h2wurz7mjwmc4n650g3207caddlz35fay8cl5ay6ss86ejy
 //old babylon lst : bbn1qmayg959zunza00s040ppqesf7qnvusys3r2m9vw35ry28x9sncq84jphy
 
-
-// "uniontestnet": {
-//   chainId: "union-testnet-9",
-//   chainName: "uniontestnet",
-//   rest: "https://rest.testnet-9.union.build",
-//   rpc: "https://rpc.testnet-9.union.build",
-//   stakeCurrency: currency["uniontestnet"],
-//   bip44: {
-//     coinType: 118
-//   },
-//   bech32Config: {
-//     bech32PrefixAccAddr: "union",
-//     bech32PrefixAccPub: "unionpub",
-//     bech32PrefixValAddr: "unionvaloper",
-//     bech32PrefixValPub: "unionvaloperpub",
-//     bech32PrefixConsAddr: "unionvalcons",
-//     bech32PrefixConsPub: "unionvalconspub",
-//   },
-//   currencies: [currency["uniontestnet"]],
-//   feeCurrencies: [currency["uniontestnet"]],
-//   contracts: {
-//     lst: "union1mdsv9vd9f0gjte83vauwjqsahxg4gte2mdkcxxex68p97h8a4txqq0k5ct",
-//     cw20: "union1uf2jmjgaxwdxl5ttnwcef829lm2hgcxcxczyn93leuuhs4jrtm8sgse85m",
-//     reward: "union14nt98pl3edsgd4lu56m3yndervtp9z3qvyp0wmqkx6tmmse5ufnsrct8pc",
-//   },
-//   gasPrice: "0.0025muno"
-// },
