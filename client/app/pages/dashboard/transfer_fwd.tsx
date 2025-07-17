@@ -10,7 +10,7 @@ import {
 import { useGlobalContext } from "@/app/core/context";
 import { encodeAbiParameters, Hex, toHex } from "viem";
 import { instructionAbi } from "@unionlabs/sdk/evm/abi";
-import { getSalt, transferInstruction, TransferIntent } from "../utils/ucs03";
+import { getSalt, transferForwardInstruction, TransferFwdIntent, transferInstruction, TransferIntent } from "../utils/ucs03";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/ibc";
@@ -24,6 +24,7 @@ import { BaseNetworks } from "@/config/networks.config";
 // wrapped_token: 0x666163746f72792f6f736d6f3133756c63367071686d3630716e78353873733773336366743863716679636578713375793364643276306c3871736e6b766b34736a3232736e362f46374266536e58746d6652613343475541473841507055576b42794476686445706e464874694b59394542
 
 const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
+
     let allowanceMsg = {
         increase_allowance: {
             spender,
@@ -71,7 +72,7 @@ export default function TransferEbabyToOsmosis() {
 
         let testnet = network?.chainName?.toLowerCase().includes("testnet");
 
-        const cosmosIntent: TransferIntent = {
+        const cosmosIntent: TransferFwdIntent = {
             sender: userAddress,
             receiver: formEntries.receiver.toString(),
             baseToken: formEntries.denom.toString(),
@@ -81,12 +82,13 @@ export default function TransferEbabyToOsmosis() {
             quoteToken: testnet ? toHex(BaseNetworks["osmosis-testnet"].escher.ebabyDenom) : toHex(BaseNetworks["osmosis-mainnet"].escher.ebabyDenom),
             quoteAmount: BigInt(amount),
             baseTokenPath: BigInt(0),
-            baseTokenDecimals: 6
+            baseTokenDecimals: 6,
+            quoteTokenPath: BigInt(1),
         } as const
 
         console.log("cosmosIntent", JSON.stringify(cosmosIntent));
 
-        const batch_instruction = transferInstruction(cosmosIntent);
+        const batch_instruction = transferForwardInstruction(cosmosIntent);
 
         console.log("batch_instruction", JSON.stringify(batch_instruction));
 
@@ -113,7 +115,7 @@ export default function TransferEbabyToOsmosis() {
             amount: testnet ? "10000" : "100"
         }]
 
-        const executeTransferMsg = {
+        const executeBondMsg = {
             typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
             value: MsgExecuteContract.fromPartial({
                 sender: userAddress,
@@ -128,7 +130,7 @@ export default function TransferEbabyToOsmosis() {
 
         console.log(JSON.stringify(msg));
         try {
-            const res = await client?.signAndBroadcast(userAddress, [executeAllowanceMsg, executeTransferMsg], "auto", "transfer ebaby from babylon to osmosis");
+            const res = await client?.signAndBroadcast(userAddress, [executeAllowanceMsg, executeBondMsg], "auto", "transfer ebaby from babylon to osmosis");
             alert(res?.transactionHash);
 
         } catch (err) {
