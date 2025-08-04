@@ -9,6 +9,7 @@ Escher currently supports two contract versions:
 
 - Union Chain: Separate implementation for the Union chain (you can see in the
   rest of the page).
+    [Union Liquid Staking Contract](https://github.com/Escher-finance/cw-liquid-staking/tree/babylon/contracts/liquidstaking/liquidstaking)
 
 Key Differences:
 
@@ -33,6 +34,7 @@ Babylon Contract Details:
 - For liquid staking contract implementation, we have 2 versions, one with
   separate reward contract and the other one is without. Please see this
   [Architecture](docs/architecture.md)
+
 
 ## Components:
 
