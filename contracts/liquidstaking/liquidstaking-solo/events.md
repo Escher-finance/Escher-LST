@@ -52,22 +52,21 @@ This event is emitted when user submit unbond request as part of specific batch
 
 event attribute key: submit_batch
 
-This event is emitted when batch period is met so batch is submitted by backend scheduler, this means contract will call undelegate requests to validators.
+This event is emitted when periodic time of batch submission is met so the current pending batch is submitted by backend scheduler, this means contract will call undelegate requests to validators.
 Batch will be submitted every 8 hours.
 
 | event key | description |
 |--|--|
 | batch_id | batch id that is submitted |
-| sender | amount that will be sent to user/recipient |
-| unstake_amount | denom that will be received after unbonding |
-| output_amount | timestamp of unbonding transaction  |
-| delegated_amount | batch id that will process the unbonding |
-| total_bond_amount | source ucs03 channel_id of staker |
-| total_supply | recipient address that will get back the token (in hex if recipient_channel_id is not 0)  |
-| exchange_rate | ucs03 channel id of recipient (0 if recipient is on same chain) |
-| time | ucs03 channel id of recipient (0 if recipient is on same chain) |
-| denom | ucs03 channel id of recipient (0 if recipient is on same chain) |
-
+| sender | address that call the contract |
+| unstake_amount | total liquid staking token that is unstaked in batch |
+| output_amount | total native token that will be unbonded in batch |
+| delegated_amount| total amount that is delegated to validators after it is substracted by total amount that is undelegated in batch  |
+| total_bond_amount | total delegated_amount + total rewards |
+| total_supply | total ebaby/liquid staking amount that already substracted by total unstake amount  |
+| exchange_rate | exchange rate when batch is submitted |
+| time | timestamp of transaction |
+| denom | native denom name |
 
 ## process batch unbonding
 
@@ -107,7 +106,7 @@ This event is emitted per user recipient address when unbonding batch is process
 
 event attribute key: "batch_received";
 
-This event will be emitted when complete unbonding is done to set total amount that is received by batch from validators
+This event will be emitted when complete unbonding is done and contract get total amount from validators that is received by contract 
 
 | event key | description |
 |--|--|
