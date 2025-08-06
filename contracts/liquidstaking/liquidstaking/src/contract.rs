@@ -71,6 +71,9 @@ pub fn instantiate(
         transfer_fee: msg.transfer_fee,
         transfer_handler: msg.transfer_handler,
         zkgm_token_minter: msg.zkgm_token_minter,
+        hub_channel_id: msg.hub_channel_id,
+        hub_quote_token: msg.hub_quote_token,
+        hub_contract: msg.hub_contract,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -183,6 +186,9 @@ pub fn execute(
             transfer_handler,
             transfer_fee,
             zkgm_token_minter,
+            hub_channel_id,
+            hub_quote_token,
+            hub_contract,
         } => execute::set_parameters(
             deps,
             env,
@@ -204,6 +210,9 @@ pub fn execute(
             transfer_handler,
             transfer_fee,
             zkgm_token_minter,
+            hub_channel_id,
+            hub_quote_token,
+            hub_contract,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,
@@ -225,6 +234,12 @@ pub fn execute(
         ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
         ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
         ExecuteMsg::Inject { amount } => execute::inject(deps, env, info, amount),
+        ExecuteMsg::TransferAndCall {
+            channel_id,
+            recipient,
+            amount,
+            salt,
+        } => execute::transfer_and_call(deps, env, info, channel_id, recipient, amount, salt),
     }
 }
 

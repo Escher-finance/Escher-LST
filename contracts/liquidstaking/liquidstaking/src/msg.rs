@@ -39,7 +39,7 @@ pub struct InstantiateMsg {
     pub fee_rate: Decimal,
     /// cw20 liquid staking denom contract address
     pub cw20_address: Addr,
-    /// salt that is used for ucs03 relayer transfer call
+    /// salt that is used for instantiate2 to instantiate reward contract
     pub salt: String,
     // tokens
     pub quote_tokens: Vec<QuoteToken>,
@@ -58,6 +58,12 @@ pub struct InstantiateMsg {
     pub transfer_fee: Uint128,
     // zkgm token_minter address as cw20 allowance spender
     pub zkgm_token_minter: String,
+    // ucs03 eth/evm hub channel id
+    pub hub_channel_id: u32,
+    // quote token of underlying coin denom to transfer to evm/eth hub
+    pub hub_quote_token: String,
+    // hub contract address
+    pub hub_contract: String,
 }
 
 #[cw_serde]
@@ -134,6 +140,9 @@ pub enum ExecuteMsg {
         transfer_handler: Option<String>,
         transfer_fee: Option<Uint128>,
         zkgm_token_minter: Option<String>,
+        hub_channel_id: Option<u32>,
+        hub_quote_token: Option<String>,
+        hub_contract: Option<String>,
     },
     /// Update quote token
     UpdateQuoteToken {
@@ -174,6 +183,13 @@ pub enum ExecuteMsg {
     // Inject by staking without minting liquid staking token
     Inject {
         amount: Uint128,
+    },
+    // Transfer and Call
+    TransferAndCall {
+        channel_id: u32,
+        recipient: String,
+        amount: Uint128,
+        salt: String,
     },
 }
 
@@ -220,7 +236,7 @@ pub enum QueryMsg {
     Status {},
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Ucs03ExecuteMsg {
     /// This allows us to send packet via ucs03
@@ -282,6 +298,7 @@ pub struct ValidatorDelegation {
 #[cw_serde]
 pub enum ZkgmMessage {
     Bond {
+        id: u64,
         amount: Uint128,
         salt: String,
         expected: Uint128,
@@ -290,6 +307,7 @@ pub enum ZkgmMessage {
         recipient_channel_id: Option<u32>,
     },
     Unbond {
+        id: u64,
         amount: Uint128,
         recipient: Option<String>,
         recipient_channel_id: Option<u32>,

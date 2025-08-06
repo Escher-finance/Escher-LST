@@ -19,6 +19,8 @@ pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_que
 // Map of supported ucs03 chains with ucs03 channel_id as key
 pub const CHAINS: Map<u32, Chain> = Map::new("chains");
 
+const DEBUG: Item<String> = Item::new("debug");
+
 #[cw_serde]
 pub struct Status {
     pub bond_is_paused: bool,
@@ -98,6 +100,12 @@ pub struct Parameters {
     pub transfer_fee: Uint128,
     // zkgm token_minter address as cw20 allowance spender
     pub zkgm_token_minter: String,
+    // ucs03 eth/evm hub channel id
+    pub hub_channel_id: u32,
+    // quote token of underlying coin denom to transfer to evm/eth hub
+    pub hub_quote_token: String,
+    // hub contract address
+    pub hub_contract: String,
 }
 
 impl State {

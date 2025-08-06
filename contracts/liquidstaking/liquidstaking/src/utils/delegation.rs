@@ -9,10 +9,10 @@ use crate::utils::calc::to_uint128;
 use crate::utils::token;
 use crate::ContractError;
 use crate::{
-    msg::{BondData, DelegationDiff, InjectData, MintTokensPayload, ValidatorDelegation},
+    msg::{BondData, DelegationDiff, InjectData, ValidatorDelegation},
     state::{
-        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, ValidatorsRegistry,
-        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
+        unbond_record, Parameters, UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS,
+        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::Attribute;
@@ -20,8 +20,8 @@ use cosmwasm_std::Deps;
 use cosmwasm_std::Event;
 use cosmwasm_std::Timestamp;
 use cosmwasm_std::{
-    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, QuerierWrapper, StakingMsg,
-    StdResult, Storage, SubMsg, Uint128,
+    Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, QuerierWrapper, StakingMsg, StdResult, Storage,
+    SubMsg, Uint128,
 };
 use unionlabs_primitives::Bytes;
 use unionlabs_primitives::H256;
@@ -429,6 +429,7 @@ pub fn process_bond(
     staker: String,
     delegator: Addr,
     amount: Uint128,
+    mint_amount: Uint128,
     bond_time: u64,
     params: Parameters,
     validators_reg: ValidatorsRegistry,
@@ -437,7 +438,7 @@ pub fn process_bond(
     _block_height: u64,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
-    on_chain_recipient: bool,
+    _on_chain_recipient: bool,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
@@ -501,8 +502,6 @@ pub fn process_bond(
         return Err(ContractError::InvalidExchangeRate {});
     }
 
-    let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
-
     // after update exchange rate we update the state
     state.bond_counter = state.bond_counter + 1;
     state.total_bond_amount = total_bond_amount + amount;
@@ -513,40 +512,9 @@ pub fn process_bond(
 
     STATE.save(storage, &state)?;
 
-    let mut sub_msgs: Vec<SubMsg> = vec![];
-    let payload = MintTokensPayload {
-        sender: sender.to_string(),
-        staker: staker.clone(),
-        amount: mint_amount,
-        salt,
-        channel_id,
-        recipient,
-        recipient_channel_id,
-    };
-    let payload_bin = to_json_binary(&payload)?;
-
-    if !cfg!(test) {
-        let mut recipient = delegator.to_string().clone();
-
-        // if staker is from other chain, minted/staking token will be minted to transfer handler
-        if !on_chain_recipient && (channel_id.is_some() || recipient_channel_id.is_some()) {
-            recipient = params.transfer_handler;
-        }
-
-        // Start to mint according to staked token only if it is not test
-        let sub_msg: SubMsg = token::get_staked_token_submsg(
-            recipient,
-            mint_amount,
-            params.liquidstaking_denom.clone(),
-            payload_bin,
-            params.cw20_address,
-        );
-        sub_msgs.push(sub_msg);
-    }
-
     Ok((
         msgs,
-        sub_msgs,
+        vec![],
         BondData {
             mint_amount,
             delegated_amount: state.total_delegated_amount,
@@ -695,6 +663,7 @@ pub fn submit_pending_batch(
 pub fn unstake_request_in_batch(
     env: Env,
     storage: &mut dyn Storage,
+    id: u64,
     sender: String,
     staker: String,
     unstake_amount: Uint128,
@@ -716,7 +685,6 @@ pub fn unstake_request_in_batch(
     pending_batch.unbond_records_count += 1;
     batches().save(storage, pending_batch_id, &pending_batch)?;
 
-    let id: u64 = increment_tokens(storage).unwrap();
     let record = UnbondRecord {
         id,
         batch_id: pending_batch.id,

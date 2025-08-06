@@ -1,5 +1,7 @@
 use alloy::primitives::U256;
 
+pub const BASE_TOKEN_DECIMALS: u8 = 6;
+
 pub const INSTR_VERSION_0: u8 = 0x00;
 pub const INSTR_VERSION_1: u8 = 0x01;
 
@@ -83,4 +85,14 @@ alloy::sol! {
         uint256 fill_type;
         bytes market_maker;
     }
+
+
+    #[derive(Debug)]
+    struct ZkgmHubMsg {
+            string action;
+            uint64 id;
+            uint256 amount;
+            uint256 rate;
+    }
+
 }

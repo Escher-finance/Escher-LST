@@ -21,6 +21,9 @@ use crate::utils::{
     delegation::get_unbonding_ucs03_transfer_cosmos_msg, delegation::get_unclaimed_reward,
     delegation::submit_pending_batch,
 };
+use crate::zkgm::com::ZkgmHubMsg;
+use crate::zkgm::protocol::ucs03_transfer_and_call;
+use alloy::primitives::U256;
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
     DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
@@ -82,6 +85,7 @@ pub fn bond(
         sender.to_string(),
         delegator.clone(),
         payment.amount,
+        payment.amount,
         env.block.time.nanos(),
         params,
         validators_reg.clone(),
@@ -98,6 +102,7 @@ pub fn bond(
     // create bond event here
     // create bond event here
     let bond_event = BondEvent(
+        1,
         sender.to_string(),
         sender.to_string(),
         payment.amount.clone(),
@@ -113,7 +118,6 @@ pub fn bond(
         recipient_channel_id,
         bond_data.reward_balance,
         bond_data.unclaimed_reward,
-        None,
     );
 
     if bond_data.mint_amount == Uint128::zero() {
@@ -143,6 +147,7 @@ pub fn zkgm_unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    id: u64,
     channel_id: ChannelId,
     staker: String,
     amount: Uint128,
@@ -180,6 +185,7 @@ pub fn zkgm_unbond(
     let unstake_request_event = utils::delegation::unstake_request_in_batch(
         env.clone(),
         deps.storage,
+        id,
         sender.to_string(),
         staker.clone(),
         amount,
@@ -198,9 +204,11 @@ pub fn zkgm_bond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    id: u64,
     channel_id: ChannelId,
     staker: String,
     amount: Uint128,
+    lst_amount: Uint128,
     salt: String,
     slippage: Option<Decimal>,
     expected: Uint128,
@@ -236,6 +244,7 @@ pub fn zkgm_bond(
         staker.clone(),
         delegator.clone(),
         amount,
+        lst_amount,
         env.block.time.nanos(),
         params,
         validators_reg.clone(),
@@ -253,6 +262,7 @@ pub fn zkgm_bond(
 
     // create bond event here
     let bond_event = BondEvent(
+        id,
         sender.to_string(),
         sender.to_string(),
         amount.clone(),
@@ -268,13 +278,9 @@ pub fn zkgm_bond(
         recipient_channel_id,
         bond_data.reward_balance,
         bond_data.unclaimed_reward,
-        None,
     );
 
     check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
-
-    deps.api
-        .debug(&format!("{}: {:?}", env.block.time, bond_event));
 
     let res: Response = Response::new()
         .add_messages(msgs)
@@ -282,6 +288,7 @@ pub fn zkgm_bond(
         .add_event(bond_event)
         .add_attributes(vec![
             attr("action", "bond"),
+            attr("id", format!("{}", id)),
             attr("from", sender),
             attr("staker", staker.to_string()),
             attr("channel_id", format!("{}", channel_id)),
@@ -371,6 +378,7 @@ pub fn receive(
     let unstake_request_event = utils::delegation::unstake_request_in_batch(
         env.clone(),
         deps.storage,
+        1,
         sender.to_string(),
         the_staker.clone(),
         unbond_amount,
@@ -676,6 +684,9 @@ pub fn set_parameters(
     transfer_handler: Option<String>,
     transfer_fee: Option<Uint128>,
     zkgm_token_minter: Option<String>,
+    hub_channel_id: Option<u32>,
+    hub_quote_token: Option<String>,
+    hub_contract: Option<String>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -721,6 +732,16 @@ pub fn set_parameters(
     params.liquidstaking_denom_symbol = liquidstaking_denom_symbol
         .clone()
         .unwrap_or_else(|| params.liquidstaking_denom_symbol);
+
+    params.hub_channel_id = hub_channel_id
+        .clone()
+        .unwrap_or_else(|| params.hub_channel_id);
+
+    params.hub_quote_token = hub_quote_token
+        .clone()
+        .unwrap_or_else(|| params.hub_quote_token);
+
+    params.hub_contract = hub_contract.clone().unwrap_or_else(|| params.hub_contract);
 
     if batch_period.is_some() {
         params.batch_period = batch_period.unwrap();
@@ -1005,6 +1026,7 @@ pub fn on_zkgm(
 
     match payload {
         ZkgmMessage::Bond {
+            id,
             amount,
             salt,
             slippage,
@@ -1016,9 +1038,11 @@ pub fn on_zkgm(
                 deps,
                 env,
                 info,
+                id,
                 channel_id,
                 format!("{}", sender),
                 amount,
+                expected,
                 salt,
                 slippage,
                 expected,
@@ -1027,6 +1051,7 @@ pub fn on_zkgm(
             )
         }
         ZkgmMessage::Unbond {
+            id,
             amount,
             recipient,
             recipient_channel_id,
@@ -1035,6 +1060,7 @@ pub fn on_zkgm(
                 deps,
                 env,
                 info,
+                id,
                 channel_id,
                 format!("{}", sender),
                 amount,
@@ -1184,5 +1210,65 @@ pub fn inject(
         .add_messages(msgs)
         .add_event(inject_event)
         .add_attribute("action", "inject")
+        .add_attribute("amount", amount))
+}
+
+pub fn transfer_and_call(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    channel_id: u32,
+    receiver: String,
+    amount: Uint128,
+    salt: String,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let params = PARAMETERS.load(deps.storage)?;
+    let contract_addr: Addr = env.contract.address.clone();
+    let balance = deps
+        .querier
+        .query_balance(contract_addr.clone(), params.underlying_coin_denom.clone())?;
+
+    if balance.amount < amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let sender = env.contract.address.to_string();
+
+    let contract_calldata = ZkgmHubMsg {
+        action: "bond_ack".into(),
+        id: 7,
+        amount: U256::from(amount.u128()),
+        rate: U256::from(Uint128::one().u128()),
+    };
+
+    let msg_bin = ucs03_transfer_and_call(
+        env.block.time,
+        channel_id,
+        sender,
+        receiver,
+        params.underlying_coin_denom_symbol,
+        params.underlying_coin_denom.clone(),
+        params.underlying_coin_denom.clone(),
+        amount,
+        params.hub_quote_token,
+        amount,
+        salt,
+        params.hub_contract,
+        contract_calldata,
+    )?;
+
+    let msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: params.ucs03_relay_contract.clone(),
+        msg: msg_bin,
+        funds: vec![Coin {
+            denom: params.underlying_coin_denom.clone(),
+            amount,
+        }],
+    });
+
+    Ok(Response::new()
+        .add_message(msg)
+        .add_attribute("action", "transfer_and_call")
         .add_attribute("amount", amount))
 }
