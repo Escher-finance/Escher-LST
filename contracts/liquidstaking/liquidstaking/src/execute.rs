@@ -898,6 +898,7 @@ pub fn on_zkgm(
                 salt,
             );
         }
+        ZkgmMessage::SubmitBatch {} => return submit_batch(deps, env, info),
     }
 }
 

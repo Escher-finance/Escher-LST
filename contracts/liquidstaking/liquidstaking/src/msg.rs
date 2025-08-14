@@ -304,6 +304,7 @@ pub enum ZkgmMessage {
         mint_amount: Uint128,
         salt: String,
     },
+    SubmitBatch {},
 }
 
 #[cw_serde]
