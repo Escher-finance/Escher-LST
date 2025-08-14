@@ -542,7 +542,7 @@ pub fn process_staking_batch(
     bond_time: u64,
     params: Parameters,
     validators_reg: ValidatorsRegistry,
-) -> Result<(Vec<CosmosMsg>, Event), ContractError> {
+) -> Result<(Vec<CosmosMsg>, Event, Decimal), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
     }
@@ -630,7 +630,7 @@ pub fn process_staking_batch(
         unclaimed_reward,
     );
 
-    Ok((msgs, event))
+    Ok((msgs, event, exchange_rate))
 }
 
 /// Process unstake requests from batch that will burn liquid staking token, undelegate some amount from validator according to exchange rate and create UnbondRecord

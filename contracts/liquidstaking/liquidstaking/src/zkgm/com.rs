@@ -90,9 +90,10 @@ alloy::sol! {
     #[derive(Debug)]
     struct ZkgmHubMsg {
             string action;
-            uint64 id;
+            uint32 id;
             uint256 amount;
             uint256 rate;
+            uint64 union_block;
     }
 
 }

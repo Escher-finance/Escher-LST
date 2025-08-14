@@ -20,7 +20,7 @@ use crate::utils::{
     delegation::submit_pending_batch,
 };
 use crate::zkgm::com::ZkgmHubMsg;
-use crate::zkgm::protocol::ucs03_transfer_and_call;
+use crate::zkgm::protocol::{get_hub_ack_msg, ucs03_transfer_and_call};
 use alloy::primitives::U256;
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
@@ -139,7 +139,7 @@ pub fn zkgm_hub_batch(
     delegate_amount: Uint128,
     unstake_amount: Uint128,
     mint_amount: Uint128,
-    _salt: String,
+    salt: String,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
@@ -163,7 +163,7 @@ pub fn zkgm_hub_batch(
     let delegator = env.contract.address.clone();
     // stake the amount part of the batch
 
-    let (msgs, bond_event) = utils::delegation::process_staking_batch(
+    let (mut msgs, bond_event, exchange_rate) = utils::delegation::process_staking_batch(
         deps.storage,
         deps.querier,
         channel_id,
@@ -181,12 +181,32 @@ pub fn zkgm_hub_batch(
         env.clone(),
         deps.storage,
         hub_batch_id,
-        params.hub_contract,
+        params.hub_contract.clone(),
         unstake_amount,
         Some(params.hub_channel_id),
     )?;
 
-    // add batch ack message and update rate to hub here
+    // send ack message to hub contract with latest exchange rate
+
+    let payload = ZkgmHubMsg {
+        action: "hub_batch_ack".into(),
+        id: hub_batch_id,
+        amount: U256::from(0u128),
+        rate: U256::from(exchange_rate.to_uint_floor().u128()),
+        union_block: env.block.height,
+    };
+
+    let msg = get_hub_ack_msg(
+        delegator.to_string(),
+        params.ucs03_relay_contract,
+        channel_id,
+        env.block.time,
+        params.hub_contract,
+        payload,
+        salt,
+    )?;
+
+    msgs.push(msg);
 
     let res: Response = Response::new()
         .add_event(bond_event)
@@ -324,6 +344,8 @@ pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         params,
         validators_reg.clone(),
     )?;
+
+    //TODO: add batch ack message, update rate and burn
 
     let res: Response = Response::new().add_messages(msgs).add_events(events);
 
@@ -1067,10 +1089,11 @@ pub fn transfer_and_call(
     let sender = env.contract.address.to_string();
 
     let contract_calldata = ZkgmHubMsg {
-        action: "bond_ack".into(),
+        action: "hub_batch_ack".into(),
         id: 7,
         amount: U256::from(amount.u128()),
         rate: U256::from(Uint128::one().u128()),
+        union_block: env.block.height,
     };
 
     let msg_bin = ucs03_transfer_and_call(

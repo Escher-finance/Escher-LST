@@ -8,7 +8,9 @@ use crate::zkgm::com::ZkgmHubMsg;
 use crate::ContractError;
 use alloy::primitives::U256;
 use alloy::sol_types::SolValue;
-use cosmwasm_std::{to_json_binary, Binary, StdError, Timestamp, Uint128, Uint64};
+use cosmwasm_std::{
+    to_json_binary, Binary, CosmosMsg, StdError, Timestamp, Uint128, Uint64, WasmMsg,
+};
 use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
@@ -170,4 +172,73 @@ pub fn ucs03_transfer_and_call(
 
     let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
     Ok(transfer_relay_msg)
+}
+
+pub fn ucs03_multiplex(
+    sender: String,
+    channel_id: u32,
+    time: Timestamp,
+    hub_contract: String,
+    payload: ZkgmHubMsg,
+    salt: H256,
+) -> Result<Binary, ContractError> {
+    let multiplex_instruction = Instruction {
+        version: INSTR_VERSION_0,
+        opcode: OP_MULTIPLEX,
+        operand: Multiplex {
+            sender: sender.as_bytes().to_vec().into(),
+            eureka: false,
+            contract_address: hub_contract.as_bytes().to_vec().into(),
+            contract_calldata: payload.abi_encode_params().into(),
+        }
+        .abi_encode_params()
+        .into(),
+    };
+
+    let timeout_timestamp_offset: u64 = 86400; // 1 day period
+    let timeout_timestamp =
+        Timestamp::from_nanos(time.plus_seconds(timeout_timestamp_offset).nanos());
+
+    let ucs03_send_msg: Ucs03ExecuteMsg = Ucs03ExecuteMsg::Send {
+        channel_id: ChannelId::from_raw(channel_id).unwrap(),
+        timeout_height: Uint64::from(0u64),
+        timeout_timestamp,
+        salt,
+        instruction: multiplex_instruction.abi_encode_params().into(),
+    };
+
+    let ucc03_msg_bin = to_json_binary(&ucs03_send_msg)?;
+    Ok(ucc03_msg_bin)
+}
+
+pub fn get_hub_ack_msg(
+    sender: String,
+    ucs03_contract: String,
+    channel_id: u32,
+    time: Timestamp,
+    hub_contract: String,
+    payload: ZkgmHubMsg,
+    salt: String,
+) -> Result<CosmosMsg, ContractError> {
+    let salt: unionlabs_primitives::H256 = match unionlabs_primitives::H256::from_str(salt.as_str())
+    {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(ContractError::Std(StdError::generic_err(format!(
+                "failed to parse salt: {}, reason: {}",
+                salt,
+                e.to_string()
+            ))))
+        }
+    };
+
+    let msg_bin = ucs03_multiplex(sender, channel_id, time, hub_contract, payload, salt)?;
+
+    let msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: ucs03_contract.clone(),
+        msg: msg_bin,
+        funds: vec![],
+    });
+
+    Ok(msg)
 }
