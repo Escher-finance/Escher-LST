@@ -31,14 +31,14 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         )?),
         QueryMsg::RewardBalance {} => to_json_binary(&(query_reward_balance(deps.storage)?)),
         QueryMsg::UnbondRecord {
-            staker,
+            sender,
             released,
             id,
             batch_id,
             min,
             max,
         } => to_json_binary(
-            &(query_unbond_record(deps.storage, staker, released, id, batch_id, min, max)?),
+            &(query_unbond_record(deps.storage, sender, released, id, batch_id, min, max)?),
         ),
         QueryMsg::QuoteToken { channel_id } => {
             to_json_binary(&query_quote_token(deps.storage, channel_id)?)
@@ -160,7 +160,7 @@ pub fn query_staking_liquidity(
 
 pub fn query_unbond_record(
     storage: &dyn Storage,
-    staker: Option<String>,
+    sender: Option<String>,
     released: Option<bool>,
     id: Option<u64>,
     batch_id: Option<u64>,
@@ -183,8 +183,8 @@ pub fn query_unbond_record(
             .prefix(batch_id.to_string())
             .range(storage, min_bound, max_bound, Order::Ascending)
     } else {
-        match (staker, released) {
-            (Some(staker), None) => unbond_record().idx.staker.prefix(staker).range(
+        match (sender, released) {
+            (Some(sender), None) => unbond_record().idx.sender.prefix(sender).range(
                 storage,
                 min_bound,
                 max_bound,
@@ -195,10 +195,10 @@ pub fn query_unbond_record(
                 .released
                 .prefix(released.to_string())
                 .range(storage, min_bound, max_bound, Order::Ascending),
-            (Some(staker), Some(released)) => unbond_record()
+            (Some(sender), Some(released)) => unbond_record()
                 .idx
-                .staker_released
-                .prefix(format!("{}-{}", staker, released))
+                .sender
+                .prefix(format!("{}-{}", sender, released))
                 .range(storage, min_bound, max_bound, Order::Ascending),
             (None, None) => return Err(ContractError::InvalidUnbondRecordQuery {}),
         }

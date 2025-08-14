@@ -5,9 +5,8 @@ pub const BOND_EVENT: &str = "bond";
 
 #[allow(non_snake_case)]
 pub fn BondEvent(
-    id: u64,
+    hub_batch_id: u32,
     sender: String,
-    staker: String,
     bond_amount: Uint128,
     delegated_amount: Uint128,
     minted_amount: Uint128,
@@ -15,27 +14,13 @@ pub fn BondEvent(
     total_supply: Uint128,
     exchange_rate: Decimal,
     channel_id: String,
-    time: Timestamp,
-    denom: String,
-    recipient: Option<String>,
-    recipient_channel_id: Option<u32>,
+    time: u64,
     reward_balance: Uint128,
     unclaimed_reward: Uint128,
 ) -> Event {
-    let recipient = match recipient {
-        Some(recipient) => recipient,
-        None => "".to_string(),
-    };
-
-    let recipient_channel_id: String = match recipient_channel_id {
-        Some(channel_id) => channel_id.to_string(),
-        None => "0".to_string(),
-    };
-
     Event::new(BOND_EVENT.to_string())
-        .add_attribute("id", format!("{}", id))
+        .add_attribute("hub_batch_id", format!("{}", hub_batch_id))
         .add_attribute("sender", sender)
-        .add_attribute("staker", staker)
         .add_attribute("channel_id", channel_id)
         .add_attribute("bond_amount", bond_amount)
         .add_attribute("output_amount", minted_amount)
@@ -43,10 +28,7 @@ pub fn BondEvent(
         .add_attribute("total_bond_amount", total_bond_amount)
         .add_attribute("total_supply", total_supply)
         .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
-        .add_attribute("time", format!("{}", time.nanos()))
-        .add_attribute("denom", denom)
-        .add_attribute("recipient", recipient)
-        .add_attribute("recipient_channel_id", recipient_channel_id)
+        .add_attribute("time", format!("{}", time))
         .add_attribute("reward_balance", reward_balance)
         .add_attribute("unclaimed_reward", unclaimed_reward)
 }
@@ -147,31 +129,18 @@ pub const PROCESS_UNBONDING_EVENT: &str = "process_unbonding";
 pub fn ProcessUnbondingEvent(
     batch_id: u64,
     channel_id: Option<u32>,
-    staker: String,
+    sender: String,
     amount: Uint128,
     denom: String,
     time: Timestamp,
-    recipient: Option<String>,
-    recipient_channel_id: Option<u32>,
 ) -> Event {
-    let recipient = match recipient {
-        Some(recipient) => recipient,
-        None => staker.to_string(),
-    };
-
-    let recipient_channel_id: String = match recipient_channel_id {
-        Some(channel_id) => channel_id.to_string(),
-        None => "0".to_string(),
-    };
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
-        .add_attribute("staker", staker)
+        .add_attribute("sender", sender)
         .add_attribute("amount", amount.to_string())
         .add_attribute("denom", denom)
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("batch_id", format!("{}", batch_id))
         .add_attribute("channel_id", channel_id.unwrap_or(0).to_string())
-        .add_attribute("recipient", recipient)
-        .add_attribute("recipient_channel_id", recipient_channel_id)
 }
 
 pub const PROCESS_BATCH_UNBONDING_EVENT: &str = "process_batch_unbonding";
@@ -209,41 +178,27 @@ pub const UNSTAKE_REQUEST_EVENT: &str = "unstake_request";
 #[allow(non_snake_case)]
 pub fn UnstakeRequestEvent(
     sender: String,
-    staker: String,
     channel_id: Option<u32>,
     amount: Uint128,
     record_id: u64,
     batch_id: u64,
     time: Timestamp,
-    recipient: Option<String>,
-    recipient_channel_id: Option<u32>,
     reward_balance: Uint128,
+    hub_batch_id: u32,
 ) -> Event {
     let channel_id: String = match channel_id {
         Some(channel_id) => channel_id.to_string(),
         None => "".to_string(),
     };
 
-    let recipient = match recipient {
-        Some(recipient) => recipient,
-        None => "".to_string(),
-    };
-
-    let recipient_channel_id: String = match recipient_channel_id {
-        Some(channel_id) => channel_id.to_string(),
-        None => "0".to_string(),
-    };
-
     Event::new(UNSTAKE_REQUEST_EVENT.to_string())
         .add_attribute("sender", sender)
-        .add_attribute("staker", staker)
         .add_attribute("channel_id", channel_id)
         .add_attribute("unbond_amount", amount)
         .add_attribute("time", format!("{}", time.nanos()))
         .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("hub_batch_id", format!("{}", hub_batch_id))
         .add_attribute("record_id", format!("{}", record_id))
-        .add_attribute("recipient", recipient)
-        .add_attribute("recipient_channel_id", recipient_channel_id)
         .add_attribute("reward_balance", reward_balance)
 }
 

@@ -1,7 +1,9 @@
+use crate::event::BondEvent;
 use crate::event::SubmitBatchEvent;
 use crate::event::UnbondEventsFromAtts;
 use crate::event::UnstakeRequestEvent;
 use crate::execute::StakerUndelegation;
+use crate::state::increment_tokens;
 use crate::utils::authz::get_authz_ucs03_transfer;
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc;
@@ -425,21 +427,122 @@ pub fn adjust_validators_delegation(
 pub fn process_bond(
     storage: &mut dyn Storage,
     querier: QuerierWrapper,
+    _sender: String,
+    _staker: String,
+    delegator: Addr,
+    amount: Uint128,
+    lst_amount: Uint128,
+    bond_time: u64,
+    params: Parameters,
+    validators_reg: ValidatorsRegistry,
+    _salt: String,
+    _channel_id: Option<u32>,
+    _block_height: u64,
+    _recipient: Option<String>,
+    _recipient_channel_id: Option<u32>,
+    _on_chain_recipient: bool,
+) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
+    if amount < params.min_bond {
+        return Err(ContractError::BondAmountTooLow {});
+    }
+
+    let coin_denom = params.underlying_coin_denom.to_string();
+    let msgs = get_delegate_to_validator_msgs(
+        amount,
+        coin_denom.to_string(),
+        validators_reg.validators.clone(),
+    );
+
+    let validators_list: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    // logic to mint token and update the supply and total_bond_amount
+    let mut state = STATE.load(storage)?;
+
+    let delegated_amount = get_actual_total_delegated(
+        querier,
+        delegator.to_string(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    )?;
+
+    let total_bond_amount: Uint128;
+    let mut reward_balance: Uint128 = Uint128::zero();
+    let mut unclaimed_reward: Uint128 = Uint128::zero();
+    if !cfg!(test) {
+        state.total_delegated_amount = delegated_amount;
+        // query the total reward from this contract
+        unclaimed_reward = get_unclaimed_reward(
+            querier,
+            delegator.to_string(),
+            coin_denom.clone(),
+            validators_list,
+        )?;
+
+        reward_balance = REWARD_BALANCE.load(storage)?;
+        let reward = unclaimed_reward + reward_balance;
+        let fee = calc::calc_with_rate(reward, params.fee_rate);
+
+        total_bond_amount = delegated_amount + reward - fee;
+
+        // update the reward balance on this contract as there is automatic reward withdrawal on delegation
+        REWARD_BALANCE.save(storage, &reward)?;
+    } else {
+        total_bond_amount = get_mock_total_reward(state.total_bond_amount);
+    }
+
+    let mut exchange_rate = state.exchange_rate;
+
+    if !total_bond_amount.is_zero() && !state.total_supply.is_zero() {
+        exchange_rate = Decimal::from_ratio(total_bond_amount, state.total_supply);
+    }
+
+    if exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
+    // after update exchange rate we update the state
+    state.bond_counter = state.bond_counter + 1;
+    state.total_bond_amount = total_bond_amount + amount;
+    state.total_supply += lst_amount;
+    state.total_delegated_amount += amount;
+    state.last_bond_time = bond_time;
+    state.update_exchange_rate();
+
+    STATE.save(storage, &state)?;
+
+    Ok((
+        msgs,
+        vec![],
+        BondData {
+            lst_amount,
+            delegated_amount: state.total_delegated_amount,
+            total_bond_amount: state.total_bond_amount,
+            exchange_rate,
+            total_supply: state.total_supply,
+            reward_balance,
+            unclaimed_reward,
+        },
+    ))
+}
+
+/// Process staking batch
+pub fn process_staking_batch(
+    storage: &mut dyn Storage,
+    querier: QuerierWrapper,
+    channel_id: u32,
     sender: String,
-    staker: String,
+    hub_batch_id: u32,
     delegator: Addr,
     amount: Uint128,
     mint_amount: Uint128,
     bond_time: u64,
     params: Parameters,
     validators_reg: ValidatorsRegistry,
-    salt: String,
-    channel_id: Option<u32>,
-    _block_height: u64,
-    recipient: Option<String>,
-    recipient_channel_id: Option<u32>,
-    _on_chain_recipient: bool,
-) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
+) -> Result<(Vec<CosmosMsg>, Event), ContractError> {
     if amount < params.min_bond {
         return Err(ContractError::BondAmountTooLow {});
     }
@@ -512,19 +615,22 @@ pub fn process_bond(
 
     STATE.save(storage, &state)?;
 
-    Ok((
-        msgs,
-        vec![],
-        BondData {
-            mint_amount,
-            delegated_amount: state.total_delegated_amount,
-            total_bond_amount: state.total_bond_amount,
-            exchange_rate,
-            total_supply: state.total_supply,
-            reward_balance,
-            unclaimed_reward,
-        },
-    ))
+    let event = BondEvent(
+        hub_batch_id,
+        sender,
+        amount,
+        state.total_delegated_amount,
+        mint_amount,
+        state.total_bond_amount,
+        state.total_supply,
+        exchange_rate,
+        channel_id.to_string(),
+        bond_time,
+        reward_balance,
+        unclaimed_reward,
+    );
+
+    Ok((msgs, event))
 }
 
 /// Process unstake requests from batch that will burn liquid staking token, undelegate some amount from validator according to exchange rate and create UnbondRecord
@@ -665,11 +771,11 @@ pub fn unstake_request_in_batch(
     storage: &mut dyn Storage,
     id: u64,
     sender: String,
-    staker: String,
+    _staker: String,
     unstake_amount: Uint128,
     channel_id: Option<u32>,
-    recipient: Option<String>,
-    recipient_channel_id: Option<u32>,
+    _recipient: Option<String>,
+    _recipient_channel_id: Option<u32>,
 ) -> Result<Event, ContractError> {
     let params = PARAMETERS.load(storage)?;
 
@@ -691,12 +797,10 @@ pub fn unstake_request_in_batch(
         height: env.block.height,
         channel_id,
         sender: sender.clone(),
-        staker: staker.clone(),
         amount: unstake_amount,
         released_height: 0,
         released: false,
-        recipient: recipient.clone(),
-        recipient_channel_id,
+        hub_batch_id: 0,
     };
     unbond_record().save(storage, id, &record)?;
 
@@ -704,15 +808,68 @@ pub fn unstake_request_in_batch(
 
     let event = UnstakeRequestEvent(
         sender,
-        staker,
         channel_id,
         unstake_amount,
         record.id,
         pending_batch.id,
         env.block.time,
-        recipient,
-        recipient_channel_id,
         reward_balance,
+        0,
+    );
+    Ok(event)
+}
+
+/// Create undelegate requests that will create unbond record and put in pending batch
+/// 1. Increase total liquid stake amount in pending batch
+/// 2. Create unbond record and save in pending batch
+/// 3. Create UndelegateRequest event
+pub fn unstake_request(
+    env: Env,
+    storage: &mut dyn Storage,
+    hub_batch_id: u32,
+    sender: String,
+    unstake_amount: Uint128,
+    channel_id: Option<u32>,
+) -> Result<Event, ContractError> {
+    let params = PARAMETERS.load(storage)?;
+
+    if unstake_amount < params.min_unbond {
+        return Err(ContractError::UnbondAmountTooLow {});
+    }
+
+    let pending_batch_id = PENDING_BATCH_ID.load(storage)?;
+    let mut pending_batch = batches().load(storage, pending_batch_id)?;
+
+    // update total unstaked liquid stake amount in batch and increase unbond records count
+    pending_batch.total_liquid_stake += unstake_amount;
+    pending_batch.unbond_records_count += 1;
+    batches().save(storage, pending_batch_id, &pending_batch)?;
+
+    let id: u64 = increment_tokens(storage).unwrap();
+    let record = UnbondRecord {
+        id,
+        batch_id: pending_batch.id,
+        height: env.block.height,
+        channel_id: channel_id,
+        sender: sender.clone(),
+        amount: unstake_amount,
+        released_height: 0,
+        released: false,
+        hub_batch_id,
+    };
+    unbond_record().save(storage, id, &record)?;
+
+    let reward_balance = REWARD_BALANCE.load(storage)?;
+
+    let event = UnstakeRequestEvent(
+        sender,
+        channel_id,
+        unstake_amount,
+        record.id,
+        pending_batch.id,
+        env.block.time,
+        reward_balance,
+        hub_batch_id,
     );
     Ok(event)
 }
@@ -791,34 +948,22 @@ pub fn get_staker_undelegation(
     unbonding_records: &mut Vec<UnbondRecord>,
     total_liquid_stake: Uint128,
     block_height: u64,
-) -> Result<
-    (
-        HashMap<(String, String), StakerUndelegation>,
-        Vec<u64>,
-        Uint128,
-    ),
-    ContractError,
-> {
+) -> Result<(HashMap<String, StakerUndelegation>, Vec<u64>, Uint128), ContractError> {
     let total_received_amount_in_decimal =
         Decimal::from_ratio(total_received_amount, Uint128::one());
     let mut unbond_record_ids = vec![];
 
     // hash map with tuple of staker and recipient as key
-    let mut staker_undelegation: HashMap<(String, String), StakerUndelegation> = HashMap::new();
+    let mut staker_undelegation: HashMap<String, StakerUndelegation> = HashMap::new();
 
     for record in unbonding_records.iter_mut() {
         let entry = staker_undelegation
-            .entry((
-                record.staker.clone(),
-                record.recipient.clone().unwrap_or("".to_string()),
-            ))
+            .entry(record.sender.clone())
             .and_modify(|e| e.unstake_amount += record.amount)
             .or_insert(StakerUndelegation {
                 unstake_amount: record.amount,
                 channel_id: record.channel_id,
                 unstake_return_native_amount: None,
-                recipient: record.recipient.clone(),
-                recipient_channel_id: record.recipient_channel_id,
             });
 
         let user_to_total_unstake_ratio =
@@ -854,15 +999,10 @@ pub fn get_staker_undelegation(
         Uint128::new(unbonding_records.len() as u128),
     );
     for (i, record) in unbonding_records.iter_mut().enumerate() {
-        let recipient = match record.recipient.clone() {
-            Some(recipient) => recipient,
-            None => "".to_string(),
+        let staker_undelegation = match staker_undelegation.get_mut(&record.sender.clone()) {
+            Some(x) => x,
+            None => continue,
         };
-        let staker_undelegation =
-            match staker_undelegation.get_mut(&(record.staker.clone(), recipient)) {
-                Some(x) => x,
-                None => continue,
-            };
         let dust = dust_distribution[i];
         staker_undelegation.unstake_return_native_amount = staker_undelegation
             .unstake_return_native_amount

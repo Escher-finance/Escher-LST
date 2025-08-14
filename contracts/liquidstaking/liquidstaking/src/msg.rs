@@ -214,7 +214,7 @@ pub enum QueryMsg {
     RewardBalance {},
     #[returns(Vec<UnbondRecord>)]
     UnbondRecord {
-        staker: Option<String>,
+        sender: Option<String>,
         released: Option<bool>,
         id: Option<u64>,
         batch_id: Option<u64>,
@@ -297,26 +297,18 @@ pub struct ValidatorDelegation {
 
 #[cw_serde]
 pub enum ZkgmMessage {
-    Bond {
-        id: u64,
-        amount: Uint128,
+    HubBatch {
+        id: u32,
+        delegate_amount: Uint128,
+        unstake_amount: Uint128,
+        mint_amount: Uint128,
         salt: String,
-        expected: Uint128,
-        slippage: Option<Decimal>,
-        recipient: Option<String>,
-        recipient_channel_id: Option<u32>,
-    },
-    Unbond {
-        id: u64,
-        amount: Uint128,
-        recipient: Option<String>,
-        recipient_channel_id: Option<u32>,
     },
 }
 
 #[cw_serde]
 pub struct BondData {
-    pub mint_amount: Uint128,
+    pub lst_amount: Uint128,
     pub delegated_amount: Uint128,
     pub total_bond_amount: Uint128,
     pub exchange_rate: Decimal,

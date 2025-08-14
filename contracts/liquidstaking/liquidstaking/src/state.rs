@@ -19,7 +19,7 @@ pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_que
 // Map of supported ucs03 chains with ucs03 channel_id as key
 pub const CHAINS: Map<u32, Chain> = Map::new("chains");
 
-const DEBUG: Item<String> = Item::new("debug");
+pub const DEBUG: Item<String> = Item::new("debug");
 
 #[cw_serde]
 pub struct Status {
@@ -136,29 +136,27 @@ pub struct UnbondRecord {
     pub id: u64,
     pub height: u64,
     pub sender: String,
-    pub staker: String,
     pub channel_id: Option<u32>,
     pub amount: Uint128,
     pub released_height: u64,
     pub released: bool,
     pub batch_id: u64,
-    pub recipient: Option<String>,
-    pub recipient_channel_id: Option<u32>,
+    pub hub_batch_id: u32,
 }
 
 pub struct UnbondRecordIndexes<'a> {
-    pub staker: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub sender: MultiIndex<'a, String, UnbondRecord, u64>,
     pub released: MultiIndex<'a, String, UnbondRecord, u64>,
-    pub staker_released: MultiIndex<'a, String, UnbondRecord, u64>,
+    pub sender_released: MultiIndex<'a, String, UnbondRecord, u64>,
     pub batch: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
         let v: Vec<&dyn Index<UnbondRecord>> = vec![
-            &self.staker,
+            &self.sender,
             &self.released,
-            &self.staker_released,
+            &self.sender_released,
             &self.batch,
         ];
         Box::new(v.into_iter())
@@ -169,20 +167,20 @@ const UNBOND_RECORD_NAMESPACE: &str = "unbond_record";
 
 pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<'a>> {
     let indexes = UnbondRecordIndexes {
-        staker: MultiIndex::new(
-            |_pk, d: &UnbondRecord| d.staker.clone(),
+        sender: MultiIndex::new(
+            |_pk, d: &UnbondRecord| d.sender.clone(),
             UNBOND_RECORD_NAMESPACE,
-            "unbond_record__staker",
+            "unbond_record__sender",
         ),
         released: MultiIndex::new(
             |_pk, d: &UnbondRecord| d.released.to_string(),
             UNBOND_RECORD_NAMESPACE,
             "unbond_record__released",
         ),
-        staker_released: MultiIndex::new(
-            |_pk, d: &UnbondRecord| format!("{}-{}", d.staker, d.released),
+        sender_released: MultiIndex::new(
+            |_pk, d: &UnbondRecord| format!("{}-{}", d.sender, d.released),
             UNBOND_RECORD_NAMESPACE,
-            "unbond_record__staker_released",
+            "unbond_record__sender_released",
         ),
         batch: MultiIndex::new(
             |_pk, d: &UnbondRecord| d.batch_id.to_string(),
