@@ -192,7 +192,7 @@ pub fn zkgm_hub_batch(
         action: "hub_batch_ack".into(),
         id: hub_batch_id,
         amount: U256::from(0u128),
-        rate: U256::from(exchange_rate.to_uint_floor().u128()),
+        rate: U256::from(exchange_rate.atomics().u128()),
         union_block: env.block.height,
     };
 
@@ -308,7 +308,12 @@ pub fn receive(
 }
 
 /// Process pending batch and execute it
-pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+pub fn submit_batch(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    salt: String,
+) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let params = PARAMETERS.load(deps.storage)?;
@@ -335,17 +340,35 @@ pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         });
     }
 
-    let (msgs, events) = submit_pending_batch(
+    let (mut msgs, events, exchange_rate) = submit_pending_batch(
         deps,
         env.block.time,
         info.sender,
         delegator.clone(),
         &mut pending_batch,
-        params,
+        params.clone(),
         validators_reg.clone(),
     )?;
 
-    //TODO: add batch ack message, update rate and burn
+    let payload = ZkgmHubMsg {
+        action: "hub_batch_unbonding_ack".into(),
+        id: pending_batch_id as u32,
+        amount: U256::from(pending_batch.total_liquid_stake.u128()),
+        rate: U256::from(exchange_rate.atomics().u128()),
+        union_block: env.block.height,
+    };
+
+    let msg = get_hub_ack_msg(
+        delegator.to_string(),
+        params.ucs03_relay_contract.clone(),
+        params.hub_channel_id,
+        env.block.time,
+        params.hub_contract,
+        payload,
+        salt,
+    )?;
+
+    msgs.push(msg);
 
     let res: Response = Response::new().add_messages(msgs).add_events(events);
 
@@ -920,7 +943,7 @@ pub fn on_zkgm(
                 salt,
             );
         }
-        ZkgmMessage::SubmitBatch {} => return submit_batch(deps, env, info),
+        ZkgmMessage::SubmitBatch { salt } => return submit_batch(deps, env, info, salt),
     }
 }
 

@@ -8,7 +8,6 @@ use crate::utils::authz::get_authz_ucs03_transfer;
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc;
 use crate::utils::calc::to_uint128;
-use crate::utils::token;
 use crate::ContractError;
 use crate::{
     msg::{BondData, DelegationDiff, InjectData, ValidatorDelegation},
@@ -646,7 +645,7 @@ pub fn submit_pending_batch(
     batch: &mut Batch,
     params: Parameters,
     validators_reg: ValidatorsRegistry,
-) -> Result<(Vec<CosmosMsg>, Vec<Event>), ContractError> {
+) -> Result<(Vec<CosmosMsg>, Vec<Event>, Decimal), ContractError> {
     let coin_denom = params.underlying_coin_denom;
 
     let validators_list: Vec<String> = validators_reg
@@ -714,9 +713,6 @@ pub fn submit_pending_batch(
 
     let mut events = UnbondEventsFromAtts(atts, batch.id, time);
 
-    let burn_msg = token::burn_token(batch.total_liquid_stake, params.cw20_address.to_string());
-    msgs.push(burn_msg.into());
-
     // // update total bond, supply and exchange rate here
     state.total_bond_amount = total_bond_amount - total_undelegate_amount;
     state.total_supply = state.total_supply - batch.total_liquid_stake;
@@ -759,7 +755,7 @@ pub fn submit_pending_batch(
     batches().save(deps.storage, new_pending_batch.id, &new_pending_batch)?;
     PENDING_BATCH_ID.save(deps.storage, &new_pending_batch.id)?;
 
-    Ok((msgs, events))
+    Ok((msgs, events, state.exchange_rate))
 }
 
 /// Create unbond requests that will create unbond record and put in pending batch

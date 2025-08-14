@@ -156,7 +156,7 @@ pub fn execute(
             salt,
         ),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
-        ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
+        ExecuteMsg::SubmitBatch { salt } => execute::submit_batch(deps, env, info, salt),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
         ExecuteMsg::ProcessBatchWithdrawal { id, salt } => {
             execute::process_batch_withdrawal(deps, env, info, id, salt)

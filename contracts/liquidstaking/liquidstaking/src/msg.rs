@@ -109,7 +109,9 @@ pub enum ExecuteMsg {
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
     /// Submit pending batch
-    SubmitBatch {},
+    SubmitBatch {
+        salt: String,
+    },
     // Withdraw staking rewards and call split reward to reward contract
     ProcessRewards {},
     SetBatchReceivedAmount {
@@ -304,7 +306,9 @@ pub enum ZkgmMessage {
         mint_amount: Uint128,
         salt: String,
     },
-    SubmitBatch {},
+    SubmitBatch {
+        salt: String,
+    },
 }
 
 #[cw_serde]
