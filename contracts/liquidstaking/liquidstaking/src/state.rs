@@ -102,7 +102,7 @@ pub struct Parameters {
     pub zkgm_token_minter: String,
     // ucs03 eth/evm hub channel id
     pub hub_channel_id: u32,
-    // quote token of underlying coin denom to transfer to evm/eth hub
+    // quote token of underlying coin denom (U) on evm/eth
     pub hub_quote_token: String,
     // hub contract address
     pub hub_contract: String,

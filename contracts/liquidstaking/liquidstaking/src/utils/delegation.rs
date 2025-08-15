@@ -4,7 +4,6 @@ use crate::event::UnbondEventsFromAtts;
 use crate::event::UnstakeRequestEvent;
 use crate::execute::StakerUndelegation;
 use crate::state::increment_tokens;
-use crate::utils::authz::get_authz_ucs03_transfer;
 use crate::utils::batch::{batches, Batch, BatchStatus};
 use crate::utils::calc;
 use crate::utils::calc::to_uint128;
@@ -13,7 +12,7 @@ use crate::{
     msg::{BondData, DelegationDiff, InjectData, ValidatorDelegation},
     state::{
         unbond_record, Parameters, UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS,
-        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
+        PENDING_BATCH_ID, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
     },
 };
 use cosmwasm_std::Attribute;
@@ -24,11 +23,8 @@ use cosmwasm_std::{
     Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, QuerierWrapper, StakingMsg, StdResult, Storage,
     SubMsg, Uint128,
 };
-use unionlabs_primitives::Bytes;
-use unionlabs_primitives::H256;
 
 use std::collections::HashMap;
-use std::str::FromStr;
 
 use super::calc::calculate_native_token_from_staking_token;
 
@@ -868,74 +864,6 @@ pub fn unstake_request(
         hub_batch_id,
     );
     Ok(event)
-}
-
-pub fn get_unbonding_ucs03_transfer_cosmos_msg(
-    storage: &mut dyn Storage,
-    lst_contract: Addr,
-    recipient: String,
-    channel_id: u32,
-    time: Timestamp,
-    ucs03_relay_contract: String,
-    undelegate_amount: Uint128,
-    transfer_fee: Uint128,
-    denom: String,
-    salt: String,
-) -> Result<CosmosMsg, ContractError> {
-    let total_amount = undelegate_amount + transfer_fee;
-
-    // for the amount
-    let funds = vec![Coin {
-        denom: denom.clone(),
-        amount: total_amount.clone(),
-    }];
-
-    let params = PARAMETERS.load(storage)?;
-    // get quote token of native base denom (muno) on specific channel id
-    let quote_token = QUOTE_TOKEN.load(storage, channel_id)?;
-
-    let quote_token_string = quote_token.quote_token.clone();
-
-    let recipient_address = match Bytes::from_str(recipient.as_str()) {
-        Ok(rec) => rec,
-        Err(_) => {
-            return Err(ContractError::InvalidAddress {
-                kind: "recipient".into(),
-                address: recipient,
-            })
-        }
-    };
-    let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
-        Ok(token) => token,
-        Err(_) => {
-            return Err(ContractError::InvalidAddress {
-                kind: "quote_token".into(),
-                address: quote_token_string,
-            })
-        }
-    };
-
-    let authz_ucs03_msg = get_authz_ucs03_transfer(
-        params.cw20_address.to_string(),
-        params.transfer_handler,  // granter
-        lst_contract.to_string(), // grantee
-        time,
-        ucs03_relay_contract.as_str().into(),
-        channel_id,
-        recipient_address,
-        denom.clone(),
-        total_amount,
-        quote_token,
-        undelegate_amount,
-        funds,
-        H256::from_str(salt.as_str()).unwrap(),
-        params.underlying_coin_denom.clone(),
-        params.underlying_coin_denom_symbol.clone(),
-        params.liquidstaking_denom.clone(),
-        params.liquidstaking_denom_symbol.clone(),
-    )?;
-
-    Ok(authz_ucs03_msg)
 }
 
 pub fn get_staker_undelegation(

@@ -1,72 +1,45 @@
 use super::com::{
-    Batch, FungibleAssetOrder, Instruction, Multiplex, BASE_TOKEN_DECIMALS, INSTR_VERSION_0,
-    INSTR_VERSION_1, OP_BATCH, OP_FUNGIBLE_ASSET_ORDER, OP_MULTIPLEX,
+    Batch, Call, Instruction, SolverMetadata, TokenOrderV2, INSTR_VERSION_0, INSTR_VERSION_2,
+    OP_BATCH, OP_CALL, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_SOLVE,
 };
 use crate::msg::Ucs03ExecuteMsg;
 use crate::types::ChannelId;
 use crate::zkgm::com::ZkgmHubMsg;
 use crate::ContractError;
-use alloy::primitives::U256;
 use alloy::sol_types::SolValue;
 use cosmwasm_std::{
     to_json_binary, Binary, CosmosMsg, StdError, Timestamp, Uint128, Uint64, WasmMsg,
 };
 use std::str::FromStr;
-use unionlabs_primitives::{Bytes, H256};
+use unionlabs_primitives::H256;
 
 pub fn ucs03_transfer(
-    cw20_contract: String,
     time: Timestamp,
     channel_id: u32,
     sender: String,
-    receiver: Bytes,
+    receiver: String,
     base_token: String,
     base_amount: Uint128,
-    quote_token: Bytes,
+    quote_token: String,
     quote_amount: Uint128,
-    salt: H256,
-    underlying_denom: String,
-    underlying_denom_symbol: String,
-    liquidstaking_denom: String,
-    liquidstaking_denom_symbol: String,
+    salt: String,
 ) -> Result<Binary, ContractError> {
-    let base_token_symbol = if base_token == cw20_contract {
-        liquidstaking_denom_symbol
-    } else {
-        underlying_denom_symbol
+    let metadata = SolverMetadata {
+        solverAddress: Vec::from(quote_token.clone()).into(),
+        metadata: Default::default(),
     };
-
-    let base_token_name = if base_token == cw20_contract {
-        liquidstaking_denom
-    } else {
-        underlying_denom
-    };
-
-    let base_token_path = U256::ZERO;
-    let fungible_order_instruction = Instruction {
-        version: INSTR_VERSION_1,
-        opcode: OP_FUNGIBLE_ASSET_ORDER,
-        operand: FungibleAssetOrder {
+    let token_order_instruction = Instruction {
+        version: INSTR_VERSION_2,
+        opcode: OP_TOKEN_ORDER,
+        operand: TokenOrderV2 {
             sender: sender.as_bytes().to_vec().into(),
             receiver: Vec::from(receiver).into(),
             base_token: base_token.as_bytes().to_vec().into(),
             base_amount: base_amount.u128().try_into().expect("u256>u128"),
-            base_token_symbol: base_token_symbol.to_string(),
-            base_token_name: base_token_name.to_string(),
-            base_token_decimals: BASE_TOKEN_DECIMALS,
-            base_token_path,
             quote_token: Vec::from(quote_token).into(),
-            quote_amount: U256::from(quote_amount.u128()),
-        }
-        .abi_encode_params()
-        .into(),
-    };
-
-    let batch_instruction = Instruction {
-        version: INSTR_VERSION_0,
-        opcode: OP_BATCH,
-        operand: Batch {
-            instructions: vec![fungible_order_instruction],
+            quote_amount: quote_amount.u128().try_into().unwrap(),
+            kind: TOKEN_ORDER_KIND_SOLVE,
+            metadata: metadata.abi_encode_params().into(),
         }
         .abi_encode_params()
         .into(),
@@ -76,12 +49,24 @@ pub fn ucs03_transfer(
     let timeout_timestamp =
         Timestamp::from_nanos(time.plus_seconds(timeout_timestamp_offset).nanos());
 
+    let salt: unionlabs_primitives::H256 = match unionlabs_primitives::H256::from_str(salt.as_str())
+    {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(ContractError::Std(StdError::generic_err(format!(
+                "failed to parse salt: {}, reason: {}",
+                salt,
+                e.to_string()
+            ))))
+        }
+    };
+
     let relay_transfer_msg: Ucs03ExecuteMsg = Ucs03ExecuteMsg::Send {
         channel_id: ChannelId::from_raw(channel_id).unwrap(),
         timeout_height: Uint64::from(0u64),
         timeout_timestamp,
         salt,
-        instruction: batch_instruction.abi_encode_params().into(),
+        instruction: token_order_instruction.abi_encode_params().into(),
     };
 
     let transfer_relay_msg = to_json_binary(&relay_transfer_msg)?;
@@ -93,8 +78,6 @@ pub fn ucs03_transfer_and_call(
     channel_id: u32,
     sender: String,
     receiver: String,
-    base_token_symbol: String,
-    base_token_name: String,
     base_token: String,
     base_amount: Uint128,
     quote_token: String,
@@ -103,30 +86,31 @@ pub fn ucs03_transfer_and_call(
     hub_contract: String,
     contract_calldata: ZkgmHubMsg,
 ) -> Result<Binary, ContractError> {
-    let base_token_path = U256::ZERO;
+    let metadata = SolverMetadata {
+        solverAddress: Vec::from(quote_token.clone()).into(),
+        metadata: Default::default(),
+    };
     let fungible_order_instruction = Instruction {
-        version: INSTR_VERSION_1,
-        opcode: OP_FUNGIBLE_ASSET_ORDER,
-        operand: FungibleAssetOrder {
+        version: INSTR_VERSION_2,
+        opcode: OP_TOKEN_ORDER,
+        operand: TokenOrderV2 {
             sender: sender.as_bytes().to_vec().into(),
-            receiver: receiver.as_bytes().to_vec().into(),
+            receiver: Vec::from(receiver).into(),
             base_token: base_token.as_bytes().to_vec().into(),
             base_amount: base_amount.u128().try_into().expect("u256>u128"),
-            base_token_symbol,
-            base_token_name,
-            base_token_decimals: BASE_TOKEN_DECIMALS,
-            base_token_path,
-            quote_token: quote_token.as_bytes().to_vec().into(),
-            quote_amount: U256::from(quote_amount.u128()),
+            quote_token: Vec::from(quote_token).into(),
+            quote_amount: quote_amount.u128().try_into().unwrap(),
+            kind: TOKEN_ORDER_KIND_SOLVE,
+            metadata: metadata.abi_encode_params().into(),
         }
         .abi_encode_params()
         .into(),
     };
 
-    let multiplex_instruction = Instruction {
+    let call_instruction = Instruction {
         version: INSTR_VERSION_0,
-        opcode: OP_MULTIPLEX,
-        operand: Multiplex {
+        opcode: OP_CALL,
+        operand: Call {
             sender: sender.as_bytes().to_vec().into(),
             eureka: false,
             contract_address: hub_contract.as_bytes().to_vec().into(),
@@ -140,7 +124,7 @@ pub fn ucs03_transfer_and_call(
         version: INSTR_VERSION_0,
         opcode: OP_BATCH,
         operand: Batch {
-            instructions: vec![fungible_order_instruction, multiplex_instruction],
+            instructions: vec![fungible_order_instruction, call_instruction],
         }
         .abi_encode_params()
         .into(),
@@ -174,7 +158,7 @@ pub fn ucs03_transfer_and_call(
     Ok(transfer_relay_msg)
 }
 
-pub fn ucs03_multiplex(
+pub fn ucs03_call(
     sender: String,
     channel_id: u32,
     time: Timestamp,
@@ -183,9 +167,9 @@ pub fn ucs03_multiplex(
     salt: H256,
 ) -> Result<Binary, ContractError> {
     let multiplex_instruction = Instruction {
-        version: INSTR_VERSION_0,
-        opcode: OP_MULTIPLEX,
-        operand: Multiplex {
+        version: INSTR_VERSION_2,
+        opcode: OP_CALL,
+        operand: Call {
             sender: sender.as_bytes().to_vec().into(),
             eureka: false,
             contract_address: hub_contract.as_bytes().to_vec().into(),
@@ -232,7 +216,7 @@ pub fn get_hub_ack_msg(
         }
     };
 
-    let msg_bin = ucs03_multiplex(sender, channel_id, time, hub_contract, payload, salt)?;
+    let msg_bin = ucs03_call(sender, channel_id, time, hub_contract, payload, salt)?;
 
     let msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: ucs03_contract.clone(),

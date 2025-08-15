@@ -16,11 +16,10 @@ use crate::utils::calc::to_uint128;
 use crate::utils::validation::{validate_recipient, validate_validators};
 use crate::utils::{
     self, delegation::get_actual_total_delegated, delegation::get_mock_total_reward,
-    delegation::get_unbonding_ucs03_transfer_cosmos_msg, delegation::get_unclaimed_reward,
-    delegation::submit_pending_batch,
+    delegation::get_unclaimed_reward, delegation::submit_pending_batch,
 };
 use crate::zkgm::com::ZkgmHubMsg;
-use crate::zkgm::protocol::{get_hub_ack_msg, ucs03_transfer_and_call};
+use crate::zkgm::protocol::{get_hub_ack_msg, ucs03_transfer};
 use alloy::primitives::U256;
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
@@ -779,7 +778,7 @@ pub fn process_batch_withdrawal(
     env: Env,
     info: MessageInfo,
     id: u64,
-    salt: Vec<String>,
+    _salt: Vec<String>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let params = PARAMETERS.load(deps.storage)?;
@@ -818,15 +817,15 @@ pub fn process_batch_withdrawal(
 
     let time = env.block.time;
     let denom = params.underlying_coin_denom;
-    let ucs03_relay_contract = params.ucs03_relay_contract;
-    let lst_contract = env.contract.address;
+    let _ucs03_relay_contract = params.ucs03_relay_contract;
+    let _lst_contract = env.contract.address;
 
     let mut events = vec![];
 
     let mut send_msgs: Vec<CosmosMsg> = vec![];
 
     let transfer_handler = params.transfer_handler.clone();
-    let mut i = 0;
+    let mut _i = 0;
     for (sender, undelegation) in staker_undelegation.iter() {
         let bank_msg = BankMsg::Send {
             to_address: transfer_handler.clone(),
@@ -838,22 +837,10 @@ pub fn process_batch_withdrawal(
         let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
         send_msgs.push(msg);
 
-        let target_channel_id = undelegation.channel_id.unwrap();
+        let _target_channel_id = undelegation.channel_id.unwrap();
 
-        //after send bank msg to transfer handler, then call ucs03 on behalf of transfer handler to send token back
-        let msg = get_unbonding_ucs03_transfer_cosmos_msg(
-            deps.storage,
-            lst_contract.clone(),
-            sender.clone(),
-            target_channel_id,
-            time,
-            ucs03_relay_contract.clone(),
-            undelegation.unstake_return_native_amount.unwrap(),
-            params.transfer_fee,
-            denom.clone(),
-            salt.get(i).unwrap().clone(),
-        )?;
-        send_msgs.push(msg);
+        // after send bank msg to transfer handler, then call ucs03 on behalf of transfer handler to send token back
+        // TODO: add send token back to evm hub
 
         let ev = ProcessUnbondingEvent(
             id,
@@ -864,7 +851,8 @@ pub fn process_batch_withdrawal(
             env.block.time,
         );
         events.push(ev);
-        i += 1;
+
+        _i += 1;
     }
 
     if total_released_amount > Uint128::zero() {
@@ -1111,7 +1099,7 @@ pub fn transfer_and_call(
 
     let sender = env.contract.address.to_string();
 
-    let contract_calldata = ZkgmHubMsg {
+    let _contract_calldata = ZkgmHubMsg {
         action: "hub_batch_ack".into(),
         id: 7,
         amount: U256::from(amount.u128()),
@@ -1119,20 +1107,30 @@ pub fn transfer_and_call(
         union_block: env.block.height,
     };
 
-    let msg_bin = ucs03_transfer_and_call(
+    // let msg_bin = ucs03_transfer_and_call(
+    // env.block.time,
+    // channel_id,
+    // sender,
+    // receiver,
+    // params.underlying_coin_denom.clone(),
+    // amount,
+    // params.hub_quote_token,
+    // amount,
+    // salt,
+    // params.hub_contract,
+    // contract_calldata,
+    // )?;
+
+    let msg_bin = ucs03_transfer(
         env.block.time,
         channel_id,
         sender,
         receiver,
-        params.underlying_coin_denom_symbol,
-        params.underlying_coin_denom.clone(),
         params.underlying_coin_denom.clone(),
         amount,
         params.hub_quote_token,
         amount,
         salt,
-        params.hub_contract,
-        contract_calldata,
     )?;
 
     let msg = CosmosMsg::Wasm(WasmMsg::Execute {
