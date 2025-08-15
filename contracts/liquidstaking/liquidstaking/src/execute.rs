@@ -622,7 +622,6 @@ pub fn set_parameters(
     batch_limit: Option<u32>,
     transfer_handler: Option<String>,
     transfer_fee: Option<Uint128>,
-    zkgm_token_minter: Option<String>,
     hub_channel_id: Option<u32>,
     hub_quote_token: Option<String>,
     hub_contract: Option<String>,
@@ -661,9 +660,6 @@ pub fn set_parameters(
         .clone()
         .unwrap_or_else(|| params.transfer_handler);
     params.transfer_fee = transfer_fee.clone().unwrap_or_else(|| params.transfer_fee);
-    params.zkgm_token_minter = zkgm_token_minter
-        .clone()
-        .unwrap_or_else(|| params.zkgm_token_minter);
     params.underlying_coin_denom_symbol = underlying_coin_denom_symbol
         .clone()
         .unwrap_or_else(|| params.underlying_coin_denom_symbol);
@@ -745,10 +741,6 @@ pub fn set_parameters(
         .add_attribute(
             "transfer_handler",
             transfer_handler.unwrap_or_else(|| "".to_string()),
-        )
-        .add_attribute(
-            "zkgm_token_minter",
-            zkgm_token_minter.unwrap_or_else(|| "".to_string()),
         )
         .add_attribute(
             "underlying_coin_denom_symbol",

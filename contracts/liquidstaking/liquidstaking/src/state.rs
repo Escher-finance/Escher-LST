@@ -98,8 +98,6 @@ pub struct Parameters {
     pub transfer_handler: String,
     // ucs03 transfer fee from babylon to other
     pub transfer_fee: Uint128,
-    // zkgm token_minter address as cw20 allowance spender
-    pub zkgm_token_minter: String,
     // ucs03 eth/evm hub channel id
     pub hub_channel_id: u32,
     // quote token of underlying coin denom (U) on evm/eth

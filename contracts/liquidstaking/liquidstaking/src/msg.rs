@@ -56,8 +56,6 @@ pub struct InstantiateMsg {
     pub transfer_handler: String,
     // ucs03 transfer fee from babylon to other
     pub transfer_fee: Uint128,
-    // zkgm token_minter address as cw20 allowance spender
-    pub zkgm_token_minter: String,
     // ucs03 eth/evm hub channel id
     pub hub_channel_id: u32,
     // quote token of underlying coin denom to transfer to evm/eth hub
@@ -141,7 +139,6 @@ pub enum ExecuteMsg {
         batch_limit: Option<u32>,
         transfer_handler: Option<String>,
         transfer_fee: Option<Uint128>,
-        zkgm_token_minter: Option<String>,
         hub_channel_id: Option<u32>,
         hub_quote_token: Option<String>,
         hub_contract: Option<String>,
