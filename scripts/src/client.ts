@@ -2,10 +2,10 @@ import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { DirectSecp256k1HdWallet, OfflineDirectSigner, OfflineSigner } from "@cosmjs/proto-signing";
 import { GasPrice } from "@cosmjs/stargate";
 const fs = require("fs");
-
+import dotenv from 'dotenv';
+dotenv.config()
 
 import { SupportedNetworks, Networks } from "./config";
-
 
 var MNEMONIC = process.env.MNEMONIC;
 
@@ -29,7 +29,7 @@ export const initializeClient = async (network: SupportedNetworks): Promise<[Sig
     let rpc = Networks[network].rpc;
     if (!client) {
         client = await SigningCosmWasmClient.connectWithSigner(rpc, signer, {
-            gasPrice: GasPrice.fromString("0.001stake"),
+            gasPrice: GasPrice.fromString("1au"),
         });
     }
     return [client, userAddress];
