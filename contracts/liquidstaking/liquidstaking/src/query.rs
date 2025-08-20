@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::msg::{QueryMsg, StakingLiquidity};
+use crate::msg::{Debug, QueryMsg, StakingLiquidity};
 use crate::state::{unbond_record, Status, STATUS};
 use crate::state::{
-    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, PARAMETERS,
+    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, DEBUG, PARAMETERS,
     QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, Batch, BatchStatus};
@@ -52,7 +52,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
             max,
         } => to_json_binary(&query_batch(deps.storage, id, status, min, max)?),
         QueryMsg::Status {} => to_json_binary(&query_status(deps.storage)?),
+        QueryMsg::Debug {} => to_json_binary(&query_debug(deps.storage)?),
     }?)
+}
+
+pub fn query_debug(storage: &dyn Storage) -> Result<Debug, ContractError> {
+    let debug = DEBUG.load(storage)?;
+    Ok(Debug { log: debug })
 }
 
 pub fn query_status(storage: &dyn Storage) -> Result<Status, ContractError> {

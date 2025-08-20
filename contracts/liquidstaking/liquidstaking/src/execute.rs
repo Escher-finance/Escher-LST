@@ -4,10 +4,10 @@ use crate::event::{
     ProcessRewardsEvent, ProcessUnbondingEvent, UpdateValidatorsEvent,
 };
 use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
-use crate::query::query_unreleased_unbond_record_from_batch;
+use crate::query::{query_staking_liquidity, query_unreleased_unbond_record_from_batch};
 use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
 use crate::state::{
-    Chain, QuoteToken, Status, Validator, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
+    Chain, QuoteToken, Status, Validator, WithdrawReward, DEBUG, PARAMETERS, PENDING_BATCH_ID,
     QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
 };
 use crate::types::ChannelId;
@@ -19,11 +19,11 @@ use crate::utils::{
     delegation::get_unclaimed_reward, delegation::submit_pending_batch,
 };
 use crate::zkgm::com::ZkgmHubMsg;
-use crate::zkgm::protocol::{get_hub_ack_msg, ucs03_transfer};
+use crate::zkgm::protocol::{get_hub_ack_msg, ucs03_transfer, ucs03_transfer_and_call};
 use alloy::primitives::U256;
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
-    DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
+    DistributionMsg, Env, MessageInfo, Response, StdError, SubMsg, Uint128, WasmMsg,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
@@ -382,6 +382,7 @@ pub fn set_batch_received_amount(
     info: MessageInfo,
     id: u64,
     amount: Uint128,
+    salt: String,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -412,7 +413,26 @@ pub fn set_batch_received_amount(
 
     let event = BatchReceivedEvent(batch.id, amount.to_string(), env.block.time);
 
-    let res: Response = Response::new().add_event(event);
+    let payload = ZkgmHubMsg {
+        action: "hub_batch_unbonding_received".into(),
+        id: id as u32,
+        amount: U256::from(amount.u128()),
+        rate: U256::from(0u128),
+        union_block: env.block.height,
+    };
+
+    let params = PARAMETERS.load(deps.storage)?;
+    let msg = get_hub_ack_msg(
+        env.contract.address.to_string(),
+        params.ucs03_relay_contract.clone(),
+        params.hub_channel_id,
+        env.block.time,
+        params.hub_contract,
+        payload,
+        salt,
+    )?;
+
+    let res: Response = Response::new().add_message(msg).add_event(event);
 
     Ok(res)
 }
@@ -770,7 +790,7 @@ pub fn process_batch_withdrawal(
     env: Env,
     info: MessageInfo,
     id: u64,
-    _salt: Vec<String>,
+    salt: Vec<String>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let params = PARAMETERS.load(deps.storage)?;
@@ -808,9 +828,9 @@ pub fn process_batch_withdrawal(
         )?;
 
     let time = env.block.time;
-    let denom = params.underlying_coin_denom;
-    let _ucs03_relay_contract = params.ucs03_relay_contract;
-    let _lst_contract = env.contract.address;
+    let denom = params.underlying_coin_denom.clone();
+    let ucs03_relay_contract = params.ucs03_relay_contract.clone();
+    let lst_contract = env.contract.address.clone();
 
     let mut events = vec![];
 
@@ -830,9 +850,6 @@ pub fn process_batch_withdrawal(
         send_msgs.push(msg);
 
         let _target_channel_id = undelegation.channel_id.unwrap();
-
-        // after send bank msg to transfer handler, then call ucs03 on behalf of transfer handler to send token back
-        // TODO: add send token back to evm hub
 
         let ev = ProcessUnbondingEvent(
             id,
@@ -865,6 +882,50 @@ pub fn process_batch_withdrawal(
         batches().save(deps.storage, id, &batch)?;
         let ev = BatchReleasedEvent(batch.id, env.block.time);
         events.push(ev);
+
+        let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
+        let validators_list: Vec<String> = validators_reg
+            .validators
+            .iter()
+            .map(|v| v.address.clone())
+            .collect();
+        let liquidity = query_staking_liquidity(
+            deps.as_ref(),
+            env.clone(),
+            Some(lst_contract.to_string()),
+            Some(params.underlying_coin_denom.clone()),
+            Some(validators_list),
+        )?;
+
+        let payload = ZkgmHubMsg {
+            action: "hub_batch_unbonding_released".into(),
+            id: id as u32,
+            amount: U256::from(batch.received_native_unstaked.unwrap().u128()),
+            rate: U256::from(liquidity.exchange_rate.atomics().u128()),
+            union_block: env.block.height,
+        };
+
+        let msg_bin = ucs03_transfer_and_call(
+            env.block.time,
+            params.hub_channel_id,
+            lst_contract.to_string(),
+            params.hub_contract.clone(),
+            denom.clone(),
+            batch.received_native_unstaked.unwrap(),
+            params.hub_quote_token,
+            batch.received_native_unstaked.unwrap(),
+            salt.first().unwrap().to_string(),
+            params.hub_contract.clone(),
+            payload,
+        )?;
+
+        let msg = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: ucs03_relay_contract.clone(),
+            msg: msg_bin,
+            funds: vec![],
+        });
+
+        send_msgs.push(msg);
     }
 
     let res: Response = Response::new()
@@ -879,53 +940,70 @@ pub fn process_batch_withdrawal(
 /// Zkgm callback function to process bond and unbond from another chain
 pub fn on_zkgm(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    _env: Env,
+    _info: MessageInfo,
     channel_id: ChannelId,
     sender: Bytes,
     message: Bytes,
 ) -> Result<Response, ContractError> {
     let msg_bytes = message.as_ref();
-    let payload: ZkgmMessage = from_json(msg_bytes)?;
-    let msg = format!(
-        "on zgkm time:{} info sender :{}, channel_id:{}, source sender:{} payload:{:?}",
-        env.block.time,
-        info.sender.to_string(),
-        channel_id,
-        sender,
-        payload
-    );
-    deps.api.debug(&msg);
-
-    // only ucs03 relayer contract can call this callback function
-    let params = PARAMETERS.load(deps.storage)?;
-    if info.sender.to_string() != params.ucs03_relay_contract {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    match payload {
-        ZkgmMessage::HubBatch {
-            id,
-            delegate_amount,
-            unstake_amount,
-            mint_amount,
-            salt,
-        } => {
-            return zkgm_hub_batch(
-                deps,
-                env,
-                info,
-                channel_id.raw(),
-                id,
-                delegate_amount,
-                unstake_amount,
-                mint_amount,
-                salt,
-            );
-        }
-        ZkgmMessage::SubmitBatch { salt } => return submit_batch(deps, env, info, salt),
+    let payload: Result<ZkgmMessage, StdError> = from_json(msg_bytes);
+    if payload.is_err() {
+        DEBUG.save(
+            deps.storage,
+            &format!("Failed to parse ZkgmMessage from bytes: {:?}", msg_bytes),
+        )?;
+        return Ok(Response::default());
+    } else {
+        let payload = payload.unwrap();
+        DEBUG.save(deps.storage, &format!("payload: {:?}", payload))?;
+        return Ok(Response::new()
+            .add_attribute("action", "on_zkgm")
+            .add_attribute("channel_id", channel_id.to_string())
+            .add_attribute("sender", sender.to_string())
+            .add_attribute("payload", format!("payload: {:?}", payload)));
     }
 }
+
+//     let msg = format!(
+//         "on zgkm time:{} info sender :{}, channel_id:{}, source sender:{} payload:{:?}",
+//         env.block.time,
+//         info.sender.to_string(),
+//         channel_id,
+//         sender,
+//         payload
+//     );
+//     deps.api.debug(&msg);
+
+//     // only ucs03 relayer contract can call this callback function
+//     let params = PARAMETERS.load(deps.storage)?;
+//     if info.sender.to_string() != params.ucs03_relay_contract {
+//         return Err(ContractError::Unauthorized {});
+//     }
+
+//     match payload {
+//         ZkgmMessage::HubBatch {
+//             id,
+//             delegate_amount,
+//             unstake_amount,
+//             mint_amount,
+//             salt,
+//         } => {
+//             return zkgm_hub_batch(
+//                 deps,
+//                 env,
+//                 info,
+//                 channel_id.raw(),
+//                 id,
+//                 delegate_amount,
+//                 unstake_amount,
+//                 mint_amount,
+//                 salt,
+//             );
+//         }
+//         ZkgmMessage::SubmitBatch { salt } => return submit_batch(deps, env, info, salt),
+//     }
+// }
 
 /// Update the ownership of the contract.
 #[allow(clippy::needless_pass_by_value)]

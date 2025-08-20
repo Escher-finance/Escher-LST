@@ -115,6 +115,7 @@ pub enum ExecuteMsg {
     SetBatchReceivedAmount {
         id: u64,
         amount: Uint128,
+        salt: String,
     },
     // Process batch with complete unbonding(already receive token) to automatic withdraw and send native token back to user
     ProcessBatchWithdrawal {
@@ -233,6 +234,8 @@ pub enum QueryMsg {
     },
     #[returns(Status)]
     Status {},
+    #[returns(Debug)]
+    Debug {},
 }
 
 #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
@@ -342,4 +345,9 @@ pub struct InjectData {
     pub unclaimed_reward: Uint128,
     pub delegated_amount: Uint128,
     pub total_bond_amount: Uint128,
+}
+
+#[cw_serde]
+pub struct Debug {
+    pub log: String,
 }

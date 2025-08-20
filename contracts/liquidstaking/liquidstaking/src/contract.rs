@@ -3,8 +3,9 @@ use crate::execute;
 use crate::instantiate::create_reward;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
 use crate::state::{
-    Parameters, State, Status, ValidatorsRegistry, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
+    Parameters, State, Status, ValidatorsRegistry, WithdrawReward, DEBUG, PARAMETERS,
+    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
+    VALIDATORS_REGISTRY,
 };
 use crate::utils::batch::{batches, Batch};
 use crate::utils::validation::{validate_quote_tokens, validate_validators};
@@ -160,8 +161,8 @@ pub fn execute(
         ExecuteMsg::ProcessBatchWithdrawal { id, salt } => {
             execute::process_batch_withdrawal(deps, env, info, id, salt)
         }
-        ExecuteMsg::SetBatchReceivedAmount { id, amount } => {
-            execute::set_batch_received_amount(deps, env, info, id, amount)
+        ExecuteMsg::SetBatchReceivedAmount { id, amount, salt } => {
+            execute::set_batch_received_amount(deps, env, info, id, amount, salt)
         }
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
         ExecuteMsg::UpdateValidators { validators } => {
@@ -241,7 +242,9 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    DEBUG.save(deps.storage, &env.block.time.to_string())?;
     Ok(Response::default())
 }

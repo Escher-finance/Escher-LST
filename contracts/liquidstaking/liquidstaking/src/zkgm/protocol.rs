@@ -7,6 +7,7 @@ use crate::types::ChannelId;
 use crate::zkgm::com::ZkgmHubMsg;
 use crate::ContractError;
 use alloy::sol_types::SolValue;
+use alloy_primitives::Bytes;
 use cosmwasm_std::{
     to_json_binary, Binary, CosmosMsg, StdError, Timestamp, Uint128, Uint64, WasmMsg,
 };
@@ -24,6 +25,27 @@ pub fn ucs03_transfer(
     quote_amount: Uint128,
     salt: String,
 ) -> Result<Binary, ContractError> {
+    let recipient_address = match Bytes::from_str(receiver.as_str()) {
+        Ok(rec) => rec,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "recipient".into(),
+                address: receiver,
+                reason: "address must be in hex and starts with 0x".to_string(),
+            })
+        }
+    };
+    let quote_token = match Bytes::from_str(quote_token.as_str()) {
+        Ok(token) => token,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "quote_token".into(),
+                address: quote_token,
+                reason: "address must be in hex and starts with 0x".to_string(),
+            })
+        }
+    };
+
     let metadata = SolverMetadata {
         solverAddress: Vec::from(quote_token.clone()).into(),
         metadata: Default::default(),
@@ -33,7 +55,7 @@ pub fn ucs03_transfer(
         opcode: OP_TOKEN_ORDER,
         operand: TokenOrderV2 {
             sender: sender.as_bytes().to_vec().into(),
-            receiver: Vec::from(receiver).into(),
+            receiver: Vec::from(recipient_address).into(),
             base_token: base_token.as_bytes().to_vec().into(),
             base_amount: base_amount.u128().try_into().expect("u256>u128"),
             quote_token: Vec::from(quote_token).into(),

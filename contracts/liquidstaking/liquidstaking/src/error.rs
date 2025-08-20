@@ -125,8 +125,12 @@ pub enum ContractError {
     #[error("invalid channel id")]
     InvalidChannelId {},
 
-    #[error("invalid {kind} address: {address}")]
-    InvalidAddress { kind: String, address: String },
+    #[error("invalid {kind} address: {address}, reason: {reason}")]
+    InvalidAddress {
+        kind: String,
+        address: String,
+        reason: String,
+    },
 
     #[error("no reward to normalize: {msg}")]
     NoRewardToNormalize { msg: String },
