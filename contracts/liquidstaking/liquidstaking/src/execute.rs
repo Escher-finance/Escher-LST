@@ -1169,7 +1169,7 @@ pub fn transfer_and_call(
 
     let sender = env.contract.address.to_string();
 
-    let _contract_calldata = ZkgmHubMsg {
+    let contract_calldata = ZkgmHubMsg {
         action: "hub_batch_ack".into(),
         id: 7,
         amount: U256::from(amount.u128()),
@@ -1177,19 +1177,56 @@ pub fn transfer_and_call(
         union_block: env.block.height,
     };
 
-    // let msg_bin = ucs03_transfer_and_call(
-    // env.block.time,
-    // channel_id,
-    // sender,
-    // receiver,
-    // params.underlying_coin_denom.clone(),
-    // amount,
-    // params.hub_quote_token,
-    // amount,
-    // salt,
-    // params.hub_contract,
-    // contract_calldata,
-    // )?;
+    let msg_bin = ucs03_transfer_and_call(
+        env.block.time,
+        channel_id,
+        sender,
+        receiver.clone(),
+        params.underlying_coin_denom.clone(),
+        amount,
+        params.hub_quote_token,
+        amount,
+        salt,
+        receiver,
+        contract_calldata,
+    )?;
+
+    let msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: params.ucs03_relay_contract.clone(),
+        msg: msg_bin,
+        funds: vec![Coin {
+            denom: params.underlying_coin_denom.clone(),
+            amount,
+        }],
+    });
+
+    Ok(Response::new()
+        .add_message(msg)
+        .add_attribute("action", "transfer_and_call")
+        .add_attribute("amount", amount))
+}
+
+pub fn transfer(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    channel_id: u32,
+    receiver: String,
+    amount: Uint128,
+    salt: String,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    let params = PARAMETERS.load(deps.storage)?;
+    let contract_addr: Addr = env.contract.address.clone();
+    let balance = deps
+        .querier
+        .query_balance(contract_addr.clone(), params.underlying_coin_denom.clone())?;
+
+    if balance.amount < amount {
+        return Err(ContractError::NotEnoughAvailableFund {});
+    }
+
+    let sender = env.contract.address.to_string();
 
     let msg_bin = ucs03_transfer(
         env.block.time,

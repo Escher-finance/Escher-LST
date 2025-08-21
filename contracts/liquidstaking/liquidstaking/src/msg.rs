@@ -184,6 +184,13 @@ pub enum ExecuteMsg {
     Inject {
         amount: Uint128,
     },
+    // Transfer  (dev only)
+    Transfer {
+        channel_id: u32,
+        recipient: String,
+        amount: Uint128,
+        salt: String,
+    },
     // Transfer and Call (dev only)
     TransferAndCall {
         channel_id: u32,

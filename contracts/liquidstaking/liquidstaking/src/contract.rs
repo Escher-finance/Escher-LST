@@ -232,6 +232,12 @@ pub fn execute(
         ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
         ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
         ExecuteMsg::Inject { amount } => execute::inject(deps, env, info, amount),
+        ExecuteMsg::Transfer {
+            channel_id,
+            recipient,
+            amount,
+            salt,
+        } => execute::transfer(deps, env, info, channel_id, recipient, amount, salt),
         ExecuteMsg::TransferAndCall {
             channel_id,
             recipient,
