@@ -10,6 +10,7 @@ use unionlabs_primitives::Bytes;
 #[cw_serde]
 pub struct InstantiateMsg {
     pub owner: Option<Addr>,
+    pub zkgm: Addr,
     //
     // CW20 BASE //
     //

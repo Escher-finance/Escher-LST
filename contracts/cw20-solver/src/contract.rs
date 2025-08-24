@@ -5,6 +5,7 @@ use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Resp
 use crate::error::ContractError;
 use crate::execute;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::ZKGM;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -31,6 +32,7 @@ pub fn instantiate(
         deps.api,
         msg.owner.as_ref().map(|o| o.as_str()),
     )?;
+    ZKGM.save(deps.storage, &msg.zkgm)?;
     Ok(Response::new())
 }
 
