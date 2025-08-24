@@ -1,12 +1,12 @@
 use cosmwasm_schema::cw_serde;
 use cw_storage_plus::Map;
-use ibc_union_spec::ChannelId;
-use unionlabs_primitives::{Bytes, U256};
+use unionlabs_primitives::Bytes;
 
 #[cw_serde]
 pub struct FungibleLane {
     pub counterparty_beneficiary: Bytes,
 }
 
-pub const FUNGIBLE_COUNTERPARTY: Map<(U256, ChannelId, Bytes), FungibleLane> =
+/// (U256, ChannelId, Bytes)
+pub const FUNGIBLE_COUNTERPARTY: Map<(String, u32, String), FungibleLane> =
     Map::new("fungible_counterparty");

@@ -3,7 +3,10 @@ use ibc_union_spec::{ChannelId, Packet};
 use ucs03_zkgm::com::CwTokenOrderV2;
 use unionlabs_primitives::Bytes;
 
-use crate::ContractError;
+use crate::{
+    state::{FungibleLane, FUNGIBLE_COUNTERPARTY},
+    ContractError,
+};
 
 pub fn update_ownership(
     deps: DepsMut,
@@ -16,13 +19,23 @@ pub fn update_ownership(
 }
 
 pub fn set_fungible_counterparty(
+    sender: Addr,
     deps: DepsMut,
     path: Uint256,
     channel_id: ChannelId,
     base_token: Bytes,
     counterparty_beneficiary: Bytes,
 ) -> Result<Response, ContractError> {
-    todo!()
+    cw_ownable::assert_owner(deps.storage, &sender)?;
+    let key = (path.to_string(), channel_id.raw(), base_token.to_string());
+    FUNGIBLE_COUNTERPARTY.save(
+        deps.storage,
+        key,
+        &FungibleLane {
+            counterparty_beneficiary,
+        },
+    )?;
+    Ok(Response::new())
 }
 
 pub fn do_solve(

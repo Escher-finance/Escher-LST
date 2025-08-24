@@ -53,6 +53,7 @@ pub fn execute(
             base_token,
             counterparty_beneficiary,
         } => execute::set_fungible_counterparty(
+            sender,
             deps,
             path,
             channel_id,
