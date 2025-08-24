@@ -2,12 +2,14 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Binary, Uint128, Uint256};
 use cw20::{Cw20Coin, Expiration, Logo, MinterResponse};
 use cw20_base::msg::InstantiateMarketingInfo;
+use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use ibc_union_spec::{ChannelId, Packet};
 use ucs03_zkgm::com::CwTokenOrderV2;
 use unionlabs_primitives::Bytes;
 
 #[cw_serde]
 pub struct InstantiateMsg {
+    pub owner: Option<Addr>,
     //
     // CW20 BASE //
     //
@@ -19,6 +21,7 @@ pub struct InstantiateMsg {
     pub marketing: Option<InstantiateMarketingInfo>,
 }
 
+#[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
     //
@@ -108,6 +111,7 @@ pub enum ExecuteMsg {
     UploadLogo(Logo),
 }
 
+#[cw_ownable_query]
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {

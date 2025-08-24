@@ -55,6 +55,7 @@ unionlabs-primitives = { git = "https://github.com/unionlabs/union", version = "
 ] }
 ucs03-zkgm = { git = "https://github.com/unionlabs/union", version = "0.0.0" }
 ibc-union-spec = { git = "https://github.com/unionlabs/union", version = "0.0.0" }
+cw-ownable = "2.1.0"
 
 [dev-dependencies]
 cw-multi-test = "2.0.0"
