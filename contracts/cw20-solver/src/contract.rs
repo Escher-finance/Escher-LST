@@ -70,7 +70,17 @@ pub fn execute(
             relayer,
             relayer_msg,
             intent,
-        } => execute::do_solve(packet, order, path, caller, relayer, relayer_msg, intent),
+        } => execute::do_solve(
+            sender,
+            deps,
+            packet,
+            order,
+            path,
+            caller,
+            relayer,
+            relayer_msg,
+            intent,
+        ),
         //
         // CW20 BASE
         //

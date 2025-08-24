@@ -13,4 +13,16 @@ pub enum ContractError {
 
     #[error("{0}")]
     Cw20Error(#[from] Cw20ContractError),
+
+    #[error("sender is not zkgm")]
+    OnlyZkgm {},
+
+    #[error("lane (channel-id {channel_id}) has not been configured to be fungible")]
+    LaneNotFungible { channel_id: u32 },
+
+    #[error("receiver is not valid")]
+    InvalidReceiver {},
+
+    #[error("only finalized txs are currently supported")]
+    OnlyFinalized {},
 }
