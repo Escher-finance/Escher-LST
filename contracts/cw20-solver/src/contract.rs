@@ -1,6 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
 use crate::error::ContractError;
 use crate::execute;
@@ -122,8 +122,55 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(_deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<Binary> {
-    unimplemented!()
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::Ownership {} => to_json_binary(&cw_ownable::get_ownership(deps.storage)?),
+        //
+        // ZKGM SOLVER
+        //
+        QueryMsg::IsSolver {} => to_json_binary(&()),
+        QueryMsg::AllowMarketMakers {} => to_json_binary(&false),
+        //
+        // CW20 BASE
+        //
+        QueryMsg::Minter {} => to_json_binary(&cw20_base::contract::query_minter(deps)?),
+        QueryMsg::Balance { address } => {
+            to_json_binary(&cw20_base::contract::query_balance(deps, address)?)
+        }
+        QueryMsg::TokenInfo {} => to_json_binary(&cw20_base::contract::query_token_info(deps)?),
+        QueryMsg::Allowance { owner, spender } => to_json_binary(
+            &cw20_base::allowances::query_allowance(deps, owner, spender)?,
+        ),
+        QueryMsg::AllAllowances {
+            owner,
+            start_after,
+            limit,
+        } => to_json_binary(&cw20_base::enumerable::query_owner_allowances(
+            deps,
+            owner,
+            start_after,
+            limit,
+        )?),
+        QueryMsg::AllSpenderAllowances {
+            spender,
+            start_after,
+            limit,
+        } => to_json_binary(&cw20_base::enumerable::query_spender_allowances(
+            deps,
+            spender,
+            start_after,
+            limit,
+        )?),
+        QueryMsg::AllAccounts { start_after, limit } => to_json_binary(
+            &cw20_base::enumerable::query_all_accounts(deps, start_after, limit)?,
+        ),
+        QueryMsg::MarketingInfo {} => {
+            to_json_binary(&cw20_base::contract::query_marketing_info(deps)?)
+        }
+        QueryMsg::DownloadLogo {} => {
+            to_json_binary(&cw20_base::contract::query_download_logo(deps)?)
+        }
+    }
 }
 
 #[cfg(test)]
