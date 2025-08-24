@@ -47,8 +47,27 @@ pub fn execute(
         //
         // ZKGM SOLVER
         //
-        ExecuteMsg::SetFungibleCounterparty { .. } => unimplemented!(),
-        ExecuteMsg::DoSolve { .. } => unimplemented!(),
+        ExecuteMsg::SetFungibleCounterparty {
+            path,
+            channel_id,
+            base_token,
+            counterparty_beneficiary,
+        } => execute::set_fungible_counterparty(
+            deps,
+            path,
+            channel_id,
+            base_token,
+            counterparty_beneficiary,
+        ),
+        ExecuteMsg::DoSolve {
+            packet,
+            order,
+            path,
+            caller,
+            relayer,
+            relayer_msg,
+            intent,
+        } => execute::do_solve(packet, order, path, caller, relayer, relayer_msg, intent),
         //
         // CW20 BASE
         //
