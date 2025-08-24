@@ -49,6 +49,7 @@ schemars = "0.8.16"
 serde = { version = "1.0.197", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.58" }
 
+# union deps
 unionlabs-primitives = { git = "https://github.com/unionlabs/union", version = "0.0.0", features = [
   "schemars",
 ] }
