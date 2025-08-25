@@ -236,11 +236,6 @@ pub fn execute(
 pub fn migrate(deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // update batch next_batch_action_time
-    let mut pending_batch = batches().load(deps.storage, 1)?;
-    pending_batch.next_batch_action_time = Some(env.block.time.seconds());
-    batches().save(deps.storage, 1, &pending_batch)?;
-
     DEBUG.save(deps.storage, &env.block.time.to_string())?;
     Ok(Response::default())
 }
