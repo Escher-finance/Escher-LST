@@ -139,23 +139,6 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Bond {
-            slippage,
-            expected,
-            recipient,
-            recipient_channel_id,
-            salt,
-        } => execute::bond(
-            deps,
-            env,
-            info,
-            slippage,
-            expected,
-            recipient,
-            recipient_channel_id,
-            salt,
-        ),
-        ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch { salt } => execute::submit_batch(deps, env, info, salt),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
         ExecuteMsg::ProcessBatchWithdrawal { id, salt } => {
@@ -244,12 +227,19 @@ pub fn execute(
             amount,
             salt,
         } => execute::transfer_and_call(deps, env, info, channel_id, recipient, amount, salt),
+        ExecuteMsg::Reset {} => execute::reset(deps, env, info),
+        ExecuteMsg::TransferOwner {} => execute::transfer_to_owner(deps, env, info),
     }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    // update batch next_batch_action_time
+    let mut pending_batch = batches().load(deps.storage, 1)?;
+    pending_batch.next_batch_action_time = Some(env.block.time.seconds());
+    batches().save(deps.storage, 1, &pending_batch)?;
 
     DEBUG.save(deps.storage, &env.block.time.to_string())?;
     Ok(Response::default())

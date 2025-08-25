@@ -99,7 +99,6 @@ pub fn ucs03_transfer_and_call(
     time: Timestamp,
     channel_id: u32,
     sender: String,
-    receiver: String,
     base_token: String,
     base_amount: Uint128,
     quote_token: String,
@@ -108,16 +107,38 @@ pub fn ucs03_transfer_and_call(
     hub_contract: String,
     contract_calldata: ZkgmHubMsg,
 ) -> Result<Binary, ContractError> {
+    let recipient_address = match Bytes::from_str(hub_contract.as_str()) {
+        Ok(rec) => rec,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "recipient".into(),
+                address: hub_contract,
+                reason: "address must be in hex and starts with 0x".to_string(),
+            })
+        }
+    };
+    let quote_token = match Bytes::from_str(quote_token.as_str()) {
+        Ok(token) => token,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "quote_token".into(),
+                address: quote_token,
+                reason: "address must be in hex and starts with 0x".to_string(),
+            })
+        }
+    };
+
     let metadata = SolverMetadata {
         solverAddress: Vec::from(quote_token.clone()).into(),
         metadata: Default::default(),
     };
+
     let fungible_order_instruction = Instruction {
         version: INSTR_VERSION_2,
         opcode: OP_TOKEN_ORDER,
         operand: TokenOrderV2 {
             sender: sender.as_bytes().to_vec().into(),
-            receiver: Vec::from(receiver).into(),
+            receiver: Vec::from(recipient_address.clone()).into(),
             base_token: base_token.as_bytes().to_vec().into(),
             base_amount: base_amount.u128().try_into().expect("u256>u128"),
             quote_token: Vec::from(quote_token).into(),
@@ -135,7 +156,7 @@ pub fn ucs03_transfer_and_call(
         operand: Call {
             sender: sender.as_bytes().to_vec().into(),
             eureka: false,
-            contract_address: hub_contract.as_bytes().to_vec().into(),
+            contract_address: Vec::from(recipient_address).into(),
             contract_calldata: contract_calldata.abi_encode_params().into(),
         }
         .abi_encode_params()
@@ -188,13 +209,24 @@ pub fn ucs03_call(
     payload: ZkgmHubMsg,
     salt: H256,
 ) -> Result<Binary, ContractError> {
-    let multiplex_instruction = Instruction {
-        version: INSTR_VERSION_2,
+    let contract_address = match Bytes::from_str(hub_contract.as_str()) {
+        Ok(rec) => rec,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "recipient".into(),
+                address: hub_contract,
+                reason: "address must be in hex and starts with 0x".to_string(),
+            })
+        }
+    };
+
+    let call_instruction = Instruction {
+        version: INSTR_VERSION_0,
         opcode: OP_CALL,
         operand: Call {
             sender: sender.as_bytes().to_vec().into(),
             eureka: false,
-            contract_address: hub_contract.as_bytes().to_vec().into(),
+            contract_address,
             contract_calldata: payload.abi_encode_params().into(),
         }
         .abi_encode_params()
@@ -210,7 +242,7 @@ pub fn ucs03_call(
         timeout_height: Uint64::from(0u64),
         timeout_timestamp,
         salt,
-        instruction: multiplex_instruction.abi_encode_params().into(),
+        instruction: call_instruction.abi_encode_params().into(),
     };
 
     let ucc03_msg_bin = to_json_binary(&ucs03_send_msg)?;

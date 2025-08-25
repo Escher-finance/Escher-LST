@@ -376,16 +376,18 @@ pub fn get_unbond_all_messages(
             .map(|d| d.amount.amount)
             .sum();
 
-        let amount = Coin {
-            amount: undelegate_amount.clone(),
-            denom: denom.to_string(),
-        };
-        let undelegate_staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Undelegate {
-            validator: validator.address.to_string(),
-            amount,
-        });
+        if undelegate_amount != Uint128::zero() {
+            let amount = Coin {
+                amount: undelegate_amount.clone(),
+                denom: denom.to_string(),
+            };
+            let undelegate_staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Undelegate {
+                validator: validator.address.to_string(),
+                amount,
+            });
 
-        msgs.push(undelegate_staking_msg.into());
+            msgs.push(undelegate_staking_msg.into());
+        }
     }
 
     Ok(msgs)
@@ -438,7 +440,10 @@ pub fn process_bond(
     _on_chain_recipient: bool,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     if amount < params.min_bond {
-        return Err(ContractError::BondAmountTooLow {});
+        return Err(ContractError::BondAmountTooLow {
+            actual: amount,
+            expected: params.min_bond,
+        });
     }
 
     let coin_denom = params.underlying_coin_denom.to_string();
@@ -539,7 +544,10 @@ pub fn process_staking_batch(
     validators_reg: ValidatorsRegistry,
 ) -> Result<(Vec<CosmosMsg>, Event, Decimal), ContractError> {
     if amount < params.min_bond {
-        return Err(ContractError::BondAmountTooLow {});
+        return Err(ContractError::BondAmountTooLow {
+            actual: amount,
+            expected: params.min_bond,
+        });
     }
 
     let coin_denom = params.underlying_coin_denom.to_string();
@@ -754,63 +762,6 @@ pub fn submit_pending_batch(
     Ok((msgs, events, state.exchange_rate))
 }
 
-/// Create unbond requests that will create unbond record and put in pending batch
-/// 1. Increase total liquid stake amount in pending batch
-/// 2. Create unbond record and save in pending batch
-/// 3. Create UnstakeRequest event
-pub fn unstake_request_in_batch(
-    env: Env,
-    storage: &mut dyn Storage,
-    id: u64,
-    sender: String,
-    _staker: String,
-    unstake_amount: Uint128,
-    channel_id: Option<u32>,
-    _recipient: Option<String>,
-    _recipient_channel_id: Option<u32>,
-) -> Result<Event, ContractError> {
-    let params = PARAMETERS.load(storage)?;
-
-    if unstake_amount < params.min_unbond {
-        return Err(ContractError::UnbondAmountTooLow {});
-    }
-
-    let pending_batch_id = PENDING_BATCH_ID.load(storage)?;
-    let mut pending_batch = batches().load(storage, pending_batch_id)?;
-
-    // update total unstaked liquid stake amount in batch and increase unbond records count
-    pending_batch.total_liquid_stake += unstake_amount;
-    pending_batch.unbond_records_count += 1;
-    batches().save(storage, pending_batch_id, &pending_batch)?;
-
-    let record = UnbondRecord {
-        id,
-        batch_id: pending_batch.id,
-        height: env.block.height,
-        channel_id,
-        sender: sender.clone(),
-        amount: unstake_amount,
-        released_height: 0,
-        released: false,
-        hub_batch_id: 0,
-    };
-    unbond_record().save(storage, id, &record)?;
-
-    let reward_balance = REWARD_BALANCE.load(storage)?;
-
-    let event = UnstakeRequestEvent(
-        sender,
-        channel_id,
-        unstake_amount,
-        record.id,
-        pending_batch.id,
-        env.block.time,
-        reward_balance,
-        0,
-    );
-    Ok(event)
-}
-
 /// Create undelegate requests that will create unbond record and put in pending batch
 /// 1. Increase total liquid stake amount in pending batch
 /// 2. Create unbond record and save in pending batch
@@ -824,9 +775,11 @@ pub fn unstake_request(
     channel_id: Option<u32>,
 ) -> Result<Event, ContractError> {
     let params = PARAMETERS.load(storage)?;
-
-    if unstake_amount < params.min_unbond {
-        return Err(ContractError::UnbondAmountTooLow {});
+    if unstake_amount < params.min_bond {
+        return Err(ContractError::UnbondAmountTooLow {
+            actual: unstake_amount,
+            expected: params.min_unbond,
+        });
     }
 
     let pending_batch_id = PENDING_BATCH_ID.load(storage)?;
@@ -951,7 +904,10 @@ pub fn inject(
     params: Parameters,
 ) -> Result<(Vec<CosmosMsg>, InjectData), ContractError> {
     if amount < params.min_bond {
-        return Err(ContractError::BondAmountTooLow {});
+        return Err(ContractError::BondAmountTooLow {
+            actual: amount,
+            expected: params.min_bond,
+        });
     }
 
     let validators_reg = crate::state::VALIDATORS_REGISTRY.load(storage)?;

@@ -95,17 +95,6 @@ pub enum Cw20PayloadMsg {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    /// Delegate native denom `amount` to validator
-    /// Issue `amount` / exchange_rate for the user.
-    Bond {
-        slippage: Option<Decimal>,
-        expected: Uint128,
-        recipient: Option<String>,
-        recipient_channel_id: Option<u32>,
-        salt: Option<String>,
-    },
-    /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
-    Receive(Cw20ReceiveMsg),
     /// Submit pending batch
     SubmitBatch {
         salt: String,
@@ -184,6 +173,7 @@ pub enum ExecuteMsg {
     Inject {
         amount: Uint128,
     },
+    // TODO: Remove all below
     // Transfer  (dev only)
     Transfer {
         channel_id: u32,
@@ -198,6 +188,10 @@ pub enum ExecuteMsg {
         amount: Uint128,
         salt: String,
     },
+    // Reset
+    Reset {},
+    // TransferOwner
+    TransferOwner {},
 }
 
 #[cw_ownable_query]

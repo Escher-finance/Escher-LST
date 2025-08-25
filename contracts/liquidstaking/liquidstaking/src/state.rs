@@ -117,16 +117,16 @@ impl State {
     }
 }
 
-pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
+pub const RECORD_COUNT: Item<u64> = Item::new("record_count");
 
 pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
-    let val = num_tokens(storage)? + 1;
-    TOKEN_COUNT.save(storage, &val)?;
+    let val = num_records(storage)? + 1;
+    RECORD_COUNT.save(storage, &val)?;
     Ok(val)
 }
 
-pub fn num_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
-    Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
+pub fn num_records(storage: &mut dyn Storage) -> StdResult<u64> {
+    Ok(RECORD_COUNT.may_load(storage)?.unwrap_or_default())
 }
 
 #[cw_serde]

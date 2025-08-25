@@ -1,4 +1,4 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{StdError, Uint128};
 use cw_ownable::OwnershipError;
 use thiserror::Error;
 
@@ -104,11 +104,11 @@ pub enum ContractError {
     #[error("cannot migrate reward contract that is equal with current contract")]
     InvalidRewardContractMigration {},
 
-    #[error("bond amount is less than minimum bond amount")]
-    BondAmountTooLow {},
+    #[error("bond amount is less than minimum bond amount, {actual} < {expected}")]
+    BondAmountTooLow { actual: Uint128, expected: Uint128 },
 
-    #[error("unbond amount is less than minimum unbond amount")]
-    UnbondAmountTooLow {},
+    #[error("unbond amount is less than minimum unbond amount, {actual} < {expected}")]
+    UnbondAmountTooLow { actual: Uint128, expected: Uint128 },
 
     #[error("This functionality is currently disabled for maintenance")]
     FunctionalityUnderMaintenance {},
