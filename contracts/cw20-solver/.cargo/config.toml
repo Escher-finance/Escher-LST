@@ -1,0 +1,8 @@
+[alias]
+wasm = "build --release --lib --target wasm32-unknown-unknown -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort"
+unit-test = "test --lib"
+schema = "run --bin schema"
+integration-test = "test --lib integration_tests"
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-cpu=mvp"]
