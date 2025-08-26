@@ -20,8 +20,8 @@ incremental = false
 overflow-checks = true
 strip = true
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(nonunion)'] }
+[lints]
+workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -32,17 +32,9 @@ serde    = []
 schemars = ["dep:schemars"]
 bincode  = ["dep:bincode"]
 
-[package.metadata.scripts]
-optimize = """docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
-  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/optimizer:0.16.0
-"""
-
-
 [dependencies]
-cosmwasm-schema = "2.2.2"
-cosmwasm-std = { version = "2.2.2", features = [
+cosmwasm-schema = { workspace = true }
+cosmwasm-std = { workspace = true, features = [
   "staking",
   "stargate",
   "cosmwasm_1_4",
