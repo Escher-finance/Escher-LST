@@ -773,6 +773,10 @@ pub fn on_zkgm(
         return Err(ContractError::Unauthorized {});
     }
 
+    if sender.to_string() != params.hub_contract {
+        return Err(ContractError::ZkgmNotAuthorized {});
+    }
+
     let msg_bytes = message.as_ref();
     let payload: Result<ZkgmMessage, StdError> = from_json(msg_bytes);
     if payload.is_err() {

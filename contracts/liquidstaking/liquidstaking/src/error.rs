@@ -80,6 +80,7 @@ pub enum ContractError {
 
     #[error("Quote tokens must be unique by channel_id")]
     InvalidQuoteTokens {},
+
     #[error("no pending batch is available")]
     EmptyBatch {},
 
@@ -98,7 +99,7 @@ pub enum ContractError {
     #[error("batch received amount can not bigger than expected native unstaked amount")]
     InvalidBatchReceivedAmount {},
 
-    #[error("InvalidContractName")]
+    #[error("invalid payload")]
     InvalidPayload {},
 
     #[error("cannot migrate reward contract that is equal with current contract")]
@@ -134,4 +135,7 @@ pub enum ContractError {
 
     #[error("no reward to normalize: {msg}")]
     NoRewardToNormalize { msg: String },
+
+    #[error("Unauthorized Zkgm message, only hub contract is allowed")]
+    ZkgmNotAuthorized {},
 }
