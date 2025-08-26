@@ -669,21 +669,7 @@ pub fn process_batch_withdrawal(
 
     let mut send_msgs: Vec<CosmosMsg> = vec![];
 
-    let transfer_handler = params.transfer_handler.clone();
-    let mut _i = 0;
     for (sender, undelegation) in staker_undelegation.iter() {
-        let bank_msg = BankMsg::Send {
-            to_address: transfer_handler.clone(),
-            amount: vec![Coin {
-                denom: denom.clone(),
-                amount: undelegation.unstake_return_native_amount.unwrap(),
-            }],
-        };
-        let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
-        send_msgs.push(msg);
-
-        let _target_channel_id = undelegation.channel_id.unwrap();
-
         let ev = ProcessUnbondingEvent(
             id,
             undelegation.channel_id,
@@ -693,8 +679,6 @@ pub fn process_batch_withdrawal(
             env.block.time,
         );
         events.push(ev);
-
-        _i += 1;
     }
 
     if total_released_amount > Uint128::zero() {
@@ -751,10 +735,15 @@ pub fn process_batch_withdrawal(
             payload,
         )?;
 
+        let funds = vec![Coin {
+            denom: params.underlying_coin_denom.clone(),
+            amount: batch.received_native_unstaked.unwrap(),
+        }];
+
         let msg = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: ucs03_relay_contract.clone(),
             msg: msg_bin,
-            funds: vec![],
+            funds,
         });
 
         send_msgs.push(msg);
