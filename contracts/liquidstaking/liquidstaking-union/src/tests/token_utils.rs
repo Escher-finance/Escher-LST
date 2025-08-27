@@ -1,5 +1,6 @@
+use cosmwasm_std::{Addr, Binary, CosmosMsg, ReplyOn, Uint128, WasmMsg, from_json};
+
 use crate::{reply::MINT_CW20_TOKENS_REPLY_ID, utils::token::*};
-use cosmwasm_std::{from_json, Addr, Binary, CosmosMsg, ReplyOn, Uint128, WasmMsg};
 
 #[test]
 fn test_get_staked_token_submsg() {

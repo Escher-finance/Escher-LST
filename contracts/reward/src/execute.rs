@@ -1,12 +1,14 @@
-use crate::event::{SplitRewardEvent, UpdateConfigEvent};
-use crate::msg::{Balance, LSTQueryMsg};
-use crate::{error::ContractError, msg::ExecuteLstMsg};
-
-use crate::helpers;
-use crate::state::CONFIG;
 use cosmwasm_std::{
-    attr, Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
-    Uint128,
+    Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128,
+    attr,
+};
+
+use crate::{
+    error::ContractError,
+    event::{SplitRewardEvent, UpdateConfigEvent},
+    helpers,
+    msg::{Balance, ExecuteLstMsg, LSTQueryMsg},
+    state::CONFIG,
 };
 
 pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {

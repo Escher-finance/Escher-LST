@@ -1,20 +1,27 @@
 use std::marker::PhantomData;
 
-use crate::msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity};
-use crate::state::{unbond_record, Status, WithdrawRewardQueue, STATUS, WITHDRAW_REWARD_QUEUE};
-use crate::state::{
-    Parameters, QuoteToken, State, SupplyQueue, UnbondRecord, ValidatorsRegistry, PARAMETERS,
-    QUOTE_TOKEN, REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL,
-    VALIDATORS_REGISTRY,
+use cosmwasm_std::{
+    Binary, Decimal, Deps, Env, FullDelegation, Order, Storage, Uint128, entry_point,
+    to_json_binary,
 };
-use crate::utils::batch::{batches, Batch, BatchStatus};
-use crate::utils::calc::{self, calculate_fee_from_reward, calculate_query_bounds};
-use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
-use crate::ContractError;
-use cosmwasm_std::{entry_point, to_json_binary, Decimal, FullDelegation, Order, Uint128};
-use cosmwasm_std::{Binary, Deps, Env, Storage};
-use cw2::ContractVersion;
 use cw_ownable::get_ownership;
+use cw2::ContractVersion;
+
+use crate::{
+    ContractError,
+    msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
+    state::{
+        PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
+        SUPPLY_QUEUE, State, Status, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL, UnbondRecord,
+        VALIDATORS_REGISTRY, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue,
+        unbond_record,
+    },
+    utils::{
+        batch::{Batch, BatchStatus, batches},
+        calc::{self, calculate_fee_from_reward, calculate_query_bounds},
+        delegation::{get_actual_total_delegated, get_unclaimed_reward},
+    },
+};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {

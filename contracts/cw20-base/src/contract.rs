@@ -1,26 +1,27 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::Order::Ascending;
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
+    Binary, Deps, DepsMut, Env, MessageInfo, Order::Ascending, Response, StdError, StdResult,
+    Uint128, to_json_binary,
 };
-
 use cw2::{ensure_from_older_version, set_contract_version};
 use cw20::{
     BalanceResponse, Cw20Coin, Cw20ReceiveMsg, DownloadLogoResponse, EmbeddedLogo, Logo, LogoInfo,
     MarketingInfoResponse, MinterResponse, TokenInfoResponse,
 };
 
-use crate::allowances::{
-    execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
-    execute_transfer_from, query_allowance,
-};
-use crate::enumerable::{query_all_accounts, query_owner_allowances, query_spender_allowances};
-use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::state::{
-    MinterData, TokenInfo, ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, LOGO, MARKETING_INFO,
-    TOKEN_INFO,
+use crate::{
+    allowances::{
+        execute_burn_from, execute_decrease_allowance, execute_increase_allowance,
+        execute_send_from, execute_transfer_from, query_allowance,
+    },
+    enumerable::{query_all_accounts, query_owner_allowances, query_spender_allowances},
+    error::ContractError,
+    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
+    state::{
+        ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, LOGO, MARKETING_INFO, MinterData, TOKEN_INFO,
+        TokenInfo,
+    },
 };
 
 // version info for migration info
@@ -604,10 +605,10 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{
-        mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
+    use cosmwasm_std::{
+        Addr, CosmosMsg, StdError, SubMsg, WasmMsg, coins, from_json,
+        testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info},
     };
-    use cosmwasm_std::{coins, from_json, Addr, CosmosMsg, StdError, SubMsg, WasmMsg};
 
     use super::*;
     use crate::msg::InstantiateMarketingInfo;
@@ -1313,12 +1314,12 @@ mod tests {
     }
 
     mod migration {
-        use super::*;
-
         use cosmwasm_std::Empty;
-        use cw20::{AllAllowancesResponse, AllSpenderAllowancesResponse, SpenderAllowanceInfo};
         use cw_multi_test::{App, Contract, ContractWrapper, Executor};
         use cw_utils::Expiration;
+        use cw20::{AllAllowancesResponse, AllSpenderAllowancesResponse, SpenderAllowanceInfo};
+
+        use super::*;
 
         fn cw20_contract() -> Box<dyn Contract<Empty>> {
             let contract = ContractWrapper::new(

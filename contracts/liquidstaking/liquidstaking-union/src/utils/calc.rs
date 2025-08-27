@@ -1,6 +1,7 @@
+use std::str::FromStr;
+
 use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
 use cw20::TokenInfoResponse;
-use std::str::FromStr;
 
 use crate::ContractError;
 

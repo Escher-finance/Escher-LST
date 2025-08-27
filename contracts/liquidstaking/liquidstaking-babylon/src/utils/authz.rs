@@ -1,12 +1,13 @@
-use cosmwasm_std::{to_json_binary, AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128};
+use cosmos_sdk_proto::{
+    Any,
+    cosmos::{authz::v1beta1::MsgExec, base::v1beta1::Coin as ProtoCoin},
+    cosmwasm::wasm::v1::MsgExecuteContract,
+    traits::Message,
+};
+use cosmwasm_std::{AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128, to_json_binary};
+use unionlabs_primitives::{Bytes, H256};
 
 use crate::{error::ContractError, zkgm::protocol::ucs03_transfer};
-use cosmos_sdk_proto::cosmos::authz::v1beta1::MsgExec;
-use cosmos_sdk_proto::cosmos::base::v1beta1::Coin as ProtoCoin;
-use cosmos_sdk_proto::cosmwasm::wasm::v1::MsgExecuteContract;
-use cosmos_sdk_proto::traits::Message;
-use cosmos_sdk_proto::Any;
-use unionlabs_primitives::{Bytes, H256};
 
 pub fn cosmos_msg_for_contract_execution(
     granter: String,

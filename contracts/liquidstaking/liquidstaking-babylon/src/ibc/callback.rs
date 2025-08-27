@@ -1,16 +1,17 @@
-use crate::event::IbcCallbackEvent;
-use crate::utils::calc::check_slippage;
-use crate::utils::transfer::ibc_transfer_msg;
-use crate::{
-    state::{PARAMETERS, VALIDATORS_REGISTRY},
-    utils,
-};
+use std::str::FromStr;
+
 use cosmwasm_std::{
-    ensure_eq, entry_point, from_json, Decimal, DepsMut, Env, IbcBasicResponse,
-    IbcDestinationCallbackMsg, StdAck, StdError, StdResult, Uint128,
+    Decimal, DepsMut, Env, IbcBasicResponse, IbcDestinationCallbackMsg, StdAck, StdError,
+    StdResult, Uint128, ensure_eq, entry_point, from_json,
 };
 use ibc::apps::transfer::types::proto::transfer::v2::FungibleTokenPacketData;
-use std::str::FromStr;
+
+use crate::{
+    event::IbcCallbackEvent,
+    state::{PARAMETERS, VALIDATORS_REGISTRY},
+    utils,
+    utils::{calc::check_slippage, transfer::ibc_transfer_msg},
+};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn ibc_destination_callback(

@@ -1,32 +1,37 @@
 use std::str::FromStr;
 
-use crate::error::ContractError;
-use crate::event::{
-    BatchReceivedEvent, BatchReleasedEvent, BondEvent, ProcessBatchUnbondingEvent,
-    ProcessRewardsEvent, ProcessUnbondingEvent, UpdateValidatorsEvent,
-};
-use crate::msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMsg, ZkgmMessage};
-use crate::query::query_unreleased_unbond_record_from_batch;
-use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
-use crate::state::{
-    Chain, QuoteToken, Status, Validator, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
-};
-use crate::types::ChannelId;
-use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::{check_slippage, to_uint128};
-use crate::utils::validation::{validate_recipient, validate_validators};
-use crate::utils::{
-    self, delegation::get_actual_total_delegated, delegation::get_mock_total_reward,
-    delegation::get_unbonding_ucs03_transfer_cosmos_msg, delegation::get_unclaimed_reward,
-    delegation::submit_pending_batch,
-};
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
-    DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
+    Addr, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response,
+    SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
+
+use crate::{
+    error::ContractError,
+    event::{
+        BatchReceivedEvent, BatchReleasedEvent, BondEvent, ProcessBatchUnbondingEvent,
+        ProcessRewardsEvent, ProcessUnbondingEvent, UpdateValidatorsEvent,
+    },
+    msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteRewardMsg, MigrateMsg, ZkgmMessage},
+    query::query_unreleased_unbond_record_from_batch,
+    reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
+    state::{
+        Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, STATE, STATUS, Status, VALIDATORS_REGISTRY, Validator, WithdrawReward,
+    },
+    types::ChannelId,
+    utils::{
+        self,
+        batch::{BatchStatus, batches},
+        calc::{check_slippage, to_uint128},
+        delegation::{
+            get_actual_total_delegated, get_mock_total_reward,
+            get_unbonding_ucs03_transfer_cosmos_msg, get_unclaimed_reward, submit_pending_batch,
+        },
+        validation::{validate_recipient, validate_validators},
+    },
+};
 
 /// process bond/stake to contract
 pub fn bond(
@@ -1024,7 +1029,7 @@ pub fn on_zkgm(
                 expected,
                 recipient,
                 recipient_channel_id,
-            )
+            );
         }
         ZkgmMessage::Unbond {
             amount,
@@ -1040,7 +1045,7 @@ pub fn on_zkgm(
                 amount,
                 recipient,
                 recipient_channel_id,
-            )
+            );
         }
     }
 }

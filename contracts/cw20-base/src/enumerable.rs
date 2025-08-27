@@ -1,11 +1,11 @@
 use cosmwasm_std::{Deps, Order, StdResult};
+use cw_storage_plus::Bound;
 use cw20::{
     AllAccountsResponse, AllAllowancesResponse, AllSpenderAllowancesResponse, AllowanceInfo,
     SpenderAllowanceInfo,
 };
 
 use crate::state::{ALLOWANCES, ALLOWANCES_SPENDER, BALANCES};
-use cw_storage_plus::Bound;
 
 // settings for pagination
 const MAX_LIMIT: u32 = 30;
@@ -80,14 +80,17 @@ pub fn query_all_accounts(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_json, DepsMut, Uint128};
+    use cosmwasm_std::{
+        DepsMut, Uint128, coins, from_json,
+        testing::{mock_dependencies_with_balance, mock_env, mock_info},
+    };
     use cw20::{Cw20Coin, Expiration, TokenInfoResponse};
 
-    use crate::contract::{execute, instantiate, query, query_token_info};
-    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+    use super::*;
+    use crate::{
+        contract::{execute, instantiate, query, query_token_info},
+        msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    };
 
     // this will set up the instantiation for other tests
     fn do_instantiate(mut deps: DepsMut, addr: &str, amount: Uint128) -> TokenInfoResponse {
