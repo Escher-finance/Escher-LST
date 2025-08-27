@@ -4,7 +4,6 @@ pub mod batch_utils;
 pub mod calc_utils;
 pub mod delegation_utils;
 pub mod execute;
-pub mod protocol_utils;
 pub mod query;
 pub mod state;
 pub mod token_utils;
@@ -31,6 +30,11 @@ pub fn make_contract(app: &mut App, sender: Addr, instantiate_msg: InstantiateMs
 
 pub fn mock_instantiate_msg() -> InstantiateMsg {
     InstantiateMsg {
+        zkgm_token_minter: "minter".to_string(),
+        transfer_fee: Uint128::one(),
+        transfer_handler: "foo".to_string(),
+        underlying_coin_denom_symbol: "den".to_string(),
+        liquidstaking_denom_symbol: "denom".to_string(),
         underlying_coin_denom: "denom".to_string(),
         validators: vec![
             Validator {
@@ -60,6 +64,11 @@ pub fn mock_instantiate_msg() -> InstantiateMsg {
 
 pub fn mock_parameters() -> Parameters {
     Parameters {
+        zkgm_token_minter: "minter".to_string(),
+        transfer_fee: Uint128::one(),
+        transfer_handler: "foo".to_string(),
+        underlying_coin_denom_symbol: "den".to_string(),
+        liquidstaking_denom_symbol: "denom".to_string(),
         underlying_coin_denom: "underlying_coin".to_string(),
         liquidstaking_denom: "liquidstaking".to_string(),
         ucs03_relay_contract: String::default(),
