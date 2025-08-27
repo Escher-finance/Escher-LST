@@ -3,11 +3,11 @@ use cosmwasm_std::{
 };
 
 use crate::{
+    ContractError,
     execute::StakerUndelegation,
     utils::delegation::{
-        get_unbonding_ucs03_transfer_cosmos_msg, DEFAULT_TIMEOUT_TIMESTAMP_OFFSET,
+        DEFAULT_TIMEOUT_TIMESTAMP_OFFSET, get_unbonding_ucs03_transfer_cosmos_msg,
     },
-    ContractError,
 };
 
 pub fn get_send_bank_msg(

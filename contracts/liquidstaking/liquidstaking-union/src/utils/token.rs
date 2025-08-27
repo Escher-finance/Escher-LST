@@ -19,8 +19,8 @@ pub fn get_staked_token_submsg(
         msg: mint_bin,
         funds: vec![],
     });
-    let sub_msg: SubMsg = SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID)
-        .with_payload(payload_bin);
+    let sub_msg: SubMsg =
+        SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID).with_payload(payload_bin);
     sub_msg
 }
 

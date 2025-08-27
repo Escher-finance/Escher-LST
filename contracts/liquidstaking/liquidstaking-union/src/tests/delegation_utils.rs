@@ -1,10 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    assert_approx_eq, from_json,
-    testing::{mock_dependencies, mock_env, MockQuerier},
     Addr, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
-    StakingMsg, Timestamp, Uint128,
+    StakingMsg, Timestamp, Uint128, assert_approx_eq, from_json,
+    testing::{MockQuerier, mock_dependencies, mock_env},
 };
 use cw_multi_test::App;
 
@@ -12,12 +11,12 @@ use crate::{
     event::{SUBMIT_BATCH_EVENT, UNBOND_EVENT, UNSTAKE_REQUEST_EVENT},
     msg::{BondData, DelegationDiff, ValidatorDelegation},
     state::{
-        unbond_record, State, UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS,
-        PENDING_BATCH_ID, REWARD_BALANCE, STATE, TOKEN_COUNT, VALIDATORS_REGISTRY,
+        PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE, STATE, State, TOKEN_COUNT, UnbondRecord,
+        VALIDATORS_REGISTRY, Validator, ValidatorsRegistry, unbond_record,
     },
     tests::mock_parameters,
     utils::{
-        batch::{batches, Batch, BatchStatus},
+        batch::{Batch, BatchStatus, batches},
         calc,
         delegation::{
             adjust_validators_delegation, get_actual_total_delegated,
@@ -1190,9 +1189,11 @@ fn test_submit_pending_batch() {
             _ => false,
         }
     }));
-    assert!(events
-        .iter()
-        .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT));
+    assert!(
+        events
+            .iter()
+            .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT)
+    );
 }
 
 #[test]
