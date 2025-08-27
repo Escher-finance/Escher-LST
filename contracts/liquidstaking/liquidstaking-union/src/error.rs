@@ -82,8 +82,12 @@ pub enum ContractError {
 
     #[error("Quote tokens must be unique by channel_id")]
     InvalidQuoteTokens {},
+
     #[error("no pending batch is available")]
     EmptyBatch {},
+
+    #[error("invalid batch")]
+    InvalidBatch {},
 
     #[error("bath status is incorrect, actual: {actual}, expected: {expected}")]
     BatchStatusIncorrect {
