@@ -885,16 +885,15 @@
         "xion": "xion"
       },
       "locked": {
-        "lastModified": 1756242215,
-        "narHash": "sha256-hy1aoAD7LDSwF4JZCxUrNEaeCANzUrwpdcN9zwb0n/g=",
+        "lastModified": 1756312874,
+        "narHash": "sha256-y2QakhQvsZy9ZBfEgbGt4Kyxc0ZQuJvFbaEbecj1UFs=",
         "owner": "unionlabs",
         "repo": "union",
-        "rev": "8068cbf58be1215e68f664c9ab0797b7f88d79f7",
+        "rev": "3eaf10150da21c2f89ca9f0a63c9b16abe15fa60",
         "type": "github"
       },
       "original": {
         "owner": "unionlabs",
-        "ref": "crane-stuff",
         "repo": "union",
         "type": "github"
       }

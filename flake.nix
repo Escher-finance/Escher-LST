@@ -7,7 +7,7 @@
     };
     rust-overlay.url = "github:oxalica/rust-overlay";
     union = {
-      url = "github:unionlabs/union/crane-stuff";
+      url = "github:unionlabs/union";
     };
     treefmt-nix.url = "github:numtide/treefmt-nix";
   };
