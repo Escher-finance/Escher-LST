@@ -1,10 +1,10 @@
 use cosmos_sdk_proto::{
-    Any,
     cosmos::{authz::v1beta1::MsgExec, base::v1beta1::Coin as ProtoCoin},
     cosmwasm::wasm::v1::MsgExecuteContract,
     traits::Message,
+    Any,
 };
-use cosmwasm_std::{AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128, to_json_binary};
+use cosmwasm_std::{to_json_binary, AnyMsg, Binary, Coin, CosmosMsg, StdError, Timestamp, Uint128};
 use unionlabs_primitives::{Bytes, H256};
 
 use crate::{error::ContractError, zkgm::protocol::ucs03_transfer};
@@ -30,15 +30,12 @@ pub fn cosmos_msg_for_contract_execution(
         funds: proto_funds,
     };
 
-    let execute_any = Any::from_msg(&execute_contract);
-
-    if execute_any.is_err() {
-        return Err(ContractError::EncodeAnyMsgError {});
-    };
+    let execute_any =
+        Any::from_msg(&execute_contract).map_err(|_| ContractError::EncodeAnyMsgError {})?;
 
     let execute_msg = MsgExec {
         grantee,
-        msgs: vec![execute_any.unwrap()],
+        msgs: vec![execute_any],
     };
 
     let execute_stargate = CosmosMsg::Any(AnyMsg {
@@ -63,7 +60,7 @@ pub fn get_authz_increase_allowance_msg(
         expires: None,
     };
 
-    let allow_bin = to_json_binary(&allowance_msg).unwrap();
+    let allow_bin = to_json_binary(&allowance_msg)?;
 
     cosmos_msg_for_contract_execution(granter, grantee, cw20_contract, allow_bin, funds)
 }
