@@ -2,7 +2,6 @@
 
 Liquid Staking Contract that enables liquid staking on union chain.
 
-
 ### Build contract:
 
 ```
@@ -23,8 +22,3 @@ We can use this contract for Non Union chain (utilizing CW20)
 In order to make this liquid contract works, this contract will require cw20 token minter set to this contract
 
 
-### E2E Test
-
-This contract has E2E Test
-
-[Read more](./e2e/interchaintest/README.md)

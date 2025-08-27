@@ -39,7 +39,7 @@ export const GlobalContext = createContext<IGlobalContextProps>({
   setAuthenticated: () => { },
   userAddress: null,
   setUserAddress: () => { },
-  network: Networks["uniontestnet"],
+  network: Networks["babylon-testnet"],
   setNetwork: () => { },
   client: undefined,
   setClient: () => { },
@@ -55,7 +55,7 @@ export const GlobalContextProvider = ({ children }: Props) => {
   // the value that will be given to the context
   const [authenticated, setAuthenticated] = useState(false);
   const [userAddress, setUserAddress] = useState<string | null>(null);
-  const [network, setNetwork] = useState<ChainConfig>(Networks["uniontestnet"]);
+  const [network, setNetwork] = useState<ChainConfig>(Networks["babylon-testnet"]);
   const [client, setClient] = useState<SigningCosmWasmClient>();
   const [queryClient, setQueryClient] = useState<CosmWasmClient>();
   const [icaAddress, setICAAddress] = useState<string | null>(null);

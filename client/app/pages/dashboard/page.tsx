@@ -1,18 +1,22 @@
 "use client";
 
-import ExecuteBond from "../utils/execute_bond";
-import Unbond from "../utils/unbond";
+import Bond from "./bond";
+import Unbond from "./unbond";
 import Assets from "./assets";
 import { Tabs, Tab, Chip, Link } from "@nextui-org/react";
-import UnbondingRecords from "./unbonding_records";
 import RewardAsset from "./reward_asset";
 import RevenueAssets from "./revenue_assets";
 import { useState } from "react";
 import Liquidity from "./liquidity";
-import TransactionHistory from "./transaction_history";
+import { useGlobalContext } from "@/app/core/context";
+import IbcBond from "./ibc_bond";
+import ZkgmUnbond from "./zkgm_unbond";
+import TransferEbabyFromOsmosis from "./transfer_ebaby_from_osmosis";
+import TransferEbabyToOsmosis from "./transfer_ebaby_to_osmosis";
+import DualTransferToOsmosis from "./dual_transfer_to_osmosis";
 
 export default function Dashboard() {
-
+  const { network } = useGlobalContext();
 
   const [stateKey, setStateKey] = useState(1);
 
@@ -26,39 +30,59 @@ export default function Dashboard() {
       <div className="w-full mt-2 ">
         <div className="flex flex-row items-center pb-2">
           <h1 className="p-3 text-2xl">Escher Liquid Staking</h1>
-          <Chip><Link color="warning" onPress={refresh}>Refresh</Link></Chip>
+          <Chip><Link onPress={refresh}>Refresh</Link></Chip>
         </div>
+        {network?.chainId.indexOf("osmo") == -1 &&
+          <div className="flex flex-col">
 
-        <div className="flex flex-col">
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <Assets stateKey={stateKey} />
-              <RevenueAssets stateKey={stateKey} />
-              <RewardAsset stateKey={stateKey} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <Assets stateKey={stateKey} />
+                <RevenueAssets stateKey={stateKey} />
+                <RewardAsset stateKey={stateKey} />
+              </div>
+              <Liquidity stateKey={stateKey} />
             </div>
-            <Liquidity stateKey={stateKey} />
+
+            <Tabs className="mt-10 p-3">
+              <Tab key="bond" title="Bond">
+                <Bond stateKey={stateKey} setStateKey={setStateKey} />
+              </Tab>
+
+
+              <Tab key="unbond" title="Unbond" >
+                <Unbond stateKey={stateKey} setStateKey={setStateKey} />
+              </Tab>
+
+              <Tab key="ebaby_transfer_to_osmosis" title="Transfer eBaby to Osmosis" >
+                <TransferEbabyToOsmosis />
+              </Tab>
+
+              <Tab key="dual_transfer_to_osmosis" title="Transfer Baby & eBaby to Osmosis" >
+                <DualTransferToOsmosis />
+              </Tab>
+
+            </Tabs>
+
           </div>
+        }
 
-          <Tabs aria-label="Tabs sizes" className="mt-10 p-3">
-            <Tab key="bond" title="Bond">
-              <ExecuteBond stateKey={stateKey} setStateKey={setStateKey} />
+        {network?.chainId.indexOf("osmo") != -1 &&
+          <Tabs className="mt-10 p-3">
+            <Tab key="ibc_bond" title="IbcBond" >
+              <IbcBond stateKey={stateKey} setStateKey={setStateKey} />
             </Tab>
-            <Tab key="unbond" title="Unbond" >
-              <Unbond stateKey={stateKey} setStateKey={setStateKey} />
+            <Tab key="zkgm_unbond" title="ZKGM Unbond" >
+              <ZkgmUnbond stateKey={stateKey} setStateKey={setStateKey} />
             </Tab>
-            <Tab key="records" title="Unbonding Process">
-              <UnbondingRecords />
+            <Tab key="transfer_to_babylon" title="Transfer Ebaby To Babylon" >
+              <TransferEbabyFromOsmosis />
             </Tab>
-            <Tab key="history" title="Transactions History">
-              <TransactionHistory />
-            </Tab>
+
           </Tabs>
+        }
 
-
-        </div>
-
-      </div>
+      </div >
     </div>
   );
 }

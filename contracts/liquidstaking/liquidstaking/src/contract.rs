@@ -1,4 +1,11 @@
+use crate::error::ContractError;
+use crate::execute;
 use crate::instantiate::create_reward;
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
+use crate::state::{
+    Parameters, State, Status, ValidatorsRegistry, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
+    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
+};
 use crate::utils::batch::{batches, Batch};
 use crate::utils::validation::{validate_quote_tokens, validate_validators};
 use cosmwasm_std::entry_point;
@@ -6,14 +13,6 @@ use cosmwasm_std::{
     CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
 };
 use cw2::set_contract_version;
-
-use crate::error::ContractError;
-use crate::execute;
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg};
-use crate::state::{
-    Parameters, State, Status, ValidatorsRegistry, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
-    QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
-};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:evm_union_liquid_staking";
@@ -56,7 +55,9 @@ pub fn instantiate(
 
     let params = Parameters {
         underlying_coin_denom: msg.underlying_coin_denom,
+        underlying_coin_denom_symbol: msg.underlying_coin_denom_symbol,
         liquidstaking_denom: msg.liquidstaking_denom,
+        liquidstaking_denom_symbol: msg.liquidstaking_denom_symbol,
         ucs03_relay_contract: msg.ucs03_relay_contract,
         unbonding_time: msg.unbonding_time,
         cw20_address: msg.cw20_address,
@@ -67,6 +68,9 @@ pub fn instantiate(
         min_bond: msg.min_bond,
         min_unbond: msg.min_unbond,
         batch_limit: msg.batch_limit,
+        transfer_fee: msg.transfer_fee,
+        transfer_handler: msg.transfer_handler,
+        zkgm_token_minter: msg.zkgm_token_minter,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -101,6 +105,7 @@ pub fn instantiate(
         },
     )?;
 
+    // initialize the batch
     let pending_batch = Batch::new(
         1,
         Uint128::zero(),
@@ -108,6 +113,15 @@ pub fn instantiate(
     );
     batches().save(deps.storage, pending_batch.id, &pending_batch)?;
     PENDING_BATCH_ID.save(deps.storage, &pending_batch.id)?;
+
+    // initialize the status
+    STATUS.save(
+        deps.storage,
+        &Status {
+            bond_is_paused: false,
+            unbond_is_paused: false,
+        },
+    )?;
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
@@ -122,9 +136,22 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Bond { slippage, expected } => {
-            execute::bond(deps, env, info, slippage, expected)
-        }
+        ExecuteMsg::Bond {
+            slippage,
+            expected,
+            recipient,
+            recipient_channel_id,
+            salt,
+        } => execute::bond(
+            deps,
+            env,
+            info,
+            slippage,
+            expected,
+            recipient,
+            recipient_channel_id,
+            salt,
+        ),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
@@ -140,7 +167,9 @@ pub fn execute(
         }
         ExecuteMsg::SetParameters {
             underlying_coin_denom,
+            underlying_coin_denom_symbol,
             liquidstaking_denom,
+            liquidstaking_denom_symbol,
             ucs03_relay_contract,
             unbonding_time,
             cw20_address,
@@ -151,12 +180,17 @@ pub fn execute(
             min_bond,
             min_unbond,
             batch_limit,
+            transfer_handler,
+            transfer_fee,
+            zkgm_token_minter,
         } => execute::set_parameters(
             deps,
             env,
             info,
             underlying_coin_denom,
+            underlying_coin_denom_symbol,
             liquidstaking_denom,
+            liquidstaking_denom_symbol,
             ucs03_relay_contract,
             unbonding_time,
             cw20_address,
@@ -167,34 +201,35 @@ pub fn execute(
             min_bond,
             min_unbond,
             batch_limit,
+            transfer_handler,
+            transfer_fee,
+            zkgm_token_minter,
         ),
         ExecuteMsg::UpdateQuoteToken {
             channel_id,
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
-        ExecuteMsg::SetExecutor { executor } => execute::set_executor(deps, info, executor),
         ExecuteMsg::OnZkgm {
-            path: _,
-            source_channel_id: _,
-            destination_channel_id: channel_id,
+            caller: _caller,
+            path: _path,
+            source_channel_id: _source_channel_id,
+            destination_channel_id,
             sender,
             message,
-        } => execute::on_zkgm(deps, env, info, channel_id, sender, message),
+            relayer: _relayer,
+            relayer_msg: _relayer_msg,
+        } => execute::on_zkgm(deps, env, info, destination_channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
+        ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
+        ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
+        ExecuteMsg::Inject { amount } => execute::inject(deps, env, info, amount),
     }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    STATUS.save(
-        deps.storage,
-        &Status {
-            bond_is_paused: false,
-            unbond_is_paused: false,
-        },
-    )?;
     Ok(Response::default())
 }

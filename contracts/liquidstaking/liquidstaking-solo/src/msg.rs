@@ -5,13 +5,15 @@ use crate::{
         Parameters, QuoteToken, State, Status, SupplyQueue, UnbondRecord, Validator,
         ValidatorsRegistry,
     },
+    types::ChannelId,
     utils::batch::{Batch, BatchStatus},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256};
+use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256, Uint64};
 use cw2::ContractVersion;
 use cw20::Cw20ReceiveMsg;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
+use serde::{Deserialize, Serialize};
 use unionlabs_primitives::{Bytes, H256};
 
 #[cw_serde]
@@ -52,6 +54,12 @@ pub struct InstantiateMsg {
     // limit per batch
     // this is the max number of unbonding records that can be processed in one batch
     pub batch_limit: u32,
+    // handler of cw20 staking token transfer, as ucs03 fee payer address and also minted cw20 staking token receiver
+    pub transfer_handler: String,
+    // ucs03 transfer fee from babylon to other
+    pub transfer_fee: Uint128,
+    // zkgm token_minter address as cw20 allowance spender
+    pub zkgm_token_minter: String,
 }
 
 #[cw_serde]
@@ -75,11 +83,15 @@ pub enum ExecuteRewardMsg {
 
 #[cw_serde]
 pub enum Cw20PayloadMsg {
-    Unstake {},
+    Unstake {
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+        recipient_ibc_channel_id: Option<String>,
+    },
 }
 
 #[cw_ownable_execute]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
@@ -87,6 +99,9 @@ pub enum ExecuteMsg {
     Bond {
         slippage: Option<Decimal>,
         expected: Uint128,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+        salt: Option<String>,
     },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
@@ -118,6 +133,9 @@ pub enum ExecuteMsg {
         min_bond: Option<Uint128>,
         min_unbond: Option<Uint128>,
         batch_limit: Option<u32>,
+        transfer_handler: Option<String>,
+        transfer_fee: Option<Uint128>,
+        zkgm_token_minter: Option<String>,
     },
     /// Update quote token
     UpdateQuoteToken {
@@ -129,9 +147,14 @@ pub enum ExecuteMsg {
         validators: Vec<Validator>,
     },
     OnZkgm {
-        channel_id: u32,
+        caller: Addr,
+        path: Uint256,
+        source_channel_id: ChannelId,
+        destination_channel_id: ChannelId,
         sender: Bytes,
         message: Bytes,
+        relayer: Addr,
+        relayer_msg: Bytes,
     },
     /// Redelegate some amount that is called from reward contract as result of split reward call to reward contract
     Redelegate {},
@@ -147,6 +170,23 @@ pub enum ExecuteMsg {
         coin_denom: Option<String>,
     },
     SetStatus(Status),
+    SetChain {
+        chain: crate::state::Chain,
+    },
+    RemoveChain {
+        channel_id: u32,
+    },
+    NormalizeReward {},
+    Inject {
+        amount: Uint128,
+    },
+    AddIbcChannel {
+        ibc_channel_id: String,
+        prefix: String,
+    },
+    RemoveIbcChannel {
+        ibc_channel_id: String,
+    },
 }
 
 #[cw_serde]
@@ -197,14 +237,24 @@ pub enum QueryMsg {
     SupplyQueue {},
     #[returns(Status)]
     Status {},
+    #[returns(Vec<cosmwasm_std::FullDelegation>)]
+    Delegations {},
+    #[returns(Vec<crate::state::Chain>)]
+    Chains {},
+    #[returns(Vec<crate::state::WithdrawRewardQueue>)]
+    RewardQueue {},
+    #[returns(Vec<IBCChannel>)]
+    IbcChannels {},
+    #[returns(IbcChannelId)]
+    RecipientIbcChannel { unbond_record_id: u64 },
 }
 
 pub type Fees = BTreeMap<String, Coin>;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Ucs03ExecuteMsg {
-    /// This allows us to transfer via ucs03 relayer
+    /// This allows us to transfer via ucs03
     Transfer {
         channel_id: u32,
         receiver: Bytes,
@@ -215,6 +265,14 @@ pub enum Ucs03ExecuteMsg {
         timeout_height: u64,
         timeout_timestamp: u64,
         salt: H256,
+    },
+    /// This allows us to send packet via ucs03
+    Send {
+        channel_id: ChannelId,
+        timeout_height: Uint64,
+        timeout_timestamp: Timestamp,
+        salt: H256,
+        instruction: Bytes,
     },
 }
 
@@ -237,6 +295,9 @@ pub struct MintTokensPayload {
     pub amount: Uint128,
     pub salt: String,
     pub channel_id: Option<u32>,
+    pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
+    pub transfer_fee: Option<Uint128>,
 }
 
 #[cw_serde]
@@ -269,11 +330,16 @@ pub enum ZkgmMessage {
     Bond {
         amount: Uint128,
         salt: String,
-        slippage: Option<Decimal>,
         expected: Uint128,
+        slippage: Option<Decimal>,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
     },
     Unbond {
         amount: Uint128,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+        recipient_ibc_channel_id: Option<String>,
     },
 }
 
@@ -284,6 +350,8 @@ pub struct BondData {
     pub total_bond_amount: Uint128,
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
 }
 
 #[cw_serde]
@@ -294,7 +362,47 @@ pub struct UnbondData {
     pub exchange_rate: Decimal,
     pub total_supply: Uint128,
     pub record_id: u64,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
 }
 
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub transfer_handler: Option<String>,
+    pub zkgm_token_minter: Option<String>,
+}
+
+#[cw_serde]
+pub struct RewardMigrateMsg {}
+
+#[cw_serde]
+pub struct IBCCallbackPayload {
+    pub amount: Uint128,
+    pub slippage: Option<Decimal>,
+    pub expected: Uint128,
+    pub salt: String,
+    pub recipient: String,
+    pub recipient_channel_id: Option<u32>,
+    pub transfer_fee: Option<Uint128>,
+}
+
+pub struct InjectData {
+    pub prev_exchange_rate: Decimal,
+    pub new_exchange_rate: Decimal,
+    pub total_supply: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
+    pub delegated_amount: Uint128,
+    pub total_bond_amount: Uint128,
+}
+
+#[cw_serde]
+pub struct IBCChannel {
+    pub ibc_channel_id: String,
+    pub prefix: String,
+}
+
+#[cw_serde]
+pub struct IbcChannelId {
+    pub channel_id: String,
+}

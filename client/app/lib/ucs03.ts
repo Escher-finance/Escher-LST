@@ -1,6 +1,5 @@
 import { err, ok, ResultAsync, type Result } from "neverthrow"
 import { fromHex, Hex, isHex } from "viem";
-import { request } from "graphql-request";
 import { graphql } from "gql.tada";
 import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 
@@ -163,6 +162,7 @@ export const getQuoteToken = async (
     >
 > => {
     // check if the denom is wrapped
+    const { request } = await import("graphql-request");
     let wrapping: any = await ResultAsync.fromPromise(
         request(GRAQPHQL_URL, tokenWrappingQuery, {
             base_token,

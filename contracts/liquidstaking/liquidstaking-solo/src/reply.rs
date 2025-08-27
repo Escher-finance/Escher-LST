@@ -3,15 +3,15 @@ use std::str::FromStr;
 use crate::error::ContractError;
 use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
 use crate::state::{
-    Parameters, WithdrawReward, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
+    Parameters, WithdrawReward, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE,
+    SPLIT_REWARD_QUEUE, SUPPLY_QUEUE, WITHDRAW_REWARD_QUEUE,
 };
-use crate::utils;
+use crate::utils::calc::get_next_epoch;
 use cosmwasm_std::{
     attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, SubMsg, Uint128, Uint256, WasmMsg,
+    Env, Reply, Response, StdError, SubMsg, Uint128, WasmMsg,
 };
-use unionlabs_primitives::{Bytes, H256};
-
+use unionlabs_primitives::Bytes;
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
@@ -37,8 +37,26 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let params: Parameters = PARAMETERS.load(deps.storage)?;
     let payload: MintTokensPayload = from_json(msg.payload)?;
 
-    let msg = cw20::Cw20QueryMsg::Balance {
-        address: env.contract.address.to_string(),
+    // if recipient channel id is none, need to make sure recipient address is valid address on the chain where the contract is running
+    let is_on_chain_recipient = crate::utils::validation::is_on_chain_recipient(
+        &deps,
+        payload.recipient.clone(),
+        payload.recipient_channel_id,
+        None,
+    );
+
+    // check to query balance of transfer handler or this contract
+    // transfer handler is used to transfer cw20 minted token to other chain
+    let msg = if !is_on_chain_recipient
+        && (payload.channel_id.is_some() || payload.recipient_channel_id.is_some())
+    {
+        cw20::Cw20QueryMsg::Balance {
+            address: params.transfer_handler.to_string(),
+        }
+    } else {
+        cw20::Cw20QueryMsg::Balance {
+            address: env.contract.address.to_string(),
+        }
     };
 
     let balance: cw20::BalanceResponse = deps
@@ -51,53 +69,133 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
     let mut msgs: Vec<CosmosMsg> = vec![];
 
-    if payload.staker != payload.sender && payload.channel_id.is_some() {
-        let allowance_msg = cw20::Cw20ExecuteMsg::IncreaseAllowance {
-            spender: params.ucs03_relay_contract.clone(),
-            amount: payload.amount.clone(),
-            expires: None,
+    // if staker is from other chain, we need to use transfer handler address to do transfer back to user
+    // so we need to get correct authz execute msg to cw20 and ucs03 to handle the transfer
+    // also need to attach required funds
+    let mut quote_token_string = String::new();
+    let amount = payload.amount;
+    // check if payload has transfer fee, use it, otherwise use default transfer fee from parameters
+    let transfer_fee = match payload.transfer_fee {
+        Some(fee) => fee,
+        None => params.transfer_fee,
+    };
+
+    // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
+    // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
+    if !is_on_chain_recipient
+        && (payload.channel_id.is_some() || payload.recipient_channel_id.is_some())
+    {
+        let channel_id = match payload.recipient_channel_id {
+            Some(channel_id) => channel_id,
+            None => payload.channel_id.unwrap(),
         };
 
-        let allow_bin = to_json_binary(&allowance_msg).unwrap();
-        let allow_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: params.cw20_address.to_string(),
-            msg: allow_bin,
-            funds: vec![],
-        });
-        msgs.push(allow_msg);
+        let recipient = match payload.recipient.clone() {
+            Some(rec) => rec,
+            None => payload.staker.clone(),
+        };
+        let params = PARAMETERS.load(deps.storage)?;
 
-        let quote_token = QUOTE_TOKEN.load(deps.storage, payload.channel_id.unwrap())?;
-        let wasm_msg: WasmMsg = utils::protocol::ucs03_transfer(
-            env.block.time,
-            params.ucs03_relay_contract,
-            payload.channel_id.unwrap(),
-            Bytes::from_str(payload.staker.as_str()).unwrap(),
+        // allow/approve ucs03 to transfer on behalf of transfer handler via authz
+        let allowance_msg = crate::utils::authz::get_authz_increase_allowance_msg(
+            params.transfer_handler.clone(),
+            env.contract.address.to_string(),
             params.cw20_address.to_string(),
-            payload.amount.clone(),
-            Bytes::from_str(quote_token.lst_quote_token.as_str()).unwrap(),
-            Uint256::from(payload.amount.clone()),
+            params.zkgm_token_minter,
+            amount,
             vec![],
-            H256::from_str(payload.salt.as_str()).unwrap(),
         )?;
-        msgs.push(wasm_msg.into());
-    } else {
-        let msg = send_cw20(
-            deps,
-            payload.amount,
+
+        msgs.push(allowance_msg);
+
+        let mut funds = vec![];
+
+        if transfer_fee > Uint128::zero() {
+            funds.push(Coin {
+                amount: transfer_fee,
+                denom: params.underlying_coin_denom.clone(),
+            });
+        }
+
+        let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
+        quote_token_string = quote_token.lst_quote_token.clone();
+
+        let recipient_address = match Bytes::from_str(recipient.as_str()) {
+            Ok(rec) => rec,
+            Err(_) => {
+                return Err(ContractError::InvalidAddress {
+                    kind: "recipient".into(),
+                    address: recipient,
+                    reason: "address must be in hex and starts with 0x".to_string(),
+                })
+            }
+        };
+        let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
+            Ok(token) => token,
+            Err(_) => {
+                return Err(ContractError::InvalidAddress {
+                    kind: "quote_token".into(),
+                    address: quote_token_string,
+                    reason: "address must be in hex and starts with 0x".to_string(),
+                })
+            }
+        };
+
+        let salt: unionlabs_primitives::H256 =
+            match unionlabs_primitives::H256::from_str(payload.salt.as_str()) {
+                Ok(s) => s,
+                Err(e) => {
+                    return Err(ContractError::Std(StdError::generic_err(format!(
+                        "failed to parse salt: {}, reason: {}",
+                        payload.salt,
+                        e.to_string()
+                    ))))
+                }
+            };
+
+        let authz_ucs03_msg = crate::utils::authz::get_authz_ucs03_transfer(
             params.cw20_address.to_string(),
-            payload.staker.clone(),
+            params.transfer_handler,
+            env.contract.address.to_string(),
+            env.block.time,
+            params.ucs03_relay_contract.clone(),
+            channel_id,
+            recipient_address,
+            params.cw20_address.to_string(),
+            amount,
+            quote_token,
+            amount,
+            funds.clone(),
+            salt,
         )?;
+
+        msgs.push(authz_ucs03_msg);
+    } else {
+        let receiver = match payload.recipient.clone() {
+            Some(receiver) => receiver,
+            None => payload.staker.clone(),
+        };
+
+        // if staker from same chain, this contract will send the cw20 staking token
+        let msg = send_cw20(deps, amount, params.cw20_address.to_string(), receiver)?;
         msgs.push(msg);
     }
 
     let res: Response = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "mint_cw20")
-        .add_attribute("receiver", payload.staker.to_string())
-        .add_attribute("amount", payload.amount.to_string())
+        .add_attribute("sender", payload.sender.to_string())
+        .add_attribute("staker", payload.staker.to_string())
+        .add_attribute("recipient", format!("{:?}", payload.recipient))
+        .add_attribute("channel_id", payload.channel_id.unwrap_or(0).to_string())
+        .add_attribute("amount", amount.to_string())
         .add_attribute("denom", params.liquidstaking_denom)
         .add_attribute("base_denom", params.cw20_address)
+        .add_attribute("quote_token", quote_token_string)
+        .add_attribute("transfer_handler", params.transfer_handler)
+        .add_attribute("transfer_fee", transfer_fee)
         .add_attribute("staked_token_balance", balance.balance.to_string());
+
     Ok(res)
 }
 
@@ -152,9 +250,26 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
 }
 
 /// Handle split reward call to reward contract reply
-fn on_split_reward(deps: DepsMut, _env: Env, _msg: Reply) -> Result<Response, ContractError> {
+fn on_split_reward(deps: DepsMut, env: Env, _msg: Reply) -> Result<Response, ContractError> {
     // reset reward balance after split reward call success
     REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
+    let supply = SUPPLY_QUEUE.load(deps.storage)?;
+    let block_height = env.block.height;
+
+    let next_epoch = get_next_epoch(block_height, supply.epoch_period);
+    let epoch_diff = next_epoch - block_height;
+
+    // Only add one withdraw reward queue entry if epoch diff > 3 to trigger normalize reward
+    if epoch_diff > 0 && epoch_diff != supply.epoch_period as u64 {
+        let reward_queue = WithdrawRewardQueue {
+            amount: Uint128::zero(),
+            block: block_height,
+        };
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![reward_queue])?;
+    } else {
+        // reset withdraw reward queue if epoch diff is 0 or equal to epoch period
+        WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![])?;
+    }
 
     let res: Response = Response::new().add_attribute("action", "on_split_reward");
 
