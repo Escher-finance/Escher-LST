@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::{
-    ContractError,
     state::{QuoteToken, Validator},
+    ContractError,
 };
 
 pub fn validate_validators(validators: &[Validator]) -> Result<(), ContractError> {
@@ -47,15 +47,16 @@ pub fn validate_recipient(
 ) -> Result<bool, ContractError> {
     let mut on_chain_recipient = false;
     // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
-    if recipient.is_some() && recipient_channel_id.is_none() {
-        deps.api
-            .addr_validate(recipient.clone().unwrap().as_str())?;
-        on_chain_recipient = true;
+    if let Some(recipient) = recipient {
+        if recipient_channel_id.is_none() {
+            deps.api.addr_validate(recipient.clone().as_str())?;
+            on_chain_recipient = true;
+        }
     }
 
     // if recipient_channel_id exists, must make sure the chain is supported
-    if recipient_channel_id.is_some() {
-        let channel_id = crate::state::CHAINS.load(deps.storage, recipient_channel_id.unwrap());
+    if let Some(recipient_channel_id) = recipient_channel_id {
+        let channel_id = crate::state::CHAINS.load(deps.storage, recipient_channel_id);
         if channel_id.is_err() {
             return Err(ContractError::InvalidChannelId {});
         }
@@ -74,13 +75,10 @@ pub fn is_on_chain_recipient(
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
 ) -> bool {
-    let mut on_chain_recipient = false;
-    if recipient.is_some() && recipient_channel_id.is_none() {
-        let res = deps.api.addr_validate(recipient.clone().unwrap().as_str());
-        if res.is_ok() {
-            on_chain_recipient = true;
-        }
+    if let Some(recipient) = recipient {
+        return recipient_channel_id.is_none()
+            && deps.api.addr_validate(recipient.clone().as_str()).is_ok();
     }
 
-    on_chain_recipient
+    false
 }

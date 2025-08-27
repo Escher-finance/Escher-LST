@@ -1,28 +1,28 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    Addr, Attribute, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, Event, QuerierWrapper,
-    StakingMsg, StdResult, Storage, SubMsg, Timestamp, Uint128, to_json_binary,
+    to_json_binary, Addr, Attribute, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, Event,
+    QuerierWrapper, StakingMsg, StdResult, Storage, SubMsg, Timestamp, Uint128,
 };
 use unionlabs_primitives::{Bytes, H256};
 
 use super::calc::calculate_native_token_from_staking_token;
 use crate::{
-    ContractError,
     event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
     execute::StakerUndelegation,
     msg::{BondData, DelegationDiff, InjectData, MintTokensPayload, ValidatorDelegation},
     state::{
-        PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN, REWARD_BALANCE, STATE, UnbondRecord,
-        VALIDATORS_REGISTRY, Validator, ValidatorsRegistry, increment_tokens, unbond_record,
+        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, ValidatorsRegistry,
+        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
     },
     utils::{
         authz::get_authz_ucs03_transfer,
-        batch::{Batch, BatchStatus, batches},
+        batch::{batches, Batch, BatchStatus},
         calc,
         calc::to_uint128,
         token,
     },
+    ContractError,
 };
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
@@ -354,7 +354,7 @@ pub fn get_unbond_all_messages(
     deps: DepsMut,
     delegator: Addr,
 ) -> Result<Vec<CosmosMsg>, ContractError> {
-    let delegations_resp = deps.querier.query_all_delegations(delegator);
+    let delegations_resp = deps.querier.query_all_delegations(delegator)?;
     let params = PARAMETERS.load(deps.storage)?;
     let denom = params.underlying_coin_denom;
 
@@ -362,8 +362,6 @@ pub fn get_unbond_all_messages(
     let mut msgs: Vec<CosmosMsg> = vec![];
     for validator in validators_reg.validators.iter() {
         let undelegate_amount: Uint128 = delegations_resp
-            .as_ref()
-            .unwrap()
             .iter()
             .filter(|d| {
                 d.amount.denom == denom
@@ -535,7 +533,7 @@ pub fn process_bond(
             params.liquidstaking_denom.clone(),
             payload_bin,
             params.cw20_address,
-        );
+        )?;
         sub_msgs.push(sub_msg);
     }
 
@@ -635,7 +633,7 @@ pub fn submit_pending_batch(
 
     let mut events = UnbondEventsFromAtts(atts, batch.id, time);
 
-    let burn_msg = token::burn_token(batch.total_liquid_stake, params.cw20_address.to_string());
+    let burn_msg = token::burn_token(batch.total_liquid_stake, params.cw20_address.to_string())?;
     msgs.push(burn_msg);
 
     // // update total bond, supply and exchange rate here
@@ -712,7 +710,7 @@ pub fn unstake_request_in_batch(
     pending_batch.unbond_records_count += 1;
     batches().save(storage, pending_batch_id, &pending_batch)?;
 
-    let id: u64 = increment_tokens(storage).unwrap();
+    let id: u64 = increment_tokens(storage)?;
     let record = UnbondRecord {
         id,
         batch_id: pending_batch.id,
@@ -804,7 +802,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
         quote_token,
         undelegate_amount,
         funds,
-        H256::from_str(salt.as_str()).unwrap(),
+        H256::from_str(salt.as_str()).map_err(|_| ContractError::InvalidSalt {})?,
         params.underlying_coin_denom.clone(),
         params.underlying_coin_denom_symbol.clone(),
         params.liquidstaking_denom.clone(),
@@ -871,7 +869,7 @@ pub fn get_staker_undelegation(
     // released amount before adjusted with dust distribution, sometime it can be lower than total received amount
     let released_amount: Uint128 = staker_undelegation
         .values()
-        .map(|item| item.unstake_return_native_amount.unwrap())
+        .map(|item| item.unstake_return_native_amount.unwrap_or_default())
         .sum();
 
     let dust_amount = (total_received_amount_in_decimal
@@ -898,7 +896,9 @@ pub fn get_staker_undelegation(
             .unstake_return_native_amount
             .map(|x| x + dust);
 
-        total_released_amount += staker_undelegation.unstake_return_native_amount.unwrap();
+        total_released_amount += staker_undelegation
+            .unstake_return_native_amount
+            .unwrap_or_default();
     }
 
     Ok((

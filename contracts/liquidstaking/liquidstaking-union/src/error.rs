@@ -118,6 +118,9 @@ pub enum ContractError {
     #[error("invalid fee rate")]
     InvalidFeeRate {},
 
+    #[error("invalid salt")]
+    InvalidSalt {},
+
     #[error("Invalid exchange rate")]
     InvalidExchangeRate {},
 
