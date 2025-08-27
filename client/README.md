@@ -3,11 +3,10 @@
 ### Config
 
 1. Menu config
-config/site.ts
+   config/site.ts
 
 2. Network config
-config/networks.config.ts
-
+   config/networks.config.ts
 
 ### STEPS to run Non union/Ignite chain client demo app:
 
@@ -17,7 +16,7 @@ config/networks.config.ts
 
 3. Instantiate cw20 contract and set minter to user
 
-4. Instantiate liquid staking contract 
+4. Instantiate liquid staking contract
 
 5. Set minter of cw20 contract to liquid staking contract address
 

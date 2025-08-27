@@ -7,8 +7,6 @@
 - LST_WASM_PATH="liquid staking contract wasm absolute file path"
 - REWARD_WASM_PATH="reward contract wasm absolute file path"
 
-
-
 2. Prepare these data as env vars and set in src/config.ts
 
 - chainId

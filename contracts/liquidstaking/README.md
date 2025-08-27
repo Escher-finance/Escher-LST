@@ -20,5 +20,3 @@ We can use this contract for Non Union chain (utilizing CW20)
 ### Prequisites:
 
 In order to make this liquid contract works, this contract will require cw20 token minter set to this contract
-
-
