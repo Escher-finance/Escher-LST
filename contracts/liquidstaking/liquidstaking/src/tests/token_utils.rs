@@ -8,7 +8,6 @@ fn test_get_staked_token_submsg() {
     let payload_bin = Binary::default();
     let cw20_address = Addr::unchecked("cw20");
     let submsg = get_staked_token_submsg(
-        String::new(),
         staker.clone(),
         mint_amount,
         String::default(),

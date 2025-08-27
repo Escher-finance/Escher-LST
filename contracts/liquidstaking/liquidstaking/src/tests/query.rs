@@ -24,6 +24,8 @@ fn test_query_unbond_record() {
             // These bellow are just to create some variation in the data
             released: i > (total / 2),
             batch_id: if i % 2 == 0 { 1 } else { 2 },
+            recipient: None,
+            recipient_channel_id: None,
         };
         unbond_record()
             .save(deps.as_mut().storage, i, &unbond_rec)

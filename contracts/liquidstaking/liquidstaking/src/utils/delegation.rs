@@ -166,7 +166,7 @@ pub fn get_validator_delegation_map_base_on_weight(
     let total_weight = validators
         .iter()
         .map(|v| v.weight)
-        .reduce(|a, b| (a + b))
+        .reduce(|a, b| a + b)
         .unwrap_or(0);
 
     let mut correct_validator_delegation_map: HashMap<String, Uint128> = HashMap::new();
@@ -304,7 +304,7 @@ pub fn get_delegate_to_validator_msgs(
     let total_weight = validators
         .iter()
         .map(|v| v.weight)
-        .reduce(|a, b| (a + b))
+        .reduce(|a, b| a + b)
         .unwrap_or(1);
 
     let mut total_delegated: Uint128 = Uint128::from(0u32);
