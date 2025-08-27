@@ -4,7 +4,7 @@ use cosmos_sdk_proto::{
     traits::Message,
     Any,
 };
-use cosmwasm_std::{to_json_binary, AnyMsg, Binary, Coin, CosmosMsg, StdError, Timestamp, Uint128};
+use cosmwasm_std::{to_json_binary, AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128};
 use unionlabs_primitives::{Bytes, H256};
 
 use crate::{error::ContractError, zkgm::protocol::ucs03_transfer};

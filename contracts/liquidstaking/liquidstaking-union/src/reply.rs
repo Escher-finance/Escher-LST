@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StdError, SubMsg, Uint128,
-    WasmMsg, attr, entry_point, from_json, to_json_binary,
+    attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
+    Env, Reply, Response, StdError, SubMsg, Uint128, WasmMsg,
 };
 use unionlabs_primitives::Bytes;
 
@@ -10,7 +10,7 @@ use crate::{
     error::ContractError,
     msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload},
     state::{
-        PARAMETERS, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, WithdrawReward,
+        Parameters, WithdrawReward, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
     },
 };
 
@@ -81,15 +81,18 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     if !is_on_chain_recipient
         && (payload.channel_id.is_some() || payload.recipient_channel_id.is_some())
     {
-        let channel_id = match payload.recipient_channel_id {
-            Some(channel_id) => channel_id,
-            None => payload.channel_id.unwrap(),
+        let channel_id = match (payload.recipient_channel_id, payload.channel_id) {
+            (Some(id), _) => id,
+            (None, Some(id)) => id,
+            (None, None) => {
+                return Err(ContractError::InvalidChannelId {});
+            }
         };
 
-        let recipient = match payload.recipient.clone() {
-            Some(rec) => rec,
-            None => payload.staker.clone(),
-        };
+        let recipient = payload
+            .recipient
+            .clone()
+            .unwrap_or_else(|| payload.staker.clone());
         let params = PARAMETERS.load(deps.storage)?;
 
         // allow/approve ucs03 to transfer on behalf of transfer handler via authz
@@ -281,7 +284,7 @@ pub fn send_cw20(
     recipient: String,
 ) -> Result<CosmosMsg, ContractError> {
     let cw20_execute_transfer_msg = cw20::Cw20ExecuteMsg::Transfer { recipient, amount };
-    let msg_bin = to_json_binary(&cw20_execute_transfer_msg).unwrap();
+    let msg_bin = to_json_binary(&cw20_execute_transfer_msg)?;
     let cw20_transfer_msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: cw20_address,
         msg: msg_bin,
