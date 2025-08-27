@@ -4,8 +4,8 @@ use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
 use cw20::TokenInfoResponse;
 
 use crate::{
+    state::{BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue, SUPPLY_QUEUE},
     ContractError,
-    state::{BurnQueue, MintQueue, SUPPLY_QUEUE, SupplyQueue, WithdrawRewardQueue},
 };
 
 /// return how much staking token from underlying native coin denom
@@ -70,7 +70,7 @@ pub fn get_next_epoch(block: u64, epoch_period: u32) -> u64 {
     block + (epoch_period as u64 - remainder)
 }
 
-fn get_elements_by_indices<T: Clone>(vec: &Vec<T>, indices: &[usize]) -> Vec<T> {
+fn get_elements_by_indices<T: Clone>(vec: &[T], indices: &[usize]) -> Vec<T> {
     let mut result = Vec::with_capacity(indices.len());
 
     for &index in indices {
@@ -96,8 +96,8 @@ pub fn normalize_supply_queue(supply_queue: &mut SupplyQueue, current_block: u64
             burn_retain.push(pos)
         }
     }
-    supply_queue.mint = get_elements_by_indices(&mut supply_queue.mint, &mint_retain);
-    supply_queue.burn = get_elements_by_indices(&mut supply_queue.burn, &burn_retain);
+    supply_queue.mint = get_elements_by_indices(&supply_queue.mint, &mint_retain);
+    supply_queue.burn = get_elements_by_indices(&supply_queue.burn, &burn_retain);
 }
 
 pub fn normalize_total_supply(

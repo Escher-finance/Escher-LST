@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, WasmMsg, instantiate2_address, to_json_binary,
+    instantiate2_address, to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, WasmMsg,
 };
 
 use crate::{error::ContractError, msg::InstantiateRewardMsg};
@@ -18,7 +18,7 @@ pub fn instantiate2(
     let code_info = deps.querier.query_wasm_code_info(code_id)?;
     let creator_cannonical = deps.api.addr_canonicalize(env.contract.address.as_str())?;
     let contract_addr = deps.api.addr_humanize(&instantiate2_address(
-        &code_info.checksum.as_slice(),
+        code_info.checksum.as_slice(),
         &creator_cannonical,
         salt.as_bytes(),
     )?)?;
@@ -30,7 +30,7 @@ pub fn instantiate2(
             message: format!(
                 "Wallet code id : {} not found, {}",
                 code_id,
-                code_info_result.unwrap_err().to_string()
+                code_info_result.unwrap_err()
             ),
         });
     }
@@ -44,9 +44,10 @@ pub fn instantiate2(
         salt: salt.as_bytes().into(),
     });
 
-    Ok((instantiate_msg.into(), contract_addr))
+    Ok((instantiate_msg, contract_addr))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_reward(
     deps: &DepsMut,
     env: &Env,

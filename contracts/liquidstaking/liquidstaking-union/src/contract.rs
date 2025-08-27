@@ -53,7 +53,7 @@ pub fn instantiate(
         msg.reward_code_id,
         env.clone().contract.address,
         msg.fee_receiver.clone(),
-        msg.fee_rate.clone(),
+        msg.fee_rate,
         msg.underlying_coin_denom.clone(),
     )?;
 

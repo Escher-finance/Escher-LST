@@ -1,9 +1,10 @@
-use cosmwasm_std::{Addr, Attribute, Decimal, Event, Timestamp, Uint128, attr};
+use cosmwasm_std::{attr, Addr, Attribute, Decimal, Event, Timestamp, Uint128};
 
 use crate::state::Validator;
 pub const BOND_EVENT: &str = "bond";
 
 #[allow(non_snake_case)]
+#[allow(clippy::too_many_arguments)]
 pub fn BondEvent(
     sender: String,
     staker: String,
@@ -89,6 +90,7 @@ pub fn UnbondEventsFromAtts(atts: Vec<Attribute>, batch_id: u64, time: Timestamp
 pub const SUBMIT_BATCH_EVENT: &str = "submit_batch";
 
 #[allow(non_snake_case)]
+#[allow(clippy::too_many_arguments)]
 pub fn SubmitBatchEvent(
     batch_id: u64,
     sender: String,
@@ -154,6 +156,7 @@ pub fn ProcessRewardsEvent(total_amount: Uint128, balance_reward: Uint128) -> Ev
 pub const PROCESS_UNBONDING_EVENT: &str = "process_unbonding";
 
 #[allow(non_snake_case)]
+#[allow(clippy::too_many_arguments)]
 pub fn ProcessUnbondingEvent(
     batch_id: u64,
     channel_id: Option<u32>,
@@ -225,6 +228,7 @@ pub fn ProcessBatchUnbondingEvent(
 pub const UNSTAKE_REQUEST_EVENT: &str = "unstake_request";
 
 #[allow(non_snake_case)]
+#[allow(clippy::too_many_arguments)]
 pub fn UnstakeRequestEvent(
     sender: String,
     staker: String,
@@ -328,6 +332,7 @@ pub fn UpdateConfigEvent(
 pub const INJECT_EVENT: &str = "inject";
 
 #[allow(non_snake_case)]
+#[allow(clippy::too_many_arguments)]
 pub fn InjectEvent(
     amount: Uint128,
     reward_balance: Uint128,
@@ -354,6 +359,7 @@ pub fn InjectEvent(
 pub const IBC_CALLBACK_EVENT: &str = "ibc_callback";
 
 #[allow(non_snake_case)]
+#[allow(clippy::too_many_arguments)]
 pub fn IbcCallbackEvent(
     sender: String,
     ibc_channel_id: String,

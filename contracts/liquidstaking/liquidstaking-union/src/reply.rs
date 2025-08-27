@@ -141,7 +141,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                     return Err(ContractError::Std(StdError::generic_err(format!(
                         "failed to parse salt: {}, reason: {}",
                         payload.salt,
-                        e.to_string()
+                        e
                     ))));
                 }
             };

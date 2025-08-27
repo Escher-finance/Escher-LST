@@ -119,7 +119,7 @@ fn test_total_lst_supply() {
                             total_supply,
                         };
                         let bin = to_json_binary(&response).unwrap();
-                        return SystemResult::Ok(cosmwasm_std::ContractResult::Ok(bin));
+                        SystemResult::Ok(cosmwasm_std::ContractResult::Ok(bin))
                     }
                     _ => unsupported_err,
                 }
@@ -563,7 +563,7 @@ fn test_normalize_reward() {
     env.block.height = 1100;
 
     let res = execute::normalize_reward(deps.as_mut(), env);
-    assert_eq!(res.is_err(), true);
+    assert!(res.is_err());
 
     let queue = vec![WithdrawRewardQueue {
         amount: Uint128::new(100),
@@ -578,25 +578,25 @@ fn test_normalize_reward() {
 
     let res = execute::normalize_reward(deps.as_mut(), env);
     println!("res: {:?}", res);
-    assert_eq!(res.is_err(), true);
+    assert!(res.is_err());
 
     let mut env = mock_env();
     env.block.height = 1199;
 
     let res = execute::normalize_reward(deps.as_mut(), env);
-    assert_eq!(res.is_ok(), true);
+    assert!(res.is_ok());
 
     let mut env = mock_env();
     env.block.height = 1200;
 
     let res = execute::normalize_reward(deps.as_mut(), env);
     println!("res: {:?}", res);
-    assert_eq!(res.is_ok(), true);
+    assert!(res.is_ok());
 
     let mut env: cosmwasm_std::Env = mock_env();
     env.block.height = 1400;
 
     let res = execute::normalize_reward(deps.as_mut(), env);
     println!("res: {:?}", res);
-    assert_eq!(res.is_err(), true);
+    assert!(res.is_err());
 }

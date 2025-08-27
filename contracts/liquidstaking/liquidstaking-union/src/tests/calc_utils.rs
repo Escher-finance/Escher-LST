@@ -108,7 +108,7 @@ fn test_total_lst_supply() {
                             total_supply,
                         };
                         let bin = to_json_binary(&response).unwrap();
-                        return SystemResult::Ok(cosmwasm_std::ContractResult::Ok(bin));
+                        SystemResult::Ok(cosmwasm_std::ContractResult::Ok(bin))
                     }
                     _ => unsupported_err,
                 }

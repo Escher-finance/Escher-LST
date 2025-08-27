@@ -1,9 +1,9 @@
-use cosmwasm_std::{Uint128, testing::mock_dependencies};
+use cosmwasm_std::{testing::mock_dependencies, Uint128};
 
 use crate::{
-    ContractError,
     query::*,
-    state::{UnbondRecord, unbond_record},
+    state::{unbond_record, UnbondRecord},
+    ContractError,
 };
 
 #[test]
@@ -58,11 +58,9 @@ fn test_query_unbond_record() {
     )
     .unwrap();
     assert_eq!(unbond_recs.len(), 6);
-    assert!(
-        unbond_recs
-            .iter()
-            .all(|r| r.staker == staker && r.id >= 10 && r.id <= 15)
-    );
+    assert!(unbond_recs
+        .iter()
+        .all(|r| r.staker == staker && r.id >= 10 && r.id <= 15));
     // Query by staker_released
     let unbond_recs = query_unbond_record(
         &deps.storage,
@@ -84,11 +82,7 @@ fn test_query_unbond_record_should_return_err_if_invalid_query() {
     let deps = mock_dependencies();
     let err =
         query_unbond_record(&deps.storage, None, None, None, None, Some(0), Some(100)).unwrap_err();
-    let has_right_error = if let ContractError::InvalidUnbondRecordQuery {} = err {
-        true
-    } else {
-        false
-    };
+    let has_right_error = matches!(err, ContractError::InvalidUnbondRecordQuery {});
     assert!(has_right_error);
 }
 
@@ -114,7 +108,7 @@ fn test_query_chains() {
         .filter_map(|result| result.ok().map(|(_, chain)| chain))
         .collect();
 
-    let chain_1: &crate::state::Chain = chains.get(0).unwrap();
+    let chain_1: &crate::state::Chain = chains.first().unwrap();
     assert_eq!(chain_1.ucs03_channel_id, 1);
 
     let chain_9: &crate::state::Chain = chains.get(8).unwrap();
