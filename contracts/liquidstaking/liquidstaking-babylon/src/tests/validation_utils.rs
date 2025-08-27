@@ -1,9 +1,9 @@
 use cosmwasm_std::testing::mock_dependencies;
 
 use crate::{
+    ContractError,
     state::{QuoteToken, Validator},
     utils::validation::*,
-    ContractError,
 };
 
 #[test]

@@ -1,25 +1,24 @@
 use std::marker::PhantomData;
 
 use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, Decimal, Deps, Env, Order, Storage, Uint128,
+    Binary, Decimal, Deps, Env, Order, Storage, Uint128, entry_point, to_json_binary,
 };
-use cw2::ContractVersion;
 use cw_ownable::get_ownership;
+use cw2::ContractVersion;
 
 use crate::{
+    ContractError,
     msg::{QueryMsg, StakingLiquidity},
     state::{
-        unbond_record, Balance, Parameters, QuoteToken, State, Status, UnbondRecord,
-        ValidatorsRegistry, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, STATE, STATUS,
-        VALIDATORS_REGISTRY,
+        Balance, PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
+        State, Status, UnbondRecord, VALIDATORS_REGISTRY, ValidatorsRegistry, unbond_record,
     },
     utils::{
-        batch::{batches, Batch, BatchStatus},
+        batch::{Batch, BatchStatus, batches},
         calc,
         calc::calculate_query_bounds,
         delegation::{get_actual_total_delegated, get_unclaimed_reward},
     },
-    ContractError,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]

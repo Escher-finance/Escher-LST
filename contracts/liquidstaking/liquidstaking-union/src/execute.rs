@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
-    DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
+    Addr, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response,
+    SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
@@ -17,13 +17,13 @@ use crate::{
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, QuoteToken, Status, Validator, WithdrawReward, PARAMETERS, PENDING_BATCH_ID,
-        QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, VALIDATORS_REGISTRY,
+        Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, STATE, STATUS, Status, VALIDATORS_REGISTRY, Validator, WithdrawReward,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{batches, BatchStatus},
+        batch::{BatchStatus, batches},
         calc::{check_slippage, to_uint128},
         delegation::{
             get_actual_total_delegated, get_mock_total_reward,
