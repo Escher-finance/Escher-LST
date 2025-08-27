@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use cosmwasm_schema::{QueryResponses, cw_serde};
-use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint64, Uint128, Uint256};
-use cw_ownable::{cw_ownable_execute, cw_ownable_query};
+use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256, Uint64};
 use cw2::ContractVersion;
 use cw20::Cw20ReceiveMsg;
+use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use serde::{Deserialize, Serialize};
 use unionlabs_primitives::{Bytes, H256};
 
@@ -94,6 +94,7 @@ pub enum Cw20PayloadMsg {
 #[cw_ownable_execute]
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
     /// Issue `amount` / exchange_rate for the user.

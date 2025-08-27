@@ -3,22 +3,22 @@ use cosmwasm_std::{
 };
 
 use crate::{
-    ContractError,
     execute::StakerUndelegation,
     utils::delegation::{
-        DEFAULT_TIMEOUT_TIMESTAMP_OFFSET, get_unbonding_ucs03_transfer_cosmos_msg,
+        get_unbonding_ucs03_transfer_cosmos_msg, DEFAULT_TIMEOUT_TIMESTAMP_OFFSET,
     },
+    ContractError,
 };
 
 pub fn get_send_bank_msg(
-    staker: &String,
+    staker: &str,
     recipient: Option<String>,
     denom: String,
     amount: Uint128,
 ) -> CosmosMsg {
     let recipient = match recipient.clone() {
         Some(addr) => addr,
-        None => staker.clone(),
+        None => staker.to_owned(),
     };
     let bank_msg = BankMsg::Send {
         to_address: recipient,
@@ -27,10 +27,11 @@ pub fn get_send_bank_msg(
     CosmosMsg::Bank(bank_msg)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn send_back_token_via_ucs03(
     storage: &mut dyn Storage,
     lst_contract: Addr,
-    staker: &String,
+    staker: &str,
     denom: String,
     transfer_handler: String,
     transfer_fee: Uint128,
@@ -55,7 +56,7 @@ pub fn send_back_token_via_ucs03(
 
     let receiver = match undelegation.recipient.clone() {
         Some(rec) => rec,
-        None => staker.clone(),
+        None => staker.to_owned(),
     };
     //after send bank msg to transfer handler, then call ucs03 on behalf of transfer handler to send token back
     let ucs3_send_msg = get_unbonding_ucs03_transfer_cosmos_msg(

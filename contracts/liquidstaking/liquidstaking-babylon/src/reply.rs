@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StdError, SubMsg, Uint128,
-    WasmMsg, attr, entry_point, from_json, to_json_binary,
+    attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
+    Env, Reply, Response, StdError, SubMsg, Uint128, WasmMsg,
 };
 use unionlabs_primitives::Bytes;
 
@@ -10,8 +10,8 @@ use crate::{
     error::ContractError,
     msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload},
     state::{
-        PARAMETERS, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, SUPPLY_QUEUE,
-        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+        Parameters, WithdrawReward, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, SUPPLY_QUEUE, WITHDRAW_REWARD_QUEUE,
     },
     utils::calc::get_next_epoch,
 };
@@ -42,7 +42,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
     // if recipient channel id is none, need to make sure recipient address is valid address on the chain where the contract is running
     let is_on_chain_recipient = crate::utils::validation::is_on_chain_recipient(
-        &deps,
+        &deps.as_ref(),
         payload.recipient.clone(),
         payload.recipient_channel_id,
         None,
@@ -150,8 +150,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                 Err(e) => {
                     return Err(ContractError::Std(StdError::generic_err(format!(
                         "failed to parse salt: {}, reason: {}",
-                        payload.salt,
-                        e.to_string()
+                        payload.salt, e
                     ))));
                 }
             };

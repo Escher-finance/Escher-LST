@@ -1,24 +1,25 @@
 use std::marker::PhantomData;
 
 use cosmwasm_std::{
-    Binary, Decimal, Deps, Env, Order, Storage, Uint128, entry_point, to_json_binary,
+    entry_point, to_json_binary, Binary, Decimal, Deps, Env, Order, Storage, Uint128,
 };
-use cw_ownable::get_ownership;
 use cw2::ContractVersion;
+use cw_ownable::get_ownership;
 
 use crate::{
-    ContractError,
     msg::{QueryMsg, StakingLiquidity},
     state::{
-        Balance, PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
-        State, Status, UnbondRecord, VALIDATORS_REGISTRY, ValidatorsRegistry, unbond_record,
+        unbond_record, Balance, Parameters, QuoteToken, State, Status, UnbondRecord,
+        ValidatorsRegistry, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, STATE, STATUS,
+        VALIDATORS_REGISTRY,
     },
     utils::{
-        batch::{Batch, BatchStatus, batches},
+        batch::{batches, Batch, BatchStatus},
         calc,
         calc::calculate_query_bounds,
         delegation::{get_actual_total_delegated, get_unclaimed_reward},
     },
+    ContractError,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -120,7 +121,7 @@ pub fn query_staking_liquidity(
         .map(|v| v.address.clone())
         .collect();
 
-    let validators = validators_list.clone().unwrap_or_else(|| validators_addr);
+    let validators = validators_list.clone().unwrap_or(validators_addr);
 
     let delegated_amount = get_actual_total_delegated(
         deps.querier,
@@ -230,7 +231,7 @@ pub fn query_unreleased_unbond_record_from_batch(
     for unbonded in unbonded_range {
         if unbonded.is_ok() {
             let unbond_record = unbonded.unwrap().1;
-            if unbond_record.released == false {
+            if !unbond_record.released {
                 unbonded_list.push(unbond_record);
                 count += 1;
                 if count >= limit {
@@ -273,9 +274,11 @@ pub fn query_batch(
         Order::Ascending,
     );
 
+    #[allow(clippy::manual_flatten)]
+    // https://github.com/Escher-finance/cw-liquid-staking/issues/145
     for batch in batches {
-        if batch.is_ok() {
-            batch_list.push(batch.unwrap().1);
+        if let Ok((_, batch)) = batch {
+            batch_list.push(batch);
         }
     }
     Ok(batch_list)

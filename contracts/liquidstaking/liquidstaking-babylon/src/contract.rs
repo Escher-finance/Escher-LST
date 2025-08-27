@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, StdError, Uint128,
-    entry_point,
+    entry_point, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response,
+    StdError, Uint128,
 };
 use cw2::set_contract_version;
 
@@ -10,13 +10,13 @@ use crate::{
     instantiate::create_reward,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
     state::{
-        CONFIG, Config, OldParameters, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN,
-        REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, State, Status,
-        SupplyQueue, VALIDATORS_REGISTRY, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE,
-        WithdrawReward, unbond_record,
+        unbond_record, Config, OldParameters, Parameters, State, Status, SupplyQueue,
+        ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+        REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+        WITHDRAW_REWARD_QUEUE,
     },
     utils::{
-        batch::{Batch, batches},
+        batch::{batches, Batch},
         validation::{validate_quote_tokens, validate_validators},
     },
 };
@@ -51,7 +51,7 @@ pub fn instantiate(
     let reward_config = Config {
         lst_contract_address: env.clone().contract.address,
         fee_receiver: msg.fee_receiver.clone(),
-        fee_rate: msg.fee_rate.clone(),
+        fee_rate: msg.fee_rate,
         coin_denom: msg.underlying_coin_denom.clone(),
     };
     CONFIG.save(deps.storage, &reward_config)?;
@@ -66,7 +66,7 @@ pub fn instantiate(
             msg.reward_code_id,
             env.clone().contract.address,
             msg.fee_receiver.clone(),
-            msg.fee_rate.clone(),
+            msg.fee_rate,
             msg.underlying_coin_denom.clone(),
         )?;
         let set_withdraw_msg: CosmosMsg =
@@ -402,7 +402,7 @@ fn test_migrate_unbond_record_v0_1_163() {
             height: 1000 + i,
             sender: sender.clone(),
             staker: staker.clone(),
-            channel_id: channel_id,
+            channel_id,
             amount: unstake_amount,
             released_height: 0,
             released: i > (token_count / 2),
