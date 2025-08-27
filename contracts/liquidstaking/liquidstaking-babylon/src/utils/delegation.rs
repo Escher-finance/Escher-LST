@@ -1,31 +1,31 @@
-use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
-use crate::execute::StakerUndelegation;
-use crate::msg::{InjectData, ValidatorDelegation};
-use crate::proto;
-use crate::utils::{batch::batches, calc, delegation, token};
-use crate::ContractError;
-use crate::{
-    msg::{BondData, DelegationDiff, MintTokensPayload},
-    state::{
-        increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
-        UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, WITHDRAW_REWARD_QUEUE,
-    },
-};
+use std::{collections::HashMap, str::FromStr};
+
 use cosmwasm_std::{
-    to_json_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    QuerierWrapper, StdResult, Storage, SubMsg, Uint128,
+    Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, Event,
+    QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128, to_json_binary,
 };
-use cosmwasm_std::{AnyMsg, Coin};
-use cosmwasm_std::{Event, Timestamp};
 use prost::Message;
-use std::collections::HashMap;
-use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
-use super::authz::get_authz_ucs03_transfer;
-use super::batch::{Batch, BatchStatus};
-use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
+use super::{
+    authz::get_authz_ucs03_transfer,
+    batch::{Batch, BatchStatus},
+    calc::{calculate_exchange_rate, calculate_fee_from_reward},
+};
+use crate::{
+    ContractError,
+    event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
+    execute::StakerUndelegation,
+    msg::{BondData, DelegationDiff, InjectData, MintTokensPayload, ValidatorDelegation},
+    proto,
+    state::{
+        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL,
+        UnbondRecord, Validator, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE, increment_tokens,
+        unbond_record,
+    },
+    utils::{batch::batches, calc, delegation, token},
+};
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 900;
 
@@ -808,7 +808,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
                 kind: "recipient".into(),
                 address: recipient,
                 reason: "address must be in hex and starts with 0x".to_string(),
-            })
+            });
         }
     };
     let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
@@ -818,7 +818,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
                 kind: "quote_token".into(),
                 address: quote_token_string,
                 reason: "address must be in hex and starts with 0x".to_string(),
-            })
+            });
         }
     };
 

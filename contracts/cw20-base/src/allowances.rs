@@ -1,11 +1,13 @@
 use cosmwasm_std::{
-    attr, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    Storage, Uint128,
+    Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    Storage, Uint128, attr,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
-use crate::error::ContractError;
-use crate::state::{ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, TOKEN_INFO};
+use crate::{
+    error::ContractError,
+    state::{ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, TOKEN_INFO},
+};
 
 pub fn execute_increase_allowance(
     deps: DepsMut,
@@ -254,14 +256,17 @@ pub fn query_allowance(deps: Deps, owner: String, spender: String) -> StdResult<
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
-    use cosmwasm_std::{coins, CosmosMsg, SubMsg, Timestamp, WasmMsg};
+    use cosmwasm_std::{
+        CosmosMsg, SubMsg, Timestamp, WasmMsg, coins,
+        testing::{mock_dependencies_with_balance, mock_env, mock_info},
+    };
     use cw20::{Cw20Coin, TokenInfoResponse};
 
-    use crate::contract::{execute, instantiate, query_balance, query_token_info};
-    use crate::msg::{ExecuteMsg, InstantiateMsg};
+    use super::*;
+    use crate::{
+        contract::{execute, instantiate, query_balance, query_token_info},
+        msg::{ExecuteMsg, InstantiateMsg},
+    };
 
     fn get_balance<T: Into<String>>(deps: Deps, address: T) -> Uint128 {
         query_balance(deps, address.into()).unwrap().balance

@@ -1,41 +1,44 @@
 use std::str::FromStr;
 
-use crate::error::ContractError;
-use crate::event::{
-    BatchReceivedEvent, BatchReleasedEvent, BondEvent, ProcessBatchUnbondingEvent,
-    ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent, UpdateConfigEvent,
-    UpdateValidatorsEvent,
-};
-use crate::helpers;
-use crate::msg::{
-    BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, RewardMigrateMsg, ZkgmMessage,
-};
-use crate::query::query_unreleased_unbond_record_from_batch;
-use crate::reply::PROCESS_WITHDRAW_REWARD_REPLY_ID;
-use crate::state::{
-    Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, CONFIG, PARAMETERS,
-    PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
-    VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
-};
-use crate::types::ChannelId;
-use crate::utils::batch::{batches, BatchStatus};
-use crate::utils::calc::{
-    calculate_exchange_rate, get_next_epoch, normalize_withdraw_reward_queue,
-};
-use crate::utils::calc::{calculate_fee_from_reward, get_last_epoch_block};
-use crate::utils::delegation::submit_pending_batch;
-use crate::utils::transfer::{self, get_send_bank_msg, ibc_transfer_msg};
-use crate::utils::validation::{validate_recipient, validate_validators};
-use crate::utils::{
-    self, calc::check_slippage, calc::to_uint128, delegation::get_actual_total_delegated,
-    delegation::get_actual_total_reward,
-};
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
-    DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
+    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo,
+    Response, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
+
+use crate::{
+    error::ContractError,
+    event::{
+        BatchReceivedEvent, BatchReleasedEvent, BondEvent, ProcessBatchUnbondingEvent,
+        ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent, UpdateConfigEvent,
+        UpdateValidatorsEvent,
+    },
+    helpers,
+    msg::{
+        BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, RewardMigrateMsg,
+        ZkgmMessage,
+    },
+    query::query_unreleased_unbond_record_from_batch,
+    reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
+    state::{
+        CONFIG, Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
+        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+    },
+    types::ChannelId,
+    utils::{
+        self,
+        batch::{BatchStatus, batches},
+        calc::{
+            calculate_exchange_rate, calculate_fee_from_reward, check_slippage,
+            get_last_epoch_block, get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
+        },
+        delegation::{get_actual_total_delegated, get_actual_total_reward, submit_pending_batch},
+        transfer::{self, get_send_bank_msg, ibc_transfer_msg},
+        validation::{validate_recipient, validate_validators},
+    },
+};
 
 /// process bond call to contract
 pub fn bond(
@@ -1017,7 +1020,7 @@ pub fn on_zkgm(
                 expected,
                 recipient,
                 recipient_channel_id,
-            )
+            );
         }
         ZkgmMessage::Unbond {
             amount,
@@ -1035,7 +1038,7 @@ pub fn on_zkgm(
                 recipient,
                 recipient_channel_id,
                 recipient_ibc_channel_id,
-            )
+            );
         }
     }
 }
@@ -1275,11 +1278,11 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
     }
     if epoch_diff > 5 && epoch_diff < supply_queue.epoch_period as u64 {
         return Err(ContractError::NoRewardToNormalize {
-                msg: format!(
+            msg: format!(
                 "incorrect block height: current height: {}, next epoch: {}, only can normalize reward on end of epoch period range",
                 block_height, next_epoch,
-            )
-            });
+            ),
+        });
     }
 
     let mut reward_queue = WITHDRAW_REWARD_QUEUE.load(deps.storage)?;

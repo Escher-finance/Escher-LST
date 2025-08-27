@@ -1,9 +1,13 @@
-use crate::{
-    execute::StakerUndelegation, utils::delegation::get_unbonding_ucs03_transfer_cosmos_msg,
-    utils::delegation::DEFAULT_TIMEOUT_TIMESTAMP_OFFSET, ContractError,
-};
 use cosmwasm_std::{
     Addr, BankMsg, Coin, CosmosMsg, IbcMsg, IbcTimeout, Storage, Timestamp, Uint128,
+};
+
+use crate::{
+    ContractError,
+    execute::StakerUndelegation,
+    utils::delegation::{
+        DEFAULT_TIMEOUT_TIMESTAMP_OFFSET, get_unbonding_ucs03_transfer_cosmos_msg,
+    },
 };
 
 pub fn get_send_bank_msg(

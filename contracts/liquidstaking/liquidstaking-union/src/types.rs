@@ -1,4 +1,5 @@
 use core::num::NonZeroU32;
+
 use serde::{Deserialize, Serialize};
 use unionlabs_primitives::U256;
 

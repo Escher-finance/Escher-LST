@@ -1,5 +1,6 @@
-use cosmwasm_std::{Decimal, Uint128};
 use std::str::FromStr;
+
+use cosmwasm_std::{Decimal, Uint128};
 
 use crate::helpers::split_revenue;
 

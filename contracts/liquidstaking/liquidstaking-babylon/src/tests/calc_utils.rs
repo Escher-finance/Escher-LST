@@ -1,21 +1,23 @@
+use std::str::FromStr;
+
+use cosmwasm_std::{
+    Coin, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper, SystemError, SystemResult, Uint128,
+    Uint256, from_json,
+    testing::{MockQuerier, mock_dependencies, mock_env},
+    to_json_binary,
+};
+use cw20::TokenInfoResponse;
+
 use crate::{
     execute,
     state::{
-        BurnQueue, MintQueue, State, SupplyQueue, Validator, ValidatorsRegistry,
-        WithdrawRewardQueue, PARAMETERS, REWARD_BALANCE, STATE, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
-        WITHDRAW_REWARD_QUEUE,
+        BurnQueue, MintQueue, PARAMETERS, REWARD_BALANCE, STATE, SUPPLY_QUEUE, State, SupplyQueue,
+        VALIDATORS_REGISTRY, Validator, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE,
+        WithdrawRewardQueue,
     },
     tests::mock_parameters,
     utils::calc::*,
 };
-use cosmwasm_std::{
-    from_json,
-    testing::{mock_dependencies, mock_env, MockQuerier},
-    to_json_binary, Coin, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper, SystemError,
-    SystemResult, Uint128, Uint256,
-};
-use cw20::TokenInfoResponse;
-use std::str::FromStr;
 
 #[test]
 fn test_calculate_query_bounds() {

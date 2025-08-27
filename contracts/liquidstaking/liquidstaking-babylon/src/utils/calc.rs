@@ -1,8 +1,12 @@
-use crate::state::{BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue, SUPPLY_QUEUE};
-use crate::ContractError;
+use std::str::FromStr;
+
 use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
 use cw20::TokenInfoResponse;
-use std::str::FromStr;
+
+use crate::{
+    ContractError,
+    state::{BurnQueue, MintQueue, SUPPLY_QUEUE, SupplyQueue, WithdrawRewardQueue},
+};
 
 /// return how much staking token from underlying native coin denom
 pub fn calculate_staking_token_from_rate(stake_amount: Uint128, exchange_rate: Decimal) -> Uint128 {

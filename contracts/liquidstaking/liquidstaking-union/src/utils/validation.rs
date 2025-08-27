@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::{
-    state::{QuoteToken, Validator},
     ContractError,
+    state::{QuoteToken, Validator},
 };
 
 pub fn validate_validators(validators: &Vec<Validator>) -> Result<(), ContractError> {

@@ -1,5 +1,4 @@
 use cosmwasm_schema::write_api;
-
 use liquidstaking_union::msg::{InstantiateMsg, QueryMsg};
 
 fn main() {

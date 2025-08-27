@@ -1,7 +1,8 @@
-use crate::{error::ContractError, msg::InstantiateRewardMsg};
 use cosmwasm_std::{
-    instantiate2_address, to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, WasmMsg,
+    Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, WasmMsg, instantiate2_address, to_json_binary,
 };
+
+use crate::{error::ContractError, msg::InstantiateRewardMsg};
 
 #[allow(clippy::too_many_arguments)]
 pub fn instantiate2(

@@ -1,28 +1,29 @@
+use std::{collections::HashMap, str::FromStr};
+
+use cosmwasm_std::{
+    Addr, AnyMsg, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
+    StakingMsg, Timestamp, Uint128, assert_approx_eq, from_json,
+    testing::{MockQuerier, mock_dependencies, mock_env},
+};
+use cw_multi_test::App;
+use prost::Message;
+
 use crate::{
     event::{SUBMIT_BATCH_EVENT, UNBOND_EVENT, UNSTAKE_REQUEST_EVENT},
     msg::{BondData, DelegationDiff, ValidatorDelegation},
     proto,
     state::{
-        unbond_record, BurnQueue, MintQueue, State, SupplyQueue, UnbondRecord, Validator,
-        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE,
-        STATE, SUPPLY_QUEUE, TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
+        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE, STATE, SUPPLY_QUEUE,
+        State, SupplyQueue, TOKEN_COUNT, UnbondRecord, Validator, ValidatorsRegistry,
+        WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue, unbond_record,
     },
     tests::mock_parameters,
     utils::{
-        batch::{batches, Batch, BatchStatus},
+        batch::{Batch, BatchStatus, batches},
         calc::{self, normalize_supply_queue, normalize_total_supply},
         delegation::*,
     },
 };
-use cosmwasm_std::{
-    assert_approx_eq, from_json,
-    testing::{mock_dependencies, mock_env, MockQuerier},
-    Addr, AnyMsg, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
-    StakingMsg, Timestamp, Uint128,
-};
-use cw_multi_test::App;
-use prost::Message;
-use std::{collections::HashMap, str::FromStr};
 
 #[test]
 fn test_get_validator_delegation_map_base_on_weight() {
@@ -1215,9 +1216,11 @@ fn test_submit_pending_batch() {
             _ => false,
         }
     }));
-    assert!(events
-        .iter()
-        .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT));
+    assert!(
+        events
+            .iter()
+            .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT)
+    );
 }
 
 #[test]

@@ -135,10 +135,10 @@
             package = pkgs.treefmt;
             projectRootFile = "flake.nix";
             programs = {
-              # rustfmt = {
-              #   enable = true;
-              #   package = rust-dev-toolchain;
-              # };
+              rustfmt = {
+                enable = true;
+                package = rust-dev-toolchain;
+              };
               taplo.enable = true;
               yamlfmt = {
                 enable = true;

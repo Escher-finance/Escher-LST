@@ -1,20 +1,25 @@
 use std::marker::PhantomData;
 
-use crate::msg::{QueryMsg, StakingLiquidity};
-use crate::state::{unbond_record, Status, STATUS};
-use crate::state::{
-    Balance, Parameters, QuoteToken, State, UnbondRecord, ValidatorsRegistry, PARAMETERS,
-    QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
+use cosmwasm_std::{
+    Binary, Decimal, Deps, Env, Order, Storage, Uint128, entry_point, to_json_binary,
 };
-use crate::utils::batch::{batches, Batch, BatchStatus};
-use crate::utils::calc;
-use crate::utils::calc::calculate_query_bounds;
-use crate::utils::delegation::{get_actual_total_delegated, get_unclaimed_reward};
-use crate::ContractError;
-use cosmwasm_std::{entry_point, to_json_binary, Decimal, Order, Uint128};
-use cosmwasm_std::{Binary, Deps, Env, Storage};
-use cw2::ContractVersion;
 use cw_ownable::get_ownership;
+use cw2::ContractVersion;
+
+use crate::{
+    ContractError,
+    msg::{QueryMsg, StakingLiquidity},
+    state::{
+        Balance, PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
+        State, Status, UnbondRecord, VALIDATORS_REGISTRY, ValidatorsRegistry, unbond_record,
+    },
+    utils::{
+        batch::{Batch, BatchStatus, batches},
+        calc,
+        calc::calculate_query_bounds,
+        delegation::{get_actual_total_delegated, get_unclaimed_reward},
+    },
+};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
