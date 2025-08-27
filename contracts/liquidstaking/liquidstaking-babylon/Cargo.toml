@@ -1,0 +1,41 @@
+[package]
+edition = "2021"
+name    = "liquidstaking-babylon"
+version = "0.1.192"
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+alloy                = { workspace = true, features = ["sol-types"] }
+bincode              = { workspace = true, features = ["std"], optional = true }
+cosmos-sdk-proto     = { workspace = true, features = ["cosmwasm"] }
+cosmwasm-schema      = { workspace = true }
+cosmwasm-std         = { workspace = true, features = ["staking", "stargate", "cosmwasm_1_4", "cosmwasm_2_0"] }
+cw-ownable           = { workspace = true }
+cw-storage-plus      = { workspace = true }
+cw2                  = { workspace = true }
+cw20                 = { workspace = true }
+enumorph             = { workspace = true }
+hex-literal          = { workspace = true }
+ibc                  = { workspace = true, features = ["borsh", "serde"] }
+prost                = { workspace = true, features = ["derive"] }
+schemars             = { workspace = true, optional = true }
+semver               = { workspace = true }
+serde                = { workspace = true, features = ["derive"] }
+serde_bytes          = { workspace = true, optional = true }
+thiserror            = { workspace = true }
+unionlabs-primitives = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+cw-multi-test   = { workspace = true, features = ["staking"] }
+hex-literal     = { workspace = true }
+serde-json-wasm = { workspace = true }
+
+[features]
+bincode  = ["dep:bincode"]
+library  = []
+schemars = ["dep:schemars"]
