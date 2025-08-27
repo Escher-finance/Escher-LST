@@ -1,0 +1,21 @@
+[package]
+name = "funded-dispatch"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+
+[dependencies]
+cosmwasm-schema = "2.2.2"
+cosmwasm-std = { version = "2.2.2", features = [
+  "staking",
+  "stargate",
+  "cosmwasm_1_4",
+  "cosmwasm_2_0",
+] }
+serde = { version = "1", default-features = false, features = ["derive"] }
+ibc-union-spec = { git = "https://github.com/unionlabs/union", features = ["serde"] }
+unionlabs_primitives = { path = "../unionlabs-primitives", features = ["serde"] }
+cw-storage-plus = "2.0.0"
