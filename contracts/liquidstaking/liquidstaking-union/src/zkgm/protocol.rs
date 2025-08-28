@@ -74,7 +74,9 @@ pub fn ucs03_transfer(
         Timestamp::from_nanos(time.plus_seconds(timeout_timestamp_offset).nanos());
 
     let Some(channel_id) = ChannelId::from_raw(channel_id) else {
-        return Err(ContractError::InvalidChannelId {});
+        return Err(ContractError::InvalidChannelId {
+            msg: format!("{:?} is not valid channel id", channel_id),
+        });
     };
     let relay_transfer_msg: Ucs03ExecuteMsg = Ucs03ExecuteMsg::Send {
         channel_id,

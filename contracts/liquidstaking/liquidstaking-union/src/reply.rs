@@ -81,13 +81,11 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     if !is_on_chain_recipient
         && (payload.channel_id.is_some() || payload.recipient_channel_id.is_some())
     {
-        let channel_id = match (payload.recipient_channel_id, payload.channel_id) {
-            (Some(id), _) => id,
-            (None, Some(id)) => id,
-            (None, None) => {
-                return Err(ContractError::InvalidChannelId {});
-            }
-        };
+        let channel_id = payload.recipient_channel_id.or(payload.channel_id).ok_or(
+            ContractError::InvalidChannelId {
+                msg: "out chain recipient must have channel id".to_string(),
+            },
+        )?;
 
         let recipient = payload
             .recipient

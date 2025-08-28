@@ -128,8 +128,8 @@ pub enum ContractError {
     #[error("encode anymsg error {0}")]
     EncodeAnyMsgError(#[from] cosmos_sdk_proto::prost::EncodeError),
 
-    #[error("invalid channel id")]
-    InvalidChannelId {},
+    #[error("invalid channel id : {msg}")]
+    InvalidChannelId { msg: String },
 
     #[error("invalid {kind} address: {address}")]
     InvalidAddress { kind: String, address: String },

@@ -897,14 +897,12 @@ pub fn process_batch_withdrawal(
             let msg: CosmosMsg = CosmosMsg::Bank(bank_msg);
             send_msgs.push(msg);
 
-            let target_channel_id =
-                match (undelegation.recipient_channel_id, undelegation.channel_id) {
-                    (Some(id), _) => id,
-                    (None, Some(id)) => id,
-                    (None, None) => {
-                        return Err(ContractError::InvalidChannelId {});
-                    }
-                };
+            let target_channel_id = undelegation
+                .recipient_channel_id
+                .or(undelegation.channel_id)
+                .ok_or(ContractError::InvalidChannelId {
+                    msg: "out chain recipient must have channel id".to_string(),
+                })?;
 
             let receiver = match undelegation.recipient.clone() {
                 Some(rec) => rec,

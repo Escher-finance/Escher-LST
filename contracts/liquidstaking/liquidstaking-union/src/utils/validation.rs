@@ -56,10 +56,14 @@ pub fn validate_recipient(
 
     // if recipient_channel_id exists, must make sure the chain is supported
     if let Some(recipient_channel_id) = recipient_channel_id {
-        let channel_id = crate::state::CHAINS.load(deps.storage, recipient_channel_id);
-        if channel_id.is_err() {
-            return Err(ContractError::InvalidChannelId {});
-        }
+        let _check_channel_id = crate::state::CHAINS
+            .load(deps.storage, recipient_channel_id)
+            .map_err(|_err| ContractError::InvalidChannelId {
+                msg: format!(
+                    "recipient_channel_id: {} is not supported",
+                    recipient_channel_id
+                ),
+            })?;
 
         if salt.is_none() {
             return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
