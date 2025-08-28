@@ -19,6 +19,7 @@ cw-ownable           = { workspace = true }
 cw-storage-plus      = { workspace = true }
 cw2                  = { workspace = true }
 cw20                 = { workspace = true }
+embed-commit         = { workspace = true }
 enumorph             = { workspace = true }
 hex-literal          = { workspace = true }
 ibc                  = { workspace = true, features = ["borsh", "serde"] }
@@ -29,7 +30,6 @@ serde                = { workspace = true, features = ["derive"] }
 serde_bytes          = { workspace = true, optional = true }
 thiserror            = { workspace = true }
 unionlabs-primitives = { workspace = true, features = ["serde"] }
-embed-commit         = { workspace = true }
 
 [dev-dependencies]
 cw-multi-test   = { workspace = true, features = ["staking"] }

@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    ensure_eq, entry_point, from_json, Decimal, DepsMut, Env, IbcBasicResponse,
-    IbcDestinationCallbackMsg, StdAck, StdError, StdResult, Uint128,
+    Decimal, DepsMut, Env, IbcBasicResponse, IbcDestinationCallbackMsg, StdAck, StdError,
+    StdResult, Uint128, ensure_eq, entry_point, from_json,
 };
 use ibc::apps::transfer::types::proto::transfer::v2::FungibleTokenPacketData;
 
