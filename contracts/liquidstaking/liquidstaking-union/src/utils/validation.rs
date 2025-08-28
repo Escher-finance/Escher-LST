@@ -40,7 +40,7 @@ pub fn validate_quote_tokens(quote_tokens: &[QuoteToken]) -> Result<(), Contract
 }
 
 pub fn validate_recipient(
-    deps: &cosmwasm_std::DepsMut,
+    deps: &cosmwasm_std::Deps,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     salt: Option<String>,
@@ -71,7 +71,7 @@ pub fn validate_recipient(
 }
 
 pub fn is_on_chain_recipient(
-    deps: &cosmwasm_std::DepsMut,
+    deps: &cosmwasm_std::Deps,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
 ) -> bool {

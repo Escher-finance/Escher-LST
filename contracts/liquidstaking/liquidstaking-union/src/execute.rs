@@ -48,8 +48,12 @@ pub fn bond(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    let on_chain_recipient =
-        validate_recipient(&deps, recipient.clone(), recipient_channel_id, salt.clone())?;
+    let on_chain_recipient = validate_recipient(
+        &deps.as_ref(),
+        recipient.clone(),
+        recipient_channel_id,
+        salt.clone(),
+    )?;
 
     // coin must have be sent along with transaction and it should be in underlying coin denom
     if info.funds.len() > 1usize {
@@ -159,7 +163,7 @@ pub fn zkgm_unbond(
     }
 
     validate_recipient(
-        &deps,
+        &deps.as_ref(),
         recipient.clone(),
         recipient_channel_id,
         Some("".into()),
@@ -217,7 +221,7 @@ pub fn zkgm_bond(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
     let on_chain_recipient = validate_recipient(
-        &deps,
+        &deps.as_ref(),
         recipient.clone(),
         recipient_channel_id,
         Some(salt.clone()),
@@ -353,7 +357,7 @@ pub fn receive(
     };
 
     validate_recipient(
-        &deps,
+        &deps.as_ref(),
         recipient.clone(),
         recipient_channel_id,
         Some("".into()),
@@ -867,7 +871,7 @@ pub fn process_batch_withdrawal(
         // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
         // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
         let is_on_chain_recipient = utils::validation::is_on_chain_recipient(
-            &deps,
+            &deps.as_ref(),
             undelegation.recipient.clone(),
             undelegation.recipient_channel_id,
         );

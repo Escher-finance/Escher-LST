@@ -41,7 +41,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
     // if recipient channel id is none, need to make sure recipient address is valid address on the chain where the contract is running
     let is_on_chain_recipient = crate::utils::validation::is_on_chain_recipient(
-        &deps,
+        &deps.as_ref(),
         payload.recipient.clone(),
         payload.recipient_channel_id,
     );
