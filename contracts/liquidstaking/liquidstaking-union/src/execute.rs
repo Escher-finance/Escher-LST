@@ -738,13 +738,14 @@ pub fn set_parameters(
         Some(cw20) => cw20.to_string(),
         None => "".to_string(),
     };
-    let mut reward_address_str = "".to_string();
+
+    let mut reward_address_str = String::new();
 
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     if let Some(reward_address) = reward_address {
         let msg: CosmosMsg = CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
-            address: reward_address.clone().to_string(),
+            address: reward_address.to_string(),
         });
         msgs.push(msg);
         reward_address_str = reward_address.to_string();
