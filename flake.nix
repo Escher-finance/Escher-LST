@@ -48,7 +48,7 @@
                 pkgs.lib.generators.toPretty { } value
             ) value;
 
-          nightlyVersion = "2025-03-28";
+          nightlyVersion = "2025-08-26";
 
           availableComponents = {
             rustc = "rustc";
@@ -83,7 +83,10 @@
 
             CARGO_PROFILE = "dev";
 
-            buildInputs = [ ];
+            buildInputs = [
+              pkgs.pkg-config
+              pkgs.openssl
+            ];
             nativeBuildInputs = [ ];
           };
 
@@ -122,6 +125,8 @@
                 yq
                 wasm-tools
                 binaryen
+                openssl
+                pkg-config
               ]);
             nativeBuildInputs = [
               config.treefmt.build.wrapper
