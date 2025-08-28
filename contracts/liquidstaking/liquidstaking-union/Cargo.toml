@@ -29,6 +29,7 @@ serde                = { workspace = true, features = ["derive"] }
 serde_bytes          = { workspace = true, optional = true }
 thiserror            = { workspace = true }
 unionlabs-primitives = { workspace = true, features = ["serde"] }
+embed-commit         = { workspace = true }
 
 [dev-dependencies]
 cw-multi-test = { workspace = true }

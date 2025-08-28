@@ -1,12 +1,13 @@
-use cosmwasm_std::{to_json_binary, AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128};
+use cosmos_sdk_proto::{
+    Any,
+    cosmos::{authz::v1beta1::MsgExec, base::v1beta1::Coin as ProtoCoin},
+    cosmwasm::wasm::v1::MsgExecuteContract,
+    traits::Message,
+};
+use cosmwasm_std::{AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128, to_json_binary};
+use unionlabs_primitives::{Bytes, H256};
 
 use crate::{error::ContractError, zkgm::protocol::ucs03_transfer};
-use cosmos_sdk_proto::cosmos::authz::v1beta1::MsgExec;
-use cosmos_sdk_proto::cosmos::base::v1beta1::Coin as ProtoCoin;
-use cosmos_sdk_proto::cosmwasm::wasm::v1::MsgExecuteContract;
-use cosmos_sdk_proto::traits::Message;
-use cosmos_sdk_proto::Any;
-use unionlabs_primitives::{Bytes, H256};
 
 pub fn cosmos_msg_for_contract_execution(
     granter: String,
@@ -64,11 +65,10 @@ pub fn get_authz_increase_allowance_msg(
 
     let allow_bin = to_json_binary(&allowance_msg).unwrap();
 
-    let msg = cosmos_msg_for_contract_execution(granter, grantee, cw20_contract, allow_bin, funds);
-
-    msg
+    cosmos_msg_for_contract_execution(granter, grantee, cw20_contract, allow_bin, funds)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn get_authz_ucs03_transfer(
     cw20_contract: String,
     granter: String,
@@ -105,13 +105,11 @@ pub fn get_authz_ucs03_transfer(
         liquidstaking_denom_symbol,
     )?;
 
-    let msg = cosmos_msg_for_contract_execution(
+    cosmos_msg_for_contract_execution(
         granter,
         grantee,
         ucs03_contract_addr,
         ucs03_transfer_msg_bin,
         funds,
-    );
-
-    msg
+    )
 }

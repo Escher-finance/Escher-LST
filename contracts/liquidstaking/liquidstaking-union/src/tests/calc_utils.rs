@@ -1,10 +1,12 @@
-use crate::utils::calc::*;
+use std::str::FromStr;
+
 use cosmwasm_std::{
-    from_json, testing::MockQuerier, to_json_binary, Decimal, Empty, QuerierWrapper, SystemError,
-    SystemResult, Uint128, Uint256,
+    Decimal, Empty, QuerierWrapper, SystemError, SystemResult, Uint128, Uint256, from_json,
+    testing::MockQuerier, to_json_binary,
 };
 use cw20::TokenInfoResponse;
-use std::str::FromStr;
+
+use crate::utils::calc::*;
 
 #[test]
 fn test_calculate_query_bounds() {
@@ -106,7 +108,7 @@ fn test_total_lst_supply() {
                             total_supply,
                         };
                         let bin = to_json_binary(&response).unwrap();
-                        return SystemResult::Ok(cosmwasm_std::ContractResult::Ok(bin));
+                        SystemResult::Ok(cosmwasm_std::ContractResult::Ok(bin))
                     }
                     _ => unsupported_err,
                 }

@@ -1,16 +1,17 @@
-use crate::event::IbcCallbackEvent;
-use crate::utils::calc::check_slippage;
-use crate::utils::transfer::ibc_transfer_msg;
-use crate::{
-    state::{PARAMETERS, VALIDATORS_REGISTRY},
-    utils,
-};
+use std::str::FromStr;
+
 use cosmwasm_std::{
-    ensure_eq, entry_point, from_json, Decimal, DepsMut, Env, IbcBasicResponse,
-    IbcDestinationCallbackMsg, StdAck, StdError, StdResult, Uint128,
+    Decimal, DepsMut, Env, IbcBasicResponse, IbcDestinationCallbackMsg, StdAck, StdError,
+    StdResult, Uint128, ensure_eq, entry_point, from_json,
 };
 use ibc::apps::transfer::types::proto::transfer::v2::FungibleTokenPacketData;
-use std::str::FromStr;
+
+use crate::{
+    event::IbcCallbackEvent,
+    state::{PARAMETERS, VALIDATORS_REGISTRY},
+    utils,
+    utils::{calc::check_slippage, transfer::ibc_transfer_msg},
+};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn ibc_destination_callback(
@@ -73,19 +74,21 @@ pub fn ibc_destination_callback(
         .map(Uint128::new)
         .map_err(|_| StdError::generic_err("failed to parse amount as u128"))?;
 
-    if payload.is_err() {
-        return failure_handler(
-            env,
-            None,
-            packet_data.clone(),
-            channel_id,
-            amount,
-            coin_denom,
-            payload.unwrap_err().to_string(),
-        );
-    }
+    let payload = match payload {
+        Ok(payload) => payload,
+        Err(err) => {
+            return failure_handler(
+                env,
+                None,
+                packet_data.clone(),
+                channel_id,
+                amount,
+                coin_denom,
+                err.to_string(),
+            );
+        }
+    };
 
-    let payload = payload.unwrap();
     let mut required_amount = payload.amount;
 
     // if payload transfer fee is set, use it, otherwise use params.transfer_fee
@@ -132,7 +135,7 @@ pub fn ibc_destination_callback(
     if on_chain_recipient.is_err() {
         let ibc_callback_error_message = format!(
             "invalid recipient, reason: {}",
-            on_chain_recipient.unwrap_err().to_string()
+            on_chain_recipient.unwrap_err()
         );
         return failure_handler(
             env,
@@ -156,7 +159,7 @@ pub fn ibc_destination_callback(
         packet_data.sender.clone(),
         packet_data.sender.clone(),
         delegator.clone(),
-        payload.amount.clone(),
+        payload.amount,
         env.block.time.nanos(),
         params,
         validators_reg.clone(),
@@ -169,22 +172,22 @@ pub fn ibc_destination_callback(
         payload.transfer_fee,
     );
 
-    if process_bond_result.is_err() {
-        return failure_handler(
-            env,
-            Some(payload.clone()),
-            packet_data,
-            channel_id,
-            amount,
-            coin_denom,
-            process_bond_result.unwrap_err().to_string(),
-        );
-    }
+    let (msgs, submsgs, bond_data) = match process_bond_result {
+        Ok(ok) => ok,
+        Err(err) => {
+            return failure_handler(
+                env,
+                Some(payload.clone()),
+                packet_data,
+                channel_id,
+                amount,
+                coin_denom,
+                err.to_string(),
+            );
+        }
+    };
 
-    let (msgs, submsgs, bond_data) = process_bond_result.unwrap();
-    let res = check_slippage(bond_data.mint_amount, payload.expected, slippage_rate);
-
-    if res.is_err() {
+    if let Err(err) = check_slippage(bond_data.mint_amount, payload.expected, slippage_rate) {
         return failure_handler(
             env,
             Some(payload.clone()),
@@ -192,7 +195,7 @@ pub fn ibc_destination_callback(
             channel_id,
             amount,
             coin_denom,
-            res.unwrap_err().to_string(),
+            err.to_string(),
         );
     }
 
@@ -200,10 +203,10 @@ pub fn ibc_destination_callback(
     let bond_event = crate::event::BondEvent(
         packet_data.sender.to_string(),
         packet_data.sender.clone(),
-        payload.amount.clone(),
-        bond_data.delegated_amount.clone(),
+        payload.amount,
+        bond_data.delegated_amount,
         bond_data.mint_amount,
-        bond_data.total_bond_amount.clone(),
+        bond_data.total_bond_amount,
         bond_data.total_supply,
         bond_data.exchange_rate,
         "0".into(),

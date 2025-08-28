@@ -1,5 +1,4 @@
 use cosmwasm_schema::write_api;
-
 use liquidstaking_babylon::msg::{InstantiateMsg, QueryMsg};
 
 fn main() {

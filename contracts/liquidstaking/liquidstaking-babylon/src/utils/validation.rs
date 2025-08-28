@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use crate::{
-    state::{QuoteToken, Validator},
     ContractError,
+    state::{QuoteToken, Validator},
 };
 
-pub fn validate_validators(validators: &Vec<Validator>) -> Result<(), ContractError> {
+pub fn validate_validators(validators: &[Validator]) -> Result<(), ContractError> {
     let unique_validators_len = validators
         .iter()
         .cloned()
@@ -26,7 +26,7 @@ pub fn validate_validators(validators: &Vec<Validator>) -> Result<(), ContractEr
     Ok(())
 }
 
-pub fn validate_quote_tokens(quote_tokens: &Vec<QuoteToken>) -> Result<(), ContractError> {
+pub fn validate_quote_tokens(quote_tokens: &[QuoteToken]) -> Result<(), ContractError> {
     let unique_quote_tokens_len = quote_tokens
         .iter()
         .cloned()
@@ -99,7 +99,7 @@ pub fn validate_recipient(
 }
 
 pub fn is_on_chain_recipient(
-    deps: &cosmwasm_std::DepsMut,
+    deps: &cosmwasm_std::Deps,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     recipient_ibc_channel_id: Option<String>,

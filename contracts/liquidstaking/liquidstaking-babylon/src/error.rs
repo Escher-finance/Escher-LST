@@ -62,7 +62,9 @@ pub enum ContractError {
     #[error("invalid mint amount")]
     InvalidMintAmount {},
 
-    #[error("slippage error: got {output_amount}, expected not smaller than {min_amount} or more than {max_amount}")]
+    #[error(
+        "slippage error: got {output_amount}, expected not smaller than {min_amount} or more than {max_amount}"
+    )]
     SlippageError {
         output_amount: cosmwasm_std::Uint128,
         min_amount: cosmwasm_std::Uint128,

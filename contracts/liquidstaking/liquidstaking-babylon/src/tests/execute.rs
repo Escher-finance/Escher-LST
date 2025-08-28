@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use cosmwasm_std::{Decimal, Uint128};
 
-use crate::{execute::*, state::QuoteToken, utils, ContractError};
+use crate::{ContractError, execute::*, state::QuoteToken, utils};
 
 #[test]
 fn test_calculate_native_token() {
@@ -70,11 +70,11 @@ fn slippage_calculation() {
     let output = Uint128::new(10140);
 
     let result = utils::calc::check_slippage(output, expected, slippage);
-    assert_eq!(result.is_err(), true);
+    assert!(result.is_err());
 
     let output = Uint128::new(10100);
     let result = utils::calc::check_slippage(output, expected, slippage);
-    assert_eq!(result.is_ok(), true);
+    assert!(result.is_ok());
 }
 
 #[test]
@@ -113,9 +113,5 @@ fn test_update_quote_token_channel_id_should_match() {
 
     // Fails - channel_id doesn't match
     let err = update_quote_token(deps.as_mut(), env, info, channel_id, quote_token).unwrap_err();
-    assert!(if let ContractError::InvalidQuoteTokens {} = err {
-        true
-    } else {
-        false
-    });
+    assert!(matches!(err, ContractError::InvalidQuoteTokens {}));
 }

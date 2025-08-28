@@ -1,5 +1,6 @@
+use cosmwasm_std::{Uint128, testing::mock_dependencies};
+
 use crate::utils::batch::*;
-use cosmwasm_std::{testing::mock_dependencies, Uint128};
 
 #[test]
 fn test_batch_indexes() {

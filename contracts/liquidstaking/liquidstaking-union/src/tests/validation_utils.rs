@@ -1,9 +1,9 @@
 use cosmwasm_std::testing::mock_dependencies;
 
 use crate::{
+    ContractError,
     state::{QuoteToken, Validator},
     utils::validation::*,
-    ContractError,
 };
 
 #[test]
@@ -29,11 +29,7 @@ fn test_validate_validators() {
     validators[0].weight = 0;
 
     let err = validate_validators(&validators).unwrap_err();
-    assert!(if let ContractError::InvalidValidators {} = err {
-        true
-    } else {
-        false
-    });
+    assert!(matches!(err, ContractError::InvalidValidators {}));
 
     validators[0].weight = 1;
 
@@ -48,11 +44,7 @@ fn test_validate_validators() {
     });
 
     let err = validate_validators(&validators).unwrap_err();
-    assert!(if let ContractError::InvalidValidators {} = err {
-        true
-    } else {
-        false
-    });
+    assert!(matches!(err, ContractError::InvalidValidators {}));
 }
 
 #[test]
@@ -82,9 +74,5 @@ fn test_validate_quote_tokens() {
 
     // Fails - repeated quote token channel_id
     let err = validate_quote_tokens(&quote_tokens).unwrap_err();
-    assert!(if let ContractError::InvalidQuoteTokens {} = err {
-        true
-    } else {
-        false
-    });
+    assert!(matches!(err, ContractError::InvalidQuoteTokens {}));
 }

@@ -1,5 +1,6 @@
-use crate::{msg::Ucs03ExecuteMsg, types::ChannelId};
 use cosmwasm_std::{Timestamp, Uint64};
+
+use crate::{msg::Ucs03ExecuteMsg, types::ChannelId};
 
 #[test]
 fn ucs03_send_test() {

@@ -1,31 +1,31 @@
-use crate::event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent};
-use crate::execute::StakerUndelegation;
-use crate::msg::{InjectData, ValidatorDelegation};
-use crate::proto;
-use crate::utils::{batch::batches, calc, delegation, token};
-use crate::ContractError;
-use crate::{
-    msg::{BondData, DelegationDiff, MintTokensPayload},
-    state::{
-        increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
-        UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, WITHDRAW_REWARD_QUEUE,
-    },
-};
+use std::{collections::HashMap, str::FromStr};
+
 use cosmwasm_std::{
-    to_json_binary, Addr, Attribute, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    QuerierWrapper, StdResult, Storage, SubMsg, Uint128,
+    Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, Event,
+    QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128, to_json_binary,
 };
-use cosmwasm_std::{AnyMsg, Coin};
-use cosmwasm_std::{Event, Timestamp};
 use prost::Message;
-use std::collections::HashMap;
-use std::str::FromStr;
 use unionlabs_primitives::{Bytes, H256};
 
-use super::authz::get_authz_ucs03_transfer;
-use super::batch::{Batch, BatchStatus};
-use super::calc::{calculate_exchange_rate, calculate_fee_from_reward};
+use super::{
+    authz::get_authz_ucs03_transfer,
+    batch::{Batch, BatchStatus},
+    calc::{calculate_exchange_rate, calculate_fee_from_reward},
+};
+use crate::{
+    ContractError,
+    event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
+    execute::StakerUndelegation,
+    msg::{BondData, DelegationDiff, InjectData, MintTokensPayload, ValidatorDelegation},
+    proto,
+    state::{
+        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL,
+        UnbondRecord, Validator, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE, increment_tokens,
+        unbond_record,
+    },
+    utils::{batch::batches, calc, delegation, token},
+};
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 900;
 
@@ -193,7 +193,7 @@ pub fn get_surplus_deficit_validators(
     let mut deficient_validators: Vec<ValidatorDelegation> = vec![];
     for (key, previous_amount) in validator_delegation_map.clone().iter_mut() {
         // check if old validator key exists on new validators map
-        if correct_validator_delegation_map.get(key).is_none() {
+        if !correct_validator_delegation_map.contains_key(key) {
             // because old validator not exists on new one that means the previous validator
             // need to be restaked fully so it is surplus
             surplus_validators.push(ValidatorDelegation {
@@ -225,7 +225,7 @@ pub fn get_surplus_deficit_validators(
             None => deficient_validators.push(ValidatorDelegation {
                 address: new_validator_key.to_string(),
                 delegation_diff: DelegationDiff::Deficit,
-                diff_amount: correct_amount.clone(),
+                diff_amount: *correct_amount,
             }),
         }
     }
@@ -331,7 +331,7 @@ pub fn get_delegate_to_validator_msgs(
             coin_denom.clone(),
         );
 
-        msgs.push(delegate_msg.into());
+        msgs.push(delegate_msg);
 
         if first_validator.is_empty() {
             first_validator = validator.address.to_string();
@@ -349,7 +349,7 @@ pub fn get_delegate_to_validator_msgs(
             coin_denom,
         );
 
-        msgs.push(delegate_msg.into());
+        msgs.push(delegate_msg);
     }
     msgs
 }
@@ -387,6 +387,7 @@ pub fn adjust_validators_delegation(
 }
 
 /// Process bond call to mint liquid staking token, delegate/stake base on the bond amount and exchange rate
+#[allow(clippy::too_many_arguments)]
 pub fn process_bond(
     storage: &mut dyn Storage,
     querier: QuerierWrapper,
@@ -446,7 +447,7 @@ pub fn process_bond(
         )?;
 
         reward_balance =
-            calc::normalize_reward_balance(storage, block_height, unclaimed_reward.into()).unwrap();
+            calc::normalize_reward_balance(storage, block_height, unclaimed_reward).unwrap();
 
         let reward = reward_balance + unclaimed_reward;
         let fee = calculate_fee_from_reward(reward, params.fee_rate);
@@ -472,7 +473,7 @@ pub fn process_bond(
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
 
     // after update exchange rate we update the state
-    state.bond_counter = state.bond_counter + 1;
+    state.bond_counter += 1;
     state.total_bond_amount = total_bond_amount + amount;
     state.total_supply += mint_amount;
     state.total_delegated_amount += amount;
@@ -539,6 +540,7 @@ pub fn process_bond(
 /// 2. Set current batch status to submitted
 /// 3. Create new SubmitBatchEvent
 /// 4. Create new pending batch
+#[allow(clippy::too_many_arguments)]
 pub fn submit_pending_batch(
     deps: DepsMut,
     block_height: u64,
@@ -592,9 +594,7 @@ pub fn submit_pending_batch(
         WITHDRAW_REWARD_QUEUE.save(deps.storage, &new_queue)?;
         new_balance
     } else {
-        let new_balance =
-            calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward.into())?;
-        new_balance
+        calc::normalize_reward_balance(deps.storage, block_height, unclaimed_reward)?
     };
 
     let reward: Uint128 = unclaimed_reward + new_balance;
@@ -642,7 +642,7 @@ pub fn submit_pending_batch(
     let mut events = UnbondEventsFromAtts(atts, batch.id, time);
 
     let burn_msg = token::burn_token(batch.total_liquid_stake, params.cw20_address.to_string());
-    msgs.push(burn_msg.into());
+    msgs.push(burn_msg);
 
     supply_queue.burn.push(BurnQueue {
         block: block_height,
@@ -652,7 +652,7 @@ pub fn submit_pending_batch(
 
     // // update total bond, supply and exchange rate here
     state.total_bond_amount = total_bond_amount - total_undelegate_amount;
-    state.total_supply = state.total_supply - batch.total_liquid_stake;
+    state.total_supply -= batch.total_liquid_stake;
     state.total_delegated_amount = delegated_amount - total_undelegate_amount;
     state.exchange_rate =
         calculate_exchange_rate(state.total_bond_amount, state.total_supply, &supply_queue);
@@ -667,7 +667,7 @@ pub fn submit_pending_batch(
         let next_action_time = time.seconds() + params.unbonding_time;
         batch.update_status(BatchStatus::Submitted, Some(next_action_time));
     }
-    batches().save(deps.storage, batch.id, &batch)?;
+    batches().save(deps.storage, batch.id, batch)?;
 
     let ev = SubmitBatchEvent(
         batch.id,
@@ -702,6 +702,7 @@ pub fn submit_pending_batch(
 /// 1. Increase total liquid stake amount in pending batch
 /// 2. Create unbond record and save in pending batch
 /// 3. Create UnstakeRequest event
+#[allow(clippy::too_many_arguments)]
 pub fn unstake_request_in_batch(
     env: Env,
     storage: &mut dyn Storage,
@@ -775,6 +776,7 @@ pub fn unstake_request_in_batch(
     Ok(event)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     storage: &mut dyn Storage,
     lst_contract: Addr,
@@ -792,7 +794,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     // for the amount
     let funds = vec![Coin {
         denom: denom.clone(),
-        amount: total_amount.clone(),
+        amount: total_amount,
     }];
 
     let params = PARAMETERS.load(storage)?;
@@ -808,7 +810,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
                 kind: "recipient".into(),
                 address: recipient,
                 reason: "address must be in hex and starts with 0x".to_string(),
-            })
+            });
         }
     };
     let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
@@ -818,7 +820,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
                 kind: "quote_token".into(),
                 address: quote_token_string,
                 reason: "address must be in hex and starts with 0x".to_string(),
-            })
+            });
         }
     };
 
@@ -870,11 +872,10 @@ pub fn get_babylon_delegate_cosmos_msg(
             msg: Some(delegate_msg),
         };
 
-    let any_delegate_msg = CosmosMsg::Any(AnyMsg {
+    CosmosMsg::Any(AnyMsg {
         type_url: "/babylon.epoching.v1.MsgWrappedDelegate".to_string(),
         value: Binary::from(staking_msg.encode_to_vec()),
-    });
-    any_delegate_msg
+    })
 }
 
 pub fn get_babylon_undelegate_cosmos_msg(
@@ -895,11 +896,10 @@ pub fn get_babylon_undelegate_cosmos_msg(
             msg: Some(undelegate_msg),
         };
 
-    let undelegate_staking_msg = CosmosMsg::Any(AnyMsg {
+    CosmosMsg::Any(AnyMsg {
         type_url: "/babylon.epoching.v1.MsgWrappedUndelegate".to_string(),
         value: Binary::from(wrapped_msg.encode_to_vec()),
-    });
-    undelegate_staking_msg
+    })
 }
 
 pub fn get_babylon_redelegate_cosmos_msg(
@@ -924,17 +924,17 @@ pub fn get_babylon_redelegate_cosmos_msg(
             msg: Some(redelegate_msg),
         };
 
-    let redelegate = CosmosMsg::Any(AnyMsg {
+    CosmosMsg::Any(AnyMsg {
         type_url: "/babylon.epoching.v1.MsgWrappedBeginRedelegate".to_string(),
         value: Binary::from(restaking_msg.encode_to_vec()),
-    });
-    redelegate
+    })
 }
 
+#[allow(clippy::type_complexity)]
 pub fn get_staker_undelegation(
     storage: &mut dyn Storage,
     total_received_amount: Uint128,
-    unbonding_records: &mut Vec<UnbondRecord>,
+    unbonding_records: &mut [UnbondRecord],
     total_liquid_stake: Uint128,
     block_height: u64,
 ) -> Result<
@@ -984,7 +984,7 @@ pub fn get_staker_undelegation(
 
         record.released_height = block_height;
 
-        unbond_record().save(storage, record.id, &record)?;
+        unbond_record().save(storage, record.id, record)?;
 
         unbond_record_ids.push(record.id);
     }
@@ -1077,7 +1077,7 @@ pub fn inject(
     )?;
 
     let reward_balance =
-        calc::normalize_reward_balance(storage, block_height, unclaimed_reward.into()).unwrap();
+        calc::normalize_reward_balance(storage, block_height, unclaimed_reward).unwrap();
 
     let reward = reward_balance + unclaimed_reward;
     let fee = calculate_fee_from_reward(reward, params.fee_rate);
@@ -1095,7 +1095,7 @@ pub fn inject(
         return Err(ContractError::InvalidExchangeRate {});
     }
 
-    let prev_exchange_rate = exchange_rate.clone();
+    let prev_exchange_rate = exchange_rate;
     let new_bond_amount = total_bond_amount + amount;
     let new_exchange_rate = if total_bond_amount != Uint128::zero() {
         calc::calculate_exchange_rate(new_bond_amount, state.total_supply, &supply_queue)
@@ -1111,7 +1111,7 @@ pub fn inject(
     let data = InjectData {
         prev_exchange_rate,
         new_exchange_rate,
-        total_supply: state.total_supply.clone(),
+        total_supply: state.total_supply,
         reward_balance,
         unclaimed_reward,
         delegated_amount: state.total_delegated_amount,

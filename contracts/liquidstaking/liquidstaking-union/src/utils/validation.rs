@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use crate::{
-    state::{QuoteToken, Validator},
     ContractError,
+    state::{QuoteToken, Validator},
 };
 
-pub fn validate_validators(validators: &Vec<Validator>) -> Result<(), ContractError> {
+pub fn validate_validators(validators: &[Validator]) -> Result<(), ContractError> {
     let unique_validators_len = validators
         .iter()
         .cloned()
@@ -17,18 +17,14 @@ pub fn validate_validators(validators: &Vec<Validator>) -> Result<(), ContractEr
         return Err(ContractError::InvalidValidators {});
     }
 
-    if validators
-        .iter()
-        .find(|validator| validator.weight == 0)
-        .is_some()
-    {
+    if validators.iter().any(|validator| validator.weight == 0) {
         return Err(ContractError::InvalidValidators {});
     }
 
     Ok(())
 }
 
-pub fn validate_quote_tokens(quote_tokens: &Vec<QuoteToken>) -> Result<(), ContractError> {
+pub fn validate_quote_tokens(quote_tokens: &[QuoteToken]) -> Result<(), ContractError> {
     let unique_quote_tokens_len = quote_tokens
         .iter()
         .cloned()

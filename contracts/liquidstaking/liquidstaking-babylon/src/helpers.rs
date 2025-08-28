@@ -1,4 +1,4 @@
-use cosmwasm_std::{to_json_binary, Addr, Coin, CosmosMsg, Decimal, StdResult, Uint128, WasmMsg};
+use cosmwasm_std::{Addr, Coin, CosmosMsg, Decimal, StdResult, Uint128, WasmMsg, to_json_binary};
 
 use crate::msg::ExecuteMsg;
 
@@ -28,8 +28,7 @@ pub fn split_revenue(amount: Uint128, fee_rate: Decimal, denom: String) -> (Coin
     println!("{:?}", Decimal::one().atomics());
     let decimal_fract = Decimal::new(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL);
     let fract = (fee_rate * decimal_fract).to_uint_ceil();
-    let fee_amount =
-        Decimal::from_ratio(fract * amount, Uint128::from(DECIMAL_FRACTIONAL)).to_uint_floor();
+    let fee_amount = Decimal::from_ratio(fract * amount, DECIMAL_FRACTIONAL).to_uint_floor();
     let redelegate_amount = amount - fee_amount;
 
     (

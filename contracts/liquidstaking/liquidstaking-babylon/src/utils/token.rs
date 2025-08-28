@@ -1,5 +1,6 @@
+use cosmwasm_std::{Addr, Binary, CosmosMsg, SubMsg, Uint128, WasmMsg, to_json_binary};
+
 use crate::reply::MINT_CW20_TOKENS_REPLY_ID;
-use cosmwasm_std::{to_json_binary, Addr, Binary, CosmosMsg, SubMsg, Uint128, WasmMsg};
 
 pub fn get_staked_token_submsg(
     recipient: String,
@@ -18,9 +19,8 @@ pub fn get_staked_token_submsg(
         msg: mint_bin,
         funds: vec![],
     });
-    let sub_msg: SubMsg = SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID)
-        .with_payload(payload_bin)
-        .into();
+    let sub_msg: SubMsg =
+        SubMsg::reply_always(mint_msg, MINT_CW20_TOKENS_REPLY_ID).with_payload(payload_bin);
     sub_msg
 }
 
@@ -32,6 +32,6 @@ pub fn burn_token(amount: Uint128, cw20_address: String) -> CosmosMsg {
         msg: burn_bin,
         funds: vec![],
     });
-    let msg: CosmosMsg = burn_msg.into();
+    let msg: CosmosMsg = burn_msg;
     msg
 }

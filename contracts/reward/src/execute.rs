@@ -1,12 +1,14 @@
-use crate::event::{SplitRewardEvent, UpdateConfigEvent};
-use crate::msg::{Balance, LSTQueryMsg};
-use crate::{error::ContractError, msg::ExecuteLstMsg};
-
-use crate::helpers;
-use crate::state::CONFIG;
 use cosmwasm_std::{
-    attr, Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
-    Uint128,
+    Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128,
+    attr,
+};
+
+use crate::{
+    error::ContractError,
+    event::{SplitRewardEvent, UpdateConfigEvent},
+    helpers,
+    msg::{Balance, ExecuteLstMsg, LSTQueryMsg},
+    state::CONFIG,
 };
 
 pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
@@ -97,10 +99,10 @@ pub fn set_config(
 
     config.lst_contract_address = lst_contract_address
         .clone()
-        .unwrap_or_else(|| config.lst_contract_address);
-    config.fee_receiver = fee_receiver.clone().unwrap_or_else(|| config.fee_receiver);
-    config.fee_rate = fee_rate.clone().unwrap_or_else(|| config.fee_rate);
-    config.coin_denom = coin_denom.clone().unwrap_or_else(|| config.coin_denom);
+        .unwrap_or(config.lst_contract_address);
+    config.fee_receiver = fee_receiver.clone().unwrap_or(config.fee_receiver);
+    config.fee_rate = fee_rate.unwrap_or(config.fee_rate);
+    config.coin_denom = coin_denom.clone().unwrap_or(config.coin_denom);
     CONFIG.save(deps.storage, &config)?;
 
     let event = UpdateConfigEvent(

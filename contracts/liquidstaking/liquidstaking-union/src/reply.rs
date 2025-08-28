@@ -1,15 +1,18 @@
 use std::str::FromStr;
 
-use crate::error::ContractError;
-use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
-use crate::state::{
-    Parameters, WithdrawReward, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
-};
 use cosmwasm_std::{
-    attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, StdError, SubMsg, Uint128, WasmMsg,
+    Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StdError, SubMsg, Uint128,
+    WasmMsg, attr, entry_point, from_json, to_json_binary,
 };
 use unionlabs_primitives::Bytes;
+
+use crate::{
+    error::ContractError,
+    msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload},
+    state::{
+        PARAMETERS, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, WithdrawReward,
+    },
+};
 
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
@@ -118,7 +121,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                 return Err(ContractError::InvalidAddress {
                     kind: "recipient".into(),
                     address: recipient,
-                })
+                });
             }
         };
         let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
@@ -127,7 +130,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                 return Err(ContractError::InvalidAddress {
                     kind: "quote_token".into(),
                     address: quote_token_string,
-                })
+                });
             }
         };
 
@@ -137,9 +140,8 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                 Err(e) => {
                     return Err(ContractError::Std(StdError::generic_err(format!(
                         "failed to parse salt: {}, reason: {}",
-                        payload.salt,
-                        e.to_string()
-                    ))))
+                        payload.salt, e
+                    ))));
                 }
             };
 

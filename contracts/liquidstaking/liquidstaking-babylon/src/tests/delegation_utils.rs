@@ -1,28 +1,29 @@
+use std::{collections::HashMap, str::FromStr};
+
+use cosmwasm_std::{
+    Addr, AnyMsg, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
+    StakingMsg, Timestamp, Uint128, assert_approx_eq, from_json,
+    testing::{MockQuerier, mock_dependencies, mock_env},
+};
+use cw_multi_test::App;
+use prost::Message;
+
 use crate::{
     event::{SUBMIT_BATCH_EVENT, UNBOND_EVENT, UNSTAKE_REQUEST_EVENT},
     msg::{BondData, DelegationDiff, ValidatorDelegation},
     proto,
     state::{
-        unbond_record, BurnQueue, MintQueue, State, SupplyQueue, UnbondRecord, Validator,
-        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE,
-        STATE, SUPPLY_QUEUE, TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
+        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE, STATE, SUPPLY_QUEUE,
+        State, SupplyQueue, TOKEN_COUNT, UnbondRecord, Validator, ValidatorsRegistry,
+        WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue, unbond_record,
     },
     tests::mock_parameters,
     utils::{
-        batch::{batches, Batch, BatchStatus},
+        batch::{Batch, BatchStatus, batches},
         calc::{self, normalize_supply_queue, normalize_total_supply},
         delegation::*,
     },
 };
-use cosmwasm_std::{
-    assert_approx_eq, from_json,
-    testing::{mock_dependencies, mock_env, MockQuerier},
-    Addr, AnyMsg, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
-    StakingMsg, Timestamp, Uint128,
-};
-use cw_multi_test::App;
-use prost::Message;
-use std::{collections::HashMap, str::FromStr};
 
 #[test]
 fn test_get_validator_delegation_map_base_on_weight() {
@@ -155,7 +156,7 @@ fn test_get_restaking_msgs() {
         deficient_validators,
         "denom".to_string(),
     );
-    assert!(msgs.len() > 0);
+    assert!(!msgs.is_empty());
     let zero_redelegate = msgs.iter().find(|msg| {
         if let CosmosMsg::Staking(StakingMsg::Redelegate {
             src_validator: _,
@@ -344,8 +345,7 @@ fn test_get_validator_delegation_map_base_on_weight_should_delegate_remaining_am
 
     assert_eq!(
         get_validator_delegation_map_base_on_weight(validators, total_delegated_amount)
-            .iter()
-            .map(|(_addr, amount)| amount)
+            .values()
             .sum::<Uint128>(),
         total_delegated_amount
     )
@@ -753,7 +753,7 @@ fn test_unstake_request_in_batch() {
     let unstake_amount = Uint128::new(10000);
     let pending_batch_id = 10;
     let token_count = 5;
-    let channel_id = Some(1);
+    let channel_id = 1;
     let pending_batch = Batch {
         id: pending_batch_id,
         total_liquid_stake: Uint128::new(100),
@@ -797,7 +797,7 @@ fn test_unstake_request_in_batch() {
         sender.clone(),
         staker.clone(),
         unstake_amount,
-        channel_id,
+        Some(channel_id),
         None,
         None,
         None,
@@ -827,7 +827,7 @@ fn test_unstake_request_in_batch() {
             id: new_token_count,
             batch_id: pending_batch_id,
             height: env.block.height,
-            channel_id,
+            channel_id: Some(channel_id),
             sender: sender.clone(),
             staker: staker.clone(),
             amount: unstake_amount,
@@ -858,7 +858,7 @@ fn test_unstake_request_in_batch() {
         .find(|a| a.key == "channel_id")
         .unwrap()
         .value;
-    assert_eq!(channel_id_attr, &channel_id.unwrap().to_string());
+    assert_eq!(channel_id_attr, &channel_id.to_string());
     let unbond_amount_attr = &unstake_request_event
         .attributes
         .iter()
@@ -910,7 +910,7 @@ fn test_process_bond() {
         },
     ]);
     let validators_reg = ValidatorsRegistry {
-        validators: Vec::from(validators.clone()),
+        validators: validators.clone(),
     };
     let querier_wrapper = QuerierWrapper::<Empty>::new(&querier);
     let state = State {
@@ -1104,7 +1104,7 @@ fn test_submit_pending_batch() {
     );
     deps.querier = querier;
     let validators_reg = ValidatorsRegistry {
-        validators: Vec::from(validators.clone()),
+        validators: validators.clone(),
     };
     let state = State {
         exchange_rate: Decimal::from_str("1.1").unwrap(),
@@ -1191,7 +1191,7 @@ fn test_submit_pending_batch() {
                 let cw20::Cw20ExecuteMsg::Burn { amount } = msg else {
                     return false;
                 };
-                return amount == pending_batch.total_liquid_stake;
+                amount == pending_batch.total_liquid_stake
             }
             CosmosMsg::Any(AnyMsg { type_url: _, value }) => {
                 let proto::babylon::epoching::v1::MsgWrappedUndelegate { msg } =
@@ -1203,21 +1203,23 @@ fn test_submit_pending_batch() {
                     amount,
                 } = msg.unwrap();
                 let amount = amount.unwrap();
-                return validators
+                validators
                     .iter()
                     .map(|v| v.address.clone())
                     .collect::<Vec<_>>()
                     .contains(&validator_address)
                     && delegator_address == delegator.to_string()
                     && amount.denom == params.underlying_coin_denom
-                    && !Uint128::from_str(&amount.amount).unwrap().is_zero();
+                    && !Uint128::from_str(&amount.amount).unwrap().is_zero()
             }
             _ => false,
         }
     }));
-    assert!(events
-        .iter()
-        .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT));
+    assert!(
+        events
+            .iter()
+            .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT)
+    );
 }
 
 #[test]
@@ -1245,7 +1247,7 @@ fn validator_restaking_adjustment() {
         crate::utils::delegation::get_restaking_msgs(delegator, surplus, deficit, denom.clone());
 
     let staking_msg = get_redelegate_msg(30000, denom.clone(), "A".to_string(), "C".to_string());
-    assert_eq!(msgs.get(0).unwrap(), &staking_msg);
+    assert_eq!(msgs.first().unwrap(), &staking_msg);
 
     let staking_msg = get_redelegate_msg(20000, denom.clone(), "A".to_string(), "D".to_string());
     assert_eq!(msgs.get(1).unwrap(), &staking_msg);
@@ -1282,7 +1284,7 @@ fn validator_restaking_adjustment_2() {
         crate::utils::delegation::get_restaking_msgs(delegator, surplus, deficit, denom.clone());
 
     let staking_msg = get_redelegate_msg(30000, denom.clone(), "A".to_string(), "C".to_string());
-    assert_eq!(msgs.get(0).unwrap(), &staking_msg);
+    assert_eq!(msgs.first().unwrap(), &staking_msg);
 
     let staking_msg = get_redelegate_msg(5000, denom.clone(), "B".to_string(), "C".to_string());
     assert_eq!(msgs.get(1).unwrap(), &staking_msg);
@@ -1319,7 +1321,7 @@ fn validator_restaking_adjustment_3() {
         crate::utils::delegation::get_restaking_msgs(delegator, surplus, deficit, denom.clone());
 
     let staking_msg = get_redelegate_msg(30000, denom.clone(), "A".to_string(), "D".to_string());
-    assert_eq!(msgs.get(0).unwrap(), &staking_msg);
+    assert_eq!(msgs.first().unwrap(), &staking_msg);
 
     let staking_msg = get_redelegate_msg(15000, denom.clone(), "B".to_string(), "D".to_string());
     assert_eq!(msgs.get(1).unwrap(), &staking_msg);
@@ -1357,7 +1359,7 @@ fn validator_restaking_adjustment_4() {
         crate::utils::delegation::get_restaking_msgs(delegator, surplus, deficit, denom.clone());
 
     let staking_msg = get_redelegate_msg(3000, denom.clone(), "A".to_string(), "C".to_string());
-    assert_eq!(msgs.get(0).unwrap(), &staking_msg);
+    assert_eq!(msgs.first().unwrap(), &staking_msg);
 
     let staking_msg = get_redelegate_msg(32000, denom.clone(), "B".to_string(), "C".to_string());
     assert_eq!(msgs.get(1).unwrap(), &staking_msg);
@@ -1464,7 +1466,7 @@ fn validators_restaking_adjustment_5() {
         "bbnvaloper140l6y2gp3gxvay6qtn70re7z2s0gn57zx9gg4e".to_string(),
         "bbnvaloper1004nqmppj9tvwf0l5gawl747lg452vl35m5x0x".to_string(),
     );
-    assert_eq!(msgs.get(0).unwrap(), &staking_msg);
+    assert_eq!(msgs.first().unwrap(), &staking_msg);
 
     let staking_msg = get_redelegate_msg(
         200u128,
@@ -1597,7 +1599,7 @@ fn validators_restaking_adjustment_6() {
     println!("\nmsgs: {:#?}", msgs);
 
     let staking_msg = get_redelegate_msg(65u128, denom.clone(), figment, fiona.clone());
-    assert_eq!(msgs.get(0).unwrap(), &staking_msg);
+    assert_eq!(msgs.first().unwrap(), &staking_msg);
 
     let staking_msg = get_redelegate_msg(107466u128, denom.clone(), lavender_5, fiona.clone());
     assert_eq!(msgs.get(1).unwrap(), &staking_msg);
@@ -1793,30 +1795,28 @@ fn validators_restaking_adjustment_7() {
     let mut new_delegation_map: HashMap<String, Uint128> = validator_delegation_map.clone();
 
     for msg in msgs.iter() {
-        match msg {
-            CosmosMsg::Staking(StakingMsg::Redelegate {
-                amount,
-                src_validator,
-                dst_validator,
-                ..
-            }) => {
-                let amount = amount.amount;
-                let src_validator = src_validator.clone();
-                let dst_validator = dst_validator.clone();
+        if let CosmosMsg::Staking(StakingMsg::Redelegate {
+            amount,
+            src_validator,
+            dst_validator,
+            ..
+        }) = msg
+        {
+            let amount = amount.amount;
+            let src_validator = src_validator.clone();
+            let dst_validator = dst_validator.clone();
 
-                new_delegation_map
-                    .entry(src_validator.clone())
-                    .and_modify(|v| *v -= amount);
+            new_delegation_map
+                .entry(src_validator.clone())
+                .and_modify(|v| *v -= amount);
 
-                new_delegation_map
-                    .entry(dst_validator.clone())
-                    .or_insert(Uint128::zero());
+            new_delegation_map
+                .entry(dst_validator.clone())
+                .or_insert(Uint128::zero());
 
-                new_delegation_map
-                    .entry(dst_validator.clone())
-                    .and_modify(|v| *v += amount);
-            }
-            _ => {}
+            new_delegation_map
+                .entry(dst_validator.clone())
+                .and_modify(|v| *v += amount);
         }
     }
 
@@ -2024,29 +2024,27 @@ fn validators_restaking_adjustment_8() {
     let mut new_delegation_map: HashMap<String, Uint128> = validator_delegation_map.clone();
 
     for msg in msgs.iter() {
-        match msg {
-            CosmosMsg::Staking(StakingMsg::Redelegate {
-                amount,
-                src_validator,
-                dst_validator,
-            }) => {
-                let amount = amount.amount;
-                let src_validator = src_validator.clone();
-                let dst_validator = dst_validator.clone();
+        if let CosmosMsg::Staking(StakingMsg::Redelegate {
+            amount,
+            src_validator,
+            dst_validator,
+        }) = msg
+        {
+            let amount = amount.amount;
+            let src_validator = src_validator.clone();
+            let dst_validator = dst_validator.clone();
 
-                new_delegation_map
-                    .entry(src_validator.clone())
-                    .and_modify(|v| *v -= amount);
+            new_delegation_map
+                .entry(src_validator.clone())
+                .and_modify(|v| *v -= amount);
 
-                new_delegation_map
-                    .entry(dst_validator.clone())
-                    .or_insert(Uint128::zero());
+            new_delegation_map
+                .entry(dst_validator.clone())
+                .or_insert(Uint128::zero());
 
-                new_delegation_map
-                    .entry(dst_validator.clone())
-                    .and_modify(|v| *v += amount);
-            }
-            _ => {}
+            new_delegation_map
+                .entry(dst_validator.clone())
+                .and_modify(|v| *v += amount);
         }
     }
 

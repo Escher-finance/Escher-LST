@@ -1,17 +1,20 @@
 use std::str::FromStr;
 
-use crate::error::ContractError;
-use crate::msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload};
-use crate::state::{
-    Parameters, WithdrawReward, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE,
-    SPLIT_REWARD_QUEUE, SUPPLY_QUEUE, WITHDRAW_REWARD_QUEUE,
-};
-use crate::utils::calc::get_next_epoch;
 use cosmwasm_std::{
-    attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, StdError, SubMsg, Uint128, WasmMsg,
+    Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StdError, SubMsg, Uint128,
+    WasmMsg, attr, entry_point, from_json, to_json_binary,
 };
 use unionlabs_primitives::Bytes;
+
+use crate::{
+    error::ContractError,
+    msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload},
+    state::{
+        PARAMETERS, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, SUPPLY_QUEUE,
+        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+    },
+    utils::calc::get_next_epoch,
+};
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
@@ -39,7 +42,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
     // if recipient channel id is none, need to make sure recipient address is valid address on the chain where the contract is running
     let is_on_chain_recipient = crate::utils::validation::is_on_chain_recipient(
-        &deps,
+        &deps.as_ref(),
         payload.recipient.clone(),
         payload.recipient_channel_id,
         None,
@@ -127,7 +130,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                     kind: "recipient".into(),
                     address: recipient,
                     reason: "address must be in hex and starts with 0x".to_string(),
-                })
+                });
             }
         };
         let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
@@ -137,7 +140,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                     kind: "quote_token".into(),
                     address: quote_token_string,
                     reason: "address must be in hex and starts with 0x".to_string(),
-                })
+                });
             }
         };
 
@@ -147,9 +150,8 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
                 Err(e) => {
                     return Err(ContractError::Std(StdError::generic_err(format!(
                         "failed to parse salt: {}, reason: {}",
-                        payload.salt,
-                        e.to_string()
-                    ))))
+                        payload.salt, e
+                    ))));
                 }
             };
 

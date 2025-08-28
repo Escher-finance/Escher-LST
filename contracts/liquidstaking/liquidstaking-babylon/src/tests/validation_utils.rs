@@ -1,9 +1,9 @@
 use cosmwasm_std::testing::mock_dependencies;
 
 use crate::{
+    ContractError,
     state::{QuoteToken, Validator},
     utils::validation::*,
-    ContractError,
 };
 
 #[test]
@@ -29,11 +29,7 @@ fn test_validate_validators() {
     validators[0].weight = 0;
 
     let err = validate_validators(&validators).unwrap_err();
-    assert!(if let ContractError::InvalidValidators {} = err {
-        true
-    } else {
-        false
-    });
+    assert!(matches!(err, ContractError::InvalidValidators {}));
 
     validators[0].weight = 1;
 
@@ -48,11 +44,7 @@ fn test_validate_validators() {
     });
 
     let err = validate_validators(&validators).unwrap_err();
-    assert!(if let ContractError::InvalidValidators {} = err {
-        true
-    } else {
-        false
-    });
+    assert!(matches!(err, ContractError::InvalidValidators {}));
 }
 
 #[test]
@@ -82,22 +74,18 @@ fn test_validate_quote_tokens() {
 
     // Fails - repeated quote token channel_id
     let err = validate_quote_tokens(&quote_tokens).unwrap_err();
-    assert!(if let ContractError::InvalidQuoteTokens {} = err {
-        true
-    } else {
-        false
-    });
+    assert!(matches!(err, ContractError::InvalidQuoteTokens {}));
 }
 
 #[test]
 fn test_is_on_chain_recipient() {
-    let mut deps = mock_dependencies();
+    let deps = mock_dependencies();
 
     let recipient_addr = deps.api.addr_make("isak");
     let recipient = Some(recipient_addr.to_string());
     let recipient_channel_id = None;
     let is_same_chain_recipient = crate::utils::validation::is_on_chain_recipient(
-        &mut deps.as_mut(),
+        &deps.as_ref(),
         recipient,
         recipient_channel_id,
         None,
@@ -105,23 +93,23 @@ fn test_is_on_chain_recipient() {
 
     println!("recipient_addr: {}", recipient_addr);
     println!("is_same_chain_recipient: {}", is_same_chain_recipient);
-    assert_eq!(is_same_chain_recipient, true);
+    assert!(is_same_chain_recipient);
 
     let recipient = Some("0xbb74285235846c9d98280ac92ab8007382e51234".to_string());
     let is_same_chain_recipient = crate::utils::validation::is_on_chain_recipient(
-        &mut deps.as_mut(),
+        &deps.as_ref(),
         recipient,
         recipient_channel_id,
         None,
     );
-    assert_eq!(is_same_chain_recipient, false);
+    assert!(!is_same_chain_recipient);
 
     let recipient = Some("uniondefghabcuxz7l0vcusq5jc9zvzpm8ec2au39x123".to_string());
     let is_same_chain_recipient = crate::utils::validation::is_on_chain_recipient(
-        &mut deps.as_mut(),
+        &deps.as_ref(),
         recipient,
         recipient_channel_id,
         None,
     );
-    assert_eq!(is_same_chain_recipient, false);
+    assert!(!is_same_chain_recipient);
 }

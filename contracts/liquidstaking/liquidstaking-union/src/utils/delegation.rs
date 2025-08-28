@@ -1,35 +1,29 @@
-use crate::event::SubmitBatchEvent;
-use crate::event::UnbondEventsFromAtts;
-use crate::event::UnstakeRequestEvent;
-use crate::execute::StakerUndelegation;
-use crate::utils::authz::get_authz_ucs03_transfer;
-use crate::utils::batch::{batches, Batch, BatchStatus};
-use crate::utils::calc;
-use crate::utils::calc::to_uint128;
-use crate::utils::token;
-use crate::ContractError;
-use crate::{
-    msg::{BondData, DelegationDiff, InjectData, MintTokensPayload, ValidatorDelegation},
-    state::{
-        increment_tokens, unbond_record, Parameters, UnbondRecord, Validator, ValidatorsRegistry,
-        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, STATE, VALIDATORS_REGISTRY,
-    },
-};
-use cosmwasm_std::Attribute;
-use cosmwasm_std::Deps;
-use cosmwasm_std::Event;
-use cosmwasm_std::Timestamp;
-use cosmwasm_std::{
-    to_json_binary, Addr, Coin, CosmosMsg, Decimal, DepsMut, Env, QuerierWrapper, StakingMsg,
-    StdResult, Storage, SubMsg, Uint128,
-};
-use unionlabs_primitives::Bytes;
-use unionlabs_primitives::H256;
+use std::{collections::HashMap, str::FromStr};
 
-use std::collections::HashMap;
-use std::str::FromStr;
+use cosmwasm_std::{
+    Addr, Attribute, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, Event, QuerierWrapper,
+    StakingMsg, StdResult, Storage, SubMsg, Timestamp, Uint128, to_json_binary,
+};
+use unionlabs_primitives::{Bytes, H256};
 
 use super::calc::calculate_native_token_from_staking_token;
+use crate::{
+    ContractError,
+    event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
+    execute::StakerUndelegation,
+    msg::{BondData, DelegationDiff, InjectData, MintTokensPayload, ValidatorDelegation},
+    state::{
+        PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN, REWARD_BALANCE, STATE, UnbondRecord,
+        VALIDATORS_REGISTRY, Validator, ValidatorsRegistry, increment_tokens, unbond_record,
+    },
+    utils::{
+        authz::get_authz_ucs03_transfer,
+        batch::{Batch, BatchStatus, batches},
+        calc,
+        calc::to_uint128,
+        token,
+    },
+};
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
 
@@ -114,7 +108,7 @@ pub fn get_undelegate_msgs(
             continue;
         }
         let amount = Coin {
-            amount: undelegate_amount_for_validator.clone(),
+            amount: undelegate_amount_for_validator,
             denom: coin_denom.to_string(),
         };
         let undelegate_staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Undelegate {
@@ -206,7 +200,7 @@ pub fn get_surplus_deficit_validators(
     let mut deficient_validators: Vec<ValidatorDelegation> = vec![];
     for (key, previous_amount) in validator_delegation_map.clone().iter_mut() {
         // check if old validator key exists on new validators map
-        if correct_validator_delegation_map.get(key).is_none() {
+        if !correct_validator_delegation_map.contains_key(key) {
             // because old validator not exists on new one that means the previous validator
             // need to be restaked fully so it is surplus
             surplus_validators.push(ValidatorDelegation {
@@ -238,7 +232,7 @@ pub fn get_surplus_deficit_validators(
             None => deficient_validators.push(ValidatorDelegation {
                 address: new_validator_key.to_string(),
                 delegation_diff: DelegationDiff::Deficit,
-                diff_amount: correct_amount.clone(),
+                diff_amount: *correct_amount,
             }),
         }
     }
@@ -324,7 +318,7 @@ pub fn get_delegate_to_validator_msgs(
 
         total_delegated += delegate_amount;
         let amount = Coin {
-            amount: delegate_amount.clone(),
+            amount: delegate_amount,
             denom: coin_denom.to_string(),
         };
         let staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Delegate {
@@ -332,7 +326,7 @@ pub fn get_delegate_to_validator_msgs(
             amount,
         });
 
-        msgs.push(staking_msg.into());
+        msgs.push(staking_msg);
 
         if first_validator.is_empty() {
             first_validator = validator.address.to_string();
@@ -351,7 +345,7 @@ pub fn get_delegate_to_validator_msgs(
             },
         });
 
-        msgs.push(remaining_staking_msg.into());
+        msgs.push(remaining_staking_msg);
     }
     msgs
 }
@@ -366,11 +360,11 @@ pub fn get_unbond_all_messages(
 
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let mut msgs: Vec<CosmosMsg> = vec![];
-    for (_pos, validator) in validators_reg.validators.iter().enumerate() {
+    for validator in validators_reg.validators.iter() {
         let undelegate_amount: Uint128 = delegations_resp
             .as_ref()
             .unwrap()
-            .into_iter()
+            .iter()
             .filter(|d| {
                 d.amount.denom == denom
                     && !d.amount.amount.is_zero()
@@ -380,7 +374,7 @@ pub fn get_unbond_all_messages(
             .sum();
 
         let amount = Coin {
-            amount: undelegate_amount.clone(),
+            amount: undelegate_amount,
             denom: denom.to_string(),
         };
         let undelegate_staking_msg: CosmosMsg = CosmosMsg::Staking(StakingMsg::Undelegate {
@@ -388,7 +382,7 @@ pub fn get_unbond_all_messages(
             amount,
         });
 
-        msgs.push(undelegate_staking_msg.into());
+        msgs.push(undelegate_staking_msg);
     }
 
     Ok(msgs)
@@ -422,6 +416,7 @@ pub fn adjust_validators_delegation(
 }
 
 /// Process bond call to mint liquid staking token, delegate/stake base on the bond amount and exchange rate
+#[allow(clippy::too_many_arguments)]
 pub fn process_bond(
     storage: &mut dyn Storage,
     querier: QuerierWrapper,
@@ -504,7 +499,7 @@ pub fn process_bond(
     let mint_amount = calc::calculate_staking_token_from_rate(amount, exchange_rate);
 
     // after update exchange rate we update the state
-    state.bond_counter = state.bond_counter + 1;
+    state.bond_counter += 1;
     state.total_bond_amount = total_bond_amount + amount;
     state.total_supply += mint_amount;
     state.total_delegated_amount += amount;
@@ -641,11 +636,11 @@ pub fn submit_pending_batch(
     let mut events = UnbondEventsFromAtts(atts, batch.id, time);
 
     let burn_msg = token::burn_token(batch.total_liquid_stake, params.cw20_address.to_string());
-    msgs.push(burn_msg.into());
+    msgs.push(burn_msg);
 
     // // update total bond, supply and exchange rate here
     state.total_bond_amount = total_bond_amount - total_undelegate_amount;
-    state.total_supply = state.total_supply - batch.total_liquid_stake;
+    state.total_supply -= batch.total_liquid_stake;
     state.total_delegated_amount = delegated_amount - total_undelegate_amount;
     state.update_exchange_rate();
     STATE.save(deps.storage, &state)?;
@@ -692,6 +687,7 @@ pub fn submit_pending_batch(
 /// 1. Increase total liquid stake amount in pending batch
 /// 2. Create unbond record and save in pending batch
 /// 3. Create UnstakeRequest event
+#[allow(clippy::too_many_arguments)]
 pub fn unstake_request_in_batch(
     env: Env,
     storage: &mut dyn Storage,
@@ -749,6 +745,7 @@ pub fn unstake_request_in_batch(
     Ok(event)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     storage: &mut dyn Storage,
     lst_contract: Addr,
@@ -766,7 +763,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     // for the amount
     let funds = vec![Coin {
         denom: denom.clone(),
-        amount: total_amount.clone(),
+        amount: total_amount,
     }];
 
     let params = PARAMETERS.load(storage)?;
@@ -781,7 +778,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
             return Err(ContractError::InvalidAddress {
                 kind: "recipient".into(),
                 address: recipient,
-            })
+            });
         }
     };
     let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
@@ -790,7 +787,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
             return Err(ContractError::InvalidAddress {
                 kind: "quote_token".into(),
                 address: quote_token_string,
-            })
+            });
         }
     };
 
@@ -817,10 +814,11 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     Ok(authz_ucs03_msg)
 }
 
+#[allow(clippy::type_complexity)]
 pub fn get_staker_undelegation(
     storage: &mut dyn Storage,
     total_received_amount: Uint128,
-    unbonding_records: &mut Vec<UnbondRecord>,
+    unbonding_records: &mut [UnbondRecord],
     total_liquid_stake: Uint128,
     block_height: u64,
 ) -> Result<
@@ -865,7 +863,7 @@ pub fn get_staker_undelegation(
 
         record.released_height = block_height;
 
-        unbond_record().save(storage, record.id, &record)?;
+        unbond_record().save(storage, record.id, record)?;
 
         unbond_record_ids.push(record.id);
     }
@@ -970,7 +968,7 @@ pub fn inject(
         return Err(ContractError::InvalidExchangeRate {});
     }
 
-    let prev_exchange_rate = exchange_rate.clone();
+    let prev_exchange_rate = exchange_rate;
     let new_bond_amount = total_bond_amount + amount;
     let new_exchange_rate = if total_bond_amount != Uint128::zero() {
         Decimal::from_ratio(new_bond_amount, state.total_supply)
@@ -986,7 +984,7 @@ pub fn inject(
     let data = InjectData {
         prev_exchange_rate,
         new_exchange_rate,
-        total_supply: state.total_supply.clone(),
+        total_supply: state.total_supply,
         reward_balance,
         unclaimed_reward,
         delegated_amount: state.total_delegated_amount,
