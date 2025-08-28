@@ -1,20 +1,20 @@
-use crate::contract::execute;
-use crate::contract::query;
-use crate::helpers::derive_intermediate_sender;
-use crate::msg::ExecuteMsg;
-use crate::msg::QueryMsg;
-use crate::state::new_unstake_request;
-use crate::state::unstake_requests;
-use crate::state::UnstakeRequest;
-use crate::state::{Config, BATCHES, CONFIG, STATE};
-use crate::tests::test_helper::init;
-use crate::tests::test_helper::LIQUID_STAKE_TOKEN_DENOM;
-use cosmwasm_std::from_json;
-use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{coins, Addr, CosmosMsg, ReplyOn, SubMsg, Uint128};
+use cosmwasm_std::{
+    coins, from_json,
+    testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR},
+    Addr, CosmosMsg, ReplyOn, SubMsg, Uint128,
+};
 use milky_way::staking::{Batch, BatchStatus};
-use osmosis_std::types::cosmos::base::v1beta1::Coin;
-use osmosis_std::types::osmosis::tokenfactory::v1beta1::MsgBurn;
+use osmosis_std::types::{cosmos::base::v1beta1::Coin, osmosis::tokenfactory::v1beta1::MsgBurn};
+
+use crate::{
+    contract::{execute, query},
+    helpers::derive_intermediate_sender,
+    msg::{ExecuteMsg, QueryMsg},
+    state::{
+        new_unstake_request, unstake_requests, Config, UnstakeRequest, BATCHES, CONFIG, STATE,
+    },
+    tests::test_helper::{init, LIQUID_STAKE_TOKEN_DENOM},
+};
 
 #[test]
 fn proper_liquid_unstake() {
@@ -33,7 +33,7 @@ fn proper_liquid_unstake() {
             format!("factory/cosmos2contract/{}", LIQUID_STAKE_TOKEN_DENOM),
         ),
     );
-    let msg = ExecuteMsg::LiquidUnstake {};
+    let msg = ExecuteMsg::Unbond {};
     let mut res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
     let resp = res.unwrap();
     let attrs = resp.attributes;
@@ -72,7 +72,7 @@ fn double_liquid_unstake() {
     state.total_native_token = Uint128::from(10_000u128);
     state.total_liquid_stake_token = Uint128::from(100_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
-    let msg = ExecuteMsg::LiquidUnstake {};
+    let msg = ExecuteMsg::Unbond {};
 
     // Bob unstakes 500
     let info = mock_info(
@@ -176,7 +176,7 @@ fn invalid_denom_liquid_unstake() {
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let info = mock_info("bob", &coins(1000, "factory/bob/stTIA"));
-    let msg = ExecuteMsg::LiquidUnstake {};
+    let msg = ExecuteMsg::Unbond {};
 
     let res = execute(deps.as_mut(), mock_env(), info, msg);
 
@@ -208,7 +208,7 @@ fn receive_unstaked_tokens() {
         &sender,
         &[cosmwasm_std::Coin {
             amount: Uint128::from(100u128),
-            denom: config.protocol_chain_config.ibc_token_denom.clone(),
+            denom: config.protocol_chain_config.native_token_denom.clone(),
         }],
     );
 
@@ -250,7 +250,7 @@ fn invalid_amount_liquid_unstake() {
             format!("factory/cosmos2contract/{}", LIQUID_STAKE_TOKEN_DENOM),
         ),
     );
-    let msg = ExecuteMsg::LiquidUnstake {};
+    let msg = ExecuteMsg::Unbond {};
 
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
     let resp = res.unwrap();
@@ -311,7 +311,7 @@ fn total_liquid_stake_token_with_zero() {
             format!("factory/cosmos2contract/{}", LIQUID_STAKE_TOKEN_DENOM),
         ),
     );
-    let msg = ExecuteMsg::LiquidUnstake {};
+    let msg = ExecuteMsg::Unbond {};
 
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
     let resp = res.unwrap();
@@ -421,7 +421,7 @@ fn claimable_batches() {
         &sender,
         &[cosmwasm_std::Coin {
             amount: Uint128::from(1000u128),
-            denom: config.protocol_chain_config.ibc_token_denom,
+            denom: config.protocol_chain_config.native_token_denom,
         }],
     );
     execute(deps.as_mut(), mock_env(), info, msg).unwrap();

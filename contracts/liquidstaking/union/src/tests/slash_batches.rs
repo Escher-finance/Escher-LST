@@ -1,15 +1,18 @@
 use cosmwasm_std::{
-    testing::{mock_env, mock_info},
     Uint128,
+    testing::{mock_env, mock_info},
 };
 use milky_way::staking::{Batch, BatchStatus};
 
-use crate::{
-    contract::execute, state::CONFIG, tests::test_helper::ADMIN, types::BatchExpectedAmount,
-};
-use crate::{error::ContractError, msg::ExecuteMsg, state::BATCHES};
-
 use super::test_helper::init;
+use crate::{
+    contract::execute,
+    error::ContractError,
+    msg::ExecuteMsg,
+    state::{BATCHES, CONFIG},
+    tests::test_helper::ADMIN,
+    types::BatchExpectedAmount,
+};
 
 #[test]
 fn only_admin_can_slash_batches() {

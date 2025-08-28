@@ -1,11 +1,16 @@
-use crate::contract::execute;
-use crate::error::ContractError;
-use crate::msg::ExecuteMsg;
-use crate::state::{BATCHES, CONFIG, PENDING_BATCH_ID, STATE};
-use crate::tests::test_helper::{init, OSMO1};
-use cosmwasm_std::testing::{mock_env, mock_info};
-use cosmwasm_std::Uint128;
+use cosmwasm_std::{
+    Uint128,
+    testing::{mock_env, mock_info},
+};
 use milky_way::staking::{Batch, BatchStatus};
+
+use crate::{
+    contract::execute,
+    error::ContractError,
+    msg::ExecuteMsg,
+    state::{BATCHES, CONFIG, PENDING_BATCH_ID, STATE},
+    tests::test_helper::{OSMO1, init},
+};
 
 #[test]
 fn empty_submit_batch() {

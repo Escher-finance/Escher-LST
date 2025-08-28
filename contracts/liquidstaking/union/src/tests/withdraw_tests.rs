@@ -1,12 +1,16 @@
-use crate::contract::{execute, query};
-use crate::msg::{ExecuteMsg, QueryMsg};
-use crate::state::{new_unstake_request, UnstakeRequest, BATCHES, CONFIG, STATE};
-use crate::tests::test_helper::{init, ADMIN, NATIVE_TOKEN, OSMO1};
-use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-use cosmwasm_std::{from_json, Addr, CosmosMsg, ReplyOn, SubMsg, Uint128};
+use cosmwasm_std::{
+    Addr, CosmosMsg, ReplyOn, SubMsg, Uint128, from_json,
+    testing::{MOCK_CONTRACT_ADDR, mock_env, mock_info},
+};
 use milky_way::staking::Batch;
-use osmosis_std::types::cosmos::bank::v1beta1::MsgSend;
-use osmosis_std::types::cosmos::base::v1beta1::Coin;
+use osmosis_std::types::cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin};
+
+use crate::{
+    contract::{execute, query},
+    msg::{ExecuteMsg, QueryMsg},
+    state::{BATCHES, CONFIG, STATE, UnstakeRequest, new_unstake_request},
+    tests::test_helper::{ADMIN, NATIVE_TOKEN, OSMO1, init},
+};
 
 #[test]
 fn withdraw() {
@@ -81,7 +85,7 @@ fn withdraw() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let coin = Coin {
-        denom: config.protocol_chain_config.ibc_token_denom.clone(),
+        denom: config.protocol_chain_config.native_token_denom.clone(),
         amount: "40000".to_string(),
     };
 
@@ -122,7 +126,7 @@ fn withdraw() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let coin = Coin {
-        denom: config.protocol_chain_config.ibc_token_denom.clone(),
+        denom: config.protocol_chain_config.native_token_denom.clone(),
         amount: "90000".to_string(),
     };
 
@@ -199,7 +203,7 @@ fn withdraw_slashing() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let coin = Coin {
-        denom: config.protocol_chain_config.ibc_token_denom.clone(),
+        denom: config.protocol_chain_config.native_token_denom.clone(),
         amount: "304615".to_string(), //304615.384... = 304615
     };
 
@@ -240,7 +244,7 @@ fn withdraw_slashing() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let coin = Coin {
-        denom: config.protocol_chain_config.ibc_token_denom.clone(),
+        denom: config.protocol_chain_config.native_token_denom.clone(),
         amount: "685384".to_string(), //685,384.615... = 685384
     };
 

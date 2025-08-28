@@ -1,13 +1,17 @@
-use crate::state::{NativeChainConfig, ProtocolChainConfig, ProtocolFeeConfig, BATCHES, CONFIG};
-use crate::tests::test_helper::{
-    mock_init_msg, CELESTIA1, CELESTIA2, CELESTIAVAL1, CELESTIAVAL2, CHANNEL_ID, NATIVE_TOKEN,
-    OSMO1, OSMO2, OSMO3, OSMO4, STAKER_ADDRESS,
+use cosmwasm_std::{
+    Addr, Order, Uint128,
+    testing::{mock_dependencies, mock_info},
 };
-use crate::types::MAX_UNBONDING_PERIOD;
-
-use cosmwasm_std::testing::{mock_dependencies, mock_info};
-use cosmwasm_std::{Addr, Order, Uint128};
 use milky_way::staking::BatchStatus;
+
+use crate::{
+    state::{BATCHES, CONFIG, NativeChainConfig, ProtocolChainConfig, ProtocolFeeConfig},
+    tests::test_helper::{
+        CELESTIA1, CELESTIA2, CELESTIAVAL1, CELESTIAVAL2, CHANNEL_ID, NATIVE_TOKEN, OSMO1, OSMO2,
+        OSMO3, OSMO4, STAKER_ADDRESS, mock_init_msg,
+    },
+    types::MAX_UNBONDING_PERIOD,
+};
 
 #[test]
 fn invalid_native_chain_account_address_prefix_fails() {
@@ -175,7 +179,7 @@ fn invalid_protocol_treasury_address_fails() {
     let info = mock_info(OSMO3, &[]);
     let mut msg = mock_init_msg();
 
-    msg.protocol_fee_config.treasury_address = Some(CELESTIA1.to_string());
+    msg.protocol_fee_config.fee_recipient = Some(CELESTIA1.to_string());
     let res = crate::contract::instantiate(
         deps.as_mut(),
         cosmwasm_std::testing::mock_env(),
@@ -271,7 +275,7 @@ fn init_properly() {
     assert_eq!(
         ProtocolChainConfig {
             account_address_prefix: "osmo".to_string(),
-            ibc_token_denom: NATIVE_TOKEN.to_string(),
+            native_token_denom: NATIVE_TOKEN.to_string(),
             ibc_channel_id: CHANNEL_ID.to_string(),
             oracle_address: Some(Addr::unchecked(OSMO4)),
             minimum_liquid_stake_amount: Uint128::from(100u128),
@@ -280,8 +284,8 @@ fn init_properly() {
     );
     assert_eq!(
         ProtocolFeeConfig {
-            dao_treasury_fee: Uint128::from(10000u128),
-            treasury_address: Some(Addr::unchecked(OSMO1)),
+            fee_rate: Uint128::from(10000u128),
+            fee_recipient: Some(Addr::unchecked(OSMO1)),
         },
         config.protocol_fee_config
     );

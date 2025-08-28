@@ -393,7 +393,7 @@ fn update_protocol_chain_config_properly() {
     );
     assert_eq!(
         new_config.ibc_token_denom,
-        config.protocol_chain_config.ibc_token_denom
+        config.protocol_chain_config.native_token_denom
     );
     assert_eq!(
         new_config.ibc_channel_id,
@@ -489,13 +489,13 @@ fn update_protocol_fee_config_properly() {
     let config = CONFIG.load(&deps.storage).unwrap();
     assert_eq!(
         new_config.dao_treasury_fee,
-        config.protocol_fee_config.dao_treasury_fee
+        config.protocol_fee_config.fee_rate
     );
     assert_eq!(
         new_config.treasury_address.unwrap(),
         config
             .protocol_fee_config
-            .treasury_address
+            .fee_recipient
             .unwrap()
             .to_string()
     );

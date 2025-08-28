@@ -4,7 +4,8 @@ resolver = "2"
 members = [
   "contracts/reward",
   "contracts/liquidstaking/babylon",
-  # "contracts/liquidstaking/union",
+  "contracts/liquidstaking/union",
+  "contracts/liquidstaking/union/milky_way",
   "contracts/cw20-base",
 ]
 
@@ -25,10 +26,12 @@ opt-level = 3
 
 [workspace.dependencies]
 alloy            = { version = "0.15.3", default-features = false }
+bech32           = { version = "0.11.0" }
 bincode          = { version = "2.0.1", default-features = false }
 cosmos-sdk-proto = { version = "0.27.0", default-features = false }
 cosmwasm-schema  = { version = "2.2.2" }
 cosmwasm-std     = { version = "2.2.2" }
+cw-controllers   = { version = "2.0.0" }
 cw-ownable       = { version = "2.1.0" }
 cw-storage-plus  = { version = "2.0.0" }
 cw-utils         = { version = "2.0.0" }
@@ -37,6 +40,7 @@ cw20             = { version = "2.0.0" }
 enumorph         = { version = "0.1.2" }
 hex-literal      = { version = "1.0.0" }
 ibc              = { version = "0.57.0", default-features = false }
+osmosis-std      = { version = "0.25.0" }
 prost            = { version = "0.13", features = ["derive"] }
 schemars         = { version = "0.8.16" }
 semver           = { version = "1.0" }
@@ -46,7 +50,12 @@ thiserror        = { version = "1.0.58" }
 
 # unionlabs
 embed-commit         = { git = "https://github.com/unionlabs/union", default-features = false }
+ibc-union-spec       = { git = "https://github.com/unionlabs/union", default-features = false }
+ucs03-zkgm           = { git = "https://github.com/unionlabs/union", default-features = false }
 unionlabs-primitives = { git = "https://github.com/unionlabs/union", default-features = false }
+
+# local
+milky_way = { path = "contracts/liquidstaking/union/milky_way" }
 
 # [dev-dependencies]
 cw-multi-test   = { version = "2.2.0", features = ["staking"] }

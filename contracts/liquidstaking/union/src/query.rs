@@ -1,25 +1,19 @@
-use crate::helpers::{get_rates, paginate_map};
-use crate::msg::{
-    BatchResponse, BatchesResponse, ConfigResponse, IBCQueueResponse, IBCReplyQueueResponse,
-    StateResponse,
-};
-use crate::state::ibc::IBCTransfer;
-use crate::state::{
-    unstake_requests, UnstakeRequest, BATCHES, CONFIG, IBC_WAITING_FOR_REPLY, INFLIGHT_PACKETS,
-    PENDING_BATCH_ID, STATE,
-};
 use cosmwasm_std::{Deps, StdResult, Timestamp, Uint128};
 use cw_storage_plus::Bound;
 use milky_way::staking::{Batch, BatchStatus};
+
+use crate::{
+    helpers::{get_rates, paginate_map},
+    msg::{BatchResponse, BatchesResponse, ConfigResponse, StateResponse},
+    state::{unstake_requests, UnstakeRequest, BATCHES, CONFIG, PENDING_BATCH_ID, STATE},
+};
 
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let config = CONFIG.load(deps.storage)?;
 
     let res = ConfigResponse {
-        native_chain_config: config.native_chain_config,
-        protocol_chain_config: config.protocol_chain_config,
         protocol_fee_config: config.protocol_fee_config,
-        liquid_stake_token_denom: config.liquid_stake_token_denom,
+        liquid_stake_token_denom: config.liquid_stake_token_address,
         monitors: config.monitors,
         batch_period: config.batch_period,
         stopped: config.stopped,
@@ -111,45 +105,6 @@ pub fn query_pending_batch(deps: Deps) -> StdResult<BatchResponse> {
     let pending_batch = BATCHES.load(deps.storage, pending_batch_id)?;
 
     Ok(batch_to_response(pending_batch))
-}
-
-pub fn query_ibc_queue(
-    deps: Deps,
-    start_after: Option<u64>,
-    limit: Option<u32>,
-) -> StdResult<IBCQueueResponse> {
-    let inflight_packets: Vec<IBCTransfer> = paginate_map(
-        deps,
-        &INFLIGHT_PACKETS,
-        start_after,
-        limit,
-        cosmwasm_std::Order::Ascending,
-        None,
-    )?;
-    let res = IBCQueueResponse {
-        ibc_queue: inflight_packets,
-    };
-
-    Ok(res)
-}
-
-pub fn query_reply_queue(
-    deps: Deps,
-    start_after: Option<u64>,
-    limit: Option<u32>,
-) -> StdResult<IBCReplyQueueResponse> {
-    let ibc_messages_waiting = paginate_map(
-        deps,
-        &IBC_WAITING_FOR_REPLY,
-        start_after,
-        limit,
-        cosmwasm_std::Order::Ascending,
-        None,
-    )?;
-    let res = IBCReplyQueueResponse {
-        ibc_queue: ibc_messages_waiting,
-    };
-    Ok(res)
 }
 
 pub fn query_unstake_requests(deps: Deps, user: String) -> StdResult<Vec<UnstakeRequest>> {

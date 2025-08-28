@@ -1,5 +1,6 @@
-use crate::helpers::{compute_mint_amount, compute_unbond_amount};
 use cosmwasm_std::Uint128;
+
+use crate::helpers::{compute_mint_amount, compute_unbond_amount};
 
 // Basic test - based on figures from excalidraw
 #[test]

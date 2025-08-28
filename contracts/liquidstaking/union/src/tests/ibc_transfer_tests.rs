@@ -1,28 +1,33 @@
-use crate::contract::{execute, reply, sudo, IBC_TIMEOUT};
-use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, IBCLifecycleComplete, SudoMsg};
-use crate::query::query_ibc_queue;
-use crate::state::{ibc, IbcWaitingForReply, IBC_WAITING_FOR_REPLY, INFLIGHT_PACKETS};
-use crate::tests::test_helper::{init, ADMIN, CHANNEL_ID, NATIVE_TOKEN, OSMO3, STAKER_ADDRESS};
-use cosmwasm_std::testing::{mock_env, mock_info};
-use cosmwasm_std::{
-    attr, coins, Addr, Coin, CosmosMsg, IbcTimeout, Reply, ReplyOn, SubMsg, SubMsgResponse,
-    SubMsgResult, Timestamp,
-};
-use osmosis_std::types::cosmos::base::v1beta1::Coin as OsmosisCoin;
-use osmosis_std::types::ibc::applications::transfer::v1::MsgTransfer;
-use osmosis_std::types::ibc::applications::transfer::v1::MsgTransferResponse;
 use std::vec::Vec;
+
+use cosmwasm_std::{
+    Addr, Coin, CosmosMsg, IbcTimeout, Reply, ReplyOn, SubMsg, SubMsgResponse, SubMsgResult,
+    Timestamp, attr, coins,
+    testing::{mock_env, mock_info},
+};
+use osmosis_std::types::{
+    cosmos::base::v1beta1::Coin as OsmosisCoin,
+    ibc::applications::transfer::v1::{MsgTransfer, MsgTransferResponse},
+};
+
+use crate::{
+    contract::{IBC_TIMEOUT, execute, reply, sudo},
+    error::ContractError,
+    msg::{ExecuteMsg, IBCLifecycleComplete, SudoMsg},
+    query::query_ibc_queue,
+    state::{IBC_WAITING_FOR_REPLY, INFLIGHT_PACKETS, IbcWaitingForReply, ibc},
+    tests::test_helper::{ADMIN, CHANNEL_ID, NATIVE_TOKEN, OSMO3, STAKER_ADDRESS, init},
+};
 
 #[test]
 fn success_ibc_queue() {
     let mut deps = init();
     let env = mock_env();
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
 
@@ -170,10 +175,10 @@ fn fail_ibc_queue() {
     let mut deps = init();
     let env = mock_env();
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
     let ibc_sub_msg_id = env.block.time.nanos() + env.transaction.unwrap().index as u64;
@@ -253,10 +258,10 @@ fn timeout_ibc_queue() {
     let mut deps = init();
     let env = mock_env();
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
     let ibc_sub_msg_id = env.block.time.nanos() + env.transaction.unwrap().index as u64;

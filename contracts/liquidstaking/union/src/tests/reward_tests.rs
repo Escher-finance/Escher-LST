@@ -1,13 +1,17 @@
-use crate::contract::{execute, IBC_TIMEOUT};
-use crate::error::ContractError;
-use crate::helpers::derive_intermediate_sender;
-use crate::msg::ExecuteMsg;
-use crate::state::{CONFIG, STATE};
-use crate::tests::test_helper::{init, CHANNEL_ID, NATIVE_TOKEN, STAKER_ADDRESS};
-
-use cosmwasm_std::testing::{mock_env, mock_info};
-use cosmwasm_std::{Addr, CosmosMsg, ReplyOn, Uint128};
+use cosmwasm_std::{
+    testing::{mock_env, mock_info},
+    Addr, CosmosMsg, ReplyOn, Uint128,
+};
 use osmosis_std::types::ibc::applications::transfer::v1::MsgTransfer;
+
+use crate::{
+    contract::{execute, IBC_TIMEOUT},
+    error::ContractError,
+    helpers::derive_intermediate_sender,
+    msg::ExecuteMsg,
+    state::{CONFIG, STATE},
+    tests::test_helper::{init, CHANNEL_ID, NATIVE_TOKEN, STAKER_ADDRESS},
+};
 
 #[test]
 fn receive_rewards() {
@@ -42,14 +46,14 @@ fn receive_rewards() {
     assert!(res.is_err()); // wrong denom
 
     // Test without send fees to treasury
-    config.protocol_fee_config.treasury_address = None;
+    config.protocol_fee_config.fee_recipient = None;
     CONFIG.save(&mut deps.storage, &config).unwrap();
 
     let info = mock_info(
         &sender,
         &[cosmwasm_std::Coin {
             amount: Uint128::from(100u128),
-            denom: config.protocol_chain_config.ibc_token_denom.clone(),
+            denom: config.protocol_chain_config.native_token_denom.clone(),
         }],
     );
     let res = execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
@@ -106,7 +110,7 @@ fn receive_rewards_and_send_fees_to_treasury() {
         &sender,
         &[cosmwasm_std::Coin {
             amount: Uint128::from(100u128),
-            denom: config.protocol_chain_config.ibc_token_denom.clone(),
+            denom: config.protocol_chain_config.native_token_denom.clone(),
         }],
     );
     let res = execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap();
@@ -134,7 +138,7 @@ fn receive_rewards_and_send_fees_to_treasury() {
         CosmosMsg::from(cosmwasm_std::BankMsg::Send {
             to_address: config
                 .protocol_fee_config
-                .treasury_address
+                .fee_recipient
                 .unwrap()
                 .to_string(),
             amount: vec![cosmwasm_std::Coin::new(10u128, NATIVE_TOKEN)],
@@ -174,7 +178,7 @@ fn receive_rewards_with_zero_fees_fails() {
         &sender,
         &[cosmwasm_std::Coin {
             amount: Uint128::from(3u128),
-            denom: config.protocol_chain_config.ibc_token_denom.clone(),
+            denom: config.protocol_chain_config.native_token_denom.clone(),
         }],
     );
     let err = execute(deps.as_mut(), env.clone(), info, msg.clone()).unwrap_err();

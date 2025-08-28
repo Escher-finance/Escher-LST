@@ -1,8 +1,13 @@
-use crate::contract::execute;
-use crate::msg::ExecuteMsg;
-use crate::tests::test_helper::{init, ADMIN, CELESTIAVAL1, CELESTIAVAL3};
-use cosmwasm_std::coins;
-use cosmwasm_std::testing::{mock_env, mock_info};
+use cosmwasm_std::{
+    coins,
+    testing::{mock_env, mock_info},
+};
+
+use crate::{
+    contract::execute,
+    msg::ExecuteMsg,
+    tests::test_helper::{ADMIN, CELESTIAVAL1, CELESTIAVAL3, init},
+};
 
 #[test]
 fn proper_add_validator() {

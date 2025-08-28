@@ -1,54 +1,40 @@
 [package]
-name = "staking"
-version       = "1.1.0"
-rust-version  = { workspace = true }
-authors       = { workspace = true }
-edition       = { workspace = true }
-license       = { workspace = true }
-homepage      = { workspace = true }
-repository    = { workspace = true }
-documentation = { workspace = true }
-keywords      = { workspace = true }
-
-[package.metadata.optimizer]
-default-build = true
-builds = [
-  { name = "miniwasm", features = [
-    "miniwasm",
-  ], default-features = false }
-]
+edition = "2021"
+name    = "liquidstaking-union"
+version = "0.0.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
-miniwasm = ["initia-proto"]
 
 [dependencies]
-bech32.workspace = true
-cw2.workspace = true
-cosmwasm-schema.workspace = true
-cosmwasm-std = { workspace = true, features = ["stargate"]}
-cw-controllers.workspace = true
-cw-storage-plus.workspace = true
-cw-utils.workspace = true
-enum-repr = "0.2.6"
-milky_way = { path = "../../packages/milky_way" }
-osmosis-std.workspace = true
-prost = { version = "0.12.3", default-features = false, features = ["prost-derive"] }
-prost-derive = "0.12.3"
-schemars.workspace = true
-serde.workspace = true
-serde_json = "1.0"
-sha2 = "0.10.8"
-thiserror.workspace = true
-semver.workspace = true
-initia-proto = { path = "../../packages/initia-proto", optional = true, default-features = false }
-hex = "0.4.3"
+alloy                = { workspace = true, features = ["sol-types"] }
+bech32               = { workspace = true }
+cosmwasm-schema      = { workspace = true }
+cosmwasm-std         = { workspace = true, features = ["stargate"] }
+cw-controllers       = { workspace = true }
+cw-storage-plus      = { workspace = true }
+cw-utils             = { workspace = true }
+cw2                  = { workspace = true }
+cw20                 = { workspace = true }
+enum-repr            = "0.2.6"
+hex                  = "0.4.3"
+ibc-union-spec       = { workspace = true, features = ["serde"] }
+milky_way            = { workspace = true }
+osmosis-std          = { workspace = true }
+prost                = { version = "0.12.3", default-features = false, features = ["prost-derive"] }
+prost-derive         = "0.12.3"
+schemars             = { workspace = true }
+semver               = { workspace = true }
+serde                = { workspace = true }
+serde_json           = "1.0"
+sha2                 = "0.10.8"
+thiserror            = { workspace = true }
+ucs03-zkgm           = { workspace = true, features = ["library"] }
+unionlabs-primitives = { workspace = true }
 
 [dev-dependencies]
 cw-multi-test = "0.17.0"

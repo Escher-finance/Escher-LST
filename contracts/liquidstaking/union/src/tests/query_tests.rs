@@ -1,15 +1,19 @@
-use crate::contract::{execute, query};
-use crate::msg::{
-    BatchResponse, BatchesResponse, ConfigResponse, ExecuteMsg, QueryMsg, StateResponse,
+use cosmwasm_std::{
+    coins, from_json,
+    testing::{mock_env, mock_info},
+    Addr, Decimal, Uint128,
 };
-use crate::query::query_pending_batch;
-use crate::state::{CONFIG, STATE};
-use crate::tests::test_helper::{
-    init, CELESTIA2, CELESTIAVAL1, CELESTIAVAL2, CHANNEL_ID, LIQUID_STAKE_TOKEN_DENOM,
-    NATIVE_TOKEN, OSMO2, OSMO3, OSMO4, STAKER_ADDRESS,
+
+use crate::{
+    contract::{execute, query},
+    msg::{BatchResponse, BatchesResponse, ConfigResponse, ExecuteMsg, QueryMsg, StateResponse},
+    query::query_pending_batch,
+    state::{CONFIG, STATE},
+    tests::test_helper::{
+        init, CELESTIA2, CELESTIAVAL1, CELESTIAVAL2, CHANNEL_ID, LIQUID_STAKE_TOKEN_DENOM,
+        NATIVE_TOKEN, OSMO2, OSMO3, OSMO4, STAKER_ADDRESS,
+    },
 };
-use cosmwasm_std::testing::{mock_env, mock_info};
-use cosmwasm_std::{coins, from_json, Addr, Decimal, Uint128};
 
 #[test]
 fn get_config() {
@@ -41,7 +45,10 @@ fn get_config() {
 
     // Protocol chain config
     assert_eq!(result.protocol_chain_config.account_address_prefix, "osmo");
-    assert_eq!(result.protocol_chain_config.ibc_token_denom, NATIVE_TOKEN);
+    assert_eq!(
+        result.protocol_chain_config.native_token_denom,
+        NATIVE_TOKEN
+    );
     assert_eq!(result.protocol_chain_config.ibc_channel_id, CHANNEL_ID);
     assert_eq!(
         result.protocol_chain_config.oracle_address,
@@ -83,10 +90,10 @@ fn get_state() {
 
     // stake
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let stake_msg = ExecuteMsg::LiquidStake {
+    let stake_msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info, stake_msg);
     assert!(res.is_ok());
@@ -142,7 +149,7 @@ fn get_batch() {
             format!("factory/cosmos2contract/{}", LIQUID_STAKE_TOKEN_DENOM),
         ),
     );
-    let unstake_msg = ExecuteMsg::LiquidUnstake {};
+    let unstake_msg = ExecuteMsg::Unbond {};
     let res = execute(deps.as_mut(), mock_env(), info, unstake_msg.clone());
     assert!(res.is_ok());
 
@@ -209,7 +216,7 @@ fn get_batches() {
             format!("factory/cosmos2contract/{}", LIQUID_STAKE_TOKEN_DENOM),
         ),
     );
-    let unstake_msg = ExecuteMsg::LiquidUnstake {};
+    let unstake_msg = ExecuteMsg::Unbond {};
     let res = execute(deps.as_mut(), env.clone(), info, unstake_msg.clone());
     assert!(res.is_ok());
 
@@ -308,7 +315,7 @@ fn get_pending_batch() {
             format!("factory/cosmos2contract/{}", LIQUID_STAKE_TOKEN_DENOM),
         ),
     );
-    let msg = ExecuteMsg::LiquidUnstake {};
+    let msg = ExecuteMsg::Unbond {};
     let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
 
     env.block.time = env.block.time.plus_seconds(config.batch_period + 1);

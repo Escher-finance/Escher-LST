@@ -1,17 +1,21 @@
-use cosmwasm_std::testing::{mock_dependencies, mock_env};
-use cosmwasm_std::{Addr, Coin, Uint128};
+use cosmwasm_std::{
+    testing::{mock_dependencies, mock_env},
+    Addr, Coin, Uint128,
+};
 use cw2::set_contract_version;
 
-use crate::contract::{migrate, CONTRACT_NAME};
-use crate::migrations::states::v1_0_0;
-use crate::msg::MigrateMsg;
-use crate::state::ibc::{IBCTransfer, PacketLifecycleStatus};
-use crate::state::{
-    Config, IbcWaitingForReply, NativeChainConfig, ProtocolChainConfig, ProtocolFeeConfig, CONFIG,
-    IBC_WAITING_FOR_REPLY, INFLIGHT_PACKETS, MIGRATING,
-};
-use crate::tests::test_helper::{
-    CELESTIA2, CHANNEL_ID, LIQUID_STAKE_TOKEN_DENOM, NATIVE_TOKEN, OSMO1, OSMO4, STAKER_ADDRESS,
+use crate::{
+    contract::{migrate, CONTRACT_NAME},
+    migrations::states::v1_0_0,
+    msg::MigrateMsg,
+    state::{
+        ibc::{IBCTransfer, PacketLifecycleStatus},
+        Config, IbcWaitingForReply, NativeChainConfig, ProtocolChainConfig, ProtocolFeeConfig,
+        CONFIG, IBC_WAITING_FOR_REPLY, INFLIGHT_PACKETS, MIGRATING,
+    },
+    tests::test_helper::{
+        CELESTIA2, CHANNEL_ID, LIQUID_STAKE_TOKEN_DENOM, NATIVE_TOKEN, OSMO1, OSMO4, STAKER_ADDRESS,
+    },
 };
 
 #[test]
@@ -51,17 +55,17 @@ fn paginated_migration() {
                 },
                 protocol_chain_config: ProtocolChainConfig {
                     account_address_prefix: "osmo".to_string(),
-                    ibc_token_denom: NATIVE_TOKEN.to_string(),
+                    native_token_denom: NATIVE_TOKEN.to_string(),
                     ibc_channel_id: CHANNEL_ID.to_string(),
                     oracle_address: Some(Addr::unchecked(OSMO4)),
                     minimum_liquid_stake_amount: Uint128::from(100u128),
                 },
-                liquid_stake_token_denom: LIQUID_STAKE_TOKEN_DENOM.to_string(),
+                liquid_stake_token_address: LIQUID_STAKE_TOKEN_DENOM.to_string(),
                 monitors: vec![],
                 batch_period: 86400,
                 protocol_fee_config: ProtocolFeeConfig {
-                    dao_treasury_fee: Uint128::from(10000u128),
-                    treasury_address: Some(Addr::unchecked(OSMO1)),
+                    fee_rate: Uint128::from(10000u128),
+                    fee_recipient: Some(Addr::unchecked(OSMO1)),
                 },
                 stopped: false,
             },
@@ -169,17 +173,17 @@ fn migrate_all_packets() {
                 },
                 protocol_chain_config: ProtocolChainConfig {
                     account_address_prefix: "osmo".to_string(),
-                    ibc_token_denom: NATIVE_TOKEN.to_string(),
+                    native_token_denom: NATIVE_TOKEN.to_string(),
                     ibc_channel_id: CHANNEL_ID.to_string(),
                     oracle_address: Some(Addr::unchecked(OSMO4)),
                     minimum_liquid_stake_amount: Uint128::from(100u128),
                 },
-                liquid_stake_token_denom: LIQUID_STAKE_TOKEN_DENOM.to_string(),
+                liquid_stake_token_address: LIQUID_STAKE_TOKEN_DENOM.to_string(),
                 monitors: vec![],
                 batch_period: 86400,
                 protocol_fee_config: ProtocolFeeConfig {
-                    dao_treasury_fee: Uint128::from(10000u128),
-                    treasury_address: Some(Addr::unchecked(OSMO1)),
+                    fee_rate: Uint128::from(10000u128),
+                    fee_recipient: Some(Addr::unchecked(OSMO1)),
                 },
                 stopped: false,
             },

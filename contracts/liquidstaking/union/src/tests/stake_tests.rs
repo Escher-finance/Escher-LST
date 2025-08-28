@@ -1,33 +1,38 @@
-use crate::contract::{execute, reply, IBC_TIMEOUT};
-use crate::error::ContractError;
-use crate::helpers::{derive_intermediate_sender, get_rates};
-use crate::msg::ExecuteMsg;
-use crate::state::{State, BATCHES, CONFIG, STATE};
-use crate::tests::test_helper::{
-    init, CELESTIA1, CELESTIA2, CHANNEL_ID, LIQUID_STAKE_TOKEN_DENOM, NATIVE_TOKEN, OSMO3,
-    STAKER_ADDRESS,
-};
-use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
+use std::vec::Vec;
+
 use cosmwasm_std::{
-    attr, coins, Addr, CosmosMsg, Decimal, IbcTimeout, Order, Reply, ReplyOn, StdError, SubMsg,
-    SubMsgResponse, SubMsgResult, Timestamp, Uint128,
+    Addr, CosmosMsg, Decimal, IbcTimeout, Order, Reply, ReplyOn, StdError, SubMsg, SubMsgResponse,
+    SubMsgResult, Timestamp, Uint128, attr, coins,
+    testing::{MOCK_CONTRACT_ADDR, mock_env, mock_info},
 };
 use milky_way::staking::BatchStatus;
-use osmosis_std::types::cosmos::bank::v1beta1::MsgSend;
-use osmosis_std::types::cosmos::base::v1beta1::Coin;
-use osmosis_std::types::ibc::applications::transfer::v1::MsgTransfer;
-use osmosis_std::types::osmosis::tokenfactory::v1beta1::MsgMint;
-use std::vec::Vec;
+use osmosis_std::types::{
+    cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin},
+    ibc::applications::transfer::v1::MsgTransfer,
+    osmosis::tokenfactory::v1beta1::MsgMint,
+};
+
+use crate::{
+    contract::{IBC_TIMEOUT, execute, reply},
+    error::ContractError,
+    helpers::{derive_intermediate_sender, get_rates},
+    msg::ExecuteMsg,
+    state::{BATCHES, CONFIG, STATE, State},
+    tests::test_helper::{
+        CELESTIA1, CELESTIA2, CHANNEL_ID, LIQUID_STAKE_TOKEN_DENOM, NATIVE_TOKEN, OSMO3,
+        STAKER_ADDRESS, init,
+    },
+};
 
 #[test]
 fn proper_liquid_stake() {
     let mut deps = init();
     let env = mock_env();
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
 
@@ -207,10 +212,10 @@ fn proper_liquid_stake_with_ibc_transfer() {
     let mut deps = init();
     let env = mock_env();
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: Some(CELESTIA2.to_string()),
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
 
@@ -407,10 +412,10 @@ fn proper_liquid_stake_with_ibc_transfer() {
 fn liquid_stake_less_than_minimum() {
     let mut deps = init();
     let info = mock_info(OSMO3, &coins(10, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
 
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
@@ -437,10 +442,10 @@ fn proper_ibc_liquid_stake() {
     let intermediate_sender = derive_intermediate_sender(CHANNEL_ID, CELESTIA1, "osmo").unwrap();
 
     let info = mock_info(&intermediate_sender, &coins(1000, NATIVE_TOKEN));
-    let msg: ExecuteMsg = ExecuteMsg::LiquidStake {
+    let msg: ExecuteMsg = ExecuteMsg::Bond {
         mint_to: Some(OSMO3.to_string()),
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
 
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
@@ -482,19 +487,19 @@ fn mint_amount_divergence() {
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: Some(Uint128::from(2_000_000u128)),
+        min_mint_amount: Some(Uint128::from(2_000_000u128)),
     };
     let res: Result<cosmwasm_std::Response, ContractError> =
         execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
     assert!(res.is_err()); // minted amount is lower than expected
 
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: Some(Uint128::from(1_000_000u128)),
+        min_mint_amount: Some(Uint128::from(1_000_000u128)),
     };
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
     if res.is_err() {
@@ -514,10 +519,10 @@ fn zero_liquid_stake_but_native_tokens() {
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
     assert!(res.is_ok());
@@ -543,10 +548,10 @@ fn transfer_to_native_chain_false_is_handle_correctly() {
         .unwrap();
 
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
 
@@ -652,10 +657,10 @@ fn transfer_to_native_chain_true_is_handle_correctly() {
         .unwrap();
 
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: Some(true),
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), env.clone(), info, msg);
 

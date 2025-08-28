@@ -1,11 +1,17 @@
-use crate::contract::execute;
-use crate::helpers::derive_intermediate_sender;
-use crate::msg::ExecuteMsg;
-use crate::state::{new_unstake_request, State, BATCHES, CONFIG, STATE};
-use crate::tests::test_helper::{init, ADMIN, NATIVE_TOKEN, OSMO2, OSMO3};
-use cosmwasm_std::testing::{mock_env, mock_info};
-use cosmwasm_std::{coins, Coin, Uint128};
+use cosmwasm_std::{
+    coins,
+    testing::{mock_env, mock_info},
+    Coin, Uint128,
+};
 use milky_way::staking::Batch;
+
+use crate::{
+    contract::execute,
+    helpers::derive_intermediate_sender,
+    msg::ExecuteMsg,
+    state::{new_unstake_request, State, BATCHES, CONFIG, STATE},
+    tests::test_helper::{init, ADMIN, NATIVE_TOKEN, OSMO2, OSMO3},
+};
 
 #[test]
 fn circuit_breaker() {
@@ -43,10 +49,10 @@ fn circuit_breaker() {
 
     // liquid stake
     let info = mock_info(OSMO3, &coins(1000, "osmoTIA"));
-    let msg = ExecuteMsg::LiquidStake {
+    let msg = ExecuteMsg::Bond {
         mint_to: None,
         transfer_to_native_chain: None,
-        expected_mint_amount: None,
+        min_mint_amount: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
     assert!(res.is_err());
@@ -56,7 +62,7 @@ fn circuit_breaker() {
     state.total_native_token = Uint128::from(300_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
     let info = mock_info("bob", &coins(1000, "factory/cosmos2contract/stTIA"));
-    let msg = ExecuteMsg::LiquidUnstake {};
+    let msg = ExecuteMsg::Unbond {};
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
     assert!(res.is_err());
 
@@ -72,7 +78,7 @@ fn circuit_breaker() {
         &sender,
         &[Coin {
             amount: Uint128::from(100u128),
-            denom: config.protocol_chain_config.ibc_token_denom.clone(),
+            denom: config.protocol_chain_config.native_token_denom.clone(),
         }],
     );
     let res = execute(deps.as_mut(), env.clone(), info, msg.clone());
@@ -84,7 +90,7 @@ fn circuit_breaker() {
         &sender,
         &[Coin {
             amount: Uint128::from(100u128),
-            denom: config.protocol_chain_config.ibc_token_denom.clone(),
+            denom: config.protocol_chain_config.native_token_denom.clone(),
         }],
     );
     let res = execute(deps.as_mut(), env.clone(), info, msg.clone());
@@ -145,8 +151,8 @@ fn circuit_breaker() {
 
     // test enabled
     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
-    let msg = ExecuteMsg::LiquidStake {
-        expected_mint_amount: None,
+    let msg = ExecuteMsg::Bond {
+        min_mint_amount: None,
         transfer_to_native_chain: None,
         mint_to: None,
     };

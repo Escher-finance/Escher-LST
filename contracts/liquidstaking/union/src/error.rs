@@ -1,7 +1,7 @@
 use cosmwasm_std::{StdError, Timestamp, Uint128};
-use cw2::VersionError;
 use cw_controllers::AdminError;
 use cw_utils::PaymentError;
+use cw2::VersionError;
 use milky_way::staking::BatchStatus;
 use thiserror::Error;
 
@@ -73,9 +73,7 @@ pub enum ContractError {
     #[error("Batch {batch_id} don't have the expected native amount")]
     BatchWithoutExpectedNativeAmount { batch_id: u64 },
 
-    #[error(
-        "Received wrong batch amount, batch_id {batch_id} expected {expected}, got {received}"
-    )]
+    #[error("Received wrong batch amount, batch_id {batch_id} expected {expected}, got {received}")]
     ReceivedWrongBatchAmount {
         batch_id: u64,
         expected: Uint128,
@@ -148,7 +146,9 @@ pub enum ContractError {
     #[error("Insufficient funds")]
     InsufficientFunds {},
 
-    #[error("If liquid staking is done from a non native Osmosis address you need to provide an address via 'mint_to'")]
+    #[error(
+        "If liquid staking is done from a non native Osmosis address you need to provide an address via 'mint_to'"
+    )]
     MissingMintAddress {},
 
     #[error("The treasury address has not been configured")]
@@ -168,7 +168,9 @@ pub enum ContractError {
 
     #[error("DAO treasury fee can't be higher then 100000")]
     InvalidDaoTreasuryFee {},
-    #[error("The field '{field_name}' has a value of {value}, which exceeds the maximum allowed value of {max}.")]
+    #[error(
+        "The field '{field_name}' has a value of {value}, which exceeds the maximum allowed value of {max}."
+    )]
     ValueTooBig {
         field_name: String,
         value: Uint128,

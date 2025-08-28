@@ -1,12 +1,14 @@
-use crate::contract::instantiate;
-use crate::msg::InstantiateMsg;
-use crate::state::{Config, CONFIG};
-use crate::types::{UnsafeNativeChainConfig, UnsafeProtocolChainConfig, UnsafeProtocolFeeConfig};
-
-use cosmwasm_std::testing::{
-    mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+use cosmwasm_std::{
+    OwnedDeps, Uint128, coins,
+    testing::{MockApi, MockQuerier, MockStorage, mock_dependencies, mock_env, mock_info},
 };
-use cosmwasm_std::{coins, OwnedDeps, Uint128};
+
+use crate::{
+    contract::instantiate,
+    msg::InstantiateMsg,
+    state::{CONFIG, Config},
+    types::{UnsafeNativeChainConfig, UnsafeProtocolChainConfig, UnsafeProtocolFeeConfig},
+};
 
 pub static ADMIN: &str = "admin";
 pub static OSMO1: &str = "osmo12z558dm3ew6avgjdj07mfslx80rp9sh8nt7q3w";

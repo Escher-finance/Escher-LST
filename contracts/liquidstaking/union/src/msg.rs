@@ -1,30 +1,34 @@
-use crate::{
-    state::{
-        ibc::IBCTransfer, IbcWaitingForReply, NativeChainConfig, ProtocolChainConfig,
-        ProtocolFeeConfig, UnstakeRequest,
-    },
-    types::{
-        BatchExpectedAmount, UnsafeNativeChainConfig, UnsafeProtocolChainConfig,
-        UnsafeProtocolFeeConfig,
-    },
-};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Timestamp, Uint128};
+use ibc_union_spec::ChannelId;
 use milky_way::staking::BatchStatus;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use unionlabs_primitives::Bytes;
+
+use crate::{
+    state::{ProtocolFeeConfig, UnstakeRequest},
+    types::{BatchExpectedAmount, UnsafeProtocolFeeConfig},
+};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    /// Information about the chain from which the token
-    /// (for which we are creating the LST token) originates.
-    pub native_chain_config: UnsafeNativeChainConfig,
+    pub native_token_denom: String,
 
-    /// Information about the chain where the contract is deployed.
-    pub protocol_chain_config: UnsafeProtocolChainConfig,
+    pub minimum_liquid_stake_amount: Uint128,
+
+    /// The staking module's unbonding period in seconds.
+    pub unbonding_period: u64,
+
+    /// Address of the account that delegates the tokens
+    /// toward the validators.
+    pub staker_address: Addr,
+
+    /// Address where the staking rewards are withdrawn.
+    pub reward_collector_address: Addr,
 
     /// Protocol fee configuration.
-    pub protocol_fee_config: UnsafeProtocolFeeConfig,
+    pub protocol_fee_config: ProtocolFeeConfig,
 
     /// Denomination of the liquid staking token (e.g., stTIA).
     pub liquid_stake_token_denom: String,
@@ -33,35 +37,53 @@ pub struct InstantiateMsg {
     pub batch_period: u64,
 
     /// Set of addresses allowed to trigger a circuit break.
-    pub monitors: Vec<String>,
-    pub admin: Option<String>,
+    pub monitors: Vec<Addr>,
+    pub admin: Addr,
+
+    pub ucs03_zkgm_address: Addr,
+
+    pub funded_dispatch_address: Addr,
 }
 
 #[cw_serde]
 #[allow(clippy::large_enum_variant)]
 pub enum ExecuteMsg {
     /// Initiates the bonding process for a user.
-    LiquidStake {
-        /// Address to receive the minted LST tokens.
-        /// Can belong to either the chain where this contract is deployed
-        /// or the chain from which the native token originates.
-        /// If `None`, the tokens are sent to the message sender.
-        mint_to: Option<String>,
+    Bond {
+        /// The address to mint the LST to.
+        ///
+        /// This must be a valid address for this chain, otherwise it must be a valid address for the destination chain as specified in `recipient_channel_id`.
+        mint_to: Bytes,
 
-        /// When both native and protocol chains share the same address prefix,
-        /// this flag determines whether to send tokens to the native or protocol chain.
-        transfer_to_native_chain: Option<bool>,
+        /// The channel to send the LST over once minted.
+        ///
+        /// If `None`, the LST will be minted on this chain.
+        recipient_channel_id: Option<ChannelId>,
 
         /// Minimum expected amount of LST tokens to be received
         /// for the operation to be considered valid.
-        expected_mint_amount: Option<Uint128>,
+        min_mint_amount: Option<Uint128>,
     },
 
     /// Initiates the unbonding process for a user.
-    LiquidUnstake {},
+    Unbond {
+        /// The address that will receive the native tokens on.
+        ///
+        /// This must be the same as info.sender, unless this is being called via the funded-dispatch contract.
+        staker: String,
+
+        /// The amount to unstake.
+        ///
+        /// NOTE: In the original milkyway implementation, the contract expected funds to be sent to it (verified with must_pay) since the tokens were all native (ibc denoms for the base token, tokenfactory for the lst)
+        amount: Uint128,
+    },
 
     /// Withdraws unstaked tokens.
     Withdraw {
+        /// The address that will receive the funds.
+        ///
+        /// This must be the same as info.sender, unless this is being called via the funded-dispatch contract.
+        staker: String,
         /// ID of the batch from which to withdraw.
         batch_id: u64,
     },
@@ -69,18 +91,17 @@ pub enum ExecuteMsg {
     /// Processes the pending batch.
     SubmitBatch {},
 
-    /// Adds a validator to the validator set; callable by the owner.
-    AddValidator {
-        /// Address of the validator to add.
-        new_validator: String,
-    },
-
-    /// Removes a validator from the validator set; callable by the owner.
-    RemoveValidator {
-        /// Address of the validator to remove.
-        validator: String,
-    },
-
+    // TODO: Implement once basic functionality is complete
+    // /// Adds a validator to the validator set; callable by the owner.
+    // AddValidator {
+    //     /// Address of the validator to add.
+    //     new_validator: String,
+    // },
+    // /// Removes a validator from the validator set; callable by the owner.
+    // RemoveValidator {
+    //     /// Address of the validator to remove.
+    //     validator: String,
+    // },
     /// Transfers ownership to another account; callable by the owner.
     /// The new owner must accept the transfer for it to take effect.
     TransferOwnership {
@@ -94,24 +115,19 @@ pub enum ExecuteMsg {
     /// Revokes ownership transfer; callable by the current owner.
     RevokeOwnershipTransfer {},
 
-    /// Updates contract configuration; callable by the owner.
-    UpdateConfig {
-        /// Updated native chain configuration.
-        native_chain_config: Option<UnsafeNativeChainConfig>,
+    // TODO: Implement once basic functionality is complete
+    // /// Updates contract configuration; callable by the owner.
+    // // TODO: Add more params here
+    // UpdateConfig {
+    //     /// Updated protocol fee configuration.
+    //     protocol_fee_config: Option<ProtocolFeeConfig>,
 
-        /// Updated protocol chain configuration.
-        protocol_chain_config: Option<UnsafeProtocolChainConfig>,
+    //     /// Updated list of circuit breaker monitors.
+    //     monitors: Option<Vec<String>>,
 
-        /// Updated protocol fee configuration.
-        protocol_fee_config: Option<UnsafeProtocolFeeConfig>,
-
-        /// Updated list of circuit breaker monitors.
-        monitors: Option<Vec<String>>,
-
-        /// Updated unbonding batch execution frequency (in seconds).
-        batch_period: Option<u64>,
-    },
-
+    //     /// Updated unbonding batch execution frequency (in seconds).
+    //     batch_period: Option<u64>,
+    // },
     /// Receives rewards from the native chain.
     ReceiveRewards {},
 
@@ -163,8 +179,7 @@ pub enum ExecuteMsg {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ConfigResponse {
-    pub native_chain_config: NativeChainConfig,
-    pub protocol_chain_config: ProtocolChainConfig,
+    // TODO: Add more fields here
     pub protocol_fee_config: ProtocolFeeConfig,
     pub monitors: Vec<Addr>,
     pub liquid_stake_token_denom: String,
@@ -204,15 +219,6 @@ pub struct UnstakeRequestResponse {
     pub status: String,
     pub unstake_amount: Uint128,
     pub user: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
-pub struct IBCQueueResponse {
-    pub ibc_queue: Vec<IBCTransfer>,
-}
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
-pub struct IBCReplyQueueResponse {
-    pub ibc_queue: Vec<IbcWaitingForReply>,
 }
 
 #[cw_serde]
@@ -276,68 +282,4 @@ pub enum QueryMsg {
         /// Maximum number of unstake requests to return.
         limit: Option<u32>,
     },
-
-    #[returns(IBCQueueResponse)]
-    IbcQueue {
-        /// If provided, starts listing IBC packets after this packet ID.
-        start_after: Option<u64>,
-
-        /// Maximum number of IBC packets to return.
-        limit: Option<u32>,
-    },
-
-    /// Queries IBC packets that have been sent and are still waiting for a reply.
-    #[returns(IBCReplyQueueResponse)]
-    IbcReplyQueue {
-        /// If provided, starts listing sent-but-unreplied packets after this ID.
-        start_after: Option<u64>,
-
-        /// Maximum number of IBC reply queue entries to return.
-        limit: Option<u32>,
-    },
-}
-
-#[cw_serde]
-pub enum MigrateMsg {
-    V0_4_18ToV0_4_20 {
-        send_fees_to_treasury: bool,
-    },
-    V0_4_20ToV1_0_0 {
-        native_account_address_prefix: String,
-        native_validator_address_prefix: String,
-        native_token_denom: String,
-        protocol_account_address_prefix: String,
-    },
-    V1_0_0ToV1_1_0 {
-        limit: Option<usize>,
-    },
-}
-
-#[cw_serde]
-pub enum IBCLifecycleComplete {
-    #[serde(rename = "ibc_ack")]
-    IBCAck {
-        /// The source channel (osmosis side) of the IBC packet
-        channel: String,
-        /// The sequence number that the packet was sent with
-        sequence: u64,
-        /// String encoded version of the ack as seen by OnAcknowledgementPacket(..)
-        ack: String,
-        /// Weather an ack is a success of failure according to the transfer spec
-        success: bool,
-    },
-    #[serde(rename = "ibc_timeout")]
-    IBCTimeout {
-        /// The source channel (osmosis side) of the IBC packet
-        channel: String,
-        /// The sequence number that the packet was sent with
-        sequence: u64,
-    },
-}
-
-/// Message type for `sudo` entry_point
-#[cw_serde]
-pub enum SudoMsg {
-    #[serde(rename = "ibc_lifecycle_complete")]
-    IBCLifecycleComplete(IBCLifecycleComplete),
 }
