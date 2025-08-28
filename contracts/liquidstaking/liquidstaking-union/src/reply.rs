@@ -76,6 +76,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let mut quote_token_string = String::new();
     let amount = payload.amount;
 
+    let mut recipient_str = payload.staker.clone();
     // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
     // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
     if !is_on_chain_recipient
@@ -87,10 +88,9 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
             },
         )?;
 
-        let recipient = payload
-            .recipient
-            .clone()
-            .unwrap_or_else(|| payload.staker.clone());
+        if let Some(rec) = payload.recipient.as_ref() {
+            recipient_str = rec.to_string();
+        };
         let params = PARAMETERS.load(deps.storage)?;
 
         // allow/approve ucs03 to transfer on behalf of transfer handler via authz
@@ -116,12 +116,12 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
         quote_token_string = quote_token.lst_quote_token.clone();
 
-        let recipient_address = match Bytes::from_str(recipient.as_str()) {
+        let recipient_address = match Bytes::from_str(recipient_str.as_str()) {
             Ok(rec) => rec,
             Err(_) => {
                 return Err(ContractError::InvalidAddress {
                     kind: "recipient".into(),
-                    address: recipient,
+                    address: recipient_str.to_string(),
                 });
             }
         };
@@ -168,13 +168,18 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
 
         msgs.push(authz_ucs03_msg);
     } else {
-        let receiver = match payload.recipient.clone() {
+        let receiver: &String = match payload.recipient.as_ref() {
             Some(receiver) => receiver,
-            None => payload.staker.clone(),
+            None => &payload.staker,
         };
 
         // if staker from same chain, this contract will send the cw20 staking token
-        let msg = send_cw20(deps, amount, params.cw20_address.to_string(), receiver)?;
+        let msg = send_cw20(
+            deps,
+            amount,
+            params.cw20_address.to_string(),
+            receiver.to_string(),
+        )?;
         msgs.push(msg);
     }
 
