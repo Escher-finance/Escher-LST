@@ -27,14 +27,13 @@ This event is captured when user stake/bond to contract
 | unclaimed_reward | unclaimed reward that is not yet withdrawed |
 | ibc_channel_id | source ibc channel id of staker that bond via IBC  |
 
-
 ## unbond request
 
 event attribute key: unstake_request
 
 This event is emitted when user submit unbond request as part of specific batch
 
-  | event key | description |
+| event key | description |
 |--|--|
 | sender | address that call the contract |
 | staker | user address that request to unbond/unstake |
@@ -46,7 +45,6 @@ This event is emitted when user submit unbond request as part of specific batch
 | recipient | recipient address that will get back the token (in hex if recipient_channel_id is not 0)  |
 | recipient_channel_id | ucs03 channel id of recipient (0 if recipient is on same chain) |
 | reward_balance | total withdrawed reward balance on contract  |
-
 
 ## submit batch
 
@@ -72,7 +70,7 @@ Batch will be submitted every 8 hours.
 
 event attribute key: process_batch_unbonding
 
-This event is emitted when batch unbond period is over (complete unbonding) so batch process will release the native token for unbond requests as part of batch. 
+This event is emitted when batch unbond period is over (complete unbonding) so batch process will release the native token for unbond requests as part of batch.
 Max unbond requests that will be processed is 50, so if the unbond requests in batch is more than 50, this event will be emitted a few times per batch
 
 | event key | description |
@@ -101,19 +99,17 @@ This event is emitted per user recipient address when unbonding batch is process
 | recipient | recipient address that will get back the token (in hex if recipient_channel_id is not 0)  |
 | recipient_channel_id | ucs03 channel id of recipient (0 if recipient is on same chain) |
 
-
 ## batch received
 
 event attribute key: "batch_received";
 
-This event will be emitted when complete unbonding is done and contract get total amount from validators that is received by contract 
+This event will be emitted when complete unbonding is done and contract get total amount from validators that is received by contract
 
 | event key | description |
 |--|--|
 | batch_id | batch id of unbond batch that receive unbonded token from validators |
 | received_amount | total amount that are undelegated  (complete unbonding)  and receivedfrom validators of the batch |
 | time | timestamp of transaction when batch is released completely   |
-
 
 ## batch released
 

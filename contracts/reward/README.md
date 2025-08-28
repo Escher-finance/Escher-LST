@@ -9,7 +9,7 @@ To instantiate need these config:
 - fee_rate
 - coin_denom
 
-## Build Contract 
+## Build Contract
 
 This will generate wasm file in artifacts folder.
 

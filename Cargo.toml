@@ -1,0 +1,53 @@
+[workspace]
+resolver = "2"
+# NOTE: All paths must be listed out (i.e. no globs) since ifd is still broken in nix (still can't import the output of `cargo metadata` :( ). See crane.nix for where this is used.
+members = [
+  "contracts/reward",
+  "contracts/liquidstaking/liquidstaking-babylon",
+  "contracts/liquidstaking/liquidstaking-union",
+  "contracts/cw20-base",
+]
+
+[workspace.lints.clippy]
+disallowed_types        = "deny"
+module_inception        = "allow" # it's useful sometimes
+module_name_repetitions = "allow" # dumb lint
+
+# [workspace.lints.rust]
+# unused_crate_dependencies = "warn"
+
+[workspace.lints.rustdoc]
+broken-intra-doc-links = "deny"
+
+[profile.release]
+lto       = "thin"
+opt-level = 3
+
+[workspace.dependencies]
+alloy            = { version = "0.15.3", default-features = false }
+bincode          = { version = "2.0.1", default-features = false }
+cosmos-sdk-proto = { version = "0.27.0", default-features = false }
+cosmwasm-schema  = { version = "2.2.2" }
+cosmwasm-std     = { version = "2.2.2" }
+cw-ownable       = { version = "2.1.0" }
+cw-storage-plus  = { version = "2.0.0" }
+cw-utils         = { version = "2.0.0" }
+cw2              = { version = "2.0.0" }
+cw20             = { version = "2.0.0" }
+enumorph         = { version = "0.1.2" }
+hex-literal      = { version = "1.0.0" }
+ibc              = { version = "0.57.0", default-features = false }
+prost            = { version = "0.13", features = ["derive"] }
+schemars         = { version = "0.8.16" }
+semver           = { version = "1.0" }
+serde            = { version = "1.0.197", default-features = false, features = ["derive"] }
+serde_bytes      = { version = "0.11.15" }
+thiserror        = { version = "1.0.58" }
+
+# unionlabs
+embed-commit         = { git = "https://github.com/unionlabs/union", default-features = false }
+unionlabs-primitives = { git = "https://github.com/unionlabs/union", default-features = false }
+
+# [dev-dependencies]
+cw-multi-test   = { version = "2.2.0", features = ["staking"] }
+serde-json-wasm = { version = "1.0.1" }
