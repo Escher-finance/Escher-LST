@@ -1771,33 +1771,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "liquidstaking-union"
-version = "0.1.72"
-dependencies = [
- "alloy",
- "bincode",
- "cosmos-sdk-proto 0.27.0",
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-multi-test",
- "cw-ownable",
- "cw-storage-plus",
- "cw2",
- "cw20",
- "embed-commit",
- "enumorph",
- "hex-literal",
- "ibc",
- "prost 0.13.5",
- "schemars",
- "semver",
- "serde",
- "serde_bytes",
- "thiserror 1.0.69",
- "unionlabs-primitives",
-]
-
-[[package]]
 name = "macro-string"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
