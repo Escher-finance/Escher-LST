@@ -33,6 +33,8 @@ embed-commit         = { workspace = true }
 
 [dev-dependencies]
 cw-multi-test = { workspace = true }
+union-test = { git = "https://github.com/unionlabs/union", package = "union-test", rev = "c9ebd27b5436106843888432bdf281ac65331eeb" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 
 [features]
 bincode  = ["dep:bincode"]
