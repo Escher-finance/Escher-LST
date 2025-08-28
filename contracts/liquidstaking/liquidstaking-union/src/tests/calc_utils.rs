@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    Decimal, Empty, QuerierWrapper, SystemError, SystemResult, Uint128, Uint256, from_json,
-    testing::MockQuerier, to_json_binary,
+    from_json, testing::MockQuerier, to_json_binary, Decimal, Empty, QuerierWrapper, SystemError,
+    SystemResult, Uint128, Uint256,
 };
 use cw20::TokenInfoResponse;
 

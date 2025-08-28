@@ -1,26 +1,26 @@
 use std::marker::PhantomData;
 
 use cosmwasm_std::{
-    Binary, Decimal, Deps, Env, FullDelegation, Order, Storage, Uint128, entry_point,
-    to_json_binary,
+    entry_point, to_json_binary, Binary, Decimal, Deps, Env, FullDelegation, Order, Storage,
+    Uint128,
 };
-use cw_ownable::get_ownership;
 use cw2::ContractVersion;
+use cw_ownable::get_ownership;
 
 use crate::{
-    ContractError,
     msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
     state::{
-        PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
-        SUPPLY_QUEUE, State, Status, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL, UnbondRecord,
-        VALIDATORS_REGISTRY, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue,
-        unbond_record,
+        unbond_record, Parameters, QuoteToken, State, Status, SupplyQueue, UnbondRecord,
+        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, STATE,
+        STATUS, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, VALIDATORS_REGISTRY,
+        WITHDRAW_REWARD_QUEUE,
     },
     utils::{
-        batch::{Batch, BatchStatus, batches},
+        batch::{batches, Batch, BatchStatus},
         calc::{self, calculate_fee_from_reward, calculate_query_bounds},
         delegation::{get_actual_total_delegated, get_unclaimed_reward},
     },
+    ContractError,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -236,7 +236,7 @@ pub fn query_unreleased_unbond_record_from_batch(
     storage: &dyn Storage,
     batch_id: u64,
     limit: u32,
-) -> Vec<UnbondRecord> {
+) -> Result<Vec<UnbondRecord>, ContractError> {
     let mut unbonded_list: Vec<UnbondRecord> = vec![];
     let unbonded_range = unbond_record()
         .idx
@@ -246,23 +246,21 @@ pub fn query_unreleased_unbond_record_from_batch(
 
     let mut count = 0;
 
-    for unbonded in unbonded_range {
-        if unbonded.is_ok() {
-            let unbond_record = unbonded.unwrap().1;
+    for unbonded_result in unbonded_range {
+        let unbonded = unbonded_result?;
+        let unbond_record = unbonded.1;
 
-            if !unbond_record.released {
-                unbonded_list.push(unbond_record);
+        if !unbond_record.released {
+            unbonded_list.push(unbond_record);
 
-                count += 1;
+            count += 1;
 
-                if count >= limit {
-                    break;
-                }
+            if count >= limit {
+                break;
             }
         }
     }
-
-    unbonded_list
+    Ok(unbonded_list)
 }
 
 // query batch by id or status

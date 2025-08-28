@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo,
-    Response, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
+    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
+    DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
@@ -22,14 +22,14 @@ use crate::{
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        CONFIG, Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
-        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
-        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, CONFIG,
+        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE,
+        STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{BatchStatus, batches},
+        batch::{batches, BatchStatus},
         calc::{
             calculate_exchange_rate, calculate_fee_from_reward, check_slippage,
             get_last_epoch_block, get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
@@ -738,14 +738,14 @@ pub fn set_parameters(
         .clone()
         .unwrap_or(params.zkgm_token_minter);
 
-    if batch_period.is_some() {
-        params.batch_period = batch_period.unwrap();
+    if let Some(batch_period) = batch_period {
+        params.batch_period = batch_period;
     };
 
     // update epoch period in SUPPLY QUEUE
-    if epoch_period.is_some() {
+    if let Some(epoch_period) = epoch_period {
         let mut supply_queue = SUPPLY_QUEUE.load(deps.storage)?;
-        supply_queue.epoch_period = epoch_period.unwrap();
+        supply_queue.epoch_period = epoch_period;
         SUPPLY_QUEUE.save(deps.storage, &supply_queue)?;
     }
 
@@ -757,12 +757,12 @@ pub fn set_parameters(
 
     let mut msgs: Vec<CosmosMsg> = vec![];
 
-    if reward_address.is_some() {
+    if let Some(reward_address) = reward_address {
         let msg: CosmosMsg = CosmosMsg::Distribution(DistributionMsg::SetWithdrawAddress {
-            address: reward_address.clone().unwrap().to_string(),
+            address: reward_address.clone().to_string(),
         });
         msgs.push(msg);
-        reward_address_str = reward_address.unwrap().to_string();
+        reward_address_str = reward_address.to_string();
     }
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -844,7 +844,7 @@ pub fn process_batch_withdrawal(
     let total_received_amount = batch.received_native_unstaked.unwrap();
 
     let mut unbonding_records =
-        query_unreleased_unbond_record_from_batch(deps.storage, batch.id, params.batch_limit);
+        query_unreleased_unbond_record_from_batch(deps.storage, batch.id, params.batch_limit)?;
 
     let is_last_query = unbonding_records.len() < params.batch_limit as usize;
 
@@ -1253,7 +1253,7 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
 
     let mut last_epoch = get_last_epoch_block(block_height, supply_queue.epoch_period);
 
-    if epoch_diff % supply_queue.epoch_period as u64 == 0 {
+    if epoch_diff.is_multiple_of(supply_queue.epoch_period as u64) {
         last_epoch -= supply_queue.epoch_period as u64;
         next_epoch -= supply_queue.epoch_period as u64;
     }

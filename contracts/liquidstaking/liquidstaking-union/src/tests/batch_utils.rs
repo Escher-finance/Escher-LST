@@ -1,4 +1,4 @@
-use cosmwasm_std::{Uint128, testing::mock_dependencies};
+use cosmwasm_std::{testing::mock_dependencies, Uint128};
 
 use crate::utils::batch::*;
 

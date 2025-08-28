@@ -1,4 +1,4 @@
-use cosmwasm_schema::{QueryResponses, cw_serde};
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_ownable::cw_ownable_query;
 
