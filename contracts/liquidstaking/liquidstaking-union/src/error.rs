@@ -82,8 +82,12 @@ pub enum ContractError {
 
     #[error("Quote tokens must be unique by channel_id")]
     InvalidQuoteTokens {},
+
     #[error("no pending batch is available")]
     EmptyBatch {},
+
+    #[error("invalid batch")]
+    InvalidBatch {},
 
     #[error("bath status is incorrect, actual: {actual}, expected: {expected}")]
     BatchStatusIncorrect {
@@ -115,21 +119,24 @@ pub enum ContractError {
     #[error("This functionality is currently disabled for maintenance")]
     FunctionalityUnderMaintenance {},
 
-    #[error("invalid fee rate")]
-    InvalidFeeRate {},
+    #[error("invalid fee rate: {rate}")]
+    InvalidFeeRate { rate: cosmwasm_std::Decimal },
 
     #[error("Invalid exchange rate")]
     InvalidExchangeRate {},
 
-    #[error("error encode any msg")]
-    EncodeAnyMsgError {},
+    #[error("encode anymsg error {0}")]
+    EncodeAnyMsgError(#[from] cosmos_sdk_proto::prost::EncodeError),
 
-    #[error("invalid channel id")]
-    InvalidChannelId {},
+    #[error("invalid channel id : {msg}")]
+    InvalidChannelId { msg: String },
 
     #[error("invalid {kind} address: {address}")]
     InvalidAddress { kind: String, address: String },
 
     #[error("no reward to normalize: {msg}")]
     NoRewardToNormalize { msg: String },
+
+    #[error("invalid salt")]
+    InvalidSalt {},
 }

@@ -1,12 +1,12 @@
 use alloy::{primitives::U256, sol_types::SolValue};
-use cosmwasm_std::{Binary, Timestamp, Uint64, Uint128, to_json_binary};
+use cosmwasm_std::{to_json_binary, Binary, Timestamp, Uint128, Uint64};
 use unionlabs_primitives::{Bytes, H256};
 
 use super::com::{
-    Batch, FungibleAssetOrder, INSTR_VERSION_0, INSTR_VERSION_1, Instruction, OP_BATCH,
+    Batch, FungibleAssetOrder, Instruction, INSTR_VERSION_0, INSTR_VERSION_1, OP_BATCH,
     OP_FUNGIBLE_ASSET_ORDER,
 };
-use crate::{ContractError, msg::Ucs03ExecuteMsg, types::ChannelId};
+use crate::{msg::Ucs03ExecuteMsg, types::ChannelId, ContractError};
 
 #[allow(clippy::too_many_arguments)]
 pub fn ucs03_transfer(
@@ -73,8 +73,13 @@ pub fn ucs03_transfer(
     let timeout_timestamp =
         Timestamp::from_nanos(time.plus_seconds(timeout_timestamp_offset).nanos());
 
+    let Some(channel_id) = ChannelId::from_raw(channel_id) else {
+        return Err(ContractError::InvalidChannelId {
+            msg: format!("{:?} is not valid channel id", channel_id),
+        });
+    };
     let relay_transfer_msg: Ucs03ExecuteMsg = Ucs03ExecuteMsg::Send {
-        channel_id: ChannelId::from_raw(channel_id).unwrap(),
+        channel_id,
         timeout_height: Uint64::from(0u64),
         timeout_timestamp,
         salt,

@@ -11,6 +11,14 @@ use crate::{
     state::CONFIG,
 };
 
+use crate::{
+    error::ContractError,
+    event::{SplitRewardEvent, UpdateConfigEvent},
+    helpers,
+    msg::{Balance, ExecuteLstMsg, LSTQueryMsg},
+    state::CONFIG,
+};
+
 pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -93,8 +101,10 @@ pub fn set_config(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let mut config = CONFIG.load(deps.storage)?;
 
-    if fee_rate.is_some() && fee_rate.unwrap() > Decimal::one() {
-        return Err(ContractError::InvalidFeeRate {});
+    if let Some(fee_rate) = fee_rate {
+        if fee_rate > Decimal::one() {
+            return Err(ContractError::InvalidFeeRate {});
+        }
     }
 
     config.lst_contract_address = lst_contract_address
