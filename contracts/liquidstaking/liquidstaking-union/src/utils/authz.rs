@@ -30,8 +30,7 @@ pub fn cosmos_msg_for_contract_execution(
         funds: proto_funds,
     };
 
-    let execute_any =
-        Any::from_msg(&execute_contract).map_err(|_| ContractError::EncodeAnyMsgError {})?;
+    let execute_any = Any::from_msg(&execute_contract)?;
 
     let execute_msg = MsgExec {
         grantee,

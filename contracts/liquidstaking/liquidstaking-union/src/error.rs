@@ -122,14 +122,11 @@ pub enum ContractError {
     #[error("invalid fee rate")]
     InvalidFeeRate {},
 
-    #[error("invalid salt")]
-    InvalidSalt {},
-
     #[error("Invalid exchange rate")]
     InvalidExchangeRate {},
 
-    #[error("error encode any msg")]
-    EncodeAnyMsgError {},
+    #[error("encode anymsg error {0}")]
+    EncodeAnyMsgError(#[from] cosmos_sdk_proto::prost::EncodeError),
 
     #[error("invalid channel id")]
     InvalidChannelId {},
@@ -139,4 +136,7 @@ pub enum ContractError {
 
     #[error("no reward to normalize: {msg}")]
     NoRewardToNormalize { msg: String },
+
+    #[error("invalid salt")]
+    InvalidSalt {},
 }
