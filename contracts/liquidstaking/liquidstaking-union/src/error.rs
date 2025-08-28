@@ -119,8 +119,8 @@ pub enum ContractError {
     #[error("This functionality is currently disabled for maintenance")]
     FunctionalityUnderMaintenance {},
 
-    #[error("invalid fee rate")]
-    InvalidFeeRate {},
+    #[error("invalid fee rate: {rate}")]
+    InvalidFeeRate { rate: cosmwasm_std::Decimal },
 
     #[error("Invalid exchange rate")]
     InvalidExchangeRate {},

@@ -697,7 +697,7 @@ pub fn set_parameters(
 
     if let Some(fee_rate) = fee_rate {
         if fee_rate > Decimal::one() {
-            return Err(ContractError::InvalidFeeRate {});
+            return Err(ContractError::InvalidFeeRate { rate: fee_rate });
         }
     }
 
