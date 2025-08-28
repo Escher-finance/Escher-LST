@@ -1,4 +1,4 @@
-use cosmwasm_std::{Attribute, Decimal, Event, Timestamp, Uint128, attr};
+use cosmwasm_std::{attr, Attribute, Decimal, Event, Timestamp, Uint128};
 
 use crate::state::Validator;
 

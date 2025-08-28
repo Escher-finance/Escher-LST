@@ -1,9 +1,9 @@
 use cosmwasm_std::{Deps, Order, StdResult};
-use cw_storage_plus::Bound;
 use cw20::{
     AllAccountsResponse, AllAllowancesResponse, AllSpenderAllowancesResponse, AllowanceInfo,
     SpenderAllowanceInfo,
 };
+use cw_storage_plus::Bound;
 
 use crate::state::{ALLOWANCES, ALLOWANCES_SPENDER, BALANCES};
 
@@ -81,8 +81,9 @@ pub fn query_all_accounts(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::{
-        Addr, DepsMut, Uint128, coins, from_json,
+        coins, from_json,
         testing::{message_info, mock_dependencies_with_balance, mock_env},
+        Addr, DepsMut, Uint128,
     };
     use cw20::{Cw20Coin, Expiration, TokenInfoResponse};
 

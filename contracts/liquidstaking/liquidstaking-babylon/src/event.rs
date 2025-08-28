@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Attribute, Decimal, Event, Timestamp, Uint128, attr};
+use cosmwasm_std::{attr, Addr, Attribute, Decimal, Event, Timestamp, Uint128};
 
 use crate::state::Validator;
 pub const BOND_EVENT: &str = "bond";

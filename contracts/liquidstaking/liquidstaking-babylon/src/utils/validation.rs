@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::{
-    ContractError,
     state::{QuoteToken, Validator},
+    ContractError,
 };
 
 pub fn validate_validators(validators: &[Validator]) -> Result<(), ContractError> {
@@ -57,8 +57,8 @@ pub fn validate_recipient(
     }
 
     // if recipient_channel_id exists, must make sure the chain is supported and recipient address is in hex
-    if recipient_channel_id.is_some() {
-        let channel_id = crate::state::CHAINS.load(deps.storage, recipient_channel_id.unwrap());
+    if let Some(recipient_channel_id) = recipient_channel_id {
+        let channel_id = crate::state::CHAINS.load(deps.storage, recipient_channel_id);
         if channel_id.is_err() {
             return Err(ContractError::InvalidChannelId {});
         }
@@ -78,9 +78,9 @@ pub fn validate_recipient(
         }
     }
 
-    if recipient_ibc_channel_id.is_some() {
+    if let Some(recipient_ibc_channel_id) = recipient_ibc_channel_id {
         let ibc_channel_result: Result<String, cosmwasm_std::StdError> =
-            crate::state::IBC_CHANNELS.load(deps.storage, recipient_ibc_channel_id.unwrap());
+            crate::state::IBC_CHANNELS.load(deps.storage, recipient_ibc_channel_id);
         if ibc_channel_result.is_err() {
             return Err(ContractError::InvalidIBCChannelId {});
         }

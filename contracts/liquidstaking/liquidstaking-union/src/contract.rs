@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128, entry_point,
+    entry_point, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, Uint128,
 };
 use cw2::set_contract_version;
 
@@ -9,11 +9,12 @@ use crate::{
     instantiate::create_reward,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
     state::{
-        PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
-        STATE, STATUS, State, Status, VALIDATORS_REGISTRY, ValidatorsRegistry, WithdrawReward,
+        Parameters, State, Status, ValidatorsRegistry, WithdrawReward, PARAMETERS,
+        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
+        VALIDATORS_REGISTRY,
     },
     utils::{
-        batch::{Batch, batches},
+        batch::{batches, Batch},
         validation::{validate_quote_tokens, validate_validators},
     },
 };
