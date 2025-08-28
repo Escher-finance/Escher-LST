@@ -845,7 +845,7 @@ pub fn process_batch_withdrawal(
     };
 
     let mut unbonding_records =
-        query_unreleased_unbond_record_from_batch(deps.storage, batch.id, params.batch_limit);
+        query_unreleased_unbond_record_from_batch(deps.storage, batch.id, params.batch_limit)?;
 
     let is_last_query = unbonding_records.len() < params.batch_limit as usize;
 

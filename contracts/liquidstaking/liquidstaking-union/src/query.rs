@@ -219,7 +219,7 @@ pub fn query_unreleased_unbond_record_from_batch(
     storage: &dyn Storage,
     batch_id: u64,
     limit: u32,
-) -> Vec<UnbondRecord> {
+) -> Result<Vec<UnbondRecord>, ContractError> {
     let mut unbonded_list: Vec<UnbondRecord> = vec![];
     let unbonded_range = unbond_record()
         .idx
@@ -228,8 +228,11 @@ pub fn query_unreleased_unbond_record_from_batch(
         .range(storage, None, None, Order::Ascending);
 
     let mut count = 0;
-    for unbonded in unbonded_range.flatten() {
+
+    for unbonded_result in unbonded_range {
+        let unbonded = unbonded_result?; // Propagate error immediately
         let unbond_record = unbonded.1;
+
         if !unbond_record.released {
             unbonded_list.push(unbond_record);
             count += 1;
@@ -238,7 +241,7 @@ pub fn query_unreleased_unbond_record_from_batch(
             }
         }
     }
-    unbonded_list
+    Ok(unbonded_list)
 }
 
 pub fn query_batch(
