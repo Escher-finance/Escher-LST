@@ -5,7 +5,7 @@ use cosmwasm_std::{
     SubMsgResult, Timestamp, Uint128, attr, coins,
     testing::{MOCK_CONTRACT_ADDR, mock_env, mock_info},
 };
-use milky_way::staking::BatchStatus;
+use milky_way::staking::BatchState;
 use osmosis_std::types::{
     cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin},
     ibc::applications::transfer::v1::MsgTransfer,
@@ -138,7 +138,7 @@ fn proper_liquid_stake() {
 
     let pending_batch = BATCHES
         .range(deps.as_ref().storage, None, None, Order::Descending)
-        .find(|r| r.is_ok() && r.as_ref().unwrap().1.status == BatchStatus::Pending)
+        .find(|r| r.is_ok() && r.as_ref().unwrap().1.state == BatchState::Pending)
         .unwrap()
         .unwrap()
         .1;
@@ -339,7 +339,7 @@ fn proper_liquid_stake_with_ibc_transfer() {
 
     let pending_batch = BATCHES
         .range(deps.as_ref().storage, None, None, Order::Descending)
-        .find(|r| r.is_ok() && r.as_ref().unwrap().1.status == BatchStatus::Pending)
+        .find(|r| r.is_ok() && r.as_ref().unwrap().1.state == BatchState::Pending)
         .unwrap()
         .unwrap()
         .1;

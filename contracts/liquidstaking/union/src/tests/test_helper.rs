@@ -1,13 +1,13 @@
 use cosmwasm_std::{
-    OwnedDeps, Uint128, coins,
-    testing::{MockApi, MockQuerier, MockStorage, mock_dependencies, mock_env, mock_info},
+    coins,
+    testing::{mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage},
+    Addr, OwnedDeps, Uint128,
 };
 
 use crate::{
     contract::instantiate,
     msg::InstantiateMsg,
-    state::{CONFIG, Config},
-    types::{UnsafeNativeChainConfig, UnsafeProtocolChainConfig, UnsafeProtocolFeeConfig},
+    state::{ProtocolFeeConfig, CONFIG},
 };
 
 pub static ADMIN: &str = "admin";
@@ -28,30 +28,20 @@ pub static LIQUID_STAKE_TOKEN_DENOM: &str = "umilkTIA";
 
 pub fn mock_init_msg() -> InstantiateMsg {
     InstantiateMsg {
-        native_chain_config: UnsafeNativeChainConfig {
-            token_denom: "utia".to_string(),
-            account_address_prefix: "celestia".to_string(),
-            validator_address_prefix: "celestiavaloper".to_string(),
-            validators: vec![CELESTIAVAL1.to_string(), CELESTIAVAL2.to_string()],
-            unbonding_period: 1209600,
-            staker_address: STAKER_ADDRESS.to_string(),
-            reward_collector_address: CELESTIA2.to_string(),
-        },
-        protocol_chain_config: UnsafeProtocolChainConfig {
-            account_address_prefix: "osmo".to_string(),
-            ibc_token_denom: NATIVE_TOKEN.to_string(),
-            ibc_channel_id: CHANNEL_ID.to_string(),
-            oracle_address: Some(OSMO4.to_string()),
-            minimum_liquid_stake_amount: Uint128::from(100u128),
-        },
-        liquid_stake_token_denom: LIQUID_STAKE_TOKEN_DENOM.to_string(),
-        monitors: vec![OSMO2.to_string(), OSMO3.to_string()],
+        staker_address: Addr::unchecked(STAKER_ADDRESS),
+        minimum_liquid_stake_amount: Uint128::from(100u128),
+        liquid_stake_token_address: LIQUID_STAKE_TOKEN_DENOM.to_string(),
+        monitors: vec![Addr::unchecked(OSMO2), Addr::unchecked(OSMO3)],
         batch_period: 86400,
-        protocol_fee_config: UnsafeProtocolFeeConfig {
-            dao_treasury_fee: Uint128::from(10_000u128),
-            treasury_address: Some(OSMO1.to_string()),
+        protocol_fee_config: ProtocolFeeConfig {
+            fee_rate: Uint128::from(10_000u128),
+            fee_recipient: Addr::unchecked(OSMO1),
         },
-        admin: None,
+        admin: Addr::unchecked("admin"),
+        native_token_denom: "au".to_owned(),
+        reward_collector_address: Addr::unchecked("reward_collector"),
+        ucs03_zkgm_address: Addr::unchecked("zkgm"),
+        funded_dispatch_address: Addr::unchecked("proxy_call"),
     }
 }
 
@@ -66,7 +56,7 @@ pub fn init() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     }
     assert!(res.is_ok());
 
-    let mut config: Config = CONFIG.load(&deps.storage).unwrap();
+    let mut config = CONFIG.load(&deps.storage).unwrap();
     config.stopped = false;
     CONFIG.save(&mut deps.storage, &config).unwrap();
 

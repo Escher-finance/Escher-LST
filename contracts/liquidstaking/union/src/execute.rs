@@ -4,20 +4,18 @@ use cosmwasm_std::{
     Uint128,
 };
 use cw20::Cw20ExecuteMsg;
-use cw_utils::PaymentError;
+use cw_utils::must_pay;
 use ibc_union_spec::ChannelId;
-use milky_way::staking::{Batch, BatchStatus};
-use ucs03_zkgm::com::{
-    Instruction, TokenOrderV2, INSTR_VERSION_2, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_ESCROW,
-};
+use milky_way::staking::{Batch, BatchState};
+use ucs03_zkgm::com::{Instruction, TokenOrderV2, INSTR_VERSION_2, OP_TOKEN_ORDER};
 use unionlabs_primitives::Bytes;
 
 use crate::{
     error::{ContractError, ContractResult},
-    helpers::{compute_mint_amount, compute_unbond_amount},
+    helpers::{compute_mint_amount, compute_unbond_amount, query_and_validate_unbonding_period},
     state::{
-        new_unstake_request, remove_unstake_request, unstake_requests, Config, State,
-        UnstakeRequest, ADMIN, BATCHES, CONFIG, PENDING_BATCH_ID, STATE,
+        new_unstake_request, remove_unstake_request, unstake_requests, Config, UnstakeRequest,
+        ADMIN, BATCHES, CONFIG, FUNGIBLE_RECIPIENT_CHANNEL, PENDING_BATCH_ID, STATE,
     },
     types::BatchExpectedAmount,
 };
@@ -26,8 +24,24 @@ const FEE_RATE_DENOMINATOR: u64 = 100_000;
 
 pub fn check_stopped(config: &Config) -> Result<(), ContractError> {
     if config.stopped {
-        return Err(ContractError::Stopped {});
+        return Err(ContractError::Stopped);
     }
+    Ok(())
+}
+
+// TODO: Build out an allowances system?
+pub fn ensure_trusted_address(
+    config: &Config,
+    info: &MessageInfo,
+    staker: &str,
+) -> Result<(), ContractError> {
+    if info.sender.as_str() != staker {
+        // funded_dispatch_address is a trusted address
+        if info.sender != config.funded_dispatch_address {
+            panic!("nice try fucker")
+        }
+    }
+
     Ok(())
 }
 
@@ -44,12 +58,11 @@ pub fn check_stopped(config: &Config) -> Result<(), ContractError> {
 /// - tokenfactory functionality has been converted into the equivalent cw20 messages
 /// - ibc sub messages have been converted to the equivalent cw20 messages (since the transfers will happen on the same chain, not cross-chain back to the native chain)
 pub fn execute_bond(
-    mut deps: DepsMut,
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    amount: Uint128,
     // NOTE: In the original milkyway implementation, this was optional and defaulted to info.sender if not set. Due to how we will be using this contract (i.e. with the funded-dispatch contract in the zkgm batch), it is much clearer to enforce this to be set. This makes it slightly more verbose for a user who is liquid staking directly on union, but we deem this to be a bit of a degenerate case as this will only be done in the ui from ethereum (via zkgm).
-    mint_to: Bytes,
+    mint_to_address: Bytes,
     recipient_channel_id: Option<ChannelId>,
     min_mint_amount: Option<Uint128>,
 ) -> ContractResult<Response> {
@@ -57,10 +70,9 @@ pub fn execute_bond(
 
     check_stopped(&config)?;
 
-    // NOTE: This used to default to info.sender if not provided (see comment on mint_to parameter above)
-    let mint_to_address = mint_to;
+    let amount = must_pay(&info, &config.native_token_denom)?;
 
-    let mut state: State = STATE.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
     ensure!(
         amount >= config.minimum_liquid_stake_amount,
         ContractError::MinimumLiquidStakeAmount {
@@ -68,15 +80,6 @@ pub fn execute_bond(
             sent_amount: amount,
         }
     );
-
-    // TODO: Review if this is still necessary now that the staking is happening on the same chain
-    // this handles a special case that through slashing and redeeming chaining we get into a state
-    // where the total liquid stake is zero but the total native stake is not
-    // nobody can claim the native stake, so we need to claim it to the DAO
-    if state.total_liquid_stake_token.is_zero() && !state.total_native_token.is_zero() {
-        state.total_fees += state.total_native_token;
-        state.total_native_token = Uint128::zero();
-    }
 
     // Compute mint amount
     let mint_amount = compute_mint_amount(
@@ -87,7 +90,7 @@ pub fn execute_bond(
 
     // If mint amount is zero it is likely there was a an issue with rounding, return error and do not mint
     if mint_amount.is_zero() {
-        return Err(ContractError::MintError {});
+        return Err(ContractError::MintError);
     }
 
     if let Some(min_mint_amount) = min_mint_amount {
@@ -100,23 +103,12 @@ pub fn execute_bond(
         );
     }
 
-    // Mint liquid staking token to self
-    let mint_lst_msg = wasm_execute(
-        &config.liquid_stake_token_address,
-        &Cw20ExecuteMsg::Mint {
-            amount: mint_amount,
-            recipient: env.contract.address.to_string(),
-        },
-        vec![],
-    )?;
-
-    // Transfer native token to multisig address
+    // transfer native token to multisig address
     // NOTE: In the original milkyway satking contracts, this was an ibc transfer message back to the multisig on the source chain since the liquid staking is *initiated* on the protocol chain (i.e. where this contract is deployed), but the *staking* happens on the native chain
     // TODO: This should be a wasm_execute call with a specific ExecuteMsg for the staker contract
     // TODO: Define the ExecuteMsg for the staker contract
     let transfer_funds_to_cw_account_msig_message = BankMsg::Send {
         to_address: config.staker_address.to_string(),
-        // TODO: Ensure only the staking token is provided here
         amount: info.funds,
     };
     state.total_native_token += amount;
@@ -124,7 +116,6 @@ pub fn execute_bond(
     STATE.save(deps.storage, &state)?;
 
     let response = Response::new()
-        .add_message(mint_lst_msg)
         .add_message(transfer_funds_to_cw_account_msig_message)
         .add_attribute("mint_to_address", mint_to_address.to_string())
         .add_attribute("action", "liquid_stake")
@@ -133,10 +124,23 @@ pub fn execute_bond(
         .add_attribute("in_amount", amount)
         .add_attribute("mint_amount", mint_amount);
 
-    // NOTE: This used to be a check against `mint_to_is_protocol` (see commented out code above) with the branches flipped.
     let response = if let Some(recipient_channel_id) = recipient_channel_id {
+        let recipient_channel_config =
+            FUNGIBLE_RECIPIENT_CHANNEL.load(deps.storage, recipient_channel_id.raw())?;
+
         // transfer the eU to the desired recipient channel
+        //
+        // NOTE: We can't just mint into zkgm directly, since zkgm uses `transfer_from` to spend on behalf of the caller, *not* `transfer` (which would spend zkgm's own balance).
         response.add_messages([
+            // mint LST to self
+            wasm_execute(
+                &config.liquid_stake_token_address,
+                &Cw20ExecuteMsg::Mint {
+                    amount: mint_amount,
+                    recipient: env.contract.address.to_string(),
+                },
+                vec![],
+            )?,
             // increase allowance of eU for zkgm from self
             wasm_execute(
                 // eU address
@@ -153,6 +157,8 @@ pub fn execute_bond(
                 &ucs03_zkgm::msg::ExecuteMsg::Send {
                     channel_id: recipient_channel_id,
                     timeout_timestamp: ibc_union_spec::Timestamp::from_nanos(
+                        // REVIEW: Make the timeout a config param?
+                        // REVIEW: What happens if this packet times out? The tokens will be sent back to this contract?
                         env.block.time.plus_days(3).nanos(),
                     ),
                     timeout_height: 0_u64.into(),
@@ -162,7 +168,8 @@ pub fn execute_bond(
                         version: INSTR_VERSION_2,
                         opcode: OP_TOKEN_ORDER,
                         operand: TokenOrderV2 {
-                            sender: env.contract.address.as_bytes().to_vec().into(),
+                            // in the event of a timeout or failure on the destination chain, the funds will be refunded to the staker account.
+                            sender: config.staker_address.to_string().into_bytes().into(),
                             receiver: mint_to_address.into(),
                             base_token: config
                                 .liquid_stake_token_address
@@ -170,13 +177,10 @@ pub fn execute_bond(
                                 .into_bytes()
                                 .into(),
                             base_amount: alloy::primitives::U256::from(mint_amount.u128()),
-
-                            // these depend on the channel, we need to either query or configure fungible counterparties
-                            quote_token: todo!(),
+                            quote_token: recipient_channel_config.quote_token.into(),
                             quote_amount: alloy::primitives::U256::from(mint_amount.u128()),
-                            kind: TOKEN_ORDER_KIND_ESCROW,
-                            // TODO: What does this need to be?
-                            metadata: Default::default(),
+                            kind: recipient_channel_config.kind,
+                            metadata: recipient_channel_config.metadata.into(),
                         }
                         .abi_encode_params()
                         .into(),
@@ -197,7 +201,7 @@ pub fn execute_bond(
         response.add_message(wasm_execute(
             // eU address
             config.liquid_stake_token_address,
-            &Cw20ExecuteMsg::Transfer {
+            &Cw20ExecuteMsg::Mint {
                 amount: mint_amount,
                 recipient: recipient.to_string(),
             },
@@ -208,12 +212,12 @@ pub fn execute_bond(
     Ok(response)
 }
 
-/// # Changes from original implementation
+/// Unbond the LST.
 ///
-/// - added `sender` parameter and check against info.sender and config.funded_dispatch_address
+/// The LST is sent to this contract, and an unstaking request is added to the current batch. Once the batch is submitted, [`execute_withdraw`] can be called to withdraw the unstaked native token.
 pub fn execute_unbond(
     mut deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     amount: Uint128,
     staker: String,
@@ -222,46 +226,34 @@ pub fn execute_unbond(
 
     check_stopped(&config)?;
 
-    if info.sender.as_str() != staker {
-        // funded_dispatch_address is a trusted address
-        if info.sender != config.funded_dispatch_address {
-            panic!("nice try fucker")
-        }
-    }
+    ensure_trusted_address(&config, &info, &staker)?;
 
-    STATE.load(deps.storage)?;
-
-    // Load current pending batch
     let pending_batch_id = PENDING_BATCH_ID.load(deps.storage)?;
 
-    // NOTE: This is just a convoluted `.has()` check
-    // Add unstake request to pending batch
-    let pending_unstake_request =
-        unstake_requests().may_load(deps.storage, (pending_batch_id, staker.clone()))?;
-    let is_new_request = pending_unstake_request.is_none();
-    match pending_unstake_request {
-        Some(_) => {
-            unstake_requests().update(
-                deps.storage,
-                (pending_batch_id, staker.clone()),
-                |or| -> Result<UnstakeRequest, ContractError> {
-                    match or {
-                        Some(r) => Ok(UnstakeRequest {
-                            batch_id: r.batch_id,
-                            user: r.user.clone(),
-                            amount: r.amount + amount,
-                        }),
-                        None => Err(ContractError::NoRequestInBatch {}),
-                    }
-                },
-            )?;
-        }
-        None => {
-            new_unstake_request(&mut deps, staker.clone(), pending_batch_id, amount)?;
-        }
+    let is_new_request = !unstake_requests().has(deps.storage, (pending_batch_id, staker.clone()));
+
+    if is_new_request {
+        new_unstake_request(&mut deps, staker.clone(), pending_batch_id, amount)?;
+    } else {
+        unstake_requests().update(
+            deps.storage,
+            (pending_batch_id, staker.clone()),
+            |or| -> Result<UnstakeRequest, ContractError> {
+                match or {
+                    Some(r) => Ok(UnstakeRequest {
+                        batch_id: r.batch_id,
+                        user: r.user.clone(),
+                        amount: r.amount + amount,
+                    }),
+                    None => Err(ContractError::NoRequestInBatch {
+                        staker: staker.clone(),
+                    }),
+                }
+            },
+        )?;
     }
 
-    // Add amount to batch total (stTIA)
+    // add amount to batch total
     BATCHES.update(
         deps.storage,
         pending_batch_id,
@@ -269,25 +261,26 @@ pub fn execute_unbond(
             let mut batch = batch.unwrap();
             batch.batch_total_liquid_stake += amount;
             if is_new_request {
-                batch.unstake_requests_count = Some(batch.unstake_requests_count.unwrap_or(0) + 1);
+                batch.unbond_requests_count += 1;
             }
             Ok(batch)
         },
     )?;
 
-    // burn `amount` of lst from the staker
+    // transfer the unbonded LST to this contract
     // this requires an allowance to spend these tokens on behalf of the staker
-    let lst_burn_msg = wasm_execute(
+    let lst_transfer_from_msg = wasm_execute(
         &config.liquid_stake_token_address,
-        &Cw20ExecuteMsg::BurnFrom {
+        &Cw20ExecuteMsg::TransferFrom {
             owner: staker.clone(),
+            recipient: env.contract.address.to_string(),
             amount,
         },
         vec![],
     )?;
 
     Ok(Response::new()
-        .add_message(lst_burn_msg)
+        .add_message(lst_transfer_from_msg)
         .add_attribute("action", "liquid_unstake")
         .add_attribute("sender", staker)
         .add_attribute("batch", pending_batch_id.to_string())
@@ -299,40 +292,30 @@ pub fn execute_unbond(
 /// # Changes from original implementation
 ///
 /// - oracle functionality was removed
+///
 /// TODO: Withdraw unstaked tokens in this function
-pub fn execute_submit_batch(
-    deps: DepsMut,
-    env: Env,
-    _info: MessageInfo,
-) -> ContractResult<Response> {
+pub fn execute_submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
 
     check_stopped(&config)?;
 
     let pending_batch_id = PENDING_BATCH_ID.load(deps.storage)?;
     let mut batch = BATCHES.load(deps.storage, pending_batch_id)?;
 
-    if let Some(est_next_batch_time) = batch.next_batch_action_time {
-        // Check if the batch has been submitted
-        if env.block.time.seconds() < est_next_batch_time {
-            return Err(ContractError::BatchNotReady {
-                actual: env.block.time.seconds(),
-                expected: est_next_batch_time,
-            });
-        }
-    } else {
-        // Should not enter as pending batch should have a next batch action time
-        return Err(ContractError::BatchNotReady {
+    let BatchState::Pending { submit_time } = batch.state else {
+        return Err(ContractError::BatchAlreadySubmitted);
+    };
+
+    ensure!(
+        env.block.time.seconds() >= submit_time,
+        ContractError::BatchNotReady {
             actual: env.block.time.seconds(),
-            expected: 0u64,
-        });
-    }
+            expected: submit_time,
+        }
+    );
 
-    if batch.unstake_requests_count.unwrap_or(0) == 0 {
-        return Err(ContractError::BatchEmpty {});
-    }
-
-    let mut state = STATE.load(deps.storage)?;
+    ensure!(batch.unbond_requests_count > 0, ContractError::BatchEmpty);
 
     ensure!(
         state.total_liquid_stake_token >= batch.batch_total_liquid_stake,
@@ -342,25 +325,15 @@ pub fn execute_submit_batch(
         }
     );
 
-    // Create new pending batch
-    let new_pending_batch = Batch::new(
-        batch.id + 1,
+    // create new pending batch
+    let new_pending_batch = Batch::new_pending(
         Uint128::zero(),
         env.block.time.seconds() + config.batch_period,
     );
 
     // Save new pending batch
-    BATCHES.save(deps.storage, new_pending_batch.id, &new_pending_batch)?;
-    PENDING_BATCH_ID.save(deps.storage, &new_pending_batch.id)?;
-
-    // Waiting until batch submission to burn tokens
-    let lst_burn_msg = wasm_execute(
-        config.liquid_stake_token_address,
-        &Cw20ExecuteMsg::Burn {
-            amount: batch.batch_total_liquid_stake,
-        },
-        vec![],
-    )?;
+    BATCHES.save(deps.storage, &pending_batch_id + 1, &new_pending_batch)?;
+    PENDING_BATCH_ID.save(deps.storage, &(pending_batch_id + 1))?;
 
     let unbond_amount = compute_unbond_amount(
         state.total_native_token,
@@ -368,174 +341,93 @@ pub fn execute_submit_batch(
         batch.batch_total_liquid_stake,
     );
 
-    // Reduce underlying TIA balance by unbonded amount
+    // reduce underlying native token balance by unbonded amount
     state.total_native_token = state
         .total_native_token
         .checked_sub(unbond_amount)
-        .unwrap_or_else(|_| Uint128::zero());
+        .unwrap_or_default();
 
-    // Reduce underlying stTIA balance by batch total
+    // reduce underlying LST balance by batch total
     state.total_liquid_stake_token = state
         .total_liquid_stake_token
         .checked_sub(batch.batch_total_liquid_stake)
-        .unwrap_or_else(|_| Uint128::zero());
+        .unwrap_or_default();
 
+    let unbonding_period = query_and_validate_unbonding_period(deps.as_ref(), config.batch_period)?;
+
+    batch.state = BatchState::Submitted {
+        receive_time: env.block.time.seconds() + unbonding_period,
+        expected_native_unstaked: unbond_amount,
+    };
+
+    BATCHES.save(deps.storage, pending_batch_id, &batch)?;
     STATE.save(deps.storage, &state)?;
 
-    // Update batch status
-    batch.expected_native_unstaked = Some(unbond_amount);
-    batch.update_status(
-        BatchStatus::Submitted,
-        Some(env.block.time.seconds() + config.unbonding_period),
-    );
-
-    BATCHES.save(deps.storage, batch.id, &batch)?;
-
     Ok(Response::new()
-        .add_message(lst_burn_msg)
+        // burn all unbonded LST tokens on batch submission
+        .add_message(wasm_execute(
+            config.liquid_stake_token_address,
+            &Cw20ExecuteMsg::Burn {
+                amount: batch.batch_total_liquid_stake,
+            },
+            vec![],
+        )?)
         .add_attribute("action", "submit_batch")
-        .add_attribute("batch_id", batch.id.to_string())
+        .add_attribute("batch_id", pending_batch_id.to_string())
         .add_attribute("batch_total", batch.batch_total_liquid_stake)
-        .add_attribute("expected_native_unstaked", unbond_amount))
+        .add_attribute("expected_native_unstaked", unbond_amount)
+        .add_attribute("unbonding_period", unbonding_period.to_string()))
 }
 
-// doing a "push over pool" pattern for now
-// eventually we can move this to auto-withdraw all funds upon batch completion
-// Reasoning - any one issue in the batch will cause the entire batch to fail
-/// # Changes from original implementation
-///
-/// - oracle functionality was removed
-/// - added `sender` parameter and check against info.sender and config.funded_dispatch_address
 pub fn execute_withdraw(
     mut deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     batch_id: u64,
-    sender: String,
+    staker: String,
 ) -> ContractResult<Response> {
-    let config: Config = CONFIG.load(deps.storage)?;
+    let config = CONFIG.load(deps.storage)?;
 
     check_stopped(&config)?;
 
-    if info.sender.as_str() != sender {
-        // funded_dispatch_address is a trusted address
-        if info.sender != config.funded_dispatch_address {
-            panic!("nice try fucker")
-        }
-    }
+    ensure_trusted_address(&config, &info, &staker)?;
 
-    // nice
-    let _batch = BATCHES.load(deps.storage, batch_id);
-    if _batch.is_err() {
-        return Err(ContractError::BatchEmpty {});
-    }
-    let batch = _batch.unwrap();
+    let Some(batch) = BATCHES.may_load(deps.storage, batch_id)? else {
+        return Err(ContractError::BatchNotFound { batch_id });
+    };
 
-    if batch.status != BatchStatus::Received {
-        return Err(ContractError::TokensAlreadyClaimed { batch_id: batch.id });
-    }
-    // TODO: Why unwrap?
-    let received_native_unstaked = batch.received_native_unstaked.as_ref().unwrap();
+    let BatchState::Received {
+        received_native_unstaked,
+    } = batch.state
+    else {
+        return Err(ContractError::BatchNotYetReceived);
+    };
 
     let liquid_unstake_request = unstake_requests()
-        .may_load(deps.storage, (batch.id, sender.clone()))?
-        .ok_or(ContractError::NoRequestInBatch {})?;
+        .may_load(deps.storage, (batch_id, staker.clone()))?
+        .ok_or_else(|| ContractError::NoRequestInBatch {
+            staker: staker.clone(),
+        })?;
 
     let amount = received_native_unstaked.multiply_ratio(
         liquid_unstake_request.amount,
         batch.batch_total_liquid_stake,
     );
 
-    remove_unstake_request(&mut deps, sender.clone(), batch.id)?;
-
-    // send the native token (U) back to the staker
-    let send_msg = BankMsg::Send {
-        to_address: sender.clone(),
-        amount: vec![Coin {
-            denom: config.native_token_denom.clone(),
-            amount,
-        }],
-    };
+    remove_unstake_request(&mut deps, staker.clone(), batch_id)?;
 
     Ok(Response::new()
-        .add_message(send_msg)
+        // send the native token (U) back to the staker
+        .add_message(BankMsg::Send {
+            to_address: staker.clone(),
+            amount: vec![Coin {
+                denom: config.native_token_denom.clone(),
+                amount,
+            }],
+        })
         .add_attribute("action", "execute_withdraw")
-        .add_attribute("batch", batch.id.to_string())
+        .add_attribute("batch", batch_id.to_string())
         .add_attribute("amount", amount.to_string()))
 }
-
-// TODO: Implement once basic functionality is completed
-// // Add a validator to the list of validators; callable by the owner
-// pub fn execute_add_validator(
-//     deps: DepsMut,
-//     _env: Env,
-//     info: MessageInfo,
-//     new_validator: String,
-// ) -> ContractResult<Response> {
-//     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
-
-//     let mut config = CONFIG.load(deps.storage)?;
-//     let new_validator_addr = validate_address(&new_validator, &config.validator_address_prefix)?;
-
-//     // Check if the new_validator is already in the list.
-//     if config
-//         .validators
-//         .iter()
-//         .any(|validator| *validator == new_validator_addr)
-//     {
-//         return Err(ContractError::DuplicateValidator {
-//             validator: new_validator.clone(),
-//         });
-//     }
-
-//     // Add the new validator to the list.
-//     config.validators.push(new_validator_addr.clone());
-
-//     // Save the updated config.
-//     CONFIG.save(deps.storage, &config)?;
-
-//     Ok(Response::new()
-//         .add_attribute("action", "add_validator")
-//         .add_attribute("new_validator", new_validator_addr)
-//         .add_attribute("sender", info.sender))
-// }
-
-// TODO: Implement once basic functionality is completed
-// pub fn execute_remove_validator(
-//     deps: DepsMut,
-//     _env: Env,
-//     info: MessageInfo,
-//     validator_to_remove: String,
-// ) -> ContractResult<Response> {
-//     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
-
-//     let mut config = CONFIG.load(deps.storage)?;
-//     let validator_addr_to_remove =
-//         validate_address(&validator_to_remove, &config.validator_address_prefix)?;
-
-//     // Find the position of the validator to be removed.
-//     if let Some(pos) = config
-//         .validators
-//         .iter()
-//         .position(|validator| *validator == validator_addr_to_remove)
-//     {
-//         // Remove the validator if found.
-//         config.validators.remove(pos);
-//     } else {
-//         // If the validator is not found, return an error.
-//         return Err(ContractError::ValidatorNotFound {
-//             validator: validator_to_remove.clone(),
-//         });
-//     }
-
-//     // Save the updated config.
-//     CONFIG.save(deps.storage, &config)?;
-
-//     Ok(Response::new()
-//         .add_attribute("action", "remove_validator")
-//         .add_attribute("removed_validator", validator_addr_to_remove)
-//         .add_attribute("sender", info.sender))
-// }
 
 // Transfer ownership to another account; callable by the owner
 // This will require the new owner to accept to take effect.
@@ -543,19 +435,20 @@ pub fn execute_withdraw(
 // Ownership can only be claimed after 7 days to mitigate fat finger errors
 pub fn execute_transfer_ownership(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     new_owner: String,
 ) -> ContractResult<Response> {
     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
-    let mut state: State = STATE.load(deps.storage)?;
-    state.pending_owner = Some(deps.api.addr_validate(&new_owner)?);
-    state.owner_transfer_min_time = Some(Timestamp::from_seconds(
-        _env.block.time.seconds() + 60 * 60 * 24 * 7,
-    )); // 7 days
+    STATE.update::<_, ContractError>(deps.storage, |mut state| {
+        state.pending_owner = Some(deps.api.addr_validate(&new_owner)?);
+        state.owner_transfer_min_time = Some(Timestamp::from_seconds(
+            env.block.time.seconds() + 60 * 60 * 24 * 7,
+        )); // 7 days
 
-    STATE.save(deps.storage, &state)?;
+        Ok(state)
+    })?;
 
     Ok(Response::new()
         .add_attribute("action", "transfer_ownership")
@@ -571,50 +464,48 @@ pub fn execute_revoke_ownership_transfer(
 ) -> ContractResult<Response> {
     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
-    let mut state = STATE.load(deps.storage)?;
-    state.pending_owner = None;
-    state.owner_transfer_min_time = None;
+    STATE.update::<_, ContractError>(deps.storage, |mut state| {
+        state.pending_owner = None;
+        state.owner_transfer_min_time = None;
 
-    STATE.save(deps.storage, &state)?;
+        Ok(state)
+    })?;
 
     Ok(Response::new().add_attribute("action", "revoke_ownership_transfer"))
 }
 
 pub fn execute_accept_ownership(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
 ) -> ContractResult<Response> {
-    let mut state: State = STATE.load(deps.storage)?;
-    if state.owner_transfer_min_time.is_some()
-        && state.owner_transfer_min_time.unwrap().seconds() > _env.block.time.seconds()
-    {
-        return Err(ContractError::OwnershipTransferNotReady {
-            time_to_claim: Timestamp::from_seconds(
-                state.owner_transfer_min_time.unwrap().seconds(),
-            ),
-        });
+    let mut state = STATE.load(deps.storage)?;
+
+    if let Some(owner_transfer_min_time) = state.owner_transfer_min_time {
+        if owner_transfer_min_time > env.block.time {
+            return Err(ContractError::OwnershipTransferNotReady {
+                time_to_claim: Timestamp::from_seconds(
+                    state.owner_transfer_min_time.unwrap().seconds(),
+                ),
+            });
+        }
     }
 
-    let new_owner = {
-        match state.pending_owner {
-            Some(pending_owner) if pending_owner == info.sender => {
+    match state.pending_owner {
+        Some(pending_owner) => {
+            if pending_owner == info.sender {
                 state.pending_owner = None;
                 STATE.save(deps.storage, &state)?;
-                Some(pending_owner)
-            }
-            _ => None,
-        }
-    };
 
-    match new_owner {
-        Some(pending_owner) => {
-            ADMIN.set(deps, Some(pending_owner))?;
-            Ok(Response::new()
-                .add_attribute("action", "accept_ownership")
-                .add_attribute("new_owner", info.sender))
+                ADMIN.set(deps, Some(pending_owner))?;
+                Ok(Response::new()
+                    .add_attribute("action", "accept_ownership")
+                    .add_attribute("new_owner", info.sender))
+            } else {
+                Err(ContractError::CallerIsNotPendingOwner)
+            }
         }
-        None => Err(ContractError::NoPendingOwner {}),
+        _ => Err(ContractError::NoPendingOwner),
     }
 }
 
@@ -631,7 +522,7 @@ pub fn execute_accept_ownership(
 // ) -> ContractResult<Response> {
 //     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
-//     let mut config: Config = CONFIG.load(deps.storage)?;
+//     let mut config = CONFIG.load(deps.storage)?;
 
 //     if let Some(native_chain_config) = &native_chain_config {
 //         config = native_chain_config.validate()?;
@@ -678,37 +569,19 @@ pub fn execute_accept_ownership(
 //     Ok(Response::new().add_attribute("action", "update_config"))
 // }
 
-/// # Changes from original implementation
+/// Receive rewards (denominated in the native token) to this contract.
 ///
-/// - oracle functionality removed
-/// - added `amount` parameter since the token is now a cw20 and the amount cannot be inferred from the `info.funds`
+/// The native token is the reward token for U<->eU. Anyone is able to call this entrypoint to increase the backing of the LST (eU).
 ///
-/// NOTE: This business logic is still needed for updating the state of the lst contract, but it will not be in this entrypoint (receive_rewards will be removed as an entrypoint)
-pub fn receive_rewards(
-    mut deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    amount: Uint128,
-) -> ContractResult<Response> {
-    let config: Config = CONFIG.load(deps.storage)?;
-    let mut state: State = STATE.load(deps.storage)?;
+/// - Send native token to the contract
+/// - Accrue (rewards, fees) based on the amount of rewards sent
+pub fn receive_rewards(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
 
     check_stopped(&config)?;
 
-    if state.total_liquid_stake_token.is_zero() {
-        return Err(ContractError::NoLiquidStake {});
-    }
+    let amount = must_pay(&info, &config.native_token_denom)?;
 
-    let coin = info
-        .funds
-        .iter()
-        .find(|c| c.denom == config.native_token_denom);
-    // nice is_none/unwrap
-    if coin.is_none() {
-        return Err(ContractError::Payment(PaymentError::NoFunds {}));
-    }
-
-    let amount = coin.unwrap().amount;
     let fee = config
         .protocol_fee_config
         .fee_rate
@@ -718,52 +591,44 @@ pub fn receive_rewards(
             received_rewards: amount,
         });
     }
-    let amount_after_fees = amount.checked_sub(fee);
-    if amount_after_fees.is_err() {
-        return Err(ContractError::ReceiveRewardsTooSmall {
-            amount,
-            minimum: fee,
-        });
-    }
-    let amount_after_fees = amount_after_fees.unwrap();
+    let amount_after_fees =
+        amount
+            .checked_sub(fee)
+            .map_err(|_| ContractError::ReceiveRewardsTooSmall {
+                amount,
+                minimum: fee,
+            })?;
 
-    // update the accounting of tokens
-    state.total_native_token += amount_after_fees;
-    state.total_reward_amount += amount;
-    if config.protocol_fee_config.fee_recipient.is_none() {
-        state.total_fees += fee;
-    }
+    STATE.update::<_, ContractError>(deps.storage, |mut state| {
+        if state.total_liquid_stake_token.is_zero() {
+            return Err(ContractError::NoLiquidStake);
+        }
 
-    STATE.save(deps.storage, &state)?;
+        // update the accounting of tokens
+        state.total_native_token += amount_after_fees;
+        state.total_reward_amount += amount;
 
-    // transfer the funds to Celestia to be staked
-    // TODO: Figure out wtf to do here lol
-    let ibc_transfer_msg = ibc_transfer_sub_msg(
-        &mut deps,
-        &env,
-        &config.staker_address,
-        Coin::new(amount_after_fees.u128(), &config.native_token_denom),
-        None,
-    )?;
+        Ok(state)
+    })?;
 
-    let mut response = Response::new()
+    Ok(Response::new()
         .add_attribute("action", "receive_rewards")
         .add_attribute("action", "transfer_stake")
         .add_attribute("amount", amount)
         .add_attribute("amount_after_fees", amount_after_fees)
-        .add_submessage(ibc_transfer_msg);
-
-    if let Some(fee_recipient) = config.protocol_fee_config.fee_recipient {
-        response = response.add_message(cosmwasm_std::BankMsg::Send {
-            to_address: fee_recipient.to_string(),
+        // send amount after fees to the staker
+        .add_message(BankMsg::Send {
+            to_address: config.staker_address.to_string(),
+            amount: vec![Coin::new(amount_after_fees, &config.native_token_denom)],
+        })
+        // send fees to the fee recipient
+        .add_message(BankMsg::Send {
+            to_address: config.protocol_fee_config.fee_recipient.to_string(),
             amount: vec![cosmwasm_std::Coin::new(
                 fee.u128(),
                 config.native_token_denom,
             )],
-        });
-    }
-
-    Ok(response)
+        }))
 }
 
 /// Marks a batch as received
@@ -774,58 +639,48 @@ pub fn receive_unstaked_tokens(
     info: MessageInfo,
     batch_id: u64,
 ) -> ContractResult<Response> {
-    let config: Config = CONFIG.load(deps.storage)?;
+    let config = CONFIG.load(deps.storage)?;
 
     check_stopped(&config)?;
 
-    let coin = info
-        .funds
-        .iter()
-        .find(|c| c.denom == config.native_token_denom);
-    if coin.is_none() {
-        return Err(ContractError::Payment(PaymentError::NoFunds {}));
-    }
+    let amount = must_pay(&info, &config.native_token_denom)?;
 
-    let amount = coin.unwrap().amount;
+    BATCHES.update::<_, ContractError>(deps.storage, batch_id, |batch| {
+        let mut batch = batch.ok_or(ContractError::BatchNotFound { batch_id })?;
 
-    let mut batch: Batch = BATCHES.load(deps.storage, batch_id)?;
+        let expected_native_unstaked = match batch.state {
+            BatchState::Pending { .. } => return Err(ContractError::BatchStillPending),
+            BatchState::Submitted {
+                receive_time,
+                expected_native_unstaked,
+            } => {
+                ensure!(
+                    receive_time <= env.block.time.seconds(),
+                    ContractError::BatchNotReady {
+                        actual: env.block.time.seconds(),
+                        expected: receive_time,
+                    }
+                );
+                expected_native_unstaked
+            }
+            BatchState::Received { .. } => return Err(ContractError::BatchAlreadyReceived),
+        };
 
-    if batch.status != BatchStatus::Submitted {
-        return Err(ContractError::BatchNotClaimable {
-            batch_id: batch.id,
-            status: batch.status,
-        });
-    }
+        ensure!(
+            expected_native_unstaked == amount,
+            ContractError::ReceivedWrongBatchAmount {
+                batch_id,
+                expected: expected_native_unstaked,
+                received: amount,
+            }
+        );
 
-    if batch.next_batch_action_time.is_none() {
-        return Err(ContractError::BatchNotClaimable {
-            batch_id: batch.id,
-            status: batch.status,
-        });
-    }
-    let next_batch_action_time = batch.next_batch_action_time.unwrap();
-    if next_batch_action_time > env.block.time.seconds() {
-        return Err(ContractError::BatchNotReady {
-            actual: env.block.time.seconds(),
-            expected: next_batch_action_time,
-        });
-    }
+        batch.state = BatchState::Received {
+            received_native_unstaked: amount,
+        };
 
-    let expected_native_amount = batch
-        .expected_native_unstaked
-        .ok_or(ContractError::BatchWithoutExpectedNativeAmount { batch_id })?;
-    if expected_native_amount != amount {
-        return Err(ContractError::ReceivedWrongBatchAmount {
-            batch_id,
-            expected: expected_native_amount,
-            received: amount,
-        });
-    }
-
-    batch.received_native_unstaked = Some(amount);
-    batch.update_status(BatchStatus::Received, None);
-
-    BATCHES.save(deps.storage, batch.id, &batch)?;
+        Ok(batch)
+    })?;
 
     Ok(Response::new()
         .add_attribute("action", "receive_unstaked_tokens")
@@ -836,10 +691,10 @@ pub fn receive_unstaked_tokens(
 pub fn circuit_breaker(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult<Response> {
     let sender = info.sender.to_string();
 
-    let mut config: Config = CONFIG.load(deps.storage)?;
+    let mut config = CONFIG.load(deps.storage)?;
 
     if ADMIN.assert_admin(deps.as_ref(), &info.sender).is_err()
-        && !config.monitors.iter().any(|v| *v == sender)
+        && !config.monitors.iter().any(|v| v.as_str() == sender)
     {
         return Err(ContractError::Unauthorized { sender });
     }
@@ -863,23 +718,23 @@ pub fn resume_contract(
 ) -> ContractResult<Response> {
     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
-    let mut config: Config = CONFIG.load(deps.storage)?;
-    if !config.stopped {
-        return Err(ContractError::NotStopped {});
-    }
+    CONFIG.update::<_, ContractError>(deps.storage, |mut config| {
+        if !config.stopped {
+            return Err(ContractError::NotStopped);
+        }
 
-    config.stopped = false;
-    CONFIG.save(deps.storage, &config)?;
+        config.stopped = false;
 
-    STATE.update(
-        deps.storage,
-        |mut state| -> Result<State, cosmwasm_std::StdError> {
-            state.total_native_token = total_native_token;
-            state.total_liquid_stake_token = total_liquid_stake_token;
-            state.total_reward_amount = total_reward_amount;
-            Ok(state)
-        },
-    )?;
+        Ok(config)
+    })?;
+
+    STATE.update::<_, ContractError>(deps.storage, |mut state| {
+        state.total_native_token = total_native_token;
+        state.total_liquid_stake_token = total_liquid_stake_token;
+        state.total_reward_amount = total_reward_amount;
+
+        Ok(state)
+    })?;
 
     Ok(Response::new()
         .add_attribute("action", "resume_contract")
@@ -897,72 +752,27 @@ pub fn slash_batches(
 
     // Ensure the contract is stopped before slashing the batches
     if !CONFIG.load(deps.storage)?.stopped {
-        return Err(ContractError::NotStopped {});
+        return Err(ContractError::NotStopped);
     }
 
-    for batch_expected_amount in expected_amounts.iter() {
-        let mut batch = BATCHES.load(deps.storage, batch_expected_amount.batch_id)?;
-        if batch.status != BatchStatus::Pending && batch.status != BatchStatus::Submitted {
-            return Err(ContractError::UnexpecedBatchStatus {
-                actual: batch.status,
-            });
-        }
-
-        if batch.expected_native_unstaked.is_none() {
-            return Err(ContractError::BatchWithoutExpectedNativeAmount {
-                batch_id: batch_expected_amount.batch_id,
+    for BatchExpectedAmount { batch_id, amount } in expected_amounts.iter() {
+        let mut batch = BATCHES.load(deps.storage, *batch_id)?;
+        let BatchState::Submitted {
+            ref mut expected_native_unstaked,
+            ..
+        } = batch.state
+        else {
+            return Err(ContractError::BatchNotYetSubmitted {
+                batch_id: *batch_id,
             });
         };
 
-        batch.expected_native_unstaked = Some(batch_expected_amount.amount);
+        *expected_native_unstaked = *amount;
 
-        BATCHES.save(deps.storage, batch_expected_amount.batch_id, &batch)?;
+        BATCHES.save(deps.storage, *batch_id, &batch)?;
     }
 
     Ok(Response::new()
         .add_attribute("action", "slash_batches")
         .add_attribute("updated_batches", serde_json::to_string(&expected_amounts)?))
-}
-
-// Why not send the fees to the fee_recipient directly when receiving the rewards?
-pub fn fee_withdraw(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    amount: Uint128,
-) -> ContractResult<Response> {
-    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
-
-    let config: Config = CONFIG.load(deps.storage)?;
-    let mut state: State = STATE.load(deps.storage)?;
-
-    if state.total_fees < amount {
-        return Err(ContractError::InsufficientFunds {});
-    }
-
-    if config.protocol_fee_config.fee_recipient.is_none() {
-        return Err(ContractError::TreasuryNotConfigured {});
-    }
-    let fee_recipient = config
-        .protocol_fee_config
-        .fee_recipient
-        .unwrap()
-        .to_string();
-
-    state.total_fees = state.total_fees.checked_sub(amount).unwrap();
-    STATE.save(deps.storage, &state)?;
-
-    let send_msg = BankMsg::Send {
-        to_address: fee_recipient.clone(),
-        amount: vec![Coin {
-            denom: config.native_token_denom,
-            amount,
-        }],
-    };
-
-    Ok(Response::new()
-        .add_attribute("action", "fee_withdraw")
-        .add_attribute("receiver", fee_recipient)
-        .add_attribute("amount", amount)
-        .add_message(send_msg))
 }

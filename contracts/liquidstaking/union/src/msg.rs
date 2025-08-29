@@ -1,14 +1,16 @@
+use std::collections::BTreeMap;
+
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Decimal, Timestamp, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use ibc_union_spec::ChannelId;
-use milky_way::staking::BatchStatus;
+use milky_way::staking::{Batch, BatchStatus};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use unionlabs_primitives::Bytes;
 
 use crate::{
     state::{ProtocolFeeConfig, UnstakeRequest},
-    types::{BatchExpectedAmount, UnsafeProtocolFeeConfig},
+    types::BatchExpectedAmount,
 };
 
 #[cw_serde]
@@ -16,9 +18,6 @@ pub struct InstantiateMsg {
     pub native_token_denom: String,
 
     pub minimum_liquid_stake_amount: Uint128,
-
-    /// The staking module's unbonding period in seconds.
-    pub unbonding_period: u64,
 
     /// Address of the account that delegates the tokens
     /// toward the validators.
@@ -30,8 +29,8 @@ pub struct InstantiateMsg {
     /// Protocol fee configuration.
     pub protocol_fee_config: ProtocolFeeConfig,
 
-    /// Denomination of the liquid staking token (e.g., stTIA).
-    pub liquid_stake_token_denom: String,
+    /// Address of the LST contract.
+    pub liquid_stake_token_address: String,
 
     /// Frequency (in seconds) at which the unbonding queue is executed.
     pub batch_period: u64,
@@ -91,19 +90,6 @@ pub enum ExecuteMsg {
     /// Processes the pending batch.
     SubmitBatch {},
 
-    // TODO: Implement once basic functionality is complete
-    // /// Adds a validator to the validator set; callable by the owner.
-    // AddValidator {
-    //     /// Address of the validator to add.
-    //     new_validator: String,
-    // },
-    // /// Removes a validator from the validator set; callable by the owner.
-    // RemoveValidator {
-    //     /// Address of the validator to remove.
-    //     validator: String,
-    // },
-    /// Transfers ownership to another account; callable by the owner.
-    /// The new owner must accept the transfer for it to take effect.
     TransferOwnership {
         /// Address of the new owner on the protocol chain.
         new_owner: String,
@@ -117,7 +103,6 @@ pub enum ExecuteMsg {
 
     // TODO: Implement once basic functionality is complete
     // /// Updates contract configuration; callable by the owner.
-    // // TODO: Add more params here
     // UpdateConfig {
     //     /// Updated protocol fee configuration.
     //     protocol_fee_config: Option<ProtocolFeeConfig>,
@@ -154,27 +139,6 @@ pub enum ExecuteMsg {
     SlashBatches {
         new_amounts: Vec<BatchExpectedAmount>,
     },
-
-    /// Recovers IBC transfers that timed out or failed.
-    RecoverPendingIbcTransfers {
-        /// If true and neither `selected_packets` nor `receiver` are specified,
-        /// recovers only the 10 oldest failed IBC transfers.
-        paginated: Option<bool>,
-
-        /// Specific packet IDs to recover.
-        /// Overrides other parameters if provided.
-        selected_packets: Option<Vec<u64>>,
-
-        /// Recovers packets addressed to this account.
-        /// Considered only if `selected_packets` is not provided.
-        receiver: Option<String>,
-    },
-
-    /// Sends the protocol fee to the treasury.
-    FeeWithdraw {
-        /// Amount to send to the treasury.
-        amount: Uint128,
-    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -194,21 +158,10 @@ pub struct StateResponse {
     pub rate: Decimal,
     pub pending_owner: String,
     pub total_reward_amount: Uint128,
-    pub total_fees: Uint128,
-}
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
-pub struct BatchResponse {
-    pub id: u64,
-    pub batch_total_liquid_stake: Uint128,
-    pub expected_native_unstaked: Uint128,
-    pub received_native_unstaked: Uint128,
-    pub unstake_request_count: u64,
-    pub next_batch_action_time: Timestamp,
-    pub status: String,
 }
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct BatchesResponse {
-    pub batches: Vec<BatchResponse>,
+    pub batches: BTreeMap<u64, Batch>,
 }
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct UnstakeRequestResponse {
@@ -236,7 +189,7 @@ pub enum QueryMsg {
     State {},
 
     /// Queries the information of a specific batch by its ID.
-    #[returns(BatchResponse)]
+    #[returns(Batch)]
     Batch {
         /// ID of the batch to query.
         id: u64,
@@ -249,7 +202,7 @@ pub enum QueryMsg {
         start_after: Option<u64>,
 
         /// Maximum number of batches to return.
-        limit: Option<u32>,
+        limit: Option<usize>,
 
         /// Optional filter to return only batches with the given status.
         status: Option<BatchStatus>,
@@ -263,7 +216,7 @@ pub enum QueryMsg {
     },
 
     /// Queries the current batch that is pending processing (if any).
-    #[returns(BatchResponse)]
+    #[returns(Batch)]
     PendingBatch {},
 
     /// Queries the unstake requests made by a specific user.

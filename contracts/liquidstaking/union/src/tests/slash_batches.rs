@@ -1,8 +1,8 @@
 use cosmwasm_std::{
-    Uint128,
     testing::{mock_env, mock_info},
+    Uint128,
 };
-use milky_way::staking::{Batch, BatchStatus};
+use milky_way::staking::{Batch, BatchState};
 
 use super::test_helper::init;
 use crate::{
@@ -18,7 +18,7 @@ use crate::{
 fn only_admin_can_slash_batches() {
     let mut deps = init();
 
-    let mut batch = Batch::new(1, Uint128::new(1000), 1000);
+    let mut batch = Batch::new_pending(1, Uint128::new(1000), 1000);
     batch.expected_native_unstaked = Some(Uint128::new(1000));
     BATCHES.save(&mut deps.storage, 1, &batch).unwrap();
 
@@ -41,7 +41,7 @@ fn only_admin_can_slash_batches() {
 fn not_halted_contract_fails() {
     let mut deps = init();
 
-    let mut batch = Batch::new(1, Uint128::new(1000), 1000);
+    let mut batch = Batch::new_pending(1, Uint128::new(1000), 1000);
     batch.expected_native_unstaked = Some(Uint128::new(1000));
     BATCHES.save(&mut deps.storage, 1, &batch).unwrap();
 
@@ -73,7 +73,7 @@ fn slash_not_found_batch_fails() {
         )
         .unwrap();
 
-    let mut batch = Batch::new(1, Uint128::new(1000), 1000);
+    let mut batch = Batch::new_pending(1, Uint128::new(1000), 1000);
     batch.expected_native_unstaked = Some(Uint128::new(1000));
     BATCHES.save(&mut deps.storage, 1, &batch).unwrap();
 
@@ -105,9 +105,9 @@ fn slash_received_batch_fails() {
         )
         .unwrap();
 
-    let mut batch = Batch::new(1, Uint128::new(1000), 1000);
+    let mut batch = Batch::new_pending(1, Uint128::new(1000), 1000);
     batch.expected_native_unstaked = Some(Uint128::new(1000));
-    batch.status = BatchStatus::Received;
+    batch.state = BatchState::Received;
     BATCHES.save(&mut deps.storage, 1, &batch).unwrap();
 
     let info = mock_info(ADMIN, &[]);
@@ -120,7 +120,7 @@ fn slash_received_batch_fails() {
 
     let err = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap_err();
     assert!(match err {
-        ContractError::UnexpecedBatchStatus { .. } => true,
+        ContractError::UnexpectedBatchStatus { .. } => true,
         _ => false,
     });
 }
@@ -138,14 +138,14 @@ fn slash_correctly() {
         )
         .unwrap();
 
-    let mut batch = Batch::new(1, Uint128::new(1000), 1000);
+    let mut batch = Batch::new_pending(1, Uint128::new(1000), 1000);
     batch.expected_native_unstaked = Some(Uint128::new(1000));
-    batch.status = BatchStatus::Pending;
+    batch.state = BatchState::Pending;
     BATCHES.save(&mut deps.storage, 1, &batch).unwrap();
 
-    let mut batch = Batch::new(2, Uint128::new(1000), 1000);
+    let mut batch = Batch::new_pending(2, Uint128::new(1000), 1000);
     batch.expected_native_unstaked = Some(Uint128::new(1000));
-    batch.status = BatchStatus::Submitted;
+    batch.state = BatchState::Submitted;
     BATCHES.save(&mut deps.storage, 2, &batch).unwrap();
 
     let info = mock_info(ADMIN, &[]);

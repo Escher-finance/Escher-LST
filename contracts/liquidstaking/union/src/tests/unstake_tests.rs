@@ -3,7 +3,7 @@ use cosmwasm_std::{
     testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR},
     Addr, CosmosMsg, ReplyOn, SubMsg, Uint128,
 };
-use milky_way::staking::{Batch, BatchStatus};
+use milky_way::staking::{Batch, BatchState};
 use osmosis_std::types::{cosmos::base::v1beta1::Coin, osmosis::tokenfactory::v1beta1::MsgBurn};
 
 use crate::{
@@ -162,7 +162,7 @@ fn double_liquid_unstake() {
     // check the batch
     let batch = BATCHES.load(&deps.storage, 1).unwrap();
     assert_eq!(batch.batch_total_liquid_stake, Uint128::from(6500u128));
-    assert_eq!(batch.status, BatchStatus::Submitted);
+    assert_eq!(batch.state, BatchState::Submitted);
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn receive_unstaked_tokens() {
     let env = mock_env();
 
     let mut state = STATE.load(&deps.storage).unwrap();
-    let config: Config = CONFIG.load(&deps.storage).unwrap();
+    let config = CONFIG.load(&deps.storage).unwrap();
 
     state.total_liquid_stake_token = Uint128::from(100_000u128);
     state.total_native_token = Uint128::from(300_000u128);
@@ -214,20 +214,20 @@ fn receive_unstaked_tokens() {
 
     let mut batch: Batch = BATCHES.load(&deps.storage, 1).unwrap();
     batch.expected_native_unstaked = Some(Uint128::new(100));
-    batch.update_status(BatchStatus::Pending, Some(env.block.time.seconds() - 1));
+    batch.update_status(BatchState::Pending, Some(env.block.time.seconds() - 1));
     BATCHES.save(&mut deps.storage, 1, &batch).unwrap();
 
     let res: Result<cosmwasm_std::Response, crate::error::ContractError> =
         execute(deps.as_mut(), env.clone(), info.clone(), msg.clone());
     assert!(res.is_err()); // batch not submitted
 
-    batch.update_status(BatchStatus::Submitted, Some(env.block.time.seconds() + 1));
+    batch.update_status(BatchState::Submitted, Some(env.block.time.seconds() + 1));
     BATCHES.save(&mut deps.storage, 1, &batch).unwrap();
 
     let res = execute(deps.as_mut(), env.clone(), info.clone(), msg.clone());
     assert!(res.is_err()); // batch not ready
 
-    batch.update_status(BatchStatus::Submitted, Some(env.block.time.seconds() - 1));
+    batch.update_status(BatchState::Submitted, Some(env.block.time.seconds() - 1));
     BATCHES.save(&mut deps.storage, 1, &batch).unwrap();
 
     execute(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
@@ -291,7 +291,7 @@ fn invalid_amount_liquid_unstake() {
         batch.batch_total_liquid_stake,
         Uint128::from(1000000000u128)
     );
-    assert_eq!(batch.status, BatchStatus::Pending);
+    assert_eq!(batch.state, BatchState::Pending);
 }
 
 #[test]
@@ -352,7 +352,7 @@ fn total_liquid_stake_token_with_zero() {
         batch.batch_total_liquid_stake,
         Uint128::from(1000000000u128)
     );
-    assert_eq!(batch.status, BatchStatus::Pending);
+    assert_eq!(batch.state, BatchState::Pending);
 }
 
 #[test]
@@ -365,7 +365,7 @@ fn claimable_batches() {
     state.total_native_token = Uint128::from(300_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
-    let mut batch_1 = Batch::new(1, Uint128::from(1000u128), 1000);
+    let mut batch_1 = Batch::new_pending(1, Uint128::from(1000u128), 1000);
     batch_1.expected_native_unstaked = Some(Uint128::new(1000));
     new_unstake_request(
         &mut deps.as_mut(),
@@ -374,7 +374,7 @@ fn claimable_batches() {
         Uint128::from(1000u128),
     )
     .unwrap();
-    let mut batch_2 = Batch::new(2, Uint128::from(1000u128), 1000);
+    let mut batch_2 = Batch::new_pending(2, Uint128::from(1000u128), 1000);
     batch_2.expected_native_unstaked = Some(Uint128::new(1000));
     new_unstake_request(
         &mut deps.as_mut(),
@@ -403,7 +403,7 @@ fn claimable_batches() {
 
     // receive tokens for batch 1
     let mut batch: Batch = BATCHES.load(&deps.storage, 1).unwrap();
-    batch.update_status(BatchStatus::Submitted, Some(1000));
+    batch.update_status(BatchState::Submitted, Some(1000));
     let res = BATCHES.save(&mut deps.storage, 1, &batch);
     assert!(res.is_ok());
 

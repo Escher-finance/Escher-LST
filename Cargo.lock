@@ -2615,6 +2615,7 @@ dependencies = [
  "enum-repr",
  "hex",
  "ibc-union-spec",
+ "itertools 0.14.0",
  "milky_way",
  "osmosis-std",
  "prost 0.12.6",

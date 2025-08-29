@@ -1,10 +1,9 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Timestamp, Uint128,
+    StdResult, Uint128,
 };
 use cw2::set_contract_version;
-use cw_utils::must_pay;
 use milky_way::staking::Batch;
 use semver::Version;
 
@@ -13,8 +12,9 @@ use crate::{
     execute::{
         circuit_breaker, execute_accept_ownership, execute_bond, execute_revoke_ownership_transfer,
         execute_submit_batch, execute_transfer_ownership, execute_unbond, execute_withdraw,
-        fee_withdraw, receive_rewards, receive_unstaked_tokens, resume_contract, slash_batches,
+        receive_rewards, receive_unstaked_tokens, resume_contract, slash_batches,
     },
+    helpers::query_and_validate_unbonding_period,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     query::{
         query_all_unstake_requests, query_batch, query_batches, query_batches_by_ids, query_config,
@@ -30,7 +30,6 @@ use crate::{
 // Version information for migration
 pub const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const IBC_TIMEOUT: Timestamp = Timestamp::from_nanos(1000000000000);
 
 ///////////////////
 /// INSTANTIATE ///
@@ -51,29 +50,20 @@ pub fn instantiate(
 
     ADMIN.set(deps.branch(), Some(msg.admin.clone()))?;
 
-    // Ensure the batch period is lower then unbonding period.
-    if msg.batch_period > msg.unbonding_period {
-        return Err(ContractError::ValueTooBig {
-            field_name: "batch_period".to_string(),
-            value: Uint128::from(msg.batch_period),
-            max: Uint128::from(msg.unbonding_period),
-        });
-    }
+    query_and_validate_unbonding_period(deps.as_ref(), msg.batch_period)?;
 
     let config = Config {
         protocol_fee_config: msg.protocol_fee_config,
-        liquid_stake_token_address: msg.liquid_stake_token_denom,
+        liquid_stake_token_address: msg.liquid_stake_token_address,
         monitors: msg.monitors,
         batch_period: msg.batch_period,
         stopped: true, // we start stopped
         native_token_denom: msg.native_token_denom,
         minimum_liquid_stake_amount: msg.minimum_liquid_stake_amount,
-        unbonding_period: msg.unbonding_period,
         ucs03_zkgm_address: msg.ucs03_zkgm_address,
         funded_dispatch_address: msg.funded_dispatch_address,
         staker_address: msg.staker_address,
     };
-    CONFIG.save(deps.storage, &config)?;
 
     // Init State
     let state = State {
@@ -81,37 +71,25 @@ pub fn instantiate(
         total_liquid_stake_token: Uint128::zero(),
         pending_owner: None,
         total_reward_amount: Uint128::zero(),
-        total_fees: Uint128::zero(),
-        ibc_id_counter: 0,
-        // this value is never written to?
-        rate: 1u128.into(),
         owner_transfer_min_time: None,
     };
 
+    // Set pending batch and batches
+    BATCHES.save(
+        deps.storage,
+        1,
+        &Batch::new_pending(
+            Uint128::zero(),
+            env.block.time.seconds() + config.batch_period,
+        ),
+    )?;
+    PENDING_BATCH_ID.save(deps.storage, &1)?;
+    CONFIG.save(deps.storage, &config)?;
     STATE.save(deps.storage, &state)?;
 
-    // Create liquid stake token denom
-    // TODO: Figure out how the cw20 will be created
-    // let cosmos_tokenfactory_msg = tokenfactory::create_denom(
-    //     env.contract.address.to_string(),
-    //     msg.liquid_stake_token_denom,
-    // )?;
-
-    let pending_batch = Batch::new(
-        1,
-        Uint128::zero(),
-        env.block.time.seconds() + config.batch_period,
-    );
-
-    // Set pending batch and batches
-    BATCHES.save(deps.storage, 1, &pending_batch)?;
-    PENDING_BATCH_ID.save(deps.storage, &1)?;
-
-    Ok(
-        Response::new()
-            .add_attribute("action", "instantiate")
-            .add_attribute("owner", msg.admin), // .add_message(cosmos_tokenfactory_msg)
-    )
+    Ok(Response::new()
+        .add_attribute("action", "instantiate")
+        .add_attribute("owner", msg.admin))
 }
 
 ///////////////
@@ -127,38 +105,24 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     assert_not_migrating(deps.as_ref())?;
 
-    let config = CONFIG.load(deps.storage)?;
     match msg {
         ExecuteMsg::Bond {
             mint_to,
             recipient_channel_id,
             min_mint_amount,
-        } => {
-            let payment = must_pay(&info, &config.native_token_denom)?;
-            execute_bond(
-                deps,
-                env,
-                info,
-                payment,
-                mint_to,
-                recipient_channel_id,
-                min_mint_amount,
-            )
-        }
+        } => execute_bond(
+            deps,
+            env,
+            info,
+            mint_to,
+            recipient_channel_id,
+            min_mint_amount,
+        ),
         ExecuteMsg::Unbond { amount, staker } => execute_unbond(deps, env, info, amount, staker),
 
-        ExecuteMsg::SubmitBatch {} => execute_submit_batch(deps, env, info),
+        ExecuteMsg::SubmitBatch {} => execute_submit_batch(deps, env),
 
-        ExecuteMsg::Withdraw { batch_id, staker } => {
-            execute_withdraw(deps, env, info, batch_id, staker)
-        }
-
-        // ExecuteMsg::AddValidator { new_validator } => {
-        //     execute_add_validator(deps, env, info, new_validator)
-        // }
-        // ExecuteMsg::RemoveValidator { validator } => {
-        //     execute_remove_validator(deps, env, info, validator)
-        // }
+        ExecuteMsg::Withdraw { batch_id, staker } => execute_withdraw(deps, info, batch_id, staker),
 
         // ownership msgs
         ExecuteMsg::TransferOwnership { new_owner } => {
@@ -185,7 +149,7 @@ pub fn execute(
         //     monitors,
         //     batch_period,
         // ),
-        ExecuteMsg::ReceiveRewards {} => receive_rewards(deps, env, info),
+        ExecuteMsg::ReceiveRewards {} => receive_rewards(deps, info),
         ExecuteMsg::ReceiveUnstakedTokens { batch_id } => {
             receive_unstaked_tokens(deps, env, info, batch_id)
         }
@@ -205,7 +169,6 @@ pub fn execute(
             total_reward_amount,
         ),
         ExecuteMsg::SlashBatches { new_amounts } => slash_batches(deps, info, new_amounts),
-        ExecuteMsg::FeeWithdraw { amount } => fee_withdraw(deps, env, info, amount),
     }
 }
 

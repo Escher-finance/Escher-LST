@@ -1,10 +1,11 @@
-use cosmwasm_std::{Deps, StdResult, Timestamp, Uint128};
+use cosmwasm_std::{Deps, Order, StdResult};
 use cw_storage_plus::Bound;
+use itertools::Itertools;
 use milky_way::staking::{Batch, BatchStatus};
 
 use crate::{
-    helpers::{get_rates, paginate_map},
-    msg::{BatchResponse, BatchesResponse, ConfigResponse, StateResponse},
+    helpers::get_rates,
+    msg::{BatchesResponse, ConfigResponse, StateResponse},
     state::{unstake_requests, UnstakeRequest, BATCHES, CONFIG, PENDING_BATCH_ID, STATE},
 };
 
@@ -33,96 +34,56 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
             .map(|v| v.to_string())
             .unwrap_or_default(),
         total_reward_amount: state.total_reward_amount,
-        total_fees: state.total_fees,
     };
     Ok(res)
 }
 
-fn batch_to_response(batch: Batch) -> BatchResponse {
-    BatchResponse {
-        id: batch.id,
-        batch_total_liquid_stake: batch.batch_total_liquid_stake,
-        expected_native_unstaked: batch.expected_native_unstaked.unwrap_or(Uint128::zero()),
-        received_native_unstaked: batch.received_native_unstaked.unwrap_or(Uint128::zero()),
-        next_batch_action_time: Timestamp::from_seconds(
-            batch.next_batch_action_time.unwrap_or(0u64),
-        ),
-        status: batch.status.as_str().to_string(),
-        unstake_request_count: batch.unstake_requests_count.unwrap_or(0), // Fallback. Only is none if migration failed. Would be set in updates for new batches though
-    }
-}
-
-pub fn query_batch(deps: Deps, id: u64) -> StdResult<BatchResponse> {
-    let batch: Batch = BATCHES.load(deps.storage, id)?;
-    Ok(batch_to_response(batch))
+pub fn query_batch(deps: Deps, id: u64) -> StdResult<Batch> {
+    BATCHES.load(deps.storage, id)
 }
 
 pub fn query_batches(
     deps: Deps,
     start_after: Option<u64>,
-    limit: Option<u32>,
+    limit: Option<usize>,
     status: Option<BatchStatus>,
 ) -> StdResult<BatchesResponse> {
-    let filter_closure =
-        status.map(|s| Box::new(move |v: &Batch| v.status == s) as Box<dyn Fn(&Batch) -> bool>);
-
-    let batches = paginate_map(
-        deps,
-        &BATCHES,
-        start_after,
-        limit,
-        cosmwasm_std::Order::Ascending,
-        filter_closure,
-    )?;
-
-    let res = BatchesResponse {
-        batches: batches.into_iter().map(batch_to_response).collect(),
-    };
-    Ok(res)
+    Ok(BatchesResponse {
+        batches: BATCHES
+            .range(
+                deps.storage,
+                start_after.map(Bound::exclusive),
+                None,
+                Order::Ascending,
+            )
+            .filter_ok(|(_, v)| status.map(|s| v.state.status() == s).unwrap_or(true))
+            .take(limit.unwrap_or(usize::MAX))
+            .collect::<Result<_, _>>()?,
+    })
 }
 
 pub fn query_batches_by_ids(deps: Deps, ids: Vec<u64>) -> StdResult<BatchesResponse> {
-    let batches: Vec<Batch> = ids
-        .into_iter()
-        .map(|id| BATCHES.load(deps.storage, id))
-        .filter_map(|r| {
-            if r.is_ok() {
-                let batch = r.unwrap();
-                return Some(batch);
-            }
-            None
-        })
-        .collect();
-
-    let res = BatchesResponse {
-        batches: batches.into_iter().map(batch_to_response).collect(),
-    };
-    Ok(res)
+    Ok(BatchesResponse {
+        batches: ids
+            .into_iter()
+            .map(|id| (id, BATCHES.load(deps.storage, id)))
+            .map(|(id, r)| r.map(|b| (id, b)))
+            .collect::<Result<_, _>>()?,
+    })
 }
 
-pub fn query_pending_batch(deps: Deps) -> StdResult<BatchResponse> {
-    let pending_batch_id = PENDING_BATCH_ID.load(deps.storage)?;
-    let pending_batch = BATCHES.load(deps.storage, pending_batch_id)?;
-
-    Ok(batch_to_response(pending_batch))
+pub fn query_pending_batch(deps: Deps) -> StdResult<Batch> {
+    BATCHES.load(deps.storage, PENDING_BATCH_ID.load(deps.storage)?)
 }
 
 pub fn query_unstake_requests(deps: Deps, user: String) -> StdResult<Vec<UnstakeRequest>> {
-    let unstaking_requests = unstake_requests()
+    unstake_requests()
         .idx
         .by_user
         .prefix(user.to_string())
         .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .filter_map(|r| {
-            if r.is_ok() {
-                let request = r.unwrap().1;
-                return Some(request);
-            }
-            None
-        })
-        .collect();
-
-    Ok(unstaking_requests)
+        .map(|r| r.map(|(_, r)| r))
+        .collect()
 }
 
 pub fn query_all_unstake_requests(
@@ -130,7 +91,7 @@ pub fn query_all_unstake_requests(
     start_after: Option<u64>,
     limit: Option<u32>,
 ) -> StdResult<Vec<UnstakeRequest>> {
-    let unstaking_requests = unstake_requests()
+    unstake_requests()
         .idx
         .by_user
         .range(
@@ -140,14 +101,6 @@ pub fn query_all_unstake_requests(
             cosmwasm_std::Order::Ascending,
         )
         .take(limit.unwrap_or(u32::MAX) as usize)
-        .filter_map(|r| {
-            if r.is_ok() {
-                let request = r.unwrap().1;
-                return Some(request);
-            }
-            None
-        })
-        .collect();
-
-    Ok(unstaking_requests)
+        .map(|r| r.map(|(_, r)| r))
+        .collect::<Result<_, _>>()
 }

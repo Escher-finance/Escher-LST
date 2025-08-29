@@ -1,8 +1,7 @@
-use cosmwasm_std::{Decimal, Deps, Order, StdError, StdResult, Uint128};
-use cw_storage_plus::{Bound, Bounder, KeyDeserialize, Map};
-use sha2::{Digest, Sha256};
+use cosmwasm_std::{Decimal, Deps, StdError, Uint128};
+use prost::Message;
 
-use crate::state::State;
+use crate::{error::ContractError, state::State};
 
 pub fn compute_mint_amount(
     total_native_token: Uint128,
@@ -37,87 +36,6 @@ pub fn compute_unbond_amount(
     }
 }
 
-// Hash creates a new address from address type and key.
-// The functions should only be used by new types defining their own address function
-// (eg public keys).
-/// https://github.com/cosmos/cosmos-sdk/blob/main/types/address/hash.go
-pub fn addess_hash(typ: &str, key: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::default();
-    hasher.update(typ.as_bytes());
-    let th = hasher.finalize();
-    let mut hasher = Sha256::default();
-    hasher.update(th);
-    hasher.update(key);
-    hasher.finalize().into()
-}
-
-// derives the sender address to be used when calling wasm hooks
-// https://github.com/osmosis-labs/osmosis/blob/master/x/ibc-hooks/keeper/keeper.go#L170 ```
-pub const SENDER_PREFIX: &str = "ibc-wasm-hook-intermediary";
-
-pub fn derive_intermediate_sender(
-    channel_id: &str,
-    original_sender: &str,
-    bech32_prefix: &str,
-) -> StdResult<String> {
-    let sender_str = format!("{channel_id}/{original_sender}");
-    let sender_hash_32 = addess_hash(SENDER_PREFIX, sender_str.as_bytes());
-    let hrp =
-        bech32::Hrp::parse(bech32_prefix).map_err(|e| StdError::generic_err(e.to_string()))?;
-    bech32::encode::<bech32::Bech32>(hrp, &sender_hash_32)
-        .map_err(|e| StdError::generic_err(e.to_string()))
-}
-
-/// Generic function for paginating a list of (K, V) pairs in a
-/// CosmWasm Map.
-#[allow(clippy::type_complexity)]
-pub fn paginate_map<'a, 'b, K, V, R: 'static>(
-    deps: Deps,
-    map: &Map<'a, K, V>,
-    start_after: Option<K>,
-    limit: Option<u32>,
-    order: Order,
-    filter: Option<Box<dyn Fn(&V) -> bool>>,
-) -> StdResult<Vec<V>>
-where
-    K: Bounder<'a> + KeyDeserialize<Output = R> + 'b,
-    V: serde::de::DeserializeOwned + serde::Serialize,
-{
-    let (range_min, range_max) = match order {
-        Order::Ascending => (start_after.map(Bound::exclusive), None),
-        Order::Descending => (None, start_after.map(Bound::exclusive)),
-    };
-
-    let mut items = map.range(deps.storage, range_min, range_max, order);
-    let mut taken = 0;
-    let mut result = Vec::new();
-    let limit = limit.unwrap_or(u32::MAX);
-    while taken < limit {
-        let item = items.next();
-        match item {
-            None => break,
-            Some(r) => {
-                if r.is_err() {
-                    continue;
-                }
-                let (_, v) = r.unwrap();
-                if let Some(filter) = &filter {
-                    if filter(&v) {
-                        taken += 1;
-                        result.push(v);
-                    } else {
-                        continue;
-                    }
-                } else {
-                    taken += 1;
-                    result.push(v);
-                }
-            }
-        }
-    }
-    Ok(result)
-}
-
 pub fn get_rates(state: &State) -> (Decimal, Decimal) {
     let total_native_token = state.total_native_token;
     let total_liquid_stake_token = state.total_liquid_stake_token;
@@ -132,91 +50,65 @@ pub fn get_rates(state: &State) -> (Decimal, Decimal) {
     }
 }
 
-/// Checks if the provided denom is valid or not.
-pub fn validate_denom(denom: impl Into<String>) -> StdResult<String> {
-    let denom: String = denom.into();
+/// Query the unbonding period from the chain, and verify that the batch period is smaller than the queried unbonding period.
+pub fn query_and_validate_unbonding_period(
+    deps: Deps,
+    batch_period: u64,
+) -> Result<u64, ContractError> {
+    #[derive(Clone, PartialEq, Message)]
+    pub struct QueryParamsRequest {}
 
-    if denom.len() <= 3 {
-        return Err(StdError::generic_err(
-            "denom len is less than or equal to 3",
-        ));
+    #[derive(Clone, PartialEq, Message)]
+    pub struct QueryParamsResponse {
+        #[prost(message, optional, tag = "1")]
+        pub params: Option<Params>,
     }
-    if !denom.chars().all(|c| c.is_ascii_alphabetic()) {
-        return Err(StdError::generic_err("denom must be alphabetic"));
+
+    #[derive(Clone, PartialEq, Message)]
+    pub struct Params {
+        #[prost(message, optional, tag = "1")]
+        pub unbonding_time: Option<Duration>,
+    }
+    #[derive(Clone, PartialEq, Message)]
+    pub struct Duration {
+        #[prost(int64, tag = "1")]
+        pub seconds: i64,
     }
 
-    Ok(denom)
-}
+    let res = deps.querier.query_grpc(
+        "/cosmos.staking.v1beta1.Query/Params".to_owned(),
+        QueryParamsRequest {}.encode_to_vec().into(),
+    )?;
 
-/// Checks the provided denom is a valid ibc denom or not.
-pub fn validate_ibc_denom(
-    ibc_denom: impl Into<String>,
-    channel_id: &str,
-    token_denom: &str,
-) -> StdResult<String> {
-    let ibc_denom: String = ibc_denom.into();
+    let unbonding_period = QueryParamsResponse::decode(&*res)
+        .map_err(|e| StdError::generic_err(format!("error decoding query params response: {e}")))
+        .and_then(|res| {
+            res.params.ok_or_else(|| {
+                StdError::generic_err("invalid query params response, missing params")
+            })
+        })
+        .and_then(|res| {
+            res.unbonding_time.ok_or_else(|| {
+                StdError::generic_err(
+                    "invalid query params response, missing params.unbonding_time",
+                )
+            })
+        })
+        .and_then(|res| {
+            res.seconds.try_into().map_err(|_| {
+                StdError::generic_err(
+                    "invalid query params response, params.unbonding_time.seconds is negative",
+                )
+            })
+        })?;
 
-    if let Some(hash) = ibc_denom.strip_prefix("ibc/") {
-        let mut hasher = Sha256::default();
-        hasher.update("transfer/".as_bytes());
-        hasher.update(channel_id.as_bytes());
-        hasher.update("/".as_bytes());
-        hasher.update(token_denom.as_bytes());
-        let expected_hash = hex::encode_upper(hasher.finalize());
-        if expected_hash != hash {
-            Err(StdError::generic_err("ibc denom is invalid"))
-        } else {
-            Ok(ibc_denom)
-        }
+    // Ensure the batch period is lower then unbonding period.
+    if batch_period > unbonding_period {
+        Err(ContractError::BatchPeriodLargerThanUnbondingPeriod {
+            batch_period,
+            unbonding_period,
+        })
     } else {
-        Err(StdError::generic_err("ibc denom is invalid"))
-    }
-}
-/// Note: The order of elements in the input vector is not preserved.
-pub fn dedup_vec<T>(mut vec: Vec<T>) -> Vec<T>
-where
-    T: std::cmp::Ord,
-{
-    if vec.is_empty() {
-        return vec;
-    }
-
-    vec.sort();
-    vec.dedup();
-    vec
-}
-
-#[cfg(test)]
-mod tests {
-    use super::validate_ibc_denom;
-
-    #[test]
-    fn test_validate_invalid_ibc_denom_fails() {
-        validate_ibc_denom(
-            "ibc/D79E7D83AB399BFFF93433E54FAA480C191248FC556924A2A8351AE2638B3866",
-            "channel-6994",
-            "utia",
-        )
-        .unwrap_err();
-    }
-
-    #[test]
-    fn test_validate_lowercase_ibc_denom_fails() {
-        validate_ibc_denom(
-            "ibc/d79e7d83ab399bfff93433e54faa480c191248fc556924a2a8351ae2638b3877",
-            "channel-6994",
-            "utia",
-        )
-        .unwrap_err();
-    }
-
-    #[test]
-    fn test_validate_ibc_denom_correctly() {
-        validate_ibc_denom(
-            "ibc/D79E7D83AB399BFFF93433E54FAA480C191248FC556924A2A8351AE2638B3877",
-            "channel-6994",
-            "utia",
-        )
-        .unwrap();
+        Ok(unbonding_period)
     }
 }

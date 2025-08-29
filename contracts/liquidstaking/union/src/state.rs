@@ -8,6 +8,7 @@ use cosmwasm_std::{Addr, Deps, DepsMut, StdError, Timestamp, Uint128};
 use cw_controllers::Admin;
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, UniqueIndex};
 use milky_way::staking::Batch;
+use unionlabs_primitives::Bytes;
 
 use crate::error::{ContractError, ContractResult};
 
@@ -20,11 +21,6 @@ pub struct Config {
 
     /// Minimum amount of token that can be liquid staked.
     pub minimum_liquid_stake_amount: Uint128,
-
-    // new fields
-
-    // NOTE: Originally was in native chain config
-    pub unbonding_period: u64,
 
     /// Denomination of the liquid staking token that have been
     /// minted through the cw20.
@@ -63,8 +59,7 @@ pub struct ProtocolFeeConfig {
     pub fee_rate: Uint128, // not using a fraction, fee percentage=x/100000
 
     /// Address where the collected fees are sent.
-    /// If this value is None, the fees will be kept in the contract.
-    pub fee_recipient: Option<Addr>,
+    pub fee_recipient: Addr,
 }
 
 #[cw_serde]
@@ -72,14 +67,14 @@ pub struct State {
     /// this is the total staked amount
     pub total_native_token: Uint128,
     /// this is the total supply of the minted lst token (eU in our case)
+    // REVIEW: This should match the total supply of the LST? Can we just read it from the LST contract itself?
     pub total_liquid_stake_token: Uint128,
-    pub pending_owner: Option<Addr>,
-    pub owner_transfer_min_time: Option<Timestamp>,
     pub total_reward_amount: Uint128,
-    /// NOTE: UNUSED!!!
-    pub rate: Uint128,
-    pub total_fees: Uint128,
-    pub ibc_id_counter: u64,
+
+    // REVIEW: Pull this out into a separate storage item, no need to load it every time we read the state and also makes more sense semantically to have it separate
+    pub pending_owner: Option<Addr>,
+    // TODO: I think this needs to be part of an enum with the pending owner
+    pub owner_transfer_min_time: Option<Timestamp>,
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
@@ -109,7 +104,7 @@ pub struct UnstakeRequest {
 }
 
 pub struct UnstakeRequestIndexes<'a> {
-    pub by_user: UniqueIndex<'a, (String, u64 /* , u32 */), UnstakeRequest, ()>,
+    pub by_user: UniqueIndex<'a, (String, u64), UnstakeRequest, ()>,
 }
 
 impl<'a> IndexList<UnstakeRequest> for UnstakeRequestIndexes<'a> {
@@ -119,21 +114,10 @@ impl<'a> IndexList<UnstakeRequest> for UnstakeRequestIndexes<'a> {
     }
 }
 
-pub fn unstake_requests<'a>(
-) -> IndexedMap<(/* u32, */ u64, String), UnstakeRequest, UnstakeRequestIndexes<'a>> {
+pub fn unstake_requests<'a>() -> IndexedMap<(u64, String), UnstakeRequest, UnstakeRequestIndexes<'a>>
+{
     let indexes = UnstakeRequestIndexes {
-        by_user: UniqueIndex::new(
-            |r| {
-                (
-                    r.user.clone(),
-                    r.batch_id,
-                    // 0  => None
-                    // id => Some(id)
-                    // r.recipient_channel_id.map(|x| x.raw()).unwrap_or_default(),
-                )
-            },
-            "unstake_requests_by_user",
-        ),
+        by_user: UniqueIndex::new(|r| (r.user.clone(), r.batch_id), "unstake_requests_by_user"),
     };
 
     IndexedMap::new("unstake_requests", indexes)
@@ -144,20 +128,14 @@ pub fn new_unstake_request(
     user: String,
     batch_id: u64,
     amount: Uint128,
-    // recipient_channel_id: Option<ChannelId>,
 ) -> Result<(), StdError> {
     unstake_requests().save(
         deps.storage,
-        (
-            // recipient_channel_id.map_or(0, |x| x.raw()),
-            batch_id,
-            user.clone(),
-        ),
+        (batch_id, user.clone()),
         &UnstakeRequest {
             batch_id,
             user,
             amount,
-            // recipient_channel_id,
         },
     )?;
     Ok(())
@@ -167,17 +145,9 @@ pub fn remove_unstake_request(
     deps: &mut DepsMut,
     user: String,
     batch_id: u64,
-    // recipient_channel_id: Option<ChannelId>,
 ) -> Result<(), StdError> {
     unstake_requests()
-        .remove(
-            deps.storage,
-            (
-                // recipient_channel_id.map_or(0, |x| x.raw()),
-                batch_id,
-                user.clone(),
-            ),
-        )
+        .remove(deps.storage, (batch_id, user.clone()))
         .unwrap();
     Ok(())
 }
@@ -191,4 +161,15 @@ pub fn assert_not_migrating(deps: Deps) -> ContractResult<()> {
     } else {
         Ok(())
     }
+}
+
+/// Map of source channel ids to quote token config on
+pub const FUNGIBLE_RECIPIENT_CHANNEL: Map<u32, CounterpartyConfig> =
+    Map::new("idkwhattocallthisyet");
+
+#[cw_serde]
+pub struct CounterpartyConfig {
+    pub quote_token: Bytes,
+    pub kind: u8,
+    pub metadata: Bytes,
 }

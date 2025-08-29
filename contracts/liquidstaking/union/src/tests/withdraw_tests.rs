@@ -1,6 +1,7 @@
 use cosmwasm_std::{
-    Addr, CosmosMsg, ReplyOn, SubMsg, Uint128, from_json,
-    testing::{MOCK_CONTRACT_ADDR, mock_env, mock_info},
+    from_json,
+    testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR},
+    Addr, CosmosMsg, ReplyOn, SubMsg, Uint128,
 };
 use milky_way::staking::Batch;
 use osmosis_std::types::cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin};
@@ -8,8 +9,8 @@ use osmosis_std::types::cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin};
 use crate::{
     contract::{execute, query},
     msg::{ExecuteMsg, QueryMsg},
-    state::{BATCHES, CONFIG, STATE, UnstakeRequest, new_unstake_request},
-    tests::test_helper::{ADMIN, NATIVE_TOKEN, OSMO1, init},
+    state::{new_unstake_request, UnstakeRequest, BATCHES, CONFIG, STATE},
+    tests::test_helper::{init, ADMIN, NATIVE_TOKEN, OSMO1},
 };
 
 #[test]
@@ -23,7 +24,7 @@ fn withdraw() {
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let mut pending_batch: Batch =
-        Batch::new(1, Uint128::new(130_000), env.block.time.seconds() + 10_000);
+        Batch::new_pending(1, Uint128::new(130_000), env.block.time.seconds() + 10_000);
     new_unstake_request(
         &mut deps.as_mut(),
         "bob".to_string(),
@@ -49,7 +50,7 @@ fn withdraw() {
 
     // batch ready
     pending_batch.received_native_unstaked = Some(Uint128::new(130_000));
-    pending_batch.status = milky_way::staking::BatchStatus::Received;
+    pending_batch.state = milky_way::staking::BatchState::Received;
     let res = BATCHES.save(&mut deps.storage, 1, &pending_batch);
     assert!(res.is_ok());
 
@@ -158,7 +159,7 @@ fn withdraw_slashing() {
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let mut pending_batch: Batch =
-        Batch::new(1, Uint128::new(130_000), env.block.time.seconds() + 10_000);
+        Batch::new_pending(1, Uint128::new(130_000), env.block.time.seconds() + 10_000);
     new_unstake_request(
         &mut deps.as_mut(),
         "bob".to_string(),
@@ -178,7 +179,7 @@ fn withdraw_slashing() {
 
     // batch ready
     pending_batch.received_native_unstaked = Some(Uint128::new(990_000)); // slashing happened
-    pending_batch.status = milky_way::staking::BatchStatus::Received;
+    pending_batch.state = milky_way::staking::BatchState::Received;
     let res = BATCHES.save(&mut deps.storage, 1, &pending_batch);
     assert!(res.is_ok());
 

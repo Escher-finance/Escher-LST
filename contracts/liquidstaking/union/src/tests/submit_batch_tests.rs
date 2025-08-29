@@ -2,7 +2,7 @@ use cosmwasm_std::{
     Uint128,
     testing::{mock_env, mock_info},
 };
-use milky_way::staking::{Batch, BatchStatus};
+use milky_way::staking::{Batch, BatchState};
 
 use crate::{
     contract::execute,
@@ -76,13 +76,13 @@ fn pending_batch_with_to_many_lst_tokens_fails() {
             1,
             &Batch {
                 id: 1,
-                unstake_requests_count: Some(1),
+                unbond_requests_count: Some(1),
                 batch_total_liquid_stake: Uint128::new(state.total_liquid_stake_token.u128() + 1),
-                status: BatchStatus::Received,
+                state: BatchState::Received,
                 next_batch_action_time: Some(
                     env.block.time.plus_seconds(config.batch_period).seconds(),
                 ),
-                liquid_unstake_requests: None,
+                liquid_unbond_requests: None,
                 expected_native_unstaked: None,
                 received_native_unstaked: None,
             },
