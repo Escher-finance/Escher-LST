@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use ibc_union_spec::ChannelId;
-use milky_way::staking::{Batch, BatchStatus};
+use crate::types::{Batch, BatchStatus};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use unionlabs_primitives::Bytes;

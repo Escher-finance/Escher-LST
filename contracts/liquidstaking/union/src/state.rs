@@ -7,10 +7,12 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, DepsMut, StdError, Timestamp, Uint128};
 use cw_controllers::Admin;
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, UniqueIndex};
-use milky_way::staking::Batch;
 use unionlabs_primitives::Bytes;
 
-use crate::error::{ContractError, ContractResult};
+use crate::{
+    error::{ContractError, ContractResult},
+    types::Batch,
+};
 
 #[cw_serde]
 pub struct Config {

@@ -1,18 +1,13 @@
 use cosmwasm_std::{
-    coins, from_json,
-    testing::{message_info, mock_env, mock_info, MOCK_CONTRACT_ADDR},
-    to_json_binary, Addr, Attribute, CosmosMsg, ReplyOn, SubMsg, Uint128, WasmMsg,
+    testing::{message_info, mock_env},
+    to_json_binary, Addr, Attribute, CosmosMsg, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
-use milky_way::staking::{Batch, BatchState};
-use osmosis_std::types::{cosmos::base::v1beta1::Coin, osmosis::tokenfactory::v1beta1::MsgBurn};
 
 use crate::{
-    contract::{execute, query},
-    msg::{ExecuteMsg, QueryMsg},
-    state::{
-        new_unstake_request, unstake_requests, Config, UnstakeRequest, BATCHES, CONFIG, STATE,
-    },
+    contract::execute,
+    msg::ExecuteMsg,
+    state::{unstake_requests, UnstakeRequest, BATCHES, STATE},
     tests::test_helper::{init, LIQUID_STAKE_TOKEN_ADDRESS, UNION1, UNION2},
 };
 

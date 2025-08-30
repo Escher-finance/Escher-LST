@@ -6,7 +6,6 @@ use cosmwasm_std::{
 use cw20::Cw20ExecuteMsg;
 use cw_utils::must_pay;
 use ibc_union_spec::ChannelId;
-use milky_way::staking::{Batch, BatchState};
 use ucs03_zkgm::com::{Instruction, TokenOrderV2, INSTR_VERSION_2, OP_TOKEN_ORDER};
 use unionlabs_primitives::Bytes;
 
@@ -17,7 +16,7 @@ use crate::{
         new_unstake_request, remove_unstake_request, unstake_requests, Config, UnstakeRequest,
         ADMIN, BATCHES, CONFIG, FUNGIBLE_RECIPIENT_CHANNEL, PENDING_BATCH_ID, STATE,
     },
-    types::BatchExpectedAmount,
+    types::{Batch, BatchExpectedAmount, BatchState},
 };
 
 const FEE_RATE_DENOMINATOR: u64 = 100_000;

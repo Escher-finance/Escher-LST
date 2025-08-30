@@ -3,7 +3,7 @@ use cosmwasm_std::{
     testing::{mock_env, mock_info},
     Coin, Uint128,
 };
-use milky_way::staking::Batch;
+use crate::types::Batch;
 
 use crate::{
     contract::execute,
@@ -133,7 +133,7 @@ fn circuit_breaker() {
         Uint128::from(10u128),
     )
     .unwrap();
-    pending_batch.state = milky_way::staking::BatchState::Received;
+    pending_batch.state = crate::types::BatchState::Received;
     BATCHES.save(&mut deps.storage, 1, &pending_batch).unwrap();
     let res = execute(
         deps.as_mut(),

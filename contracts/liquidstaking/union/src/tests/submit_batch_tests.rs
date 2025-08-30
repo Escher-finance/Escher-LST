@@ -3,7 +3,7 @@ use cosmwasm_std::{
     to_json_binary, Addr, Attribute, Coin, CosmosMsg, Timestamp, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
-use milky_way::staking::{Batch, BatchState};
+use crate::types::{Batch, BatchState};
 
 use super::test_helper::{NATIVE_TOKEN, UNION1, UNION2, UNION3};
 use crate::{

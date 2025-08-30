@@ -3,7 +3,7 @@ use cosmwasm_std::{
     testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR},
     Addr, CosmosMsg, ReplyOn, SubMsg, Uint128,
 };
-use milky_way::staking::Batch;
+use crate::types::Batch;
 use osmosis_std::types::cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin};
 
 use crate::{
@@ -50,7 +50,7 @@ fn withdraw() {
 
     // batch ready
     pending_batch.received_native_unstaked = Some(Uint128::new(130_000));
-    pending_batch.state = milky_way::staking::BatchState::Received;
+    pending_batch.state = crate::types::BatchState::Received;
     let res = BATCHES.save(&mut deps.storage, 1, &pending_batch);
     assert!(res.is_ok());
 
@@ -179,7 +179,7 @@ fn withdraw_slashing() {
 
     // batch ready
     pending_batch.received_native_unstaked = Some(Uint128::new(990_000)); // slashing happened
-    pending_batch.state = milky_way::staking::BatchState::Received;
+    pending_batch.state = crate::types::BatchState::Received;
     let res = BATCHES.save(&mut deps.storage, 1, &pending_batch);
     assert!(res.is_ok());
 

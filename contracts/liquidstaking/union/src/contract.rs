@@ -4,7 +4,7 @@ use cosmwasm_std::{
     StdResult, Uint128,
 };
 use cw2::set_contract_version;
-use milky_way::staking::Batch;
+use crate::types::Batch;
 use semver::Version;
 
 use crate::{

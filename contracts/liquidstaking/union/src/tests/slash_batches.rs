@@ -2,7 +2,7 @@ use cosmwasm_std::{
     testing::{mock_env, mock_info},
     Uint128,
 };
-use milky_way::staking::{Batch, BatchState};
+use crate::types::{Batch, BatchState};
 
 use super::test_helper::init;
 use crate::{

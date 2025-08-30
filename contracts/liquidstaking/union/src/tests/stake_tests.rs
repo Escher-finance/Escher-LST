@@ -1,34 +1,22 @@
-use std::vec::Vec;
-
 use alloy::{primitives::U256, sol_types::SolValue};
 use cosmwasm_std::{
-    attr, coins,
-    testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR},
-    to_json_binary, Addr, Attribute, BankMsg, CosmosMsg, Decimal, IbcTimeout, Order, Reply,
-    ReplyOn, StdError, SubMsg, SubMsgResponse, SubMsgResult, Timestamp, Uint128, WasmMsg,
+    coins,
+    testing::{mock_env, mock_info},
+    to_json_binary, Attribute, BankMsg, CosmosMsg, StdError, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 use ibc_union_spec::ChannelId;
-use milky_way::staking::BatchState;
-use osmosis_std::types::{
-    cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin},
-    ibc::applications::transfer::v1::MsgTransfer,
-    osmosis::tokenfactory::v1beta1::MsgMint,
-};
 use ucs03_zkgm::com::{
     Instruction, TokenOrderV2, INSTR_VERSION_2, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_SOLVE,
 };
 use unionlabs_primitives::{encoding::HexPrefixed, Bytes};
 
-use super::test_helper::OSMO1;
 use crate::{
     contract::execute,
-    error::ContractError,
-    helpers::get_rates,
     msg::ExecuteMsg,
-    state::{CounterpartyConfig, State, BATCHES, CONFIG, FUNGIBLE_RECIPIENT_CHANNEL, STATE},
+    state::{CounterpartyConfig, FUNGIBLE_RECIPIENT_CHANNEL, STATE},
     tests::test_helper::{
-        init, FUNDED_DISPATCH_ADDRESS, LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION1, UNION2,
+        init, FUNDED_DISPATCH_ADDRESS, LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION2,
         UNION_STAKER, ZKGM_ADDRESS,
     },
 };

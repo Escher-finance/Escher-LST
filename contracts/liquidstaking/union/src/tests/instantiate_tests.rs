@@ -2,7 +2,7 @@ use cosmwasm_std::{
     testing::{message_info, mock_dependencies, mock_env},
     Addr,
 };
-use milky_way::staking::BatchState;
+use crate::types::BatchState;
 
 use crate::{
     contract::instantiate,

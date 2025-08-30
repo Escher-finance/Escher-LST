@@ -2,7 +2,7 @@ use cosmwasm_std::{StdError, Timestamp, Uint128};
 use cw2::VersionError;
 use cw_controllers::AdminError;
 use cw_utils::PaymentError;
-use milky_way::staking::BatchState;
+use crate::types::BatchState;
 use thiserror::Error;
 
 pub type ContractResult<T> = core::result::Result<T, ContractError>;

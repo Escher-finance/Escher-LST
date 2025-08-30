@@ -1,7 +1,7 @@
 use cosmwasm_std::{Deps, Order, StdResult};
 use cw_storage_plus::Bound;
 use itertools::Itertools;
-use milky_way::staking::{Batch, BatchStatus};
+use crate::types::{Batch, BatchStatus};
 
 use crate::{
     helpers::get_rates,

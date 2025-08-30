@@ -5,7 +5,6 @@ members = [
   "contracts/reward",
   "contracts/liquidstaking/babylon",
   "contracts/liquidstaking/union",
-  "contracts/liquidstaking/union/milky_way",
   "contracts/cw20-base",
 ]
 
@@ -53,9 +52,6 @@ embed-commit         = { git = "https://github.com/unionlabs/union", default-fea
 ibc-union-spec       = { git = "https://github.com/unionlabs/union", default-features = false }
 ucs03-zkgm           = { git = "https://github.com/unionlabs/union", default-features = false }
 unionlabs-primitives = { git = "https://github.com/unionlabs/union", default-features = false }
-
-# local
-milky_way = { path = "contracts/liquidstaking/union/milky_way" }
 
 # [dev-dependencies]
 cw-multi-test   = { version = "2.2.0", features = ["staking"] }

@@ -275,7 +275,7 @@ fn get_batches() {
     let msg = QueryMsg::Batches {
         start_after: None,
         limit: None,
-        status: Some(milky_way::staking::BatchState::Submitted),
+        status: Some(crate::types::BatchState::Submitted),
     };
     bin = query(deps.as_ref(), env.clone(), msg).unwrap();
     result = from_json::<BatchesResponse>(&bin);
@@ -285,7 +285,7 @@ fn get_batches() {
     let msg = QueryMsg::Batches {
         start_after: None,
         limit: None,
-        status: Some(milky_way::staking::BatchState::Pending),
+        status: Some(crate::types::BatchState::Pending),
     };
     bin = query(deps.as_ref(), env.clone(), msg).unwrap();
     result = from_json::<BatchesResponse>(&bin);
