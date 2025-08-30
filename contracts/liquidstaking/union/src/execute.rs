@@ -215,8 +215,16 @@ pub fn execute_bond(
 /// Unbond the LST.
 ///
 /// The LST is sent to this contract, and an unstaking request is added to the current batch. Once the batch is submitted, [`execute_withdraw`] can be called to withdraw the unstaked native token.
+///
+/// 1. Write the new unbond request to storage.
+/// 2. Update the batch.
+/// 3. Transfer the LST to this contract. Note that this requires an allowance to spend these tokens on behalf of the staker.
+///
+/// # LST Balance Tracking
+///
+/// It should be noted that this contract does NOT track the balance of the LST. The LST contract itself is expected to correctly track and maintain it's own balances. This prevents unbonding more tokens than there are in total, since the TransferFrom call to the LST will fail.
 pub fn execute_unbond(
-    mut deps: DepsMut,
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     amount: Uint128,
@@ -230,30 +238,32 @@ pub fn execute_unbond(
 
     let pending_batch_id = PENDING_BATCH_ID.load(deps.storage)?;
 
+    // 1.
     let mut is_new_request = false;
     unstake_requests().update(
         deps.storage,
         (pending_batch_id, staker.clone()),
         |or| -> Result<UnstakeRequest, ContractError> {
-            match or {
-                Some(r) => Ok(UnstakeRequest {
+            Ok(match or {
+                Some(r) => UnstakeRequest {
                     batch_id: r.batch_id,
                     user: r.user.clone(),
                     amount: r.amount + amount,
-                }),
+                },
                 None => {
+                    // this is a bit of a hack since .update() doesn't allow for returning anything else other than the T of the IndexMap. ideally it would return (R, T), write T to storage, and then return (R, T)
                     is_new_request = true;
-                    Ok(UnstakeRequest {
+                    UnstakeRequest {
                         batch_id: pending_batch_id,
                         user: staker.clone(),
                         amount,
-                    })
+                    }
                 }
-            }
+            })
         },
     )?;
 
-    // add amount to batch total
+    // 2.
     BATCHES.update(
         deps.storage,
         pending_batch_id,
@@ -267,8 +277,7 @@ pub fn execute_unbond(
         },
     )?;
 
-    // transfer the unbonded LST to this contract
-    // this requires an allowance to spend these tokens on behalf of the staker
+    // 3.
     let lst_transfer_from_msg = wasm_execute(
         &config.liquid_stake_token_address,
         &Cw20ExecuteMsg::TransferFrom {
