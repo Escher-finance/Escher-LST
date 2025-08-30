@@ -27,6 +27,7 @@ pub static NATIVE_TOKEN: &str = "au";
 pub const ADMIN: &str = "union1fktal7292h36h7glff5edq59vpdfn7504duw5m";
 pub const UNION1: &str = "union1jk9psyhvgkrt2cumz8eytll2244m2nnz4yt2g2";
 pub const UNION2: &str = "union1a8k05kaazq576sd0n07ewhsplwtpecxjx8ygx9";
+pub const UNION3: &str = "union1f00pmpma555uunmcsy95kartescpeyuqrd2y7z";
 pub const UNION_STAKER: &str = "union1qp4uzhet2sd9mrs46kemse5dt9ncz4k3hjst5m";
 pub const UNION_MONITOR_1: &str = "union1m27enjqfejnnxru5snmcufway88py4fyqcr43u";
 pub const UNION_MONITOR_2: &str = "union1n36766lfkjcdwawu23d2tszwm26acesthzx0y7";

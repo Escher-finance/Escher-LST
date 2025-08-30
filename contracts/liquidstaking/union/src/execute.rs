@@ -281,12 +281,14 @@ pub fn execute_unbond(
     let lst_transfer_from_msg = wasm_execute(
         &config.liquid_stake_token_address,
         &Cw20ExecuteMsg::TransferFrom {
-            owner: staker.clone(),
+            owner: info.sender.to_string(),
             recipient: env.contract.address.to_string(),
             amount,
         },
         vec![],
     )?;
+
+    // Batch [ Send, Call(IncAllow), Call(Unbond) ]
 
     Ok(Response::new()
         .add_message(lst_transfer_from_msg)
@@ -385,7 +387,7 @@ pub fn execute_submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response>
         .add_attribute("action", "submit_batch")
         .add_attribute("batch_id", pending_batch_id.to_string())
         .add_attribute("batch_total", batch.batch_total_liquid_stake)
-        .add_attribute("expected_native_unstaked", unbond_amount)
+        .add_attribute("expected_unstaked", unbond_amount)
         .add_attribute("unbonding_period", unbonding_period.to_string()))
 }
 
