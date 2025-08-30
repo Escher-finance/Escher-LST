@@ -2,19 +2,18 @@ use cosmwasm_std::{
     testing::{message_info, mock_dependencies, mock_env},
     Addr,
 };
-use crate::types::BatchState;
 
 use crate::{
     contract::instantiate,
     state::BATCHES,
-    tests::test_helper::{mock_deps_with_unbonding_time, mock_init_msg, OSMO3},
-    types::MAX_TREASURY_FEE,
+    tests::test_helper::{mock_deps_with_unbonding_time, mock_init_msg, UNION1},
+    types::{BatchState, MAX_TREASURY_FEE},
 };
 
 #[test]
 fn invalid_native_token_denom_fails() {
     let mut deps = mock_dependencies();
-    let info = message_info(&Addr::unchecked(OSMO3), &[]);
+    let info = message_info(&Addr::unchecked(UNION1), &[]);
     let mut msg = mock_init_msg();
 
     msg.protocol_fee_config.fee_rate = MAX_TREASURY_FEE;
@@ -28,7 +27,7 @@ fn init_properly() {
     instantiate(
         deps.as_mut(),
         mock_env(),
-        message_info(&Addr::unchecked(OSMO3), &[]).clone(),
+        message_info(&Addr::unchecked(UNION1), &[]).clone(),
         mock_init_msg().clone(),
     )
     .unwrap();

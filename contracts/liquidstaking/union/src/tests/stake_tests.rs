@@ -1,8 +1,8 @@
 use alloy::{primitives::U256, sol_types::SolValue};
 use cosmwasm_std::{
     attr, coins,
-    testing::{mock_env, mock_info},
-    to_json_binary, BankMsg, CosmosMsg, StdError, Uint128, WasmMsg,
+    testing::{message_info, mock_env},
+    to_json_binary, Addr, BankMsg, CosmosMsg, StdError, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 use ibc_union_spec::ChannelId;
@@ -24,7 +24,10 @@ use crate::{
 #[test]
 fn bond_with_local_recipient_works() {
     let mut deps = init();
-    let info = mock_info(FUNDED_DISPATCH_ADDRESS, &coins(1000, NATIVE_TOKEN));
+    let info = message_info(
+        &Addr::unchecked(FUNDED_DISPATCH_ADDRESS),
+        &coins(1000, NATIVE_TOKEN),
+    );
     let msg = ExecuteMsg::Bond {
         mint_to: UNION2.to_string().as_bytes().into(),
         recipient_channel_id: None,
@@ -117,7 +120,10 @@ fn bond_with_local_recipient_works() {
 fn bond_with_remote_recipient_works() {
     let mut deps = init();
     let env = mock_env();
-    let info = mock_info(FUNDED_DISPATCH_ADDRESS, &coins(1000, NATIVE_TOKEN));
+    let info = message_info(
+        &Addr::unchecked(FUNDED_DISPATCH_ADDRESS),
+        &coins(1000, NATIVE_TOKEN),
+    );
     let msg = ExecuteMsg::Bond {
         mint_to: UNION2.to_string().as_bytes().into(),
         recipient_channel_id: Some(ChannelId!(1)),

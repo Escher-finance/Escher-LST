@@ -1,15 +1,17 @@
 use cosmwasm_std::{
     attr,
     testing::{message_info, mock_env},
-    to_json_binary, Addr, Attribute, CosmosMsg, Uint128, WasmMsg,
+    to_json_binary, Addr, Attribute, Coin, CosmosMsg, Timestamp, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 
+use super::test_helper::{NATIVE_TOKEN, UNION3};
 use crate::{
     contract::execute,
     msg::ExecuteMsg,
     state::{unstake_requests, UnstakeRequest, BATCHES, STATE},
     tests::test_helper::{init, LIQUID_STAKE_TOKEN_ADDRESS, UNION1, UNION2},
+    types::BatchState,
 };
 
 #[test]
@@ -85,7 +87,7 @@ fn unbond_works() {
     );
 
     let union1_amount_2 = 3_500u128.into();
-    let res = execute(
+    let _ = execute(
         deps.as_mut(),
         mock_env(),
         info.clone(),
@@ -119,7 +121,7 @@ fn unbond_works() {
     let union2_amount_1 = 4528u128.into();
 
     // a new unstake request
-    let res = execute(
+    let _ = execute(
         deps.as_mut(),
         mock_env(),
         message_info(&Addr::unchecked(UNION2), &[]),
@@ -152,6 +154,118 @@ fn unbond_works() {
     );
     // this time the unstake request count is incremented since a new user unstaked
     assert_eq!(batch.unstake_requests_count, 2);
+}
+
+#[test]
+fn receive_unstaked_tokens_works() {
+    let mut deps = init();
+
+    let mut state = STATE.load(&deps.storage).unwrap();
+
+    state.total_bonded_native_tokens = Uint128::from(5_000u128);
+    state.total_issued_lst = Uint128::from(5_000u128);
+
+    STATE.save(&mut deps.storage, &state).unwrap();
+
+    // UNION1 unbonds 1532 tokens
+    let union1_unbond_amount = 1532u128.into();
+    let _ = execute(
+        deps.as_mut(),
+        mock_env(),
+        message_info(&Addr::unchecked(UNION1), &[]),
+        ExecuteMsg::Unbond {
+            staker: UNION1.to_string(),
+            amount: union1_unbond_amount,
+        },
+    )
+    .unwrap();
+
+    // UNION2 unbonds 1200 tokens
+    let union2_unbond_amount = 1200u128.into();
+    let _ = execute(
+        deps.as_mut(),
+        mock_env(),
+        message_info(&Addr::unchecked(UNION2), &[]),
+        ExecuteMsg::Unbond {
+            staker: UNION2.to_string(),
+            amount: union2_unbond_amount,
+        },
+    )
+    .unwrap();
+
+    // UNION3 unbonds 500 tokens
+    let union3_unbond_amount = 500u128.into();
+    let _ = execute(
+        deps.as_mut(),
+        mock_env(),
+        message_info(&Addr::unchecked(UNION3), &[]),
+        ExecuteMsg::Unbond {
+            staker: UNION3.to_string(),
+            amount: union3_unbond_amount,
+        },
+    )
+    .unwrap();
+
+    let mut env = mock_env();
+    env.block.time = if let BatchState::Pending { submit_time } =
+        BATCHES.load(&deps.storage, 1).unwrap().state
+    {
+        Timestamp::from_seconds(submit_time + 1)
+    } else {
+        panic!("invalid state")
+    };
+
+    // batch is submitted so that we can receive the unstaked tokens
+    let _ = execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info(&Addr::unchecked(UNION1), &[]),
+        ExecuteMsg::SubmitBatch {},
+    )
+    .unwrap();
+
+    let mut env = mock_env();
+    env.block.time = if let BatchState::Submitted { receive_time, .. } =
+        BATCHES.load(&deps.storage, 1).unwrap().state
+    {
+        Timestamp::from_seconds(receive_time + 1)
+    } else {
+        panic!("invalid state")
+    };
+
+    let total_unbond_amount = union1_unbond_amount + union2_unbond_amount + union3_unbond_amount;
+    let res = execute(
+        deps.as_mut(),
+        env,
+        message_info(
+            &Addr::unchecked(UNION1),
+            &[Coin {
+                denom: NATIVE_TOKEN.into(),
+                amount: total_unbond_amount,
+            }],
+        ),
+        ExecuteMsg::ReceiveUnstakedTokens { batch_id: 1 },
+    )
+    .unwrap();
+
+    // the batch state is updated with the correct unbond amount
+    let batch = BATCHES.load(&deps.storage, 1).unwrap();
+    assert_eq!(
+        batch.state,
+        BatchState::Received {
+            received_native_unstaked: total_unbond_amount
+        }
+    );
+
+    // the event is emitted correctly
+    assert_eq!(
+        res.attributes,
+        vec![
+            Attribute::new("action", "receive_unstaked_tokens"),
+            Attribute::new("batch", "1"),
+            Attribute::new("amount", total_unbond_amount.to_string()),
+        ]
+    );
 }
 
 // #[test]

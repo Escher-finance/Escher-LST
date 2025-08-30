@@ -1,23 +1,19 @@
 use cosmwasm_std::{
-    testing::{message_info, mock_env, mock_info},
-    Addr, Attribute, BankMsg, Coin, CosmosMsg, ReplyOn, StdError, Uint128,
+    testing::{message_info, mock_env},
+    Addr, Attribute, BankMsg, Coin, CosmosMsg, StdError,
 };
 
 use super::test_helper::UNION1;
 use crate::{
     contract::execute,
-    error::ContractError,
     msg::ExecuteMsg,
-    state::{CONFIG, STATE},
-    tests::test_helper::{
-        init, mock_init_msg, CHANNEL_ID, NATIVE_TOKEN, STAKER_ADDRESS, UNION_STAKER,
-    },
+    state::STATE,
+    tests::test_helper::{init, mock_init_msg, NATIVE_TOKEN, UNION_STAKER},
 };
 
 #[test]
 fn receive_rewards_works() {
     let mut deps = init();
-    let env = mock_env();
 
     let state = STATE
         .update(&mut deps.storage, |mut s| {

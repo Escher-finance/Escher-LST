@@ -11,19 +11,7 @@ use crate::{
     state::{ProtocolFeeConfig, CONFIG},
 };
 
-pub static OSMO1: &str = "osmo12z558dm3ew6avgjdj07mfslx80rp9sh8nt7q3w";
-pub static OSMO2: &str = "osmo13ftwm6z4dq6ugjvus2hf2vx3045ahfn3dq7dms";
-pub static OSMO3: &str = "osmo1sfhy3emrgp26wnzuu64p06kpkxd9phel8ym0ge";
-pub static OSMO4: &str = "osmo17x4zm0m0mxc428ykll3agmehfrxpr5hqpmsatd";
-pub static STAKER_ADDRESS: &str = "celestia1sfhy3emrgp26wnzuu64p06kpkxd9phel74e0yx";
-pub static CELESTIA1: &str = "celestia1fc25htmfvg28ygjckkhrxr7t73ek6zly8dshju";
-pub static CELESTIA2: &str = "celestia1ztrhpdznu2xlwakd4yp3hg9lwyr3d46ayd30u2";
-pub static CELESTIAVAL1: &str = "celestiavaloper1463wx5xkus5hyugyecvlhv9qpxklz62kyhwcts";
-pub static CELESTIAVAL2: &str = "celestiavaloper1amxp3ah9anq4pmpnsknls7sql3kras9hs8pu0g";
-pub static CELESTIAVAL3: &str = "celestiavaloper1t345w0vxnyyrf4eh43lpd3jl7z378rtsdn9tz3";
-pub static CHANNEL_ID: &str = "channel-6994";
-pub static NATIVE_TOKEN: &str = "au";
-
+pub const NATIVE_TOKEN: &str = "au";
 pub const ADMIN: &str = "union1fktal7292h36h7glff5edq59vpdfn7504duw5m";
 pub const UNION1: &str = "union1jk9psyhvgkrt2cumz8eytll2244m2nnz4yt2g2";
 pub const UNION2: &str = "union1a8k05kaazq576sd0n07ewhsplwtpecxjx8ygx9";
