@@ -118,7 +118,7 @@ pub fn execute_bond(
     let response = Response::new()
         .add_message(transfer_funds_to_cw_account_msig_message)
         .add_attribute("mint_to_address", mint_to_address.to_string())
-        .add_attribute("action", "liquid_stake")
+        .add_attribute("action", "bond")
         // NOTE: In practice, this will always be the funded-dispatch contract. This may need to be changed to emit the original sender from the source chain (if it exists).
         .add_attribute("sender", info.sender.to_string())
         .add_attribute("in_amount", amount)

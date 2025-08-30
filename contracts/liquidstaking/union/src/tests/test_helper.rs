@@ -11,7 +11,6 @@ use crate::{
     state::{ProtocolFeeConfig, CONFIG},
 };
 
-pub static ADMIN: &str = "admin";
 pub static OSMO1: &str = "osmo12z558dm3ew6avgjdj07mfslx80rp9sh8nt7q3w";
 pub static OSMO2: &str = "osmo13ftwm6z4dq6ugjvus2hf2vx3045ahfn3dq7dms";
 pub static OSMO3: &str = "osmo1sfhy3emrgp26wnzuu64p06kpkxd9phel8ym0ge";
@@ -23,31 +22,43 @@ pub static CELESTIAVAL1: &str = "celestiavaloper1463wx5xkus5hyugyecvlhv9qpxklz62
 pub static CELESTIAVAL2: &str = "celestiavaloper1amxp3ah9anq4pmpnsknls7sql3kras9hs8pu0g";
 pub static CELESTIAVAL3: &str = "celestiavaloper1t345w0vxnyyrf4eh43lpd3jl7z378rtsdn9tz3";
 pub static CHANNEL_ID: &str = "channel-6994";
-pub static NATIVE_TOKEN: &str =
-    "ibc/D79E7D83AB399BFFF93433E54FAA480C191248FC556924A2A8351AE2638B3877";
-pub static LIQUID_STAKE_TOKEN_DENOM: &str = "umilkTIA";
+pub static NATIVE_TOKEN: &str = "au";
+
+pub const ADMIN: &str = "union1fktal7292h36h7glff5edq59vpdfn7504duw5m";
+pub const UNION1: &str = "union1jk9psyhvgkrt2cumz8eytll2244m2nnz4yt2g2";
+pub const UNION2: &str = "union1a8k05kaazq576sd0n07ewhsplwtpecxjx8ygx9";
+pub const UNION_STAKER: &str = "union1qp4uzhet2sd9mrs46kemse5dt9ncz4k3hjst5m";
+pub const UNION_MONITOR_1: &str = "union1m27enjqfejnnxru5snmcufway88py4fyqcr43u";
+pub const UNION_MONITOR_2: &str = "union1n36766lfkjcdwawu23d2tszwm26acesthzx0y7";
+pub const LIQUID_STAKE_TOKEN_DENOM: &str = "union1wr7yz3mcyd6qe3c9z5mruxv4fq99z9sg0ks6hs";
+pub const FUNDED_DISPATCH_ADDRESS: &str =
+    "union1hnuj8f6d3wy3fcprt55vddv7v2650t6uudnvd2hukqrteeam8wjqvcmecf";
+pub const ZKGM_ADDRESS: &str = "union1xwfgw7n6vwgkyv8syjskzak7lh8kmrcthmv2jsmywhyunekmg3zqul8vsh";
 
 pub fn mock_init_msg() -> InstantiateMsg {
     InstantiateMsg {
-        staker_address: Addr::unchecked(STAKER_ADDRESS),
+        staker_address: Addr::unchecked(UNION_STAKER),
         minimum_liquid_stake_amount: Uint128::from(100u128),
         liquid_stake_token_address: LIQUID_STAKE_TOKEN_DENOM.to_string(),
-        monitors: vec![Addr::unchecked(OSMO2), Addr::unchecked(OSMO3)],
+        monitors: vec![
+            Addr::unchecked(UNION_MONITOR_1),
+            Addr::unchecked(UNION_MONITOR_2),
+        ],
         batch_period: 86400,
         protocol_fee_config: ProtocolFeeConfig {
             fee_rate: Uint128::from(10_000u128),
-            fee_recipient: Addr::unchecked(OSMO1),
+            fee_recipient: Addr::unchecked(UNION_STAKER),
         },
-        admin: Addr::unchecked("admin"),
+        admin: Addr::unchecked(ADMIN),
         native_token_denom: "au".to_owned(),
-        reward_collector_address: Addr::unchecked("reward_collector"),
-        ucs03_zkgm_address: Addr::unchecked("zkgm"),
-        funded_dispatch_address: Addr::unchecked("proxy_call"),
+        reward_collector_address: Addr::unchecked(UNION_STAKER),
+        ucs03_zkgm_address: Addr::unchecked(ZKGM_ADDRESS),
+        funded_dispatch_address: Addr::unchecked(FUNDED_DISPATCH_ADDRESS),
     }
 }
 
-pub fn init() -> OwnedDeps<MockStorage, MockApi, cosmwasm_std::testing::MockQuerier> {
-    let mut deps = mock_dependencies();
+pub fn init() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
+    let mut deps = mock_deps_with_unbonding_time(100_000);
     let msg = mock_init_msg();
     let info = message_info(&Addr::unchecked(ADMIN), &coins(1000, "uosmo"));
 
@@ -118,7 +129,7 @@ pub fn mock_deps_with_unbonding_time(
 ) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     cosmwasm_std::OwnedDeps {
         storage: cosmwasm_std::testing::MockStorage::default(),
-        api: cosmwasm_std::testing::MockApi::default(),
+        api: cosmwasm_std::testing::MockApi::default().with_prefix("union"),
         querier: MockQuerier { unbonding_time },
         custom_query_type: std::marker::PhantomData,
     }
