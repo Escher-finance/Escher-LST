@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     coins,
-    testing::{mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage},
+    testing::{message_info, mock_dependencies, mock_env, MockApi, MockStorage},
     Addr, OwnedDeps, Uint128,
 };
 use prost::Message;
@@ -46,10 +46,10 @@ pub fn mock_init_msg() -> InstantiateMsg {
     }
 }
 
-pub fn init() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
+pub fn init() -> OwnedDeps<MockStorage, MockApi, cosmwasm_std::testing::MockQuerier> {
     let mut deps = mock_dependencies();
     let msg = mock_init_msg();
-    let info = mock_info(ADMIN, &coins(1000, "uosmo"));
+    let info = message_info(&Addr::unchecked(ADMIN), &coins(1000, "uosmo"));
 
     let res = instantiate(deps.as_mut(), mock_env(), info, msg);
     if res.is_err() {
@@ -82,44 +82,44 @@ pub struct QueryParamsResponse {
     pub params: Option<Params>,
 }
 
-#[macro_export]
-macro_rules! mock_deps_with_unbonding_time {
-    ($unbonding_time:expr) => {{
-        #[derive(Clone, Default)]
-        pub struct MockQuerier {}
+#[derive(Clone, Default)]
+pub struct MockQuerier {
+    unbonding_time: i64,
+}
 
-        impl cosmwasm_std::Querier for MockQuerier {
-            fn raw_query(&self, bin_request: &[u8]) -> cosmwasm_std::QuerierResult {
-                // Deserialize the request
-                let query: cosmwasm_std::QueryRequest =
-                    cosmwasm_std::from_json(bin_request).unwrap();
+impl cosmwasm_std::Querier for MockQuerier {
+    fn raw_query(&self, bin_request: &[u8]) -> cosmwasm_std::QuerierResult {
+        // Deserialize the request
+        let query: cosmwasm_std::QueryRequest = cosmwasm_std::from_json(bin_request).unwrap();
 
-                match query {
-                    // this query is meant to be used for getting the unbonding time
-                    cosmwasm_std::QueryRequest::Grpc(_) => {
-                        cosmwasm_std::SystemResult::Ok(cosmwasm_std::ContractResult::Ok(
-                            prost::Message::encode_to_vec(
-                                &crate::tests::test_helper::QueryParamsResponse {
-                                    params: Some(crate::tests::test_helper::Params {
-                                        unbonding_time: Some(crate::tests::test_helper::Duration {
-                                            seconds: $unbonding_time,
-                                        }),
-                                    }),
-                                },
-                            )
-                            .into(),
-                        ))
-                    }
-                    _ => panic!("unexpected query"),
-                }
+        match query {
+            // this query is meant to be used for getting the unbonding time
+            cosmwasm_std::QueryRequest::Grpc(_) => {
+                cosmwasm_std::SystemResult::Ok(cosmwasm_std::ContractResult::Ok(
+                    prost::Message::encode_to_vec(
+                        &crate::tests::test_helper::QueryParamsResponse {
+                            params: Some(crate::tests::test_helper::Params {
+                                unbonding_time: Some(crate::tests::test_helper::Duration {
+                                    seconds: self.unbonding_time,
+                                }),
+                            }),
+                        },
+                    )
+                    .into(),
+                ))
             }
+            _ => panic!("unexpected query"),
         }
+    }
+}
 
-        cosmwasm_std::OwnedDeps {
-            storage: cosmwasm_std::testing::MockStorage::default(),
-            api: cosmwasm_std::testing::MockApi::default(),
-            querier: MockQuerier {},
-            custom_query_type: std::marker::PhantomData,
-        }
-    }};
+pub fn mock_deps_with_unbonding_time(
+    unbonding_time: i64,
+) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
+    cosmwasm_std::OwnedDeps {
+        storage: cosmwasm_std::testing::MockStorage::default(),
+        api: cosmwasm_std::testing::MockApi::default(),
+        querier: MockQuerier { unbonding_time },
+        custom_query_type: std::marker::PhantomData,
+    }
 }
