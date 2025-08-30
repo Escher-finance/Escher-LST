@@ -14,6 +14,9 @@ pub struct Batch {
     // TODO: This should be a separate mapping storage
     pub liquid_unbond_requests: BTreeMap<String, LiquidUnbondRequest>,
 
+    /// The length of the unstake requests list.
+    ///
+    /// Multiple unbond requests in a batch are aggregated into one unstake request per user.
     pub unstake_requests_count: u64,
 
     pub state: BatchState,
@@ -52,7 +55,7 @@ pub enum BatchState {
         ///
         /// This will be `submission_time + unbonding_period`.
         receive_time: u64,
-        /// The amount of native tokens that should be received after unbonding.
+        /// The amount of native tokens that should be received after unstaking.
         expected_native_unstaked: Uint128,
     },
     /// The unbonding period has elapsed and the unbonded tokens have been sent back to this contract. The unbonded stakers from this batch are now able to claim their unbonded tokens.
