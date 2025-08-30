@@ -1,5 +1,6 @@
 use std::vec::Vec;
 
+use alloy::{primitives::U256, sol_types::SolValue};
 use cosmwasm_std::{
     attr, coins,
     testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR},
@@ -7,11 +8,15 @@ use cosmwasm_std::{
     ReplyOn, StdError, SubMsg, SubMsgResponse, SubMsgResult, Timestamp, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
+use ibc_union_spec::ChannelId;
 use milky_way::staking::BatchState;
 use osmosis_std::types::{
     cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin},
     ibc::applications::transfer::v1::MsgTransfer,
     osmosis::tokenfactory::v1beta1::MsgMint,
+};
+use ucs03_zkgm::com::{
+    Instruction, TokenOrderV2, INSTR_VERSION_2, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_SOLVE,
 };
 use unionlabs_primitives::{encoding::HexPrefixed, Bytes};
 
@@ -21,17 +26,16 @@ use crate::{
     error::ContractError,
     helpers::get_rates,
     msg::ExecuteMsg,
-    state::{State, BATCHES, CONFIG, STATE},
+    state::{CounterpartyConfig, State, BATCHES, CONFIG, FUNGIBLE_RECIPIENT_CHANNEL, STATE},
     tests::test_helper::{
         init, FUNDED_DISPATCH_ADDRESS, LIQUID_STAKE_TOKEN_DENOM, NATIVE_TOKEN, UNION1, UNION2,
-        UNION_STAKER,
+        UNION_STAKER, ZKGM_ADDRESS,
     },
 };
 
 #[test]
 fn bond_with_local_recipient_works() {
     let mut deps = init();
-    let env = mock_env();
     let info = mock_info(FUNDED_DISPATCH_ADDRESS, &coins(1000, NATIVE_TOKEN));
     let msg = ExecuteMsg::Bond {
         mint_to: UNION2.to_string().as_bytes().into(),
@@ -96,6 +100,165 @@ fn bond_with_local_recipient_works() {
 
     // there is no further state change
     assert_eq!(state, prev_state);
+
+    // changing the rate
+    STATE
+        .update(&mut deps.storage, |mut s| {
+            s.total_native_token += Uint128::new(100);
+            Ok::<_, StdError>(s)
+        })
+        .unwrap();
+
+    let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+
+    // Now, since the rate is 1000/1100, we should mint 909 lst tokens for 1000 U's.
+    assert_eq!(
+        res.messages[1].msg,
+        CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: LIQUID_STAKE_TOKEN_DENOM.into(),
+            msg: to_json_binary(&Cw20ExecuteMsg::Mint {
+                recipient: UNION2.into(),
+                amount: 909u128.into()
+            })
+            .unwrap(),
+            funds: vec![]
+        })
+    );
+}
+#[test]
+fn bond_with_remote_recipient_works() {
+    let mut deps = init();
+    let env = mock_env();
+    let info = mock_info(FUNDED_DISPATCH_ADDRESS, &coins(1000, NATIVE_TOKEN));
+    let msg = ExecuteMsg::Bond {
+        mint_to: UNION2.to_string().as_bytes().into(),
+        recipient_channel_id: Some(ChannelId!(1)),
+        min_mint_amount: None,
+    };
+
+    let counterparty_config = CounterpartyConfig {
+        quote_token: b"quote_token".to_vec().into(),
+        kind: TOKEN_ORDER_KIND_SOLVE,
+        metadata: b"metadata".to_vec().into(),
+    };
+
+    // setting the fungible recipient so that we can send tokens through zkgm
+    FUNGIBLE_RECIPIENT_CHANNEL.save(&mut deps.storage, 1, &counterparty_config);
+
+    // changing the rate
+    STATE
+        .update(&mut deps.storage, |mut s| {
+            s.total_native_token += Uint128::new(1100);
+            s.total_liquid_stake_token += Uint128::new(1000);
+            Ok::<_, StdError>(s)
+        })
+        .unwrap();
+
+    let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+
+    let mint_amount: Uint128 = 909u128.into();
+
+    // the native funds are sent to the staker
+    assert_eq!(
+        res.messages[0].msg,
+        CosmosMsg::Bank(BankMsg::Send {
+            to_address: UNION_STAKER.into(),
+            amount: info.funds.clone()
+        })
+    );
+
+    // 909 LST token is minted for 1000 U tokens to this contract to be sent through zkgm
+    assert_eq!(
+        res.messages[1].msg,
+        CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: LIQUID_STAKE_TOKEN_DENOM.into(),
+            msg: to_json_binary(&Cw20ExecuteMsg::Mint {
+                recipient: env.contract.address.into(),
+                amount: mint_amount
+            })
+            .unwrap(),
+            funds: vec![]
+        })
+    );
+
+    // allowing zkgm to spend 909 LST tokens on behalf of this contract
+    assert_eq!(
+        res.messages[2].msg,
+        CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: LIQUID_STAKE_TOKEN_DENOM.into(),
+            msg: to_json_binary(&Cw20ExecuteMsg::IncreaseAllowance {
+                spender: ZKGM_ADDRESS.into(),
+                amount: mint_amount,
+                expires: None
+            })
+            .unwrap(),
+            funds: vec![]
+        })
+    );
+
+    let amount = U256::from(mint_amount.u128());
+
+    // sending the minted tokens through zkgm
+    assert_eq!(
+        res.messages[3].msg,
+        CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: ZKGM_ADDRESS.into(),
+            msg: to_json_binary(&ucs03_zkgm::msg::ExecuteMsg::Send {
+                channel_id: ChannelId!(1),
+                timeout_height: 0u64.into(),
+                timeout_timestamp: ibc_union_spec::Timestamp::from_nanos(
+                    mock_env().block.time.plus_days(3).nanos()
+                ),
+                salt: Default::default(),
+                instruction: Instruction {
+                    // version 2 since we are using the solver api
+                    version: INSTR_VERSION_2,
+                    opcode: OP_TOKEN_ORDER,
+                    operand: TokenOrderV2 {
+                        // union staker as a fallback address
+                        sender: UNION_STAKER.to_string().into_bytes().into(),
+                        receiver: UNION2.to_string().into_bytes().into(),
+                        base_token: LIQUID_STAKE_TOKEN_DENOM.as_bytes().to_vec().into(),
+                        base_amount: amount,
+                        quote_token: counterparty_config.quote_token.into(),
+                        quote_amount: amount,
+                        kind: counterparty_config.kind,
+                        metadata: counterparty_config.metadata.into()
+                    }
+                    .abi_encode_params()
+                    .into()
+                }
+                .abi_encode_params()
+                .into()
+            })
+            .unwrap(),
+            funds: vec![]
+        })
+    );
+
+    // there should be no further messages
+    assert_eq!(res.messages.len(), 4);
+
+    // the event is correct
+    assert_eq!(
+        res.attributes,
+        vec![
+            Attribute::new(
+                "mint_to_address",
+                Bytes::<HexPrefixed>::new(UNION2.as_bytes().to_vec()).to_string()
+            ),
+            Attribute::new("action", "bond"),
+            Attribute::new("sender", FUNDED_DISPATCH_ADDRESS),
+            Attribute::new("in_amount", 1000.to_string()),
+            Attribute::new("mint_amount", 909.to_string()),
+        ]
+    );
+
+    let state = STATE.load(&deps.storage).unwrap();
+
+    // state is properly adjusted
+    assert_eq!(state.total_native_token.u128(), 2100);
+    assert_eq!(state.total_liquid_stake_token.u128(), 1909);
 }
 
 // #[test]
