@@ -38,7 +38,7 @@ pub fn compute_unbond_amount(
 
 pub fn get_rates(state: &State) -> (Decimal, Decimal) {
     let total_native_token = state.total_native_token;
-    let total_liquid_stake_token = state.total_liquid_stake_token;
+    let total_liquid_stake_token = state.total_bonded_lst;
     if total_liquid_stake_token.is_zero() || total_native_token.is_zero() {
         (Decimal::one(), Decimal::one())
     } else {

@@ -19,7 +19,7 @@ pub struct BatchExpectedAmount {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
 pub struct Batch {
     /// Total amount of `stTIA` to be burned in this batch
-    pub batch_total_liquid_stake: Uint128,
+    pub total_lst_to_burn: Uint128,
 
     // TODO: This should be a separate mapping storage
     pub liquid_unbond_requests: BTreeMap<String, LiquidUnbondRequest>,
@@ -36,9 +36,9 @@ pub struct Batch {
 // Contract: Caller determines batch data
 impl Batch {
     // TODO: BatchId type
-    pub fn new_pending(batch_total: Uint128, submit_time: u64) -> Self {
+    pub fn new_pending(submit_time: u64) -> Self {
         Self {
-            batch_total_liquid_stake: batch_total,
+            total_lst_to_burn: 0_u128.into(),
             state: BatchState::Pending { submit_time },
             liquid_unbond_requests: Default::default(),
             unstake_requests_count: 0,

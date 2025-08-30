@@ -70,7 +70,7 @@ pub struct State {
     pub total_native_token: Uint128,
     /// this is the total supply of the minted lst token (eU in our case)
     // REVIEW: This should match the total supply of the LST? Can we just read it from the LST contract itself?
-    pub total_liquid_stake_token: Uint128,
+    pub total_bonded_lst: Uint128,
     pub total_reward_amount: Uint128,
 
     // REVIEW: Pull this out into a separate storage item, no need to load it every time we read the state and also makes more sense semantically to have it separate

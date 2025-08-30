@@ -27,7 +27,7 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
     let (_, purchase_rate) = get_rates(&state);
     let res = StateResponse {
         total_native_token: state.total_native_token,
-        total_liquid_stake_token: state.total_liquid_stake_token,
+        total_liquid_stake_token: state.total_bonded_lst,
         rate: purchase_rate,
         pending_owner: state
             .pending_owner

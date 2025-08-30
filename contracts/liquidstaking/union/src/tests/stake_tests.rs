@@ -1,8 +1,8 @@
 use alloy::{primitives::U256, sol_types::SolValue};
 use cosmwasm_std::{
-    coins,
+    attr, coins,
     testing::{mock_env, mock_info},
-    to_json_binary, Attribute, BankMsg, CosmosMsg, StdError, Uint128, WasmMsg,
+    to_json_binary, BankMsg, CosmosMsg, StdError, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 use ibc_union_spec::ChannelId;
@@ -66,14 +66,14 @@ fn bond_with_local_recipient_works() {
     assert_eq!(
         res.attributes,
         vec![
-            Attribute::new(
+            attr(
                 "mint_to_address",
-                Bytes::<HexPrefixed>::new(UNION2.as_bytes().to_vec()).to_string()
+                <Bytes>::new(UNION2.as_bytes().to_vec()).to_string()
             ),
-            Attribute::new("action", "bond"),
-            Attribute::new("sender", FUNDED_DISPATCH_ADDRESS),
-            Attribute::new("in_amount", 1000.to_string()),
-            Attribute::new("mint_amount", 1000.to_string()),
+            attr("action", "bond"),
+            attr("sender", FUNDED_DISPATCH_ADDRESS),
+            attr("in_amount", 1000.to_string()),
+            attr("mint_amount", 1000.to_string()),
         ]
     );
 
@@ -81,19 +81,19 @@ fn bond_with_local_recipient_works() {
 
     // state is properly adjusted
     assert_eq!(state.total_native_token.u128(), 1000);
-    assert_eq!(state.total_liquid_stake_token.u128(), 1000);
+    assert_eq!(state.total_bonded_lst.u128(), 1000);
 
     prev_state.total_native_token = 1000u128.into();
-    prev_state.total_liquid_stake_token = 1000u128.into();
+    prev_state.total_bonded_lst = 1000u128.into();
 
     // there is no further state change
     assert_eq!(state, prev_state);
 
     // manually changing the rate instead of going through the `rewards` entrypoint
     STATE
-        .update(&mut deps.storage, |mut s| {
+        .update::<_, StdError>(&mut deps.storage, |mut s| {
             s.total_native_token += Uint128::new(100);
-            Ok::<_, StdError>(s)
+            Ok(s)
         })
         .unwrap();
 
@@ -139,7 +139,7 @@ fn bond_with_remote_recipient_works() {
     STATE
         .update(&mut deps.storage, |mut s| {
             s.total_native_token += Uint128::new(1100);
-            s.total_liquid_stake_token += Uint128::new(1000);
+            s.total_bonded_lst += Uint128::new(1000);
             Ok::<_, StdError>(s)
         })
         .unwrap();
@@ -233,14 +233,14 @@ fn bond_with_remote_recipient_works() {
     assert_eq!(
         res.attributes,
         vec![
-            Attribute::new(
+            attr(
                 "mint_to_address",
                 Bytes::<HexPrefixed>::new(UNION2.as_bytes().to_vec()).to_string()
             ),
-            Attribute::new("action", "bond"),
-            Attribute::new("sender", FUNDED_DISPATCH_ADDRESS),
-            Attribute::new("in_amount", 1000.to_string()),
-            Attribute::new("mint_amount", 909.to_string()),
+            attr("action", "bond"),
+            attr("sender", FUNDED_DISPATCH_ADDRESS),
+            attr("in_amount", 1000.to_string()),
+            attr("mint_amount", 909.to_string()),
         ]
     );
 
@@ -248,7 +248,7 @@ fn bond_with_remote_recipient_works() {
 
     // state is properly adjusted
     assert_eq!(state.total_native_token.u128(), 2100);
-    assert_eq!(state.total_liquid_stake_token.u128(), 1909);
+    assert_eq!(state.total_bonded_lst.u128(), 1909);
 }
 
 // #[test]

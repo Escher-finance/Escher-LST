@@ -4,7 +4,6 @@ use cosmwasm_std::{
     StdResult, Uint128,
 };
 use cw2::set_contract_version;
-use crate::types::Batch;
 use semver::Version;
 
 use crate::{
@@ -24,7 +23,7 @@ use crate::{
         assert_not_migrating, Config, State, ADMIN, BATCHES, CONFIG, MIGRATING, PENDING_BATCH_ID,
         STATE,
     },
-    types::MAX_TREASURY_FEE,
+    types::{Batch, MAX_TREASURY_FEE},
 };
 
 // Version information for migration
@@ -68,7 +67,7 @@ pub fn instantiate(
     // Init State
     let state = State {
         total_native_token: Uint128::zero(),
-        total_liquid_stake_token: Uint128::zero(),
+        total_bonded_lst: Uint128::zero(),
         pending_owner: None,
         total_reward_amount: Uint128::zero(),
         owner_transfer_min_time: None,
@@ -78,10 +77,7 @@ pub fn instantiate(
     BATCHES.save(
         deps.storage,
         1,
-        &Batch::new_pending(
-            Uint128::zero(),
-            env.block.time.seconds() + config.batch_period,
-        ),
+        &Batch::new_pending(env.block.time.seconds() + config.batch_period),
     )?;
     PENDING_BATCH_ID.save(deps.storage, &1)?;
     CONFIG.save(deps.storage, &config)?;

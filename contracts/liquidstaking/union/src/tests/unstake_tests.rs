@@ -1,4 +1,5 @@
 use cosmwasm_std::{
+    attr,
     testing::{message_info, mock_env},
     to_json_binary, Addr, Attribute, CosmosMsg, Uint128, WasmMsg,
 };
@@ -18,7 +19,7 @@ fn unbond_works() {
     let mut state = STATE.load(&deps.storage).unwrap();
 
     state.total_native_token = Uint128::from(1_100u128);
-    state.total_liquid_stake_token = Uint128::from(1_000u128);
+    state.total_bonded_lst = Uint128::from(1_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let info = message_info(&Addr::unchecked(UNION1), &[]);
@@ -51,7 +52,7 @@ fn unbond_works() {
     let batch = BATCHES.load(&deps.storage, 1).unwrap();
 
     // batch is adjusted accordingly
-    assert_eq!(batch.batch_total_liquid_stake, union1_amount_1);
+    assert_eq!(batch.total_lst_to_burn, union1_amount_1);
     assert_eq!(batch.unstake_requests_count, 1);
 
     // lst token is locked in the lst contract
@@ -75,11 +76,11 @@ fn unbond_works() {
     assert_eq!(
         res.attributes,
         vec![
-            Attribute::new("action", "unbond"),
-            Attribute::new("sender", UNION1),
-            Attribute::new("batch", "1"),
-            Attribute::new("amount", union1_amount_1),
-            Attribute::new("is_new_request", "true"),
+            attr("action", "unbond"),
+            attr("sender", UNION1),
+            attr("batch", "1"),
+            attr("amount", union1_amount_1),
+            attr("is_new_request", "true"),
         ]
     );
 
@@ -112,7 +113,7 @@ fn unbond_works() {
     let batch = BATCHES.load(&deps.storage, 1).unwrap();
 
     assert_eq!(
-        batch.batch_total_liquid_stake,
+        batch.total_lst_to_burn,
         union1_amount_1 + union1_amount_2
     );
     // unstake requests count is gonna stay the same since im updating my request
@@ -149,7 +150,7 @@ fn unbond_works() {
     let batch = BATCHES.load(&deps.storage, 1).unwrap();
 
     assert_eq!(
-        batch.batch_total_liquid_stake,
+        batch.total_lst_to_burn,
         union1_amount_1 + union1_amount_2 + union2_amount_1
     );
     // this time the unstake request count is incremented since a new user unstaked

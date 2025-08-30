@@ -13,8 +13,8 @@ use crate::{
     error::{ContractError, ContractResult},
     helpers::{compute_mint_amount, compute_unbond_amount, query_and_validate_unbonding_period},
     state::{
-        new_unstake_request, remove_unstake_request, unstake_requests, Config, UnstakeRequest,
-        ADMIN, BATCHES, CONFIG, FUNGIBLE_RECIPIENT_CHANNEL, PENDING_BATCH_ID, STATE,
+        remove_unstake_request, unstake_requests, Config, UnstakeRequest, ADMIN, BATCHES, CONFIG,
+        FUNGIBLE_RECIPIENT_CHANNEL, PENDING_BATCH_ID, STATE,
     },
     types::{Batch, BatchExpectedAmount, BatchState},
 };
@@ -56,6 +56,11 @@ pub fn ensure_trusted_address(
 /// - oracle functionality has been removed
 /// - tokenfactory functionality has been converted into the equivalent cw20 messages
 /// - ibc sub messages have been converted to the equivalent cw20 messages (since the transfers will happen on the same chain, not cross-chain back to the native chain)
+/// 1. Ensure native tokens are provided.
+/// 2. Ensure stake amount is >= minimum stake amount.
+/// 3. Ensure minted LST amount is within slippage.
+/// 4. Send funds to staker contract.
+/// 5. Update state
 pub fn execute_bond(
     deps: DepsMut,
     env: Env,
@@ -81,11 +86,7 @@ pub fn execute_bond(
     );
 
     // Compute mint amount
-    let mint_amount = compute_mint_amount(
-        state.total_native_token,
-        state.total_liquid_stake_token,
-        amount,
-    );
+    let mint_amount = compute_mint_amount(state.total_native_token, state.total_bonded_lst, amount);
 
     // If mint amount is zero it is likely there was a an issue with rounding, return error and do not mint
     if mint_amount.is_zero() {
@@ -111,7 +112,7 @@ pub fn execute_bond(
         amount: info.funds,
     };
     state.total_native_token += amount;
-    state.total_liquid_stake_token += mint_amount;
+    state.total_bonded_lst += mint_amount;
     STATE.save(deps.storage, &state)?;
 
     let response = Response::new()
@@ -268,7 +269,7 @@ pub fn execute_unbond(
         pending_batch_id,
         |batch| -> Result<Batch, ContractError> {
             let mut batch = batch.unwrap();
-            batch.batch_total_liquid_stake += amount;
+            batch.total_lst_to_burn += amount;
             if is_new_request {
                 batch.unstake_requests_count += 1;
             }
@@ -329,18 +330,15 @@ pub fn execute_submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response>
     ensure!(batch.unstake_requests_count > 0, ContractError::BatchEmpty);
 
     ensure!(
-        state.total_liquid_stake_token >= batch.batch_total_liquid_stake,
+        state.total_bonded_lst >= batch.total_lst_to_burn,
         ContractError::InvalidUnstakeAmount {
-            total_liquid_stake_token: state.total_liquid_stake_token,
-            amount_to_unstake: batch.batch_total_liquid_stake
+            total_liquid_stake_token: state.total_bonded_lst,
+            amount_to_unstake: batch.total_lst_to_burn
         }
     );
 
     // create new pending batch
-    let new_pending_batch = Batch::new_pending(
-        Uint128::zero(),
-        env.block.time.seconds() + config.batch_period,
-    );
+    let new_pending_batch = Batch::new_pending(env.block.time.seconds() + config.batch_period);
 
     // Save new pending batch
     BATCHES.save(deps.storage, &pending_batch_id + 1, &new_pending_batch)?;
@@ -348,8 +346,8 @@ pub fn execute_submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response>
 
     let unbond_amount = compute_unbond_amount(
         state.total_native_token,
-        state.total_liquid_stake_token,
-        batch.batch_total_liquid_stake,
+        state.total_bonded_lst,
+        batch.total_lst_to_burn,
     );
 
     // reduce underlying native token balance by unbonded amount
@@ -359,9 +357,9 @@ pub fn execute_submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response>
         .unwrap_or_default();
 
     // reduce underlying LST balance by batch total
-    state.total_liquid_stake_token = state
-        .total_liquid_stake_token
-        .checked_sub(batch.batch_total_liquid_stake)
+    state.total_bonded_lst = state
+        .total_bonded_lst
+        .checked_sub(batch.total_lst_to_burn)
         .unwrap_or_default();
 
     let unbonding_period = query_and_validate_unbonding_period(deps.as_ref(), config.batch_period)?;
@@ -379,13 +377,13 @@ pub fn execute_submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response>
         .add_message(wasm_execute(
             config.liquid_stake_token_address,
             &Cw20ExecuteMsg::Burn {
-                amount: batch.batch_total_liquid_stake,
+                amount: batch.total_lst_to_burn,
             },
             vec![],
         )?)
         .add_attribute("action", "submit_batch")
         .add_attribute("batch_id", pending_batch_id.to_string())
-        .add_attribute("batch_total", batch.batch_total_liquid_stake)
+        .add_attribute("batch_total", batch.total_lst_to_burn)
         .add_attribute("expected_unstaked", unbond_amount)
         .add_attribute("unbonding_period", unbonding_period.to_string()))
 }
@@ -419,10 +417,8 @@ pub fn execute_withdraw(
             staker: staker.clone(),
         })?;
 
-    let amount = received_native_unstaked.multiply_ratio(
-        liquid_unstake_request.amount,
-        batch.batch_total_liquid_stake,
-    );
+    let amount = received_native_unstaked
+        .multiply_ratio(liquid_unstake_request.amount, batch.total_lst_to_burn);
 
     remove_unstake_request(&mut deps, staker.clone(), batch_id)?;
 
@@ -611,7 +607,7 @@ pub fn receive_rewards(deps: DepsMut, info: MessageInfo) -> ContractResult<Respo
             })?;
 
     STATE.update::<_, ContractError>(deps.storage, |mut state| {
-        if state.total_liquid_stake_token.is_zero() {
+        if state.total_bonded_lst.is_zero() {
             return Err(ContractError::NoLiquidStake);
         }
 
@@ -741,7 +737,7 @@ pub fn resume_contract(
 
     STATE.update::<_, ContractError>(deps.storage, |mut state| {
         state.total_native_token = total_native_token;
-        state.total_liquid_stake_token = total_liquid_stake_token;
+        state.total_bonded_lst = total_liquid_stake_token;
         state.total_reward_amount = total_reward_amount;
 
         Ok(state)

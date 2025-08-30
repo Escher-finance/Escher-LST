@@ -1,9 +1,9 @@
 use cosmwasm_std::{
+    attr,
     testing::{message_info, mock_env, mock_info},
     to_json_binary, Addr, Attribute, Coin, CosmosMsg, Timestamp, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
-use crate::types::{Batch, BatchState};
 
 use super::test_helper::{NATIVE_TOKEN, UNION1, UNION2, UNION3};
 use crate::{
@@ -13,6 +13,7 @@ use crate::{
     msg::ExecuteMsg,
     state::{BATCHES, CONFIG, PENDING_BATCH_ID, STATE},
     tests::test_helper::{init, LIQUID_STAKE_TOKEN_ADDRESS, OSMO1},
+    types::{Batch, BatchState},
 };
 
 #[test]
@@ -25,7 +26,7 @@ fn submit_batch_works() {
     state.total_native_token = initial_total_native_token;
 
     let initial_total_liquid_stake_token = Uint128::from(1_000u128);
-    state.total_liquid_stake_token = initial_total_liquid_stake_token;
+    state.total_bonded_lst = initial_total_liquid_stake_token;
 
     STATE.save(&mut deps.storage, &state).unwrap();
 
@@ -107,7 +108,6 @@ fn submit_batch_works() {
     assert_eq!(
         new_batch,
         Batch::new_pending(
-            Uint128::zero(),
             env.block.time.seconds() + CONFIG.load(&deps.storage).unwrap().batch_period
         ),
     );
@@ -119,7 +119,7 @@ fn submit_batch_works() {
     assert_eq!(state.total_native_token, expected_total_native_token);
 
     let expected_total_liquid_token: Uint128 = 3227u128.into();
-    assert_eq!(state.total_liquid_stake_token, expected_total_liquid_token);
+    assert_eq!(state.total_bonded_lst, expected_total_liquid_token);
 
     let batch = BATCHES.load(&deps.storage, 1).unwrap();
 
@@ -152,11 +152,11 @@ fn submit_batch_works() {
     assert_eq!(
         res.attributes,
         vec![
-            Attribute::new("action", "submit_batch"),
-            Attribute::new("batch_id", "1"),
-            Attribute::new("batch_total", "500"),
-            Attribute::new("expected_unstaked", "550"),
-            Attribute::new("unbonding_period", "100000"),
+            attr("action", "submit_batch"),
+            attr("batch_id", "1"),
+            attr("batch_total", "500"),
+            attr("expected_unstaked", "550"),
+            attr("unbonding_period", "100000"),
         ]
     )
 }
