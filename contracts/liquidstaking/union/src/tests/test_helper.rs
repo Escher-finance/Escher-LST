@@ -3,6 +3,7 @@ use cosmwasm_std::{
     testing::{mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage},
     Addr, OwnedDeps, Uint128,
 };
+use prost::Message;
 
 use crate::{
     contract::instantiate,
@@ -61,4 +62,64 @@ pub fn init() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     CONFIG.save(&mut deps.storage, &config).unwrap();
 
     deps
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct Duration {
+    #[prost(int64, tag = "1")]
+    pub seconds: i64,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct Params {
+    #[prost(message, optional, tag = "1")]
+    pub unbonding_time: Option<Duration>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct QueryParamsResponse {
+    #[prost(message, optional, tag = "1")]
+    pub params: Option<Params>,
+}
+
+#[macro_export]
+macro_rules! mock_deps_with_unbonding_time {
+    ($unbonding_time:expr) => {{
+        #[derive(Clone, Default)]
+        pub struct MockQuerier {}
+
+        impl cosmwasm_std::Querier for MockQuerier {
+            fn raw_query(&self, bin_request: &[u8]) -> cosmwasm_std::QuerierResult {
+                // Deserialize the request
+                let query: cosmwasm_std::QueryRequest =
+                    cosmwasm_std::from_json(bin_request).unwrap();
+
+                match query {
+                    // this query is meant to be used for getting the unbonding time
+                    cosmwasm_std::QueryRequest::Grpc(_) => {
+                        cosmwasm_std::SystemResult::Ok(cosmwasm_std::ContractResult::Ok(
+                            prost::Message::encode_to_vec(
+                                &crate::tests::test_helper::QueryParamsResponse {
+                                    params: Some(crate::tests::test_helper::Params {
+                                        unbonding_time: Some(crate::tests::test_helper::Duration {
+                                            seconds: $unbonding_time,
+                                        }),
+                                    }),
+                                },
+                            )
+                            .into(),
+                        ))
+                    }
+                    _ => panic!("unexpected query"),
+                }
+            }
+        }
+
+        cosmwasm_std::OwnedDeps {
+            storage: cosmwasm_std::testing::MockStorage::default(),
+            api: cosmwasm_std::testing::MockApi::default(),
+            querier: MockQuerier {},
+            custom_query_type: std::marker::PhantomData,
+        }
+    }};
 }
