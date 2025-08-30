@@ -22,7 +22,7 @@ fn receive_rewards() {
     let mut config = CONFIG.load(&deps.storage).unwrap();
 
     state.total_liquid_stake_token = Uint128::from(100_000u128);
-    state.total_native_token = Uint128::from(100_000u128);
+    state.total_bonded_native_tokens = Uint128::from(100_000u128);
     state.total_reward_amount = Uint128::from(0u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
@@ -80,7 +80,7 @@ fn receive_rewards() {
     let state = STATE.load(&deps.storage).unwrap();
 
     assert_eq!(state.total_reward_amount, Uint128::from(100u128));
-    assert_eq!(state.total_native_token, Uint128::from(100_090u128));
+    assert_eq!(state.total_bonded_native_tokens, Uint128::from(100_090u128));
     assert_eq!(state.total_fees, Uint128::from(10u128));
 }
 
@@ -93,7 +93,7 @@ fn receive_rewards_and_send_fees_to_treasury() {
     let config = CONFIG.load(&deps.storage).unwrap();
 
     state.total_liquid_stake_token = Uint128::from(100_000u128);
-    state.total_native_token = Uint128::from(100_000u128);
+    state.total_bonded_native_tokens = Uint128::from(100_000u128);
     state.total_reward_amount = Uint128::from(0u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
@@ -148,7 +148,7 @@ fn receive_rewards_and_send_fees_to_treasury() {
     let state = STATE.load(&deps.storage).unwrap();
 
     assert_eq!(state.total_reward_amount, Uint128::from(100u128));
-    assert_eq!(state.total_native_token, Uint128::from(100_090u128));
+    assert_eq!(state.total_bonded_native_tokens, Uint128::from(100_090u128));
     assert_eq!(state.total_fees, Uint128::from(0u128));
 }
 
@@ -161,7 +161,7 @@ fn receive_rewards_with_zero_fees_fails() {
     let config = CONFIG.load(&deps.storage).unwrap();
 
     state.total_liquid_stake_token = Uint128::from(100_000u128);
-    state.total_native_token = Uint128::from(100_000u128);
+    state.total_bonded_native_tokens = Uint128::from(100_000u128);
     state.total_reward_amount = Uint128::from(0u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 

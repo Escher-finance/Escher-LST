@@ -66,8 +66,8 @@ pub fn instantiate(
 
     // Init State
     let state = State {
-        total_native_token: Uint128::zero(),
-        total_bonded_lst: Uint128::zero(),
+        total_bonded_native_tokens: Uint128::zero(),
+        total_issued_lst: Uint128::zero(),
         pending_owner: None,
         total_reward_amount: Uint128::zero(),
         owner_transfer_min_time: None,
@@ -153,14 +153,14 @@ pub fn execute(
         // pause/resume msgs
         ExecuteMsg::CircuitBreaker {} => circuit_breaker(deps, env, info),
         ExecuteMsg::ResumeContract {
-            total_native_token,
+            total_bonded_native_tokens,
             total_liquid_stake_token,
             total_reward_amount,
         } => resume_contract(
             deps,
             env,
             info,
-            total_native_token,
+            total_bonded_native_tokens,
             total_liquid_stake_token,
             total_reward_amount,
         ),

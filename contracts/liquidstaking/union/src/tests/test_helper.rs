@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     coins,
-    testing::{message_info, mock_dependencies, mock_env, MockApi, MockStorage},
+    testing::{message_info, mock_env, MockApi, MockStorage},
     Addr, OwnedDeps, Uint128,
 };
 use prost::Message;

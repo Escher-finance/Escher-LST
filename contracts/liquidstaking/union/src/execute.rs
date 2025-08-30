@@ -86,7 +86,11 @@ pub fn execute_bond(
     );
 
     // Compute mint amount
-    let mint_amount = compute_mint_amount(state.total_native_token, state.total_bonded_lst, amount);
+    let mint_amount = compute_mint_amount(
+        state.total_bonded_native_tokens,
+        state.total_issued_lst,
+        amount,
+    );
 
     // If mint amount is zero it is likely there was a an issue with rounding, return error and do not mint
     if mint_amount.is_zero() {
@@ -111,8 +115,8 @@ pub fn execute_bond(
         to_address: config.staker_address.to_string(),
         amount: info.funds,
     };
-    state.total_native_token += amount;
-    state.total_bonded_lst += mint_amount;
+    state.total_bonded_native_tokens += amount;
+    state.total_issued_lst += mint_amount;
     STATE.save(deps.storage, &state)?;
 
     let response = Response::new()
@@ -330,9 +334,9 @@ pub fn execute_submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response>
     ensure!(batch.unstake_requests_count > 0, ContractError::BatchEmpty);
 
     ensure!(
-        state.total_bonded_lst >= batch.total_lst_to_burn,
+        state.total_issued_lst >= batch.total_lst_to_burn,
         ContractError::InvalidUnstakeAmount {
-            total_liquid_stake_token: state.total_bonded_lst,
+            total_liquid_stake_token: state.total_issued_lst,
             amount_to_unstake: batch.total_lst_to_burn
         }
     );
@@ -345,20 +349,20 @@ pub fn execute_submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response>
     PENDING_BATCH_ID.save(deps.storage, &(pending_batch_id + 1))?;
 
     let unbond_amount = compute_unbond_amount(
-        state.total_native_token,
-        state.total_bonded_lst,
+        state.total_bonded_native_tokens,
+        state.total_issued_lst,
         batch.total_lst_to_burn,
     );
 
     // reduce underlying native token balance by unbonded amount
-    state.total_native_token = state
-        .total_native_token
+    state.total_bonded_native_tokens = state
+        .total_bonded_native_tokens
         .checked_sub(unbond_amount)
         .unwrap_or_default();
 
     // reduce underlying LST balance by batch total
-    state.total_bonded_lst = state
-        .total_bonded_lst
+    state.total_issued_lst = state
+        .total_issued_lst
         .checked_sub(batch.total_lst_to_burn)
         .unwrap_or_default();
 
@@ -607,12 +611,12 @@ pub fn receive_rewards(deps: DepsMut, info: MessageInfo) -> ContractResult<Respo
             })?;
 
     STATE.update::<_, ContractError>(deps.storage, |mut state| {
-        if state.total_bonded_lst.is_zero() {
+        if state.total_issued_lst.is_zero() {
             return Err(ContractError::NoLiquidStake);
         }
 
         // update the accounting of tokens
-        state.total_native_token += amount_after_fees;
+        state.total_bonded_native_tokens += amount_after_fees;
         state.total_reward_amount += amount;
 
         Ok(state)
@@ -719,7 +723,7 @@ pub fn resume_contract(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    total_native_token: Uint128,
+    total_bonded_native_tokens: Uint128,
     total_liquid_stake_token: Uint128,
     total_reward_amount: Uint128,
 ) -> ContractResult<Response> {
@@ -736,8 +740,8 @@ pub fn resume_contract(
     })?;
 
     STATE.update::<_, ContractError>(deps.storage, |mut state| {
-        state.total_native_token = total_native_token;
-        state.total_bonded_lst = total_liquid_stake_token;
+        state.total_bonded_native_tokens = total_bonded_native_tokens;
+        state.total_issued_lst = total_liquid_stake_token;
         state.total_reward_amount = total_reward_amount;
 
         Ok(state)
@@ -745,7 +749,7 @@ pub fn resume_contract(
 
     Ok(Response::new()
         .add_attribute("action", "resume_contract")
-        .add_attribute("total_native_token", total_native_token)
+        .add_attribute("total_bonded_native_tokens", total_bonded_native_tokens)
         .add_attribute("total_liquid_stake_token", total_liquid_stake_token)
         .add_attribute("total_reward_amount", total_reward_amount))
 }

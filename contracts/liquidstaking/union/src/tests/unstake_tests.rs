@@ -18,8 +18,8 @@ fn unbond_works() {
 
     let mut state = STATE.load(&deps.storage).unwrap();
 
-    state.total_native_token = Uint128::from(1_100u128);
-    state.total_bonded_lst = Uint128::from(1_000u128);
+    state.total_bonded_native_tokens = Uint128::from(1_100u128);
+    state.total_issued_lst = Uint128::from(1_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let info = message_info(&Addr::unchecked(UNION1), &[]);
@@ -112,10 +112,7 @@ fn unbond_works() {
 
     let batch = BATCHES.load(&deps.storage, 1).unwrap();
 
-    assert_eq!(
-        batch.total_lst_to_burn,
-        union1_amount_1 + union1_amount_2
-    );
+    assert_eq!(batch.total_lst_to_burn, union1_amount_1 + union1_amount_2);
     // unstake requests count is gonna stay the same since im updating my request
     assert_eq!(batch.unstake_requests_count, 1);
 
@@ -163,7 +160,7 @@ fn unbond_works() {
 
 //     let mut state = STATE.load(&deps.storage).unwrap();
 
-//     state.total_native_token = Uint128::from(10_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(10_000u128);
 //     state.total_liquid_stake_token = Uint128::from(100_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 //     let msg = ExecuteMsg::Unbond {};
@@ -266,7 +263,7 @@ fn unbond_works() {
 //     let mut state = STATE.load(&deps.storage).unwrap();
 
 //     state.total_liquid_stake_token = Uint128::from(100_000u128);
-//     state.total_native_token = Uint128::from(300_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(300_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     let info = mock_info("bob", &coins(1000, "factory/bob/stTIA"));
@@ -286,7 +283,7 @@ fn unbond_works() {
 //     let config = CONFIG.load(&deps.storage).unwrap();
 
 //     state.total_liquid_stake_token = Uint128::from(100_000u128);
-//     state.total_native_token = Uint128::from(300_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(300_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     let msg = ExecuteMsg::ReceiveUnstakedTokens { batch_id: 1 };
@@ -334,7 +331,7 @@ fn unbond_works() {
 //     let mut state = STATE.load(&deps.storage).unwrap();
 
 //     state.total_liquid_stake_token = Uint128::from(100_000u128);
-//     state.total_native_token = Uint128::from(300_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(300_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     let info = mock_info(
@@ -377,7 +374,7 @@ fn unbond_works() {
 //     // check the state
 //     state = STATE.load(&deps.storage).unwrap();
 //     assert_eq!(state.total_liquid_stake_token, Uint128::from(100000u128));
-//     assert_eq!(state.total_native_token, Uint128::from(300000u128));
+//     assert_eq!(state.total_bonded_native_tokens, Uint128::from(300000u128));
 
 //     // check the batch
 //     let batch = BATCHES.load(&deps.storage, 1).unwrap();
@@ -395,7 +392,7 @@ fn unbond_works() {
 //     let mut state = STATE.load(&deps.storage).unwrap();
 
 //     state.total_liquid_stake_token = Uint128::from(0u128);
-//     state.total_native_token = Uint128::from(300_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(300_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     let info = mock_info(
@@ -438,7 +435,7 @@ fn unbond_works() {
 //     // check the state
 //     state = STATE.load(&deps.storage).unwrap();
 //     assert_eq!(state.total_liquid_stake_token, Uint128::from(0u128));
-//     assert_eq!(state.total_native_token, Uint128::from(300000u128));
+//     assert_eq!(state.total_bonded_native_tokens, Uint128::from(300000u128));
 
 //     // check the batch
 //     let batch = BATCHES.load(&deps.storage, 1).unwrap();
@@ -456,7 +453,7 @@ fn unbond_works() {
 //     let mut state = STATE.load(&deps.storage).unwrap();
 
 //     state.total_liquid_stake_token = Uint128::from(100_000u128);
-//     state.total_native_token = Uint128::from(300_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(300_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     let mut batch_1 = Batch::new_pending(1, Uint128::from(1000u128), 1000);

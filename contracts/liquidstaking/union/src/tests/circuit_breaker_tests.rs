@@ -3,13 +3,13 @@ use cosmwasm_std::{
     testing::{mock_env, mock_info},
     Coin, Uint128,
 };
-use crate::types::Batch;
 
 use crate::{
     contract::execute,
     msg::{self, ExecuteMsg},
     state::{new_unstake_request, State, BATCHES, CONFIG, STATE},
     tests::test_helper::{init, ADMIN, NATIVE_TOKEN, OSMO2, OSMO3},
+    types::Batch,
 };
 
 #[test]
@@ -21,7 +21,7 @@ fn circuit_breaker() {
     let config = CONFIG.load(&deps.storage).unwrap();
 
     state.total_liquid_stake_token = Uint128::from(100_000u128);
-    state.total_native_token = Uint128::from(300_000u128);
+    state.total_bonded_native_tokens = Uint128::from(300_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let msg = ExecuteMsg::CircuitBreaker {};
@@ -73,7 +73,7 @@ fn circuit_breaker() {
 
     // liquid unstake
     state.total_liquid_stake_token = Uint128::from(100_000u128);
-    state.total_native_token = Uint128::from(300_000u128);
+    state.total_bonded_native_tokens = Uint128::from(300_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
     let res = execute(
         deps.as_mut(),
@@ -155,7 +155,7 @@ fn circuit_breaker() {
 
     // reenable
     let msg = ExecuteMsg::ResumeContract {
-        total_native_token: Uint128::from(100000u128),
+        total_bonded_native_tokens: Uint128::from(100000u128),
         total_liquid_stake_token: Uint128::from(200000u128),
         total_reward_amount: Uint128::from(10000u128),
     };
@@ -183,7 +183,7 @@ fn circuit_breaker() {
     // test accounting update
     let state: State = STATE.load(&deps.storage).unwrap();
     assert_eq!(state.total_liquid_stake_token, Uint128::from(200000u128));
-    assert_eq!(state.total_native_token, Uint128::from(100000u128));
+    assert_eq!(state.total_bonded_native_tokens, Uint128::from(100000u128));
     assert_eq!(state.total_reward_amount, Uint128::from(10000u128));
 
     // test can't resume contract

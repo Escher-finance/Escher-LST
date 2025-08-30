@@ -3,7 +3,6 @@ use cosmwasm_std::{
     testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR},
     Addr, CosmosMsg, ReplyOn, SubMsg, Uint128,
 };
-use crate::types::Batch;
 use osmosis_std::types::cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin};
 
 use crate::{
@@ -11,6 +10,7 @@ use crate::{
     msg::{ExecuteMsg, QueryMsg},
     state::{new_unstake_request, UnstakeRequest, BATCHES, CONFIG, STATE},
     tests::test_helper::{init, ADMIN, NATIVE_TOKEN, OSMO1},
+    types::Batch,
 };
 
 #[test]
@@ -20,7 +20,7 @@ fn withdraw() {
     let mut state = STATE.load(&deps.storage).unwrap();
 
     state.total_liquid_stake_token = Uint128::from(130_000u128);
-    state.total_native_token = Uint128::from(300_000u128);
+    state.total_bonded_native_tokens = Uint128::from(300_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let mut pending_batch: Batch =
@@ -155,7 +155,7 @@ fn withdraw_slashing() {
     let mut state = STATE.load(&deps.storage).unwrap();
 
     state.total_liquid_stake_token = Uint128::from(130_000u128);
-    state.total_native_token = Uint128::from(300_000u128);
+    state.total_bonded_native_tokens = Uint128::from(300_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let mut pending_batch: Batch =

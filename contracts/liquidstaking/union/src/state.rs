@@ -66,11 +66,14 @@ pub struct ProtocolFeeConfig {
 
 #[cw_serde]
 pub struct State {
-    /// this is the total staked amount
-    pub total_native_token: Uint128,
-    /// this is the total supply of the minted lst token (eU in our case)
-    // REVIEW: This should match the total supply of the LST? Can we just read it from the LST contract itself?
-    pub total_bonded_lst: Uint128,
+    /// The total amount of native tokens that have been bonded.
+    pub total_bonded_native_tokens: Uint128,
+    /// The total issued supply of the minted LST token.
+    ///
+    /// Note that this is *not* the same as the total supply of the LST contract, but rather the total *cross-chain* supply of the LST. When the LST is bridged, it will be burned on the source chain and minted on the destination chain.
+    pub total_issued_lst: Uint128,
+
+    // REVIEW: Unused? If this is only used for off-chain actions/ accounting then this is probably better off in a separate storage
     pub total_reward_amount: Uint128,
 
     // REVIEW: Pull this out into a separate storage item, no need to load it every time we read the state and also makes more sense semantically to have it separate

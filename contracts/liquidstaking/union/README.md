@@ -123,7 +123,7 @@ pub enum ExecuteMsg {
     /// Resumes the contract; callable by the admin.
     ResumeContract {
         /// Updated total native tokens delegated (used post-slashing).
-        total_native_token: Uint128,
+        total_bonded_native_tokens: Uint128,
 
         /// Updated total issued liquid staked tokens.
         total_liquid_stake_token: Uint128,
@@ -288,7 +288,7 @@ pub enum QueryMsg {
 
 ```json
 {
-  "total_native_token": "100000000",
+  "total_bonded_native_tokens": "100000000",
   "total_liquid_stake_token": "98000000",
   "rate": "0.98",
   "pending_owner": "cosmos1pendingownerxxxxxxxxxxxxxxxxxxxxxxxxxxx",

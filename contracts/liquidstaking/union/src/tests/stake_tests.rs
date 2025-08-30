@@ -80,11 +80,11 @@ fn bond_with_local_recipient_works() {
     let state = STATE.load(&deps.storage).unwrap();
 
     // state is properly adjusted
-    assert_eq!(state.total_native_token.u128(), 1000);
-    assert_eq!(state.total_bonded_lst.u128(), 1000);
+    assert_eq!(state.total_bonded_native_tokens.u128(), 1000);
+    assert_eq!(state.total_issued_lst.u128(), 1000);
 
-    prev_state.total_native_token = 1000u128.into();
-    prev_state.total_bonded_lst = 1000u128.into();
+    prev_state.total_bonded_native_tokens = 1000u128.into();
+    prev_state.total_issued_lst = 1000u128.into();
 
     // there is no further state change
     assert_eq!(state, prev_state);
@@ -92,7 +92,7 @@ fn bond_with_local_recipient_works() {
     // manually changing the rate instead of going through the `rewards` entrypoint
     STATE
         .update::<_, StdError>(&mut deps.storage, |mut s| {
-            s.total_native_token += Uint128::new(100);
+            s.total_bonded_native_tokens += Uint128::new(100);
             Ok(s)
         })
         .unwrap();
@@ -138,8 +138,8 @@ fn bond_with_remote_recipient_works() {
     // starting with a rate that is different than 1
     STATE
         .update(&mut deps.storage, |mut s| {
-            s.total_native_token += Uint128::new(1100);
-            s.total_bonded_lst += Uint128::new(1000);
+            s.total_bonded_native_tokens += Uint128::new(1100);
+            s.total_issued_lst += Uint128::new(1000);
             Ok::<_, StdError>(s)
         })
         .unwrap();
@@ -247,8 +247,8 @@ fn bond_with_remote_recipient_works() {
     let state = STATE.load(&deps.storage).unwrap();
 
     // state is properly adjusted
-    assert_eq!(state.total_native_token.u128(), 2100);
-    assert_eq!(state.total_bonded_lst.u128(), 1909);
+    assert_eq!(state.total_bonded_native_tokens.u128(), 2100);
+    assert_eq!(state.total_issued_lst.u128(), 1909);
 }
 
 // #[test]
@@ -392,7 +392,7 @@ fn bond_with_remote_recipient_works() {
 //     // Use the previously unwrapped value
 //     let state = STATE.load(deps.as_ref().storage).unwrap();
 //     assert_eq!(state.total_liquid_stake_token, Uint128::from(1000u128));
-//     assert_eq!(state.total_native_token, Uint128::from(1000u128));
+//     assert_eq!(state.total_bonded_native_tokens, Uint128::from(1000u128));
 
 //     let info = mock_info(OSMO3, &coins(10000, NATIVE_TOKEN));
 //     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone());
@@ -403,14 +403,14 @@ fn bond_with_remote_recipient_works() {
 //         state_for_osmo3.total_liquid_stake_token,
 //         Uint128::from(11000u128)
 //     );
-//     assert_eq!(state_for_osmo3.total_native_token, Uint128::from(11000u128));
+//     assert_eq!(state_for_osmo3.total_bonded_native_tokens, Uint128::from(11000u128));
 
 //     // set total_liquid_stake_token: 1_000_000_000,
 //     // native_token: 1_000_000
 //     deps = init();
 //     let mut state = STATE.load(&deps.storage).unwrap();
 //     state.total_liquid_stake_token = Uint128::from(1_000_000_000u128);
-//     state.total_native_token = Uint128::from(1_000_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(1_000_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     let info = mock_info(OSMO3, &coins(50_000_000, NATIVE_TOKEN));
@@ -422,14 +422,14 @@ fn bond_with_remote_recipient_works() {
 //         state.total_liquid_stake_token,
 //         Uint128::from(51_000_000_000u128)
 //     );
-//     assert_eq!(state.total_native_token, Uint128::from(51_000_000u128));
+//     assert_eq!(state.total_bonded_native_tokens, Uint128::from(51_000_000u128));
 
 //     // set total_liquid_stake_token: 1_000_000,
 //     // native_token: 1_000_000_000
 //     deps = init();
 //     let mut state = STATE.load(&deps.storage).unwrap();
 //     state.total_liquid_stake_token = Uint128::from(1_000_000u128);
-//     state.total_native_token = Uint128::from(1_000_000_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(1_000_000_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     let info = mock_info(OSMO3, &coins(50_000_000, NATIVE_TOKEN));
@@ -438,7 +438,7 @@ fn bond_with_remote_recipient_works() {
 
 //     let state = STATE.load(&deps.storage).unwrap();
 //     assert_eq!(state.total_liquid_stake_token, Uint128::from(1_050_000u128));
-//     assert_eq!(state.total_native_token, Uint128::from(1_050_000_000u128));
+//     assert_eq!(state.total_bonded_native_tokens, Uint128::from(1_050_000_000u128));
 
 //     // test redemption rate, purchase rate
 //     let (redemption_rate, purchase_rate) = get_rates(&state);
@@ -527,7 +527,7 @@ fn bond_with_remote_recipient_works() {
 //     let mut deps = init();
 //     let mut state: State = STATE.load(&deps.storage).unwrap();
 //     state.total_liquid_stake_token = Uint128::from(1_000_000_000u128);
-//     state.total_native_token = Uint128::from(1_000_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(1_000_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     let info = mock_info(OSMO3, &coins(1000, NATIVE_TOKEN));
@@ -557,7 +557,7 @@ fn bond_with_remote_recipient_works() {
 //     let mut deps = init();
 
 //     let mut state: State = STATE.load(&deps.storage).unwrap();
-//     state.total_native_token = Uint128::from(1000u128);
+//     state.total_bonded_native_tokens = Uint128::from(1000u128);
 //     state.total_liquid_stake_token = Uint128::from(0u128);
 //     state.total_fees = Uint128::from(100u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
@@ -572,7 +572,7 @@ fn bond_with_remote_recipient_works() {
 //     assert!(res.is_ok());
 
 //     let state: State = STATE.load(&deps.storage).unwrap();
-//     assert_eq!(state.total_native_token, Uint128::from(1000u128));
+//     assert_eq!(state.total_bonded_native_tokens, Uint128::from(1000u128));
 //     assert_eq!(state.total_liquid_stake_token, Uint128::from(1000u128));
 //     assert_eq!(state.total_fees, Uint128::from(1100u128));
 // }

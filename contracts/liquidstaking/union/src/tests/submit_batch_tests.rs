@@ -1,18 +1,15 @@
 use cosmwasm_std::{
     attr,
-    testing::{message_info, mock_env, mock_info},
-    to_json_binary, Addr, Attribute, Coin, CosmosMsg, Timestamp, Uint128, WasmMsg,
+    testing::{message_info, mock_env},
+    to_json_binary, Addr, Coin, CosmosMsg, Timestamp, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 
-use super::test_helper::{NATIVE_TOKEN, UNION1, UNION2, UNION3};
 use crate::{
     contract::execute,
-    error::ContractError,
-    helpers::compute_unbond_amount,
     msg::ExecuteMsg,
     state::{BATCHES, CONFIG, PENDING_BATCH_ID, STATE},
-    tests::test_helper::{init, LIQUID_STAKE_TOKEN_ADDRESS, OSMO1},
+    tests::test_helper::{init, LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION1, UNION2, UNION3},
     types::{Batch, BatchState},
 };
 
@@ -22,11 +19,11 @@ fn submit_batch_works() {
 
     let mut state = STATE.load(&deps.storage).unwrap();
 
-    let initial_total_native_token = Uint128::from(1_100u128);
-    state.total_native_token = initial_total_native_token;
+    let initial_total_bonded_native_tokens = Uint128::from(1_100u128);
+    state.total_bonded_native_tokens = initial_total_bonded_native_tokens;
 
     let initial_total_liquid_stake_token = Uint128::from(1_000u128);
-    state.total_bonded_lst = initial_total_liquid_stake_token;
+    state.total_issued_lst = initial_total_liquid_stake_token;
 
     STATE.save(&mut deps.storage, &state).unwrap();
 
@@ -115,11 +112,14 @@ fn submit_batch_works() {
     let state = STATE.load(&deps.storage).unwrap();
 
     // the rate is updated properly
-    let expected_total_native_token: Uint128 = 3550u128.into();
-    assert_eq!(state.total_native_token, expected_total_native_token);
+    let expected_total_bonded_native_tokens: Uint128 = 3550u128.into();
+    assert_eq!(
+        state.total_bonded_native_tokens,
+        expected_total_bonded_native_tokens
+    );
 
     let expected_total_liquid_token: Uint128 = 3227u128.into();
-    assert_eq!(state.total_bonded_lst, expected_total_liquid_token);
+    assert_eq!(state.total_issued_lst, expected_total_liquid_token);
 
     let batch = BATCHES.load(&deps.storage, 1).unwrap();
 
@@ -190,7 +190,7 @@ fn submit_batch_works() {
 //     let config = CONFIG.load(&deps.storage).unwrap();
 
 //     state.total_liquid_stake_token = Uint128::from(100_000u128);
-//     state.total_native_token = Uint128::from(300_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(300_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     // batch isnt ready
@@ -214,7 +214,7 @@ fn submit_batch_works() {
 //     let config = CONFIG.load(&deps.storage).unwrap();
 
 //     state.total_liquid_stake_token = Uint128::from(100_000u128);
-//     state.total_native_token = Uint128::from(300_000u128);
+//     state.total_bonded_native_tokens = Uint128::from(300_000u128);
 //     STATE.save(&mut deps.storage, &state).unwrap();
 
 //     // Create a pending batch with to many tokens

@@ -3,14 +3,13 @@ use std::collections::BTreeMap;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use ibc_union_spec::ChannelId;
-use crate::types::{Batch, BatchStatus};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use unionlabs_primitives::Bytes;
 
 use crate::{
     state::{ProtocolFeeConfig, UnstakeRequest},
-    types::BatchExpectedAmount,
+    types::{Batch, BatchExpectedAmount, BatchStatus},
 };
 
 #[cw_serde]
@@ -128,7 +127,7 @@ pub enum ExecuteMsg {
     /// Resumes the contract; callable by the admin.
     ResumeContract {
         /// Updated total native tokens delegated (used post-slashing).
-        total_native_token: Uint128,
+        total_bonded_native_tokens: Uint128,
 
         /// Updated total issued liquid staked tokens.
         total_liquid_stake_token: Uint128,
@@ -153,7 +152,7 @@ pub struct ConfigResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct StateResponse {
-    pub total_native_token: Uint128,
+    pub total_bonded_native_tokens: Uint128,
     pub total_liquid_stake_token: Uint128,
     pub rate: Decimal,
     pub pending_owner: String,

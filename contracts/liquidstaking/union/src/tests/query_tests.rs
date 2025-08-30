@@ -79,7 +79,7 @@ fn get_state() {
 
     match result {
         Ok(res) => {
-            assert_eq!(res.total_native_token, Uint128::from(0u128));
+            assert_eq!(res.total_bonded_native_tokens, Uint128::from(0u128));
             assert_eq!(res.total_liquid_stake_token, Uint128::from(0u128));
             assert_eq!(res.rate, Decimal::one());
             assert_eq!(res.pending_owner, "".to_string());
@@ -108,11 +108,11 @@ fn get_state() {
     result = from_json::<StateResponse>(&bin);
     match result {
         Ok(res) => {
-            assert_eq!(res.total_native_token, Uint128::from(1000u128));
+            assert_eq!(res.total_bonded_native_tokens, Uint128::from(1000u128));
             assert_eq!(res.total_liquid_stake_token, Uint128::from(1000u128));
             assert_eq!(
                 res.rate,
-                Decimal::from_ratio(res.total_liquid_stake_token, res.total_native_token)
+                Decimal::from_ratio(res.total_liquid_stake_token, res.total_bonded_native_tokens)
             );
             assert_eq!(res.total_fees, Uint128::from(100u128))
         }
@@ -191,7 +191,7 @@ fn get_batches() {
 
     let mut state = STATE.load(&deps.storage).unwrap();
     state.total_liquid_stake_token = Uint128::from(100_000_000u128);
-    state.total_native_token = Uint128::from(300_000_000u128);
+    state.total_bonded_native_tokens = Uint128::from(300_000_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
     match result {
@@ -305,7 +305,7 @@ fn get_pending_batch() {
     let mut state = STATE.load(&deps.storage).unwrap();
 
     state.total_liquid_stake_token = Uint128::from(100_000u128);
-    state.total_native_token = Uint128::from(300_000u128);
+    state.total_bonded_native_tokens = Uint128::from(300_000u128);
     STATE.save(&mut deps.storage, &state).unwrap();
 
     let info = mock_info(

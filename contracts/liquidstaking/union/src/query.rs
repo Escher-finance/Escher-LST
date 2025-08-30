@@ -1,12 +1,12 @@
 use cosmwasm_std::{Deps, Order, StdResult};
 use cw_storage_plus::Bound;
 use itertools::Itertools;
-use crate::types::{Batch, BatchStatus};
 
 use crate::{
     helpers::get_rates,
     msg::{BatchesResponse, ConfigResponse, StateResponse},
     state::{unstake_requests, UnstakeRequest, BATCHES, CONFIG, PENDING_BATCH_ID, STATE},
+    types::{Batch, BatchStatus},
 };
 
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
@@ -26,8 +26,8 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
     let state = STATE.load(deps.storage)?;
     let (_, purchase_rate) = get_rates(&state);
     let res = StateResponse {
-        total_native_token: state.total_native_token,
-        total_liquid_stake_token: state.total_bonded_lst,
+        total_bonded_native_tokens: state.total_bonded_native_tokens,
+        total_liquid_stake_token: state.total_issued_lst,
         rate: purchase_rate,
         pending_owner: state
             .pending_owner

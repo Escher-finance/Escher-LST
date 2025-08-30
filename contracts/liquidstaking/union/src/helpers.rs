@@ -4,48 +4,48 @@ use prost::Message;
 use crate::{error::ContractError, state::State};
 
 pub fn compute_mint_amount(
-    total_native_token: Uint128,
-    total_liquid_stake_token: Uint128,
+    total_bonded_native_tokens: Uint128,
+    total_issued_lst: Uint128,
     native_to_stake: Uint128,
 ) -> Uint128 {
     // Possible truncation issues when quantities are small
-    // Initial very large total_native_token would cause round to 0 and block minting
+    // Initial very large total_bonded_native_tokens would cause round to 0 and block minting
     // Mint at a 1:1 ratio if there is no total native token
     // Amount = Total stTIA * (Amount of native token / Total native token)
-    if total_native_token.is_zero() {
+    if total_bonded_native_tokens.is_zero() {
         native_to_stake
     } else {
-        total_liquid_stake_token.multiply_ratio(native_to_stake, total_native_token)
+        total_issued_lst.multiply_ratio(native_to_stake, total_bonded_native_tokens)
     }
 }
 
 pub fn compute_unbond_amount(
-    total_native_token: Uint128,
-    total_liquid_stake_token: Uint128,
+    total_bonded_native_tokens: Uint128,
+    total_issued_lst: Uint128,
     batch_liquid_stake_token: Uint128,
 ) -> Uint128 {
     if batch_liquid_stake_token.is_zero() {
         Uint128::zero()
     } else {
         // unbond amount is calculated at the batch level
-        // total_native_token - total TIA delegated by MilkyWay
+        // total_bonded_native_tokens - total TIA delegated by MilkyWay
         // batch_liquid_stake_token - total stTIA in submitted batch
-        // total_liquid_stake_token - total stTIA minted by MilkyWay
+        // total_issued_lst - total stTIA minted by MilkyWay
 
-        total_native_token.multiply_ratio(batch_liquid_stake_token, total_liquid_stake_token)
+        total_bonded_native_tokens.multiply_ratio(batch_liquid_stake_token, total_issued_lst)
     }
 }
 
 pub fn get_rates(state: &State) -> (Decimal, Decimal) {
-    let total_native_token = state.total_native_token;
-    let total_liquid_stake_token = state.total_bonded_lst;
-    if total_liquid_stake_token.is_zero() || total_native_token.is_zero() {
+    let total_bonded_native_tokens = state.total_bonded_native_tokens;
+    let total_issued_lst = state.total_issued_lst;
+    if total_issued_lst.is_zero() || total_bonded_native_tokens.is_zero() {
         (Decimal::one(), Decimal::one())
     } else {
         // return redemption_rate, purchase_rate
         (
-            Decimal::from_ratio(total_native_token, total_liquid_stake_token),
-            Decimal::from_ratio(total_liquid_stake_token, total_native_token),
+            Decimal::from_ratio(total_bonded_native_tokens, total_issued_lst),
+            Decimal::from_ratio(total_issued_lst, total_bonded_native_tokens),
         )
     }
 }
