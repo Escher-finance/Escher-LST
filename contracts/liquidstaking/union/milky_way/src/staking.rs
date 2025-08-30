@@ -14,7 +14,7 @@ pub struct Batch {
     // TODO: This should be a separate mapping storage
     pub liquid_unbond_requests: BTreeMap<String, LiquidUnbondRequest>,
 
-    pub unbond_requests_count: u64,
+    pub unstake_requests_count: u64,
 
     pub state: BatchState,
 }
@@ -28,7 +28,7 @@ impl Batch {
             batch_total_liquid_stake: batch_total,
             state: BatchState::Pending { submit_time },
             liquid_unbond_requests: Default::default(),
-            unbond_requests_count: 0,
+            unstake_requests_count: 0,
         }
     }
 }

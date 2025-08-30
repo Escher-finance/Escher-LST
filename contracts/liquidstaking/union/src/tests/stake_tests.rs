@@ -28,7 +28,7 @@ use crate::{
     msg::ExecuteMsg,
     state::{CounterpartyConfig, State, BATCHES, CONFIG, FUNGIBLE_RECIPIENT_CHANNEL, STATE},
     tests::test_helper::{
-        init, FUNDED_DISPATCH_ADDRESS, LIQUID_STAKE_TOKEN_DENOM, NATIVE_TOKEN, UNION1, UNION2,
+        init, FUNDED_DISPATCH_ADDRESS, LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION1, UNION2,
         UNION_STAKER, ZKGM_ADDRESS,
     },
 };
@@ -61,7 +61,7 @@ fn bond_with_local_recipient_works() {
     assert_eq!(
         res.messages[1].msg,
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: LIQUID_STAKE_TOKEN_DENOM.into(),
+            contract_addr: LIQUID_STAKE_TOKEN_ADDRESS.into(),
             msg: to_json_binary(&Cw20ExecuteMsg::Mint {
                 recipient: UNION2.into(),
                 amount: 1000u128.into()
@@ -101,7 +101,7 @@ fn bond_with_local_recipient_works() {
     // there is no further state change
     assert_eq!(state, prev_state);
 
-    // changing the rate
+    // manually changing the rate instead of going through the `rewards` entrypoint
     STATE
         .update(&mut deps.storage, |mut s| {
             s.total_native_token += Uint128::new(100);
@@ -115,7 +115,7 @@ fn bond_with_local_recipient_works() {
     assert_eq!(
         res.messages[1].msg,
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: LIQUID_STAKE_TOKEN_DENOM.into(),
+            contract_addr: LIQUID_STAKE_TOKEN_ADDRESS.into(),
             msg: to_json_binary(&Cw20ExecuteMsg::Mint {
                 recipient: UNION2.into(),
                 amount: 909u128.into()
@@ -143,9 +143,11 @@ fn bond_with_remote_recipient_works() {
     };
 
     // setting the fungible recipient so that we can send tokens through zkgm
-    FUNGIBLE_RECIPIENT_CHANNEL.save(&mut deps.storage, 1, &counterparty_config);
+    FUNGIBLE_RECIPIENT_CHANNEL
+        .save(&mut deps.storage, 1, &counterparty_config)
+        .unwrap();
 
-    // changing the rate
+    // starting with a rate that is different than 1
     STATE
         .update(&mut deps.storage, |mut s| {
             s.total_native_token += Uint128::new(1100);
@@ -171,7 +173,7 @@ fn bond_with_remote_recipient_works() {
     assert_eq!(
         res.messages[1].msg,
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: LIQUID_STAKE_TOKEN_DENOM.into(),
+            contract_addr: LIQUID_STAKE_TOKEN_ADDRESS.into(),
             msg: to_json_binary(&Cw20ExecuteMsg::Mint {
                 recipient: env.contract.address.into(),
                 amount: mint_amount
@@ -185,7 +187,7 @@ fn bond_with_remote_recipient_works() {
     assert_eq!(
         res.messages[2].msg,
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: LIQUID_STAKE_TOKEN_DENOM.into(),
+            contract_addr: LIQUID_STAKE_TOKEN_ADDRESS.into(),
             msg: to_json_binary(&Cw20ExecuteMsg::IncreaseAllowance {
                 spender: ZKGM_ADDRESS.into(),
                 amount: mint_amount,
@@ -218,7 +220,7 @@ fn bond_with_remote_recipient_works() {
                         // union staker as a fallback address
                         sender: UNION_STAKER.to_string().into_bytes().into(),
                         receiver: UNION2.to_string().into_bytes().into(),
-                        base_token: LIQUID_STAKE_TOKEN_DENOM.as_bytes().to_vec().into(),
+                        base_token: LIQUID_STAKE_TOKEN_ADDRESS.as_bytes().to_vec().into(),
                         base_amount: amount,
                         quote_token: counterparty_config.quote_token.into(),
                         quote_amount: amount,

@@ -30,7 +30,7 @@ pub const UNION2: &str = "union1a8k05kaazq576sd0n07ewhsplwtpecxjx8ygx9";
 pub const UNION_STAKER: &str = "union1qp4uzhet2sd9mrs46kemse5dt9ncz4k3hjst5m";
 pub const UNION_MONITOR_1: &str = "union1m27enjqfejnnxru5snmcufway88py4fyqcr43u";
 pub const UNION_MONITOR_2: &str = "union1n36766lfkjcdwawu23d2tszwm26acesthzx0y7";
-pub const LIQUID_STAKE_TOKEN_DENOM: &str = "union1wr7yz3mcyd6qe3c9z5mruxv4fq99z9sg0ks6hs";
+pub const LIQUID_STAKE_TOKEN_ADDRESS: &str = "union1wr7yz3mcyd6qe3c9z5mruxv4fq99z9sg0ks6hs";
 pub const FUNDED_DISPATCH_ADDRESS: &str =
     "union1hnuj8f6d3wy3fcprt55vddv7v2650t6uudnvd2hukqrteeam8wjqvcmecf";
 pub const ZKGM_ADDRESS: &str = "union1xwfgw7n6vwgkyv8syjskzak7lh8kmrcthmv2jsmywhyunekmg3zqul8vsh";
@@ -39,7 +39,7 @@ pub fn mock_init_msg() -> InstantiateMsg {
     InstantiateMsg {
         staker_address: Addr::unchecked(UNION_STAKER),
         minimum_liquid_stake_amount: Uint128::from(100u128),
-        liquid_stake_token_address: LIQUID_STAKE_TOKEN_DENOM.to_string(),
+        liquid_stake_token_address: LIQUID_STAKE_TOKEN_ADDRESS.to_string(),
         monitors: vec![
             Addr::unchecked(UNION_MONITOR_1),
             Addr::unchecked(UNION_MONITOR_2),

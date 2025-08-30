@@ -230,28 +230,28 @@ pub fn execute_unbond(
 
     let pending_batch_id = PENDING_BATCH_ID.load(deps.storage)?;
 
-    let is_new_request = !unstake_requests().has(deps.storage, (pending_batch_id, staker.clone()));
-
-    if is_new_request {
-        new_unstake_request(&mut deps, staker.clone(), pending_batch_id, amount)?;
-    } else {
-        unstake_requests().update(
-            deps.storage,
-            (pending_batch_id, staker.clone()),
-            |or| -> Result<UnstakeRequest, ContractError> {
-                match or {
-                    Some(r) => Ok(UnstakeRequest {
-                        batch_id: r.batch_id,
-                        user: r.user.clone(),
-                        amount: r.amount + amount,
-                    }),
-                    None => Err(ContractError::NoRequestInBatch {
-                        staker: staker.clone(),
-                    }),
+    let mut is_new_request = false;
+    unstake_requests().update(
+        deps.storage,
+        (pending_batch_id, staker.clone()),
+        |or| -> Result<UnstakeRequest, ContractError> {
+            match or {
+                Some(r) => Ok(UnstakeRequest {
+                    batch_id: r.batch_id,
+                    user: r.user.clone(),
+                    amount: r.amount + amount,
+                }),
+                None => {
+                    is_new_request = true;
+                    Ok(UnstakeRequest {
+                        batch_id: pending_batch_id,
+                        user: staker.clone(),
+                        amount,
+                    })
                 }
-            },
-        )?;
-    }
+            }
+        },
+    )?;
 
     // add amount to batch total
     BATCHES.update(
@@ -261,7 +261,7 @@ pub fn execute_unbond(
             let mut batch = batch.unwrap();
             batch.batch_total_liquid_stake += amount;
             if is_new_request {
-                batch.unbond_requests_count += 1;
+                batch.unstake_requests_count += 1;
             }
             Ok(batch)
         },
@@ -281,10 +281,11 @@ pub fn execute_unbond(
 
     Ok(Response::new()
         .add_message(lst_transfer_from_msg)
-        .add_attribute("action", "liquid_unstake")
+        .add_attribute("action", "unbond")
         .add_attribute("sender", staker)
         .add_attribute("batch", pending_batch_id.to_string())
-        .add_attribute("amount", amount))
+        .add_attribute("amount", amount)
+        .add_attribute("is_new_request", is_new_request.to_string()))
 }
 
 /// Submit batch and transition pending batch to submitted.
@@ -315,7 +316,7 @@ pub fn execute_submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response>
         }
     );
 
-    ensure!(batch.unbond_requests_count > 0, ContractError::BatchEmpty);
+    ensure!(batch.unstake_requests_count > 0, ContractError::BatchEmpty);
 
     ensure!(
         state.total_liquid_stake_token >= batch.batch_total_liquid_stake,
