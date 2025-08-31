@@ -984,9 +984,11 @@ pub fn on_zkgm(
         return Err(ContractError::Unauthorized {});
     }
 
-    // return pause for temporary on version 0.1.193
+    // return pause for temporary on version 0.1.194
     return Err(ContractError::FunctionalityUnderMaintenance {});
 
+    /*
+    comment for temporary as code is unreachable
     match payload {
         ZkgmMessage::Bond {
             amount,
@@ -1025,6 +1027,7 @@ pub fn on_zkgm(
             recipient_ibc_channel_id,
         ),
     }
+     */
 }
 
 /// Update the ownership of the contract.
