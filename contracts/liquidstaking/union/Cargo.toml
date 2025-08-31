@@ -16,7 +16,6 @@ bech32               = { workspace = true }
 bincode              = { workspace = true, features = ["derive"] }
 cosmwasm-schema      = { workspace = true }
 cosmwasm-std         = { workspace = true, features = ["cosmwasm_2_0"] }
-cw-controllers       = { workspace = true }
 cw-storage-plus      = { workspace = true }
 cw-utils             = { workspace = true }
 cw2                  = { workspace = true }

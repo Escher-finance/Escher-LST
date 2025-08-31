@@ -7,6 +7,7 @@ use cw2::set_contract_version;
 use depolama::StorageExt;
 use on_zkgm_call_proxy::OnProxyOnZkgmCall;
 use semver::Version;
+use unionlabs_primitives::U256;
 
 use crate::{
     error::ContractError,
@@ -80,7 +81,7 @@ pub fn instantiate(
         .write_item::<ProtocolFeeConfigStore>(&protocol_fee_config);
     deps.storage.write_item::<ConfigStore>(&Config {
         native_token_denom,
-        minimum_liquid_stake_amount,
+        minimum_liquid_stake_amount: minimum_liquid_stake_amount.into(),
         batch_period_seconds,
     });
     deps.storage
@@ -128,7 +129,19 @@ pub fn execute(
             },
         ),
         ExecuteMsg::SubmitBatch {} => submit_batch(deps, env),
-        ExecuteMsg::Withdraw { batch_id, staker } => withdraw(deps, info, batch_id, staker),
+        ExecuteMsg::Withdraw {
+            batch_id,
+            staker,
+            withdraw_to_address,
+        } => withdraw(
+            deps,
+            info,
+            batch_id,
+            Staker::Local {
+                address: staker.to_string(),
+            },
+            withdraw_to_address,
+        ),
         ExecuteMsg::TransferOwnership { new_owner } => {
             transfer_ownership(deps, env, info, new_owner)
         }
@@ -143,15 +156,21 @@ pub fn execute(
             total_bonded_native_tokens,
             total_liquid_stake_token,
             total_reward_amount,
-        } => resume_contract(
-            deps,
-            env,
-            info,
-            total_bonded_native_tokens,
-            total_liquid_stake_token,
-            total_reward_amount,
-        ),
-        ExecuteMsg::SlashBatches { new_amounts } => slash_batches(deps, info, new_amounts),
+        } => {
+            // resume_contract(
+            //     deps,
+            //     env,
+            //     info,
+            //     total_bonded_native_tokens,
+            //     total_liquid_stake_token,
+            //     total_reward_amount,
+            // );
+            todo!()
+        }
+        ExecuteMsg::SlashBatches { new_amounts } => {
+            // slash_batches(deps, info, new_amounts);
+            todo!()
+        }
         ExecuteMsg::OnProxyOnZkgmCall(OnProxyOnZkgmCall { on_zkgm_msg, msg }) => {
             // TODO: ASSERT CALLER
 
@@ -169,7 +188,7 @@ pub fn execute(
                     Some(on_zkgm_msg.relayer),
                     min_mint_amount.u128(),
                 ),
-                RemoteExecuteMsg::Unbond { staker, amount } => unbond(
+                RemoteExecuteMsg::Unbond { amount } => unbond(
                     deps,
                     env,
                     info,
@@ -178,10 +197,23 @@ pub fn execute(
                         // REVIEW: WHat address to use here?
                         address: on_zkgm_msg.sender,
                         channel_id: on_zkgm_msg.destination_channel_id,
-                        path: on_zkgm_msg.path,
+                        path: U256::from_be_bytes(on_zkgm_msg.path.to_be_bytes()),
                     },
                 ),
-                RemoteExecuteMsg::Withdraw { staker, batch_id } => todo!(),
+                RemoteExecuteMsg::Withdraw {
+                    batch_id,
+                    withdraw_to_address,
+                } => withdraw(
+                    deps,
+                    info,
+                    batch_id,
+                    Staker::Remote {
+                        address: on_zkgm_msg.sender,
+                        channel_id: on_zkgm_msg.destination_channel_id,
+                        path: U256::from_be_bytes(on_zkgm_msg.path.to_be_bytes()),
+                    },
+                    withdraw_to_address,
+                ),
             }
         }
     }

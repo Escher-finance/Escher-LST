@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, ensure, wasm_execute, Addr, BankMsg, Coin, Deps, DepsMut, Env, Event, MessageInfo,
-    Response, Timestamp,
+    Response, Timestamp, Uint128,
 };
 use cw20::Cw20ExecuteMsg;
 use cw_utils::must_pay;
@@ -36,7 +36,7 @@ pub fn ensure_trusted_address(
     info: &MessageInfo,
     local_staker_address: &str,
 ) -> Result<(), ContractError> {
-    if info.sender.as_bytes() != local_staker_address {
+    if info.sender.as_str() != local_staker_address {
         let on_zkgm_call_proxy_address = deps.storage.read_item::<OnZkgmCallProxy>()?;
 
         // on_zkgm_call_proxy is a trusted address
@@ -385,12 +385,16 @@ pub fn withdraw(
     info: MessageInfo,
     batch_id: BatchId,
     staker: Staker,
+    withdraw_to_address: Addr,
 ) -> ContractResult<Response> {
     let config = deps.storage.read_item::<ConfigStore>()?;
 
     ensure_not_stopped(deps.as_ref())?;
 
-    ensure_trusted_address(&config, &info, &staker)?;
+    // if the staker is local, then we need to ensure that the address allowed to withdraw for the staker
+    if let Staker::Local { address } = &staker {
+        ensure_trusted_address(deps.as_ref(), &info, &address)?;
+    };
 
     let Some(batch) = deps.storage.maybe_read::<Batches>(&batch_id)? else {
         return Err(ContractError::BatchNotFound { batch_id });
@@ -403,25 +407,27 @@ pub fn withdraw(
         return Err(ContractError::BatchNotYetReceived);
     };
 
+    let unstake_request_key = UnstakeRequestKey {
+        batch_id,
+        staker_hash: staker.hash(),
+    };
     let liquid_unstake_request = deps
         .storage
-        .maybe_read(&UnstakeRequestKey {
-            batch_id,
-            staker_hash: staker.hash(),
-        })?
+        .maybe_read::<UnstakeRequests>(&unstake_request_key)?
         .ok_or_else(|| ContractError::NoRequestInBatch {
             staker: staker.clone(),
         })?;
 
-    let amount = received_native_unstaked
-        .multiply_ratio(liquid_unstake_request.amount, batch.total_lst_to_burn);
+    let amount = Uint128::new(received_native_unstaked)
+        .multiply_ratio(liquid_unstake_request.amount, batch.total_lst_to_burn)
+        .u128();
 
-    remove_unstake_request(&mut deps, staker.clone(), batch_id)?;
+    deps.storage.delete(&unstake_request_key);
 
     Ok(Response::new()
         // send the native token (U) back to the staker
         .add_message(BankMsg::Send {
-            to_address: todo!("allow withdrawal to other channels"),
+            to_address: withdraw_to_address.to_string(),
             amount: vec![Coin {
                 denom: config.native_token_denom.clone(),
                 amount,

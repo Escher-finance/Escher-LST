@@ -713,7 +713,7 @@ checksum = "2382f75942f4b3be3690fe4f86365e9c853c1587d6ee58212cebf6e2a9ccd101"
 [[package]]
 name = "consensus-primitives"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "bincode",
  "schemars",
@@ -1082,7 +1082,7 @@ dependencies = [
 [[package]]
 name = "cw-account"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "cosmwasm-schema 2.2.2",
  "cosmwasm-std 2.2.2",
@@ -1101,21 +1101,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73553ee4dad5b1678977ff603e72c3fdd41518ca2b0bd9b245b21e4c72eafa9e"
 dependencies = [
  "cosmwasm-std 2.2.2",
-]
-
-[[package]]
-name = "cw-controllers"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50c1804013d21060b994dea28a080f9eab78a3bcb6b617f05e7634b0600bf7b1"
-dependencies = [
- "cosmwasm-schema 2.2.2",
- "cosmwasm-std 2.2.2",
- "cw-storage-plus 2.0.0",
- "cw-utils 2.0.0",
- "schemars",
- "serde",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1297,7 +1282,7 @@ dependencies = [
 [[package]]
 name = "depolama"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "cosmwasm-std 2.2.2",
  "num-traits",
@@ -1565,7 +1550,7 @@ dependencies = [
 [[package]]
 name = "embed-commit"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "bytemuck",
  "const-hex",
@@ -1765,7 +1750,7 @@ dependencies = [
 [[package]]
 name = "frissitheto"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "cosmwasm-std 2.2.2",
  "serde",
@@ -2401,7 +2386,7 @@ dependencies = [
 [[package]]
 name = "ibc-union-msg"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "ibc-union-spec",
  "serde",
@@ -2411,7 +2396,7 @@ dependencies = [
 [[package]]
 name = "ibc-union-spec"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "alloy-sol-types",
  "bincode",
@@ -2630,7 +2615,6 @@ dependencies = [
  "bincode",
  "cosmwasm-schema 2.2.2",
  "cosmwasm-std 2.2.2",
- "cw-controllers",
  "cw-multi-test 0.17.0",
  "cw-storage-plus 2.0.0",
  "cw-utils 2.0.0",
@@ -2719,7 +2703,7 @@ dependencies = [
 [[package]]
 name = "macros"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2770,7 +2754,7 @@ dependencies = [
 [[package]]
 name = "on-zkgm-call-proxy"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "cosmwasm-std 2.2.2",
  "depolama",
@@ -3071,7 +3055,7 @@ dependencies = [
 [[package]]
 name = "protos"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "prost 0.12.6",
  "serde",
@@ -3499,7 +3483,7 @@ dependencies = [
 [[package]]
 name = "serde-utils"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "base64 0.21.7",
  "bitvec",
@@ -3640,7 +3624,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 [[package]]
 name = "solidity-slot"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "sha3",
  "unionlabs-primitives",
@@ -3673,7 +3657,7 @@ dependencies = [
 [[package]]
 name = "ssz"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "derivative",
  "itertools 0.13.0",
@@ -3691,7 +3675,7 @@ dependencies = [
 [[package]]
 name = "ssz-derive"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3945,7 +3929,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "token-factory-api"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "cosmwasm-schema 2.2.2",
  "cosmwasm-std 2.2.2",
@@ -4019,7 +4003,7 @@ checksum = "2896d95c02a80c6d6a5d6e953d479f5ddf2dfdb6a244441010e373ac0fb88971"
 [[package]]
 name = "ucs03-zkgm"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -4044,7 +4028,7 @@ dependencies = [
 [[package]]
 name = "ucs03-zkgm-token-minter-api"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "alloy 1.0.27",
  "alloy-primitives",
@@ -4101,7 +4085,7 @@ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 [[package]]
 name = "unionlabs"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "base64 0.21.7",
  "bcs",
@@ -4137,7 +4121,7 @@ dependencies = [
 [[package]]
 name = "unionlabs-encoding"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "alloy-sol-types",
  "bincode",
@@ -4150,7 +4134,7 @@ dependencies = [
 [[package]]
 name = "unionlabs-primitives"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -4196,7 +4180,7 @@ checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
 [[package]]
 name = "voyager-primitives"
 version = "0.0.0"
-source = "git+https://github.com/unionlabs/union#cb713e9fb6efed91e680cd7b76f499b780175614"
+source = "git+https://github.com/unionlabs/union?branch=makefieldspub#479384a81752ee78f6ddab6f473387c88a59a438"
 dependencies = [
  "consensus-primitives",
  "macros",

@@ -1,9 +1,7 @@
-use cosmwasm_std::{StdError, Timestamp};
+use cosmwasm_std::{Addr, StdError, Timestamp};
 use cw2::VersionError;
-use cw_controllers::AdminError;
 use cw_utils::PaymentError;
 use thiserror::Error;
-use unionlabs_primitives::Bytes;
 
 use crate::types::{BatchId, BatchState, Staker, MAX_FEE_RATE};
 
@@ -19,9 +17,6 @@ pub enum ContractError {
 
     #[error("unauthorized: {sender}")]
     Unauthorized { sender: Addr },
-
-    #[error("admin error: {0}")]
-    Admin(#[from] AdminError),
 
     #[error("no pending owner to claim")]
     NoPendingOwner,

@@ -68,6 +68,8 @@ pub enum ExecuteMsg {
     Withdraw {
         /// The address that will receive the funds.
         staker: Addr,
+        /// The address to withdraw the funds to on this chain.
+        withdraw_to_address: Addr,
         /// ID of the batch from which to withdraw.
         batch_id: BatchId,
     },
@@ -140,21 +142,16 @@ pub enum RemoteExecuteMsg {
 
     /// Initiates the unbonding process for a user.
     Unbond {
-        /// The address that will receive the native tokens on.
-        staker: Staker,
-
         /// The amount to unstake.
-        ///
-        /// NOTE: In the original milkyway implementation, the contract expected funds to be sent to it (verified with must_pay) since the tokens were all native (ibc denoms for the base token, tokenfactory for the lst)
         amount: Uint128,
     },
 
     /// Withdraws unstaked tokens.
     Withdraw {
-        /// The address that will receive the funds.
-        staker: Staker,
         /// ID of the batch from which to withdraw.
         batch_id: BatchId,
+        /// The address to withdraw the funds to on this chain.
+        withdraw_to_address: Addr,
     },
 }
 
