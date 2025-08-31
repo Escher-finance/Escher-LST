@@ -993,6 +993,9 @@ pub fn on_zkgm(
         return Err(ContractError::Unauthorized {});
     }
 
+    // return pause for temporary on version 0.1.193
+    return Err(ContractError::FunctionalityUnderMaintenance {});
+
     match payload {
         ZkgmMessage::Bond {
             amount,
