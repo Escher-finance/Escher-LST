@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use unionlabs_primitives::Bytes;
 
 use crate::types::{
-    Batch, BatchExpectedAmount, BatchId, BatchStatus, ProtocolFeeConfig, UnstakeRequest,
+    Batch, BatchExpectedAmount, BatchId, BatchStatus, ProtocolFeeConfig, Staker, UnstakeRequest,
 };
 
 #[cw_serde]
@@ -50,7 +50,7 @@ pub enum ExecuteMsg {
 
         /// Minimum expected amount of LST tokens to be received
         /// for the operation to be considered valid.
-        min_mint_amount: Option<Uint128>,
+        min_mint_amount: Uint128,
     },
 
     /// Initiates the unbonding process for a user.
@@ -127,7 +127,36 @@ pub enum ExecuteMsg {
     OnProxyOnZkgmCall(OnProxyOnZkgmCall),
 }
 
-pub enum RemoteExecuteMsg {}
+#[derive(Debug, Serialize, Deserialize)]
+pub enum RemoteExecuteMsg {
+    /// Initiates the bonding process for a user.
+    Bond {
+        /// The address to mint the LST to.
+        mint_to: Addr,
+
+        /// Minimum expected amount of LST tokens to be received for the operation to be considered valid. Any slippage will be sent to the relayer of the packet.
+        min_mint_amount: Uint128,
+    },
+
+    /// Initiates the unbonding process for a user.
+    Unbond {
+        /// The address that will receive the native tokens on.
+        staker: Staker,
+
+        /// The amount to unstake.
+        ///
+        /// NOTE: In the original milkyway implementation, the contract expected funds to be sent to it (verified with must_pay) since the tokens were all native (ibc denoms for the base token, tokenfactory for the lst)
+        amount: Uint128,
+    },
+
+    /// Withdraws unstaked tokens.
+    Withdraw {
+        /// The address that will receive the funds.
+        staker: Staker,
+        /// ID of the batch from which to withdraw.
+        batch_id: BatchId,
+    },
+}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ConfigResponse {

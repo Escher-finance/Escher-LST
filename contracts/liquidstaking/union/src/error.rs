@@ -18,7 +18,7 @@ pub enum ContractError {
     SerdeJson(#[from] serde_json::Error),
 
     #[error("unauthorized: {sender}")]
-    Unauthorized { sender: String },
+    Unauthorized { sender: Addr },
 
     #[error("admin error: {0}")]
     Admin(#[from] AdminError),

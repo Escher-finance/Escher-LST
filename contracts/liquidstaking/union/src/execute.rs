@@ -12,8 +12,8 @@ use crate::{
     error::{ContractError, ContractResult},
     helpers::{compute_mint_amount, compute_unbond_amount, query_and_validate_unbonding_period},
     state::{
-        AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, PendingBatchId,
-        StakerAddress, Stopped, UnstakeRequests,
+        AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
+        PendingBatchId, StakerAddress, Stopped, UnstakeRequests,
     },
     types::{
         AccountingState, Batch, BatchExpectedAmount, BatchId, BatchState, Config, Staker,
@@ -32,14 +32,18 @@ pub fn ensure_not_stopped(deps: Deps) -> Result<(), ContractError> {
 
 // TODO: Build out an allowances system?
 pub fn ensure_trusted_address(
-    config: &Config,
+    deps: Deps,
     info: &MessageInfo,
-    staker: &[u8],
+    local_staker_address: &str,
 ) -> Result<(), ContractError> {
-    if info.sender.as_bytes() != staker {
-        // funded_dispatch_address is a trusted address
-        if info.sender != config.funded_dispatch_address {
-            panic!("nice try fucker")
+    if info.sender.as_bytes() != local_staker_address {
+        let on_zkgm_call_proxy_address = deps.storage.read_item::<OnZkgmCallProxy>()?;
+
+        // on_zkgm_call_proxy is a trusted address
+        if info.sender != on_zkgm_call_proxy_address {
+            return Err(ContractError::Unauthorized {
+                sender: info.sender.clone(),
+            });
         }
     }
 
@@ -53,13 +57,11 @@ pub fn ensure_trusted_address(
 /// 5. Update state
 pub fn bond(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
-    mint_to_address: String,
+    mint_to_address: Addr,
+    // if set, this address will be sent the slippage (if any)
+    relayer: Option<Addr>,
     min_mint_amount: u128,
-    // (path, destination_channel_id, relayer)
-    // channel_id of the channel *on this chain*
-    lane: Option<(U256, ChannelId, Addr)>,
 ) -> ContractResult<Response> {
     ensure_not_stopped(deps.as_ref())?;
 
@@ -89,23 +91,24 @@ pub fn bond(
         return Err(ContractError::MintError);
     }
 
-    let (mint_amount, slippage_and_lane) = match (mint_amount.checked_sub(min_mint_amount), lane) {
-        (Some(0), _) | (Some(_), None) => {
-            // either no slippage, (i.e. the exact amount was met) or there is no relayer to send the slippage to
-            (mint_amount, None)
-        }
-        (Some(slippage), Some(lane)) => {
-            // mint slippage to the relayer as a fee
-            (min_mint_amount, Some((slippage, lane)))
-        }
-        (None, _) => {
-            // slippage not met
-            return Err(ContractError::MintAmountMismatch {
-                expected: min_mint_amount,
-                actual: mint_amount,
-            });
-        }
-    };
+    let (mint_amount, slippage_and_relayer) =
+        match (mint_amount.checked_sub(min_mint_amount), relayer) {
+            (Some(0), _) | (Some(_), None) => {
+                // either no slippage, (i.e. the exact amount was met) or there is no relayer to send the slippage to
+                (mint_amount, None)
+            }
+            (Some(slippage), Some(relayer)) => {
+                // mint slippage to the relayer as a fee
+                (min_mint_amount, Some((slippage, relayer)))
+            }
+            (None, _) => {
+                // slippage not met
+                return Err(ContractError::MintAmountMismatch {
+                    expected: min_mint_amount,
+                    actual: mint_amount,
+                });
+            }
+        };
 
     // transfer native token to multisig address
     // NOTE: In the original milkyway satking contracts, this was an ibc transfer message back to the multisig on the source chain since the liquid staking is *initiated* on the protocol chain (i.e. where this contract is deployed), but the *staking* happens on the native chain
@@ -130,14 +133,15 @@ pub fn bond(
             &lst_address,
             &Cw20ExecuteMsg::Mint {
                 amount: min_mint_amount.into(),
-                recipient: mint_to_address.clone(),
+                recipient: mint_to_address.to_string(),
             },
             vec![],
         )?)
         // mint the slippage (if any), into the relayer (if any)
         .add_messages(
-            slippage_and_lane
-                .map(|(slippage, (_, _, relayer))| {
+            slippage_and_relayer
+                .clone()
+                .map(|(slippage, relayer)| {
                     wasm_execute(
                         // eU address
                         lst_address,
@@ -153,12 +157,17 @@ pub fn bond(
         .add_event(
             Event::new("bond")
                 .add_attribute("mint_to_address", mint_to_address.to_string())
-                .add_attribute("action", "bond")
                 // NOTE: In practice, this will always be the funded-dispatch contract. This may need to be changed to emit the original sender from the source chain (if it exists).
                 .add_attribute("sender", info.sender.to_string())
                 .add_attribute("in_amount", amount.to_string())
                 .add_attribute("mint_amount", mint_amount.to_string()),
-        );
+        )
+        .add_events(slippage_and_relayer.map(|(slippage, relayer)| {
+            Event::new("bond_slippage_paid").add_attributes([
+                attr("slippage", slippage.to_string()),
+                attr("relayer", relayer),
+            ])
+        }));
 
     Ok(response)
 }
@@ -181,11 +190,12 @@ pub fn unbond(
     amount: u128,
     staker: Staker,
 ) -> ContractResult<Response> {
-    let config = deps.storage.read_item::<ConfigStore>()?;
-
     ensure_not_stopped(deps.as_ref())?;
 
-    ensure_trusted_address(&config, &info, &staker)?;
+    // if the staker is local, then we need to ensure that the address allowed to unbond for the staker
+    if let Staker::Local { address } = &staker {
+        ensure_trusted_address(deps.as_ref(), &info, &address)?;
+    };
 
     let pending_batch_id = deps.storage.read_item::<PendingBatchId>()?;
 
@@ -244,11 +254,14 @@ pub fn unbond(
 
     let response = Response::new()
         .add_message(lst_transfer_from_msg)
-        .add_attribute("action", "unbond")
-        .add_attribute("staker_hash", staker_hash.to_string())
-        .add_attribute("batch", pending_batch_id.to_string())
-        .add_attribute("amount", amount.to_string())
-        .add_attribute("is_new_request", is_new_request.to_string());
+        .add_event(
+            Event::new("unbond")
+                .add_attribute("action", "unbond")
+                .add_attribute("staker_hash", staker_hash.to_string())
+                .add_attribute("batch", pending_batch_id.to_string())
+                .add_attribute("amount", amount.to_string())
+                .add_attribute("is_new_request", is_new_request.to_string()),
+        );
 
     Ok(match staker {
         Staker::Local { address } => response.add_attributes([

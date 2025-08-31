@@ -1,10 +1,11 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult,
+    entry_point, from_json, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult,
 };
 use cw2::set_contract_version;
 use depolama::StorageExt;
+use on_zkgm_call_proxy::OnProxyOnZkgmCall;
 use semver::Version;
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
         withdraw,
     },
     helpers::query_and_validate_unbonding_period,
-    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg, RemoteExecuteMsg},
     query::{
         query_all_unstake_requests, query_batch, query_batches, query_batches_by_ids, query_config,
         query_pending_batch, query_state, query_unstake_requests,
@@ -24,7 +25,7 @@ use crate::{
         AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
         PendingBatchId, ProtocolFeeConfigStore, StakerAddress, Zkgm,
     },
-    types::{AccountingState, Batch, BatchId, Config, MAX_FEE_RATE},
+    types::{AccountingState, Batch, BatchId, Config, Staker, MAX_FEE_RATE},
 };
 
 // Version information for migration
@@ -116,42 +117,27 @@ pub fn execute(
         ExecuteMsg::Bond {
             mint_to,
             min_mint_amount,
-        } => bond(deps, env, info, mint_to, min_mint_amount),
-        ExecuteMsg::Unbond { amount, staker } => unbond(deps, env, info, amount, staker),
-
+        } => bond(deps, info, mint_to, None, min_mint_amount.u128()),
+        ExecuteMsg::Unbond { amount, staker } => unbond(
+            deps,
+            env,
+            info,
+            amount.u128(),
+            Staker::Local {
+                address: staker.to_string(),
+            },
+        ),
         ExecuteMsg::SubmitBatch {} => submit_batch(deps, env),
-
         ExecuteMsg::Withdraw { batch_id, staker } => withdraw(deps, info, batch_id, staker),
-
-        // ownership msgs
         ExecuteMsg::TransferOwnership { new_owner } => {
             transfer_ownership(deps, env, info, new_owner)
         }
         ExecuteMsg::AcceptOwnership {} => accept_ownership(deps, env, info),
         ExecuteMsg::RevokeOwnershipTransfer {} => revoke_ownership_transfer(deps, env, info),
-
-        // ExecuteMsg::UpdateConfig {
-        //     native_chain_config,
-        //     protocol_chain_config,
-        //     protocol_fee_config,
-        //     monitors,
-        //     batch_period,
-        // } => update_config(
-        //     deps,
-        //     env,
-        //     info,
-        //     native_chain_config,
-        //     protocol_chain_config,
-        //     protocol_fee_config,
-        //     monitors,
-        //     batch_period,
-        // ),
         ExecuteMsg::ReceiveRewards {} => receive_rewards(deps, info),
         ExecuteMsg::ReceiveUnstakedTokens { batch_id } => {
             receive_unstaked_tokens(deps, env, info, batch_id)
         }
-
-        // pause/resume msgs
         ExecuteMsg::CircuitBreaker {} => circuit_breaker(deps, env, info),
         ExecuteMsg::ResumeContract {
             total_bonded_native_tokens,
@@ -166,6 +152,38 @@ pub fn execute(
             total_reward_amount,
         ),
         ExecuteMsg::SlashBatches { new_amounts } => slash_batches(deps, info, new_amounts),
+        ExecuteMsg::OnProxyOnZkgmCall(OnProxyOnZkgmCall { on_zkgm_msg, msg }) => {
+            // TODO: ASSERT CALLER
+
+            let msg = from_json::<RemoteExecuteMsg>(msg)?;
+
+            // this is Call.message as sent from the source chain
+            match msg {
+                RemoteExecuteMsg::Bond {
+                    mint_to,
+                    min_mint_amount,
+                } => bond(
+                    deps,
+                    info,
+                    mint_to,
+                    Some(on_zkgm_msg.relayer),
+                    min_mint_amount.u128(),
+                ),
+                RemoteExecuteMsg::Unbond { staker, amount } => unbond(
+                    deps,
+                    env,
+                    info,
+                    amount.u128(),
+                    Staker::Remote {
+                        // REVIEW: WHat address to use here?
+                        address: on_zkgm_msg.sender,
+                        channel_id: on_zkgm_msg.destination_channel_id,
+                        path: on_zkgm_msg.path,
+                    },
+                ),
+                RemoteExecuteMsg::Withdraw { staker, batch_id } => todo!(),
+            }
+        }
     }
 }
 
