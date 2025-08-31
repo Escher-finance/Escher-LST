@@ -985,7 +985,7 @@ pub fn on_zkgm(
     }
 
     // return pause for temporary on version 0.1.194
-    return Err(ContractError::FunctionalityUnderMaintenance {});
+    Err(ContractError::FunctionalityUnderMaintenance {})
 
     /*
     comment for temporary as code is unreachable
