@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, StdError, Uint128,
-    entry_point,
+    entry_point, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response,
+    StdError, Uint128,
 };
 use cw2::set_contract_version;
 
@@ -10,13 +10,13 @@ use crate::{
     instantiate::create_reward,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
     state::{
-        CONFIG, Config, OldParameters, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN,
-        REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, State, Status,
-        SupplyQueue, VALIDATORS_REGISTRY, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE,
-        WithdrawReward, unbond_record,
+        unbond_record, Config, OldParameters, Parameters, State, Status, SupplyQueue,
+        ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+        REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+        WITHDRAW_REWARD_QUEUE,
     },
     utils::{
-        batch::{Batch, batches},
+        batch::{batches, Batch},
         validation::{validate_quote_tokens, validate_validators},
     },
 };
@@ -382,6 +382,36 @@ pub fn migrate_unbond_record_v0_1_163(
     Ok(())
 }
 
+/// Fix the invalid unbond record on specific batch id
+pub fn migrate_unbond_record_v0_1_193(
+    storage: &mut dyn cosmwasm_std::Storage,
+) -> Result<(), ContractError> {
+    let invalid_batch_id = 459;
+    let mut invalid_batch = batches().load(storage, invalid_batch_id)?;
+
+    // substract amount to normalize batch total_liquid_staking
+    let batch_adjustment_amount = Uint128::new(30000u128);
+
+    let new_total_liquid_stake_amount = invalid_batch
+        .total_liquid_stake
+        .strict_sub(batch_adjustment_amount); // substract with invalid unbond record amount
+
+    invalid_batch.total_liquid_stake = new_total_liquid_stake_amount;
+    batches().save(storage, invalid_batch_id, &invalid_batch)?;
+
+    let u_record_id_1 = 517;
+    let mut u_record1 = unbond_record().load(storage, u_record_id_1)?;
+    u_record1.amount = Uint128::new(15000u128);
+    unbond_record().save(storage, u_record_id_1, &u_record1)?;
+
+    let u_record_id_2 = 519;
+    let mut u_record2: crate::state::UnbondRecord = unbond_record().load(storage, u_record_id_2)?;
+    u_record2.amount = Uint128::new(15000u128);
+    unbond_record().save(storage, u_record_id_2, &u_record2)?;
+
+    Ok(())
+}
+
 #[test]
 fn test_migrate_unbond_record_v0_1_163() {
     let mut deps = cosmwasm_std::testing::mock_dependencies();
@@ -425,4 +455,78 @@ fn test_migrate_unbond_record_v0_1_163() {
     assert_eq!(new_data.recipient, None);
 
     println!("{:#?}", new_data);
+}
+
+#[test]
+fn test_migrate_unbond_record_v0_1_193() {
+    let mut deps: cosmwasm_std::OwnedDeps<
+        cosmwasm_std::MemoryStorage,
+        cosmwasm_std::testing::MockApi,
+        cosmwasm_std::testing::MockQuerier,
+    > = cosmwasm_std::testing::mock_dependencies();
+    let sender = "sender".to_string();
+    let staker = "staker".to_string();
+    let pending_batch_id = 459;
+    let channel_id = Some(1);
+    // Populate old storage
+    let store = crate::state::unbond_record();
+
+    let invalid_batch_id = 459;
+    let current_total_liquid_stake: u128 = 4660596803; // it is over 30000 because of 1 invalid unbond record with unstake value = 30000
+    let total_liquid_stake_adjustment: u128 = 30000;
+
+    let batch = Batch {
+        id: invalid_batch_id,
+        total_liquid_stake: Uint128::new(current_total_liquid_stake),
+        expected_native_unstaked: None,
+        received_native_unstaked: None,
+        unbond_records_count: 4,
+        next_batch_action_time: Some(1756603198),
+        status: crate::utils::batch::BatchStatus::Pending,
+    };
+
+    batches()
+        .save(&mut deps.storage, invalid_batch_id, &batch)
+        .unwrap();
+
+    let amounts: [u128; 4] = [30000, 30000, 4660506803, 30000];
+
+    for (index, id) in (516..520).enumerate() {
+        let data = crate::state::UnbondRecord {
+            id,
+            height: (1000 + index) as u64,
+            sender: sender.clone(),
+            staker: staker.clone(),
+            channel_id,
+            amount: Uint128::new(amounts[index]),
+            released_height: 0,
+            released: false,
+            batch_id: pending_batch_id,
+            recipient: None,
+            recipient_channel_id: None,
+        };
+        store.save(&mut deps.storage, id, &data).unwrap();
+    }
+
+    // Run migration
+    migrate_unbond_record_v0_1_193(deps.as_mut().storage).unwrap();
+
+    // check normalize unbond_record
+    let u_record_id_1 = 517;
+    let u_record_1 = unbond_record().load(&deps.storage, u_record_id_1).unwrap();
+    assert_eq!(u_record_1.amount, Uint128::new(15000u128));
+
+    // check normalize unbond_record
+    let u_record_id_2 = 519;
+    let u_record_2 = unbond_record().load(&deps.storage, u_record_id_2).unwrap();
+    assert_eq!(u_record_2.amount, Uint128::new(15000u128));
+
+    // check batch
+    let updated_batch = batches().load(&deps.storage, invalid_batch_id).unwrap();
+
+    let expected_new_amount: u128 = current_total_liquid_stake - total_liquid_stake_adjustment;
+    assert_eq!(
+        updated_batch.total_liquid_stake,
+        Uint128::new(expected_new_amount)
+    );
 }
