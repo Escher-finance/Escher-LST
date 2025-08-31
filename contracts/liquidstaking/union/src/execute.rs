@@ -5,20 +5,15 @@ use cosmwasm_std::{
 use cw20::Cw20ExecuteMsg;
 use cw_utils::must_pay;
 use depolama::StorageExt;
-use ibc_union_spec::ChannelId;
-use unionlabs_primitives::{Bytes, U256};
 
 use crate::{
     error::{ContractError, ContractResult},
     helpers::{compute_mint_amount, compute_unbond_amount, query_and_validate_unbonding_period},
     state::{
         AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
-        PendingBatchId, StakerAddress, Stopped, UnstakeRequests,
+        PendingBatchId, ProtocolFeeConfigStore, StakerAddress, Stopped, UnstakeRequests,
     },
-    types::{
-        AccountingState, Batch, BatchExpectedAmount, BatchId, BatchState, Config, Staker,
-        UnstakeRequest, UnstakeRequestKey,
-    },
+    types::{Batch, BatchId, BatchState, Staker, UnstakeRequest, UnstakeRequestKey},
 };
 
 const FEE_RATE_DENOMINATOR: u64 = 100_000;
@@ -30,24 +25,25 @@ pub fn ensure_not_stopped(deps: Deps) -> Result<(), ContractError> {
     Ok(())
 }
 
-// TODO: Build out an allowances system?
-pub fn ensure_trusted_address(
-    deps: Deps,
-    info: &MessageInfo,
-    local_staker_address: &str,
-) -> Result<(), ContractError> {
-    if info.sender.as_str() != local_staker_address {
-        let on_zkgm_call_proxy_address = deps.storage.read_item::<OnZkgmCallProxy>()?;
-
-        // on_zkgm_call_proxy is a trusted address
-        if info.sender != on_zkgm_call_proxy_address {
-            return Err(ContractError::Unauthorized {
-                sender: info.sender.clone(),
-            });
-        }
+fn ensure_proxy(deps: Deps, info: &MessageInfo) -> Result<(), ContractError> {
+    if deps.storage.read_item::<OnZkgmCallProxy>()? != info.sender {
+        Err(ContractError::Unauthorized {
+            sender: info.sender.clone(),
+        })
+    } else {
+        Ok(())
     }
+}
 
-    Ok(())
+// TODO: Build out an allowances system?
+pub fn ensure_sender(info: &MessageInfo, local_staker_address: &str) -> Result<(), ContractError> {
+    if info.sender.as_str() != local_staker_address {
+        Err(ContractError::Unauthorized {
+            sender: info.sender.clone(),
+        })
+    } else {
+        Ok(())
+    }
 }
 
 /// 1. Ensure native tokens are provided.
@@ -194,7 +190,7 @@ pub fn unbond(
 
     // if the staker is local, then we need to ensure that the address allowed to unbond for the staker
     if let Staker::Local { address } = &staker {
-        ensure_trusted_address(deps.as_ref(), &info, &address)?;
+        ensure_sender(&info, &address)?;
     };
 
     let pending_batch_id = deps.storage.read_item::<PendingBatchId>()?;
@@ -381,7 +377,7 @@ pub fn submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response> {
 }
 
 pub fn withdraw(
-    mut deps: DepsMut,
+    deps: DepsMut,
     info: MessageInfo,
     batch_id: BatchId,
     staker: Staker,
@@ -393,7 +389,7 @@ pub fn withdraw(
 
     // if the staker is local, then we need to ensure that the address allowed to withdraw for the staker
     if let Staker::Local { address } = &staker {
-        ensure_trusted_address(deps.as_ref(), &info, &address)?;
+        ensure_sender(&info, &address)?;
     };
 
     let Some(batch) = deps.storage.maybe_read::<Batches>(&batch_id)? else {
@@ -422,7 +418,7 @@ pub fn withdraw(
         .multiply_ratio(liquid_unstake_request.amount, batch.total_lst_to_burn)
         .u128();
 
-    deps.storage.delete(&unstake_request_key);
+    deps.storage.delete::<UnstakeRequests>(&unstake_request_key);
 
     Ok(Response::new()
         // send the native token (U) back to the staker
@@ -430,7 +426,7 @@ pub fn withdraw(
             to_address: withdraw_to_address.to_string(),
             amount: vec![Coin {
                 denom: config.native_token_denom.clone(),
-                amount,
+                amount: amount.into(),
             }],
         })
         .add_attribute("action", "execute_withdraw")
@@ -442,77 +438,77 @@ pub fn withdraw(
 // This will require the new owner to accept to take effect.
 // No need to handle case of overwriting the pending owner
 // Ownership can only be claimed after 7 days to mitigate fat finger errors
-pub fn transfer_ownership(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    new_owner: String,
-) -> ContractResult<Response> {
-    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+// pub fn transfer_ownership(
+//     deps: DepsMut,
+//     env: Env,
+//     info: MessageInfo,
+//     new_owner: String,
+// ) -> ContractResult<Response> {
+//     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
-    STATE.update::<_, ContractError>(deps.storage, |mut state| {
-        state.pending_owner = Some(deps.api.addr_validate(&new_owner)?);
-        state.owner_transfer_min_time = Some(Timestamp::from_seconds(
-            env.block.time.seconds() + 60 * 60 * 24 * 7,
-        )); // 7 days
+//     STATE.update::<_, ContractError>(deps.storage, |mut state| {
+//         state.pending_owner = Some(deps.api.addr_validate(&new_owner)?);
+//         state.owner_transfer_min_time = Some(Timestamp::from_seconds(
+//             env.block.time.seconds() + 60 * 60 * 24 * 7,
+//         )); // 7 days
 
-        Ok(state)
-    })?;
+//         Ok(state)
+//     })?;
 
-    Ok(Response::new()
-        .add_attribute("action", "transfer_ownership")
-        .add_attribute("new_owner", new_owner)
-        .add_attribute("previous_owner", info.sender))
-}
+//     Ok(Response::new()
+//         .add_attribute("action", "transfer_ownership")
+//         .add_attribute("new_owner", new_owner)
+//         .add_attribute("previous_owner", info.sender))
+// }
 
 // Revoke transfer ownership, callable by the owner
-pub fn revoke_ownership_transfer(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-) -> ContractResult<Response> {
-    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+// pub fn revoke_ownership_transfer(
+//     deps: DepsMut,
+//     _env: Env,
+//     info: MessageInfo,
+// ) -> ContractResult<Response> {
+//     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
-    STATE.update::<_, ContractError>(deps.storage, |mut state| {
-        state.pending_owner = None;
-        state.owner_transfer_min_time = None;
+//     STATE.update::<_, ContractError>(deps.storage, |mut state| {
+//         state.pending_owner = None;
+//         state.owner_transfer_min_time = None;
 
-        Ok(state)
-    })?;
+//         Ok(state)
+//     })?;
 
-    Ok(Response::new().add_attribute("action", "revoke_ownership_transfer"))
-}
+//     Ok(Response::new().add_attribute("action", "revoke_ownership_transfer"))
+// }
 
-pub fn accept_ownership(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
-    let mut accounting = deps.storage.read_item::<AccountingStateStore>()?;
+// pub fn accept_ownership(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
+//     let mut accounting = deps.storage.read_item::<AccountingStateStore>()?;
 
-    if let Some(owner_transfer_min_time) = accounting.owner_transfer_min_time {
-        if owner_transfer_min_time > env.block.time {
-            return Err(ContractError::OwnershipTransferNotReady {
-                time_to_claim: Timestamp::from_seconds(
-                    accounting.owner_transfer_min_time.unwrap().seconds(),
-                ),
-            });
-        }
-    }
+//     if let Some(owner_transfer_min_time) = accounting.owner_transfer_min_time {
+//         if owner_transfer_min_time > env.block.time {
+//             return Err(ContractError::OwnershipTransferNotReady {
+//                 time_to_claim: Timestamp::from_seconds(
+//                     accounting.owner_transfer_min_time.unwrap().seconds(),
+//                 ),
+//             });
+//         }
+//     }
 
-    match accounting.pending_owner {
-        Some(pending_owner) => {
-            if pending_owner == info.sender {
-                accounting.pending_owner = None;
-                STATE.save(deps.storage, &accounting)?;
+//     match accounting.pending_owner {
+//         Some(pending_owner) => {
+//             if pending_owner == info.sender {
+//                 accounting.pending_owner = None;
+//                 STATE.save(deps.storage, &accounting)?;
 
-                ADMIN.set(deps, Some(pending_owner))?;
-                Ok(Response::new()
-                    .add_attribute("action", "accept_ownership")
-                    .add_attribute("new_owner", info.sender))
-            } else {
-                Err(ContractError::CallerIsNotPendingOwner)
-            }
-        }
-        _ => Err(ContractError::NoPendingOwner),
-    }
-}
+//                 ADMIN.set(deps, Some(pending_owner))?;
+//                 Ok(Response::new()
+//                     .add_attribute("action", "accept_ownership")
+//                     .add_attribute("new_owner", info.sender))
+//             } else {
+//                 Err(ContractError::CallerIsNotPendingOwner)
+//             }
+//         }
+//         _ => Err(ContractError::NoPendingOwner),
+//     }
+// }
 
 // TODO: Implement once basic functionality is completed
 // // Update the config; callable by the owner
@@ -585,12 +581,13 @@ pub fn receive_rewards(deps: DepsMut, info: MessageInfo) -> ContractResult<Respo
 
     ensure_not_stopped(deps.as_ref())?;
 
-    let amount = must_pay(&info, &config.native_token_denom)?;
+    let amount = must_pay(&info, &config.native_token_denom)?.u128();
 
-    let fee = config
-        .protocol_fee_config
-        .fee_rate
-        .multiply_ratio(amount, FEE_RATE_DENOMINATOR);
+    let protocol_fee_config = deps.storage.read_item::<ProtocolFeeConfigStore>()?;
+
+    let fee = Uint128::new(protocol_fee_config.fee_rate)
+        .multiply_ratio(amount, FEE_RATE_DENOMINATOR)
+        .u128();
     if fee == 0 {
         return Err(ContractError::ComputedFeesAreZero {
             received_rewards: amount,
@@ -599,36 +596,38 @@ pub fn receive_rewards(deps: DepsMut, info: MessageInfo) -> ContractResult<Respo
     let amount_after_fees =
         amount
             .checked_sub(fee)
-            .map_err(|_| ContractError::ReceiveRewardsTooSmall {
+            .ok_or_else(|| ContractError::ReceiveRewardsTooSmall {
                 amount,
                 minimum: fee,
             })?;
 
-    STATE.update::<_, ContractError>(deps.storage, |mut state| {
-        if state.total_issued_lst == 0 {
-            return Err(ContractError::NoLiquidStake);
-        }
+    deps.storage
+        .upsert_item::<AccountingStateStore, ContractError>(|accounting_state| {
+            let mut accounting_state = accounting_state.unwrap();
+            if accounting_state.total_issued_lst == 0 {
+                return Err(ContractError::NoLiquidStake);
+            }
 
-        // update the accounting of tokens
-        state.total_bonded_native_tokens += amount_after_fees;
-        state.total_reward_amount += amount;
+            // update the accounting of tokens
+            accounting_state.total_bonded_native_tokens += amount_after_fees;
+            accounting_state.total_reward_amount += amount;
 
-        Ok(state)
-    })?;
+            Ok(accounting_state)
+        });
 
     Ok(Response::new()
         .add_attribute("action", "receive_rewards")
         .add_attribute("action", "transfer_stake")
-        .add_attribute("amount", amount)
-        .add_attribute("amount_after_fees", amount_after_fees)
+        .add_attribute("amount", amount.to_string())
+        .add_attribute("amount_after_fees", amount_after_fees.to_string())
         // send amount after fees to the staker
         .add_message(BankMsg::Send {
-            to_address: config.staker_address.to_string(),
+            to_address: deps.storage.read_item::<StakerAddress>()?.to_string(),
             amount: vec![Coin::new(amount_after_fees, &config.native_token_denom)],
         })
         // send fees to the fee recipient
         .add_message(BankMsg::Send {
-            to_address: config.protocol_fee_config.fee_recipient.to_string(),
+            to_address: protocol_fee_config.fee_recipient.to_string(),
             amount: vec![cosmwasm_std::Coin::new(fee, config.native_token_denom)],
         }))
 }
@@ -692,8 +691,6 @@ pub fn receive_unstaked_tokens(
 }
 
 pub fn circuit_breaker(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult<Response> {
-    let sender = info.sender.to_string();
-
     // must either be admin or a monitor to halt the contract
     if deps.storage.read_item::<Admin>()? == info.sender
         || deps.storage.maybe_read::<Monitors>(&info.sender)?.is_some()
@@ -702,7 +699,9 @@ pub fn circuit_breaker(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractR
 
         Ok(Response::new().add_attribute("action", "circuit_breaker"))
     } else {
-        Err(ContractError::Unauthorized { sender })
+        Err(ContractError::Unauthorized {
+            sender: info.sender,
+        })
     }
 }
 
@@ -714,31 +713,38 @@ pub fn resume_contract(
     total_liquid_stake_token: u128,
     total_reward_amount: u128,
 ) -> ContractResult<Response> {
-    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+    // ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
-    CONFIG.update::<_, ContractError>(deps.storage, |mut config| {
-        if !config.stopped {
-            return Err(ContractError::NotStopped);
-        }
+    // CONFIG.update::<_, ContractError>(deps.storage, |mut config| {
+    //     if !config.stopped {
+    //         return Err(ContractError::NotStopped);
+    //     }
 
-        config.stopped = false;
+    //     config.stopped = false;
 
-        Ok(config)
-    })?;
+    //     Ok(config)
+    // })?;
 
-    STATE.update::<_, ContractError>(deps.storage, |mut state| {
-        state.total_bonded_native_tokens = total_bonded_native_tokens;
-        state.total_issued_lst = total_liquid_stake_token;
-        state.total_reward_amount = total_reward_amount;
+    // STATE.update::<_, ContractError>(deps.storage, |mut state| {
+    //     state.total_bonded_native_tokens = total_bonded_native_tokens;
+    //     state.total_issued_lst = total_liquid_stake_token;
+    //     state.total_reward_amount = total_reward_amount;
 
-        Ok(state)
-    })?;
+    //     Ok(state)
+    // })?;
 
-    Ok(Response::new()
-        .add_attribute("action", "resume_contract")
-        .add_attribute("total_bonded_native_tokens", total_bonded_native_tokens)
-        .add_attribute("total_liquid_stake_token", total_liquid_stake_token)
-        .add_attribute("total_reward_amount", total_reward_amount))
+    Ok(Response::new().add_event(
+        Event::new("resume_contract")
+            .add_attribute(
+                "total_bonded_native_tokens",
+                total_bonded_native_tokens.to_string(),
+            )
+            .add_attribute(
+                "total_liquid_stake_token",
+                total_liquid_stake_token.to_string(),
+            )
+            .add_attribute("total_reward_amount", total_reward_amount.to_string()),
+    ))
 }
 
 // pub fn slash_batches(

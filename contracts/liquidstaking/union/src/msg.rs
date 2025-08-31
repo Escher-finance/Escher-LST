@@ -12,7 +12,7 @@ use crate::types::{
     Batch, BatchExpectedAmount, BatchId, BatchStatus, ProtocolFeeConfig, Staker, UnstakeRequest,
 };
 
-#[cw_serde]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InstantiateMsg {
     pub native_token_denom: String,
 
@@ -40,7 +40,7 @@ pub struct InstantiateMsg {
     pub on_zkgm_call_proxy_address: Addr,
 }
 
-#[cw_serde]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum ExecuteMsg {
     /// Initiates the bonding process for a user.
@@ -155,7 +155,7 @@ pub enum RemoteExecuteMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConfigResponse {
     // TODO: Add more fields here
     pub protocol_fee_config: ProtocolFeeConfig,
@@ -165,7 +165,7 @@ pub struct ConfigResponse {
     pub stopped: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StateResponse {
     pub total_bonded_native_tokens: Uint128,
     pub total_liquid_stake_token: Uint128,
@@ -173,11 +173,11 @@ pub struct StateResponse {
     pub pending_owner: String,
     pub total_reward_amount: Uint128,
 }
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BatchesResponse {
     pub batches: BTreeMap<u64, Batch>,
 }
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UnstakeRequestResponse {
     pub batch_id: BatchId,
     pub batch_total_liquid_stake: Uint128,
@@ -188,29 +188,29 @@ pub struct UnstakeRequestResponse {
     pub user: String,
 }
 
-#[cw_serde]
-#[derive(QueryResponses)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// #[derive(QueryResponses)]
 pub enum QueryMsg {
     /// Queries the contract configuration.
     /// Returns the current `native_chain_config`, `protocol_chain_config`,
     /// `protocol_fee_config`, `liquid_stake_token_denom`, and other settings.
-    #[returns(ConfigResponse)]
+    // #[returns(ConfigResponse)]
     Config {},
 
     /// Queries the current state of the contract.
     /// Returns totals such as delegated native tokens, LST supply, and rewards.
-    #[returns(StateResponse)]
+    // #[returns(StateResponse)]
     State {},
 
     /// Queries the information of a specific batch by its ID.
-    #[returns(Batch)]
+    // #[returns(Batch)]
     Batch {
         /// ID of the batch to query.
         id: u64,
     },
 
     /// Queries a paginated list of all batches stored in contract storage.
-    #[returns(BatchesResponse)]
+    // #[returns(BatchesResponse)]
     Batches {
         /// If provided, starts listing batches after this batch ID.
         start_after: Option<u64>,
@@ -223,25 +223,25 @@ pub enum QueryMsg {
     },
 
     /// Queries the batches with the provided list of IDs.
-    #[returns(BatchesResponse)]
+    // #[returns(BatchesResponse)]
     BatchesByIds {
         /// List of batch IDs to fetch.
         ids: Vec<u64>,
     },
 
     /// Queries the current batch that is pending processing (if any).
-    #[returns(Batch)]
+    // #[returns(Batch)]
     PendingBatch {},
 
     /// Queries the unstake requests made by a specific user.
-    #[returns(Vec<UnstakeRequest>)]
+    // #[returns(Vec<UnstakeRequest>)]
     UnstakeRequests {
         /// Address of the user whose unstake requests are to be queried.
         user: Bytes,
     },
 
     /// Queries all unstake requests in the contract.
-    #[returns(Vec<UnstakeRequestResponse>)]
+    // #[returns(Vec<UnstakeRequestResponse>)]
     AllUnstakeRequests {
         /// If provided, starts listing unstake requests after this ID.
         start_after: Option<u64>,

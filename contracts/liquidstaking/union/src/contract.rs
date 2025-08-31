@@ -1,4 +1,3 @@
-use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     entry_point, from_json, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     StdError, StdResult,
@@ -7,21 +6,21 @@ use cw2::set_contract_version;
 use depolama::StorageExt;
 use on_zkgm_call_proxy::OnProxyOnZkgmCall;
 use semver::Version;
+use serde::{Deserialize, Serialize};
 use unionlabs_primitives::U256;
 
 use crate::{
     error::ContractError,
     execute::{
-        accept_ownership, bond, circuit_breaker, receive_rewards, receive_unstaked_tokens,
-        resume_contract, revoke_ownership_transfer, submit_batch, transfer_ownership, unbond,
-        withdraw,
+        bond, circuit_breaker, receive_rewards, receive_unstaked_tokens, resume_contract,
+        submit_batch, unbond, withdraw,
     },
     helpers::query_and_validate_unbonding_period,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, RemoteExecuteMsg},
-    query::{
-        query_all_unstake_requests, query_batch, query_batches, query_batches_by_ids, query_config,
-        query_pending_batch, query_state, query_unstake_requests,
-    },
+    // query::{
+    //     query_all_unstake_requests, query_batch, query_batches, query_batches_by_ids, query_config,
+    //     query_pending_batch, query_state, query_unstake_requests,
+    // },
     state::{
         AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
         PendingBatchId, ProtocolFeeConfigStore, StakerAddress, Zkgm,
@@ -39,7 +38,7 @@ pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
-    mut deps: DepsMut,
+    deps: DepsMut,
     env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
@@ -143,10 +142,17 @@ pub fn execute(
             withdraw_to_address,
         ),
         ExecuteMsg::TransferOwnership { new_owner } => {
-            transfer_ownership(deps, env, info, new_owner)
+            // transfer_ownership(deps, env, info, new_owner)
+            todo!()
         }
-        ExecuteMsg::AcceptOwnership {} => accept_ownership(deps, env, info),
-        ExecuteMsg::RevokeOwnershipTransfer {} => revoke_ownership_transfer(deps, env, info),
+        ExecuteMsg::AcceptOwnership {} => {
+            // accept_ownership(deps, env, info)
+            todo!()
+        }
+        ExecuteMsg::RevokeOwnershipTransfer {} => {
+            // revoke_ownership_transfer(deps, env, info)
+            todo!()
+        }
         ExecuteMsg::ReceiveRewards {} => receive_rewards(deps, info),
         ExecuteMsg::ReceiveUnstakedTokens { batch_id } => {
             receive_unstaked_tokens(deps, env, info, batch_id)
@@ -174,10 +180,8 @@ pub fn execute(
         ExecuteMsg::OnProxyOnZkgmCall(OnProxyOnZkgmCall { on_zkgm_msg, msg }) => {
             // TODO: ASSERT CALLER
 
-            let msg = from_json::<RemoteExecuteMsg>(msg)?;
-
             // this is Call.message as sent from the source chain
-            match msg {
+            match from_json::<RemoteExecuteMsg>(msg)? {
                 RemoteExecuteMsg::Bond {
                     mint_to,
                     min_mint_amount,
@@ -225,29 +229,30 @@ pub fn execute(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
-        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
-        QueryMsg::State {} => to_json_binary(&query_state(deps)?),
-        QueryMsg::Batch { id } => to_json_binary(&query_batch(deps, id)?),
-        QueryMsg::Batches {
-            start_after,
-            limit,
-            status,
-        } => to_json_binary(&query_batches(deps, start_after, limit, status)?),
-        QueryMsg::BatchesByIds { ids } => to_json_binary(&query_batches_by_ids(deps, ids)?),
-        QueryMsg::PendingBatch {} => to_json_binary(&query_pending_batch(deps)?),
-        QueryMsg::UnstakeRequests { user } => to_json_binary(&query_unstake_requests(deps, user)?),
-        QueryMsg::AllUnstakeRequests { start_after, limit } => {
-            to_json_binary(&query_all_unstake_requests(deps, start_after, limit)?)
-        }
-    }
+    // match msg {
+    //     QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
+    //     QueryMsg::State {} => to_json_binary(&query_state(deps)?),
+    //     QueryMsg::Batch { id } => to_json_binary(&query_batch(deps, id)?),
+    //     QueryMsg::Batches {
+    //         start_after,
+    //         limit,
+    //         status,
+    //     } => to_json_binary(&query_batches(deps, start_after, limit, status)?),
+    //     QueryMsg::BatchesByIds { ids } => to_json_binary(&query_batches_by_ids(deps, ids)?),
+    //     QueryMsg::PendingBatch {} => to_json_binary(&query_pending_batch(deps)?),
+    //     QueryMsg::UnstakeRequests { user } => to_json_binary(&query_unstake_requests(deps, user)?),
+    //     QueryMsg::AllUnstakeRequests { start_after, limit } => {
+    //         to_json_binary(&query_all_unstake_requests(deps, start_after, limit)?)
+    //     }
+    // }
+    todo!()
 }
 
 ///////////////
 /// MIGRATE ///
 ///////////////
 
-#[cw_serde]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MigrateMsg {}
 
 #[cfg_attr(not(feature = "library"), entry_point)]

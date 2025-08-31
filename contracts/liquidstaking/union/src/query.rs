@@ -6,7 +6,6 @@ use unionlabs_primitives::Bytes;
 use crate::{
     helpers::get_rates,
     msg::{BatchesResponse, ConfigResponse, StateResponse},
-    state::{unstake_requests, UnstakeRequest, BATCHES, CONFIG, PENDING_BATCH_ID, STATE},
     types::{Batch, BatchStatus},
 };
 
