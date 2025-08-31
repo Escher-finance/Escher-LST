@@ -118,7 +118,7 @@ pub enum ExecuteMsg {
         total_bonded_native_tokens: Uint128,
 
         /// Updated total issued liquid staked tokens.
-        total_liquid_stake_token: Uint128,
+        total_issued_lst: Uint128,
 
         /// Updated total protocol rewards.
         total_reward_amount: Uint128,
@@ -153,39 +153,6 @@ pub enum RemoteExecuteMsg {
         /// The address to withdraw the funds to on this chain.
         withdraw_to_address: Addr,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ConfigResponse {
-    // TODO: Add more fields here
-    pub protocol_fee_config: ProtocolFeeConfig,
-    pub monitors: Vec<Addr>,
-    pub liquid_stake_token_denom: String,
-    pub batch_period: u64,
-    pub stopped: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StateResponse {
-    pub total_bonded_native_tokens: Uint128,
-    pub total_liquid_stake_token: Uint128,
-    pub rate: Decimal,
-    pub pending_owner: String,
-    pub total_reward_amount: Uint128,
-}
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BatchesResponse {
-    pub batches: BTreeMap<u64, Batch>,
-}
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct UnstakeRequestResponse {
-    pub batch_id: BatchId,
-    pub batch_total_liquid_stake: Uint128,
-    pub expected_native_unstaked: Uint128,
-    pub received_native_unstaked: Uint128,
-    pub status: String,
-    pub unstake_amount: Uint128,
-    pub user: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -244,9 +211,46 @@ pub enum QueryMsg {
     // #[returns(Vec<UnstakeRequestResponse>)]
     AllUnstakeRequests {
         /// If provided, starts listing unstake requests after this ID.
-        start_after: Option<u64>,
+        start_after: Option<BatchId>,
 
         /// Maximum number of unstake requests to return.
-        limit: Option<u32>,
+        limit: Option<usize>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConfigResponse {
+    pub protocol_fee_config: ProtocolFeeConfig,
+    pub monitors: Vec<Addr>,
+    pub liquid_stake_token_address: String,
+    pub batch_period: u64,
+    pub stopped: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StateResponse {
+    pub total_bonded_native_tokens: Uint128,
+    pub total_liquid_stake_token: Uint128,
+    pub rate: Decimal,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OwnershipResponse {
+    pub pending_owner: String,
+    pub total_reward_amount: Uint128,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BatchesResponse {
+    pub batches: BTreeMap<BatchId, Batch>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UnstakeRequestResponse {
+    pub batch_id: BatchId,
+    pub batch_total_liquid_stake: Uint128,
+    pub expected_native_unstaked: Uint128,
+    pub received_native_unstaked: Uint128,
+    pub status: String,
+    pub unstake_amount: Uint128,
+    pub user: String,
 }

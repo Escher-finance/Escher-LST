@@ -1,12 +1,14 @@
 use cosmwasm_std::{Deps, Order, StdResult};
 use cw_storage_plus::Bound;
+use depolama::StorageExt;
 use itertools::Itertools;
-use unionlabs_primitives::Bytes;
+use unionlabs_primitives::{Bytes, H256};
 
 use crate::{
     helpers::get_rates,
     msg::{BatchesResponse, ConfigResponse, StateResponse},
-    types::{Batch, BatchStatus},
+    state::{Batches, PendingBatchId, UnstakeRequests, UnstakeRequestsByStakerHash},
+    types::{Batch, BatchId, BatchStatus, Staker, UnstakeRequest, UnstakeRequestKey},
 };
 
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
@@ -38,69 +40,79 @@ pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
     Ok(res)
 }
 
-pub fn query_batch(deps: Deps, id: u64) -> StdResult<Batch> {
-    BATCHES.load(deps.storage, id)
+pub fn query_batch(deps: Deps, batch_id: BatchId) -> StdResult<Option<Batch>> {
+    deps.storage.maybe_read::<Batches>(&batch_id)
 }
 
 pub fn query_batches(
     deps: Deps,
-    start_after: Option<u64>,
+    start_after: Option<BatchId>,
     limit: Option<usize>,
     status: Option<BatchStatus>,
 ) -> StdResult<BatchesResponse> {
     Ok(BatchesResponse {
-        batches: BATCHES
-            .range(
-                deps.storage,
-                start_after.map(Bound::exclusive),
-                None,
-                Order::Ascending,
-            )
-            .filter_ok(|(_, v)| status.map(|s| v.state.status() == s).unwrap_or(true))
+        batches: deps
+            .storage
+            .iter_range::<Batches>(Order::Ascending, start_after.unwrap_or(BatchId::ONE)..)
+            .filter_ok(|(_, batch)| {
+                status
+                    .as_ref()
+                    .map(|s| batch.state.status() == *s)
+                    .unwrap_or(true)
+            })
             .take(limit.unwrap_or(usize::MAX))
             .collect::<Result<_, _>>()?,
     })
 }
 
-pub fn query_batches_by_ids(deps: Deps, ids: Vec<u64>) -> StdResult<BatchesResponse> {
+pub fn query_batches_by_ids(deps: Deps, batch_ids: &[BatchId]) -> StdResult<BatchesResponse> {
     Ok(BatchesResponse {
-        batches: ids
+        batches: batch_ids
             .into_iter()
-            .map(|id| (id, BATCHES.load(deps.storage, id)))
-            .map(|(id, r)| r.map(|b| (id, b)))
+            .map(|batch_id| {
+                deps.storage
+                    .read::<Batches>(batch_id)
+                    .map(|batch| (*batch_id, batch))
+            })
             .collect::<Result<_, _>>()?,
     })
 }
 
 pub fn query_pending_batch(deps: Deps) -> StdResult<Batch> {
-    BATCHES.load(deps.storage, PENDING_BATCH_ID.load(deps.storage)?)
+    deps.storage
+        .read::<Batches>(&deps.storage.read_item::<PendingBatchId>()?)
 }
 
-pub fn query_unstake_requests(deps: Deps, user: Bytes) -> StdResult<Vec<UnstakeRequest>> {
-    unstake_requests()
-        .idx
-        .by_user
-        .prefix(user.into_vec())
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .map(|r| r.map(|(_, r)| r))
+pub fn query_unstake_requests(deps: Deps, staker: Staker) -> StdResult<Vec<UnstakeRequest>> {
+    deps.storage
+        .iter_range::<UnstakeRequestsByStakerHash>(
+            Order::Ascending,
+            UnstakeRequestKey {
+                batch_id: BatchId::ONE,
+                staker_hash: staker.hash(),
+            }..=UnstakeRequestKey {
+                batch_id: BatchId::MAX,
+                staker_hash: staker.hash(),
+            },
+        )
+        .map_ok(|(_, unstake_request)| unstake_request)
         .collect()
 }
 
 pub fn query_all_unstake_requests(
     deps: Deps,
-    start_after: Option<u64>,
-    limit: Option<u32>,
+    start_after: Option<UnstakeRequestKey>,
+    limit: Option<usize>,
 ) -> StdResult<Vec<UnstakeRequest>> {
-    unstake_requests()
-        .idx
-        .by_user
-        .range(
-            deps.storage,
-            start_after.map(|s| Bound::exclusive((vec![], s))),
-            None,
-            cosmwasm_std::Order::Ascending,
+    deps.storage
+        .iter_range::<UnstakeRequestsByStakerHash>(
+            Order::Ascending,
+            start_after.unwrap_or(UnstakeRequestKey {
+                batch_id: BatchId::ONE,
+                staker_hash: H256::new([0x00; 32]),
+            })..,
         )
-        .take(limit.unwrap_or(u32::MAX) as usize)
-        .map(|r| r.map(|(_, r)| r))
-        .collect::<Result<_, _>>()
+        .take(limit.unwrap_or(usize::MAX))
+        .map_ok(|(_, unstake_request)| unstake_request)
+        .collect()
 }

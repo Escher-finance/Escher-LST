@@ -20,7 +20,7 @@ cw-storage-plus      = { workspace = true }
 cw-utils             = { workspace = true }
 cw2                  = { workspace = true }
 cw20                 = { workspace = true }
-depolama             = { workspace = true }
+depolama             = { workspace = true, features = ["iterator"] }
 enum-repr            = "0.2.6"
 hex                  = "0.4.3"
 ibc-union-spec       = { workspace = true, features = ["serde", "bincode"] }

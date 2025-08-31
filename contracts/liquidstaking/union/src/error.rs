@@ -24,8 +24,8 @@ pub enum ContractError {
     #[error("the caller is not the pending owner")]
     CallerIsNotPendingOwner,
 
-    #[error("ownership transfer not ready")]
-    OwnershipTransferNotReady { time_to_claim: Timestamp },
+    #[error("ownership transfer not ready, claimable at {time_to_claim_seconds}")]
+    OwnershipTransferNotReady { time_to_claim_seconds: u64 },
 
     #[error("Payment error: {0}")]
     Payment(#[from] PaymentError),

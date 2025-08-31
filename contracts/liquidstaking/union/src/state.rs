@@ -4,10 +4,11 @@ use depolama::{
     KeyCodec, Prefix, Store, ValueCodec,
 };
 use unionlabs_encoding::Bincode;
-use unionlabs_primitives::{ByteArrayExt, Bytes};
+use unionlabs_primitives::{ByteArrayExt, Bytes, H256};
 
 use crate::types::{
-    AccountingState, Batch, BatchId, Config, ProtocolFeeConfig, UnstakeRequest, UnstakeRequestKey,
+    AccountingState, Batch, BatchId, Config, PendingOwner, ProtocolFeeConfig, UnstakeRequest,
+    UnstakeRequestKey,
 };
 
 pub enum Stopped {}
@@ -263,10 +264,8 @@ impl KeyCodec<UnstakeRequestKey> for UnstakeRequests {
                 ))
             })
             .and_then(|arr: [u8; 40]| {
-                let batch_id = BatchId::from_be_bytes(arr.array_slice::<0, 8>())?;
-
                 Ok(UnstakeRequestKey {
-                    batch_id,
+                    batch_id: BatchId::from_be_bytes(arr.array_slice::<0, 8>())?,
                     staker_hash: arr.array_slice::<8, 32>().into(),
                 })
             })
@@ -274,5 +273,59 @@ impl KeyCodec<UnstakeRequestKey> for UnstakeRequests {
 }
 
 impl ValueCodecViaEncoding for UnstakeRequests {
+    type Encoding = Bincode;
+}
+
+/// Compliment to [`UnstakeRequests`], but keyed by the staker hash.
+pub enum UnstakeRequestsByStakerHash {}
+
+impl Store for UnstakeRequestsByStakerHash {
+    const PREFIX: Prefix = Prefix::new(b"unstake_requests_by_staker_hash");
+
+    type Key = UnstakeRequestKey;
+
+    type Value = UnstakeRequest;
+}
+
+impl KeyCodec<UnstakeRequestKey> for UnstakeRequestsByStakerHash {
+    fn encode_key(key: &UnstakeRequestKey) -> Bytes {
+        [
+            key.staker_hash.get().as_slice(),
+            key.batch_id.get().get().to_be_bytes().as_slice(),
+        ]
+        .concat()
+        .into()
+    }
+
+    fn decode_key(raw: &Bytes) -> StdResult<UnstakeRequestKey> {
+        raw.try_into()
+            .map_err(|_| {
+                StdError::generic_err(format!(
+                    "invalid key: expected 40 bytes, found {}: {raw}",
+                    raw.len(),
+                ))
+            })
+            .and_then(|arr: [u8; 40]| {
+                Ok(UnstakeRequestKey {
+                    batch_id: BatchId::from_be_bytes(arr.array_slice::<32, 8>())?,
+                    staker_hash: arr.array_slice::<0, 32>().into(),
+                })
+            })
+    }
+}
+
+impl ValueCodecViaEncoding for UnstakeRequestsByStakerHash {
+    type Encoding = Bincode;
+}
+
+pub enum PendingOwnerStore {}
+
+impl Store for PendingOwnerStore {
+    const PREFIX: Prefix = Prefix::new(b"pending_owner");
+    type Key = ();
+    type Value = PendingOwner;
+}
+
+impl ValueCodecViaEncoding for PendingOwnerStore {
     type Encoding = Bincode;
 }

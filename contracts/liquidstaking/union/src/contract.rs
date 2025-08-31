@@ -12,15 +12,15 @@ use unionlabs_primitives::U256;
 use crate::{
     error::ContractError,
     execute::{
-        bond, circuit_breaker, receive_rewards, receive_unstaked_tokens, resume_contract,
-        submit_batch, unbond, withdraw,
+        accept_ownership, bond, circuit_breaker, receive_rewards, receive_unstaked_tokens,
+        resume_contract, submit_batch, transfer_ownership, unbond, withdraw,
     },
     helpers::query_and_validate_unbonding_period,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, RemoteExecuteMsg},
-    // query::{
-    //     query_all_unstake_requests, query_batch, query_batches, query_batches_by_ids, query_config,
-    //     query_pending_batch, query_state, query_unstake_requests,
-    // },
+    query::{
+        query_all_unstake_requests, query_batches, query_batches_by_ids, query_pending_batch,
+        query_unstake_requests,
+    },
     state::{
         AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
         PendingBatchId, ProtocolFeeConfigStore, StakerAddress, Zkgm,
@@ -142,13 +142,9 @@ pub fn execute(
             withdraw_to_address,
         ),
         ExecuteMsg::TransferOwnership { new_owner } => {
-            // transfer_ownership(deps, env, info, new_owner)
-            todo!()
+            transfer_ownership(deps, env, info, new_owner)
         }
-        ExecuteMsg::AcceptOwnership {} => {
-            // accept_ownership(deps, env, info)
-            todo!()
-        }
+        ExecuteMsg::AcceptOwnership {} => accept_ownership(deps, env, info),
         ExecuteMsg::RevokeOwnershipTransfer {} => {
             // revoke_ownership_transfer(deps, env, info)
             todo!()
@@ -160,25 +156,28 @@ pub fn execute(
         ExecuteMsg::CircuitBreaker {} => circuit_breaker(deps, env, info),
         ExecuteMsg::ResumeContract {
             total_bonded_native_tokens,
-            total_liquid_stake_token,
+            total_issued_lst,
             total_reward_amount,
-        } => {
-            // resume_contract(
-            //     deps,
-            //     env,
-            //     info,
-            //     total_bonded_native_tokens,
-            //     total_liquid_stake_token,
-            //     total_reward_amount,
-            // );
-            todo!()
-        }
+        } => resume_contract(
+            deps,
+            env,
+            info,
+            AccountingState {
+                total_bonded_native_tokens: total_bonded_native_tokens.u128(),
+                total_issued_lst: total_issued_lst.u128(),
+                total_reward_amount: total_reward_amount.u128(),
+            },
+        ),
         ExecuteMsg::SlashBatches { new_amounts } => {
             // slash_batches(deps, info, new_amounts);
             todo!()
         }
         ExecuteMsg::OnProxyOnZkgmCall(OnProxyOnZkgmCall { on_zkgm_msg, msg }) => {
-            // TODO: ASSERT CALLER
+            if deps.storage.read_item::<OnZkgmCallProxy>()? != info.sender {
+                return Err(ContractError::Unauthorized {
+                    sender: info.sender.clone(),
+                });
+            }
 
             // this is Call.message as sent from the source chain
             match from_json::<RemoteExecuteMsg>(msg)? {
@@ -229,23 +228,22 @@ pub fn execute(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    // match msg {
-    //     QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
-    //     QueryMsg::State {} => to_json_binary(&query_state(deps)?),
-    //     QueryMsg::Batch { id } => to_json_binary(&query_batch(deps, id)?),
-    //     QueryMsg::Batches {
-    //         start_after,
-    //         limit,
-    //         status,
-    //     } => to_json_binary(&query_batches(deps, start_after, limit, status)?),
-    //     QueryMsg::BatchesByIds { ids } => to_json_binary(&query_batches_by_ids(deps, ids)?),
-    //     QueryMsg::PendingBatch {} => to_json_binary(&query_pending_batch(deps)?),
-    //     QueryMsg::UnstakeRequests { user } => to_json_binary(&query_unstake_requests(deps, user)?),
-    //     QueryMsg::AllUnstakeRequests { start_after, limit } => {
-    //         to_json_binary(&query_all_unstake_requests(deps, start_after, limit)?)
-    //     }
-    // }
-    todo!()
+    match msg {
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
+        QueryMsg::State {} => to_json_binary(&query_state(deps)?),
+        QueryMsg::Batch { id } => to_json_binary(&query_batch(deps, id)?),
+        QueryMsg::Batches {
+            start_after,
+            limit,
+            status,
+        } => to_json_binary(&query_batches(deps, start_after, limit, status)?),
+        QueryMsg::BatchesByIds { ids } => to_json_binary(&query_batches_by_ids(deps, ids)?),
+        QueryMsg::PendingBatch {} => to_json_binary(&query_pending_batch(deps)?),
+        QueryMsg::UnstakeRequests { user } => to_json_binary(&query_unstake_requests(deps, user)?),
+        QueryMsg::AllUnstakeRequests { start_after, limit } => {
+            to_json_binary(&query_all_unstake_requests(deps, start_after, limit)?)
+        }
+    }
 }
 
 ///////////////

@@ -14,7 +14,17 @@ pub const MAX_FEE_RATE: u128 = 100_000;
 pub const MAX_UNBONDING_PERIOD: u64 = 3_628_800;
 
 #[derive(
-    Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    bincode::Encode,
+    bincode::Decode,
 )]
 pub struct BatchId(#[serde(with = "::serde_utils::string")] NonZeroU64);
 
@@ -26,6 +36,8 @@ impl fmt::Display for BatchId {
 
 impl BatchId {
     pub const ONE: Self = Self::from_raw(1).unwrap();
+
+    pub const MAX: Self = Self::from_raw(u64::MAX).unwrap();
 
     pub const fn new(id: NonZeroU64) -> Self {
         Self(id)
@@ -247,8 +259,8 @@ impl Staker {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
 pub struct PendingOwner {
-    pub pending_owner: String,
-    pub owner_transfer_min_time: u64,
+    pub address: String,
+    pub owner_transfer_min_time_seconds: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]

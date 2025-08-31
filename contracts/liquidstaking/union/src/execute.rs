@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, ensure, wasm_execute, Addr, BankMsg, Coin, Deps, DepsMut, Env, Event, MessageInfo,
-    Response, Timestamp, Uint128,
+    Response, Uint128,
 };
 use cw20::Cw20ExecuteMsg;
 use cw_utils::must_pay;
@@ -10,13 +10,19 @@ use crate::{
     error::{ContractError, ContractResult},
     helpers::{compute_mint_amount, compute_unbond_amount, query_and_validate_unbonding_period},
     state::{
-        AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
-        PendingBatchId, ProtocolFeeConfigStore, StakerAddress, Stopped, UnstakeRequests,
+        AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, PendingBatchId,
+        PendingOwnerStore, ProtocolFeeConfigStore, StakerAddress, Stopped, UnstakeRequests,
+        UnstakeRequestsByStakerHash,
     },
-    types::{Batch, BatchId, BatchState, Staker, UnstakeRequest, UnstakeRequestKey},
+    types::{
+        AccountingState, Batch, BatchId, BatchState, PendingOwner, Staker, UnstakeRequest,
+        UnstakeRequestKey,
+    },
 };
 
 const FEE_RATE_DENOMINATOR: u64 = 100_000;
+/// 7 days
+const OWNERSHIP_CLAIM_DELAY_PERIOD: u64 = 60 * 60 * 24 * 7;
 
 pub fn ensure_not_stopped(deps: Deps) -> Result<(), ContractError> {
     if deps.storage.read_item::<Stopped>()? {
@@ -25,8 +31,8 @@ pub fn ensure_not_stopped(deps: Deps) -> Result<(), ContractError> {
     Ok(())
 }
 
-fn ensure_proxy(deps: Deps, info: &MessageInfo) -> Result<(), ContractError> {
-    if deps.storage.read_item::<OnZkgmCallProxy>()? != info.sender {
+fn ensure_admin(deps: Deps, info: &MessageInfo) -> Result<(), ContractError> {
+    if deps.storage.read_item::<Admin>()? != info.sender {
         Err(ContractError::Unauthorized {
             sender: info.sender.clone(),
         })
@@ -199,11 +205,12 @@ pub fn unbond(
 
     // 1.
     let mut is_new_request = false;
-    deps.storage.upsert::<UnstakeRequests, ContractError>(
-        &UnstakeRequestKey {
-            batch_id: pending_batch_id,
-            staker_hash,
-        },
+    let unstake_request_key = UnstakeRequestKey {
+        batch_id: pending_batch_id,
+        staker_hash,
+    };
+    let updated_unstake_request = deps.storage.upsert::<UnstakeRequests, ContractError>(
+        &unstake_request_key,
         |maybe_unstake_request| {
             Ok(match maybe_unstake_request {
                 Some(r) => UnstakeRequest {
@@ -222,7 +229,10 @@ pub fn unbond(
                 }
             })
         },
-    );
+    )?;
+
+    deps.storage
+        .write::<UnstakeRequestsByStakerHash>(&unstake_request_key, &updated_unstake_request);
 
     // 2.
     deps.storage
@@ -419,6 +429,8 @@ pub fn withdraw(
         .u128();
 
     deps.storage.delete::<UnstakeRequests>(&unstake_request_key);
+    deps.storage
+        .delete::<UnstakeRequestsByStakerHash>(&unstake_request_key);
 
     Ok(Response::new()
         // send the native token (U) back to the staker
@@ -438,77 +450,68 @@ pub fn withdraw(
 // This will require the new owner to accept to take effect.
 // No need to handle case of overwriting the pending owner
 // Ownership can only be claimed after 7 days to mitigate fat finger errors
-// pub fn transfer_ownership(
-//     deps: DepsMut,
-//     env: Env,
-//     info: MessageInfo,
-//     new_owner: String,
-// ) -> ContractResult<Response> {
-//     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+pub fn transfer_ownership(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    new_owner: String,
+) -> ContractResult<Response> {
+    ensure_admin(deps.as_ref(), &info)?;
 
-//     STATE.update::<_, ContractError>(deps.storage, |mut state| {
-//         state.pending_owner = Some(deps.api.addr_validate(&new_owner)?);
-//         state.owner_transfer_min_time = Some(Timestamp::from_seconds(
-//             env.block.time.seconds() + 60 * 60 * 24 * 7,
-//         )); // 7 days
+    deps.storage
+        .upsert_item::<PendingOwnerStore, ContractError>(|pending_owner| {
+            let mut pending_owner = pending_owner.unwrap();
+            pending_owner.address = new_owner.clone();
+            pending_owner.owner_transfer_min_time_seconds =
+                env.block.time.seconds() + OWNERSHIP_CLAIM_DELAY_PERIOD;
 
-//         Ok(state)
-//     })?;
+            Ok(pending_owner)
+        })?;
 
-//     Ok(Response::new()
-//         .add_attribute("action", "transfer_ownership")
-//         .add_attribute("new_owner", new_owner)
-//         .add_attribute("previous_owner", info.sender))
-// }
+    Ok(Response::new()
+        .add_attribute("action", "transfer_ownership")
+        .add_attribute("new_owner", new_owner)
+        .add_attribute("previous_owner", info.sender))
+}
 
 // Revoke transfer ownership, callable by the owner
-// pub fn revoke_ownership_transfer(
-//     deps: DepsMut,
-//     _env: Env,
-//     info: MessageInfo,
-// ) -> ContractResult<Response> {
-//     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+pub fn revoke_ownership_transfer(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> ContractResult<Response> {
+    ensure_admin(deps.as_ref(), &info)?;
 
-//     STATE.update::<_, ContractError>(deps.storage, |mut state| {
-//         state.pending_owner = None;
-//         state.owner_transfer_min_time = None;
+    deps.storage.delete_item::<PendingOwnerStore>();
 
-//         Ok(state)
-//     })?;
+    Ok(Response::new().add_event(Event::new("revoke_ownership_transfer")))
+}
 
-//     Ok(Response::new().add_attribute("action", "revoke_ownership_transfer"))
-// }
+pub fn accept_ownership(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
+    let PendingOwner {
+        address: pending_owner,
+        owner_transfer_min_time_seconds,
+    } = deps
+        .storage
+        .maybe_read_item::<PendingOwnerStore>()?
+        .ok_or(ContractError::NoPendingOwner)?;
 
-// pub fn accept_ownership(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
-//     let mut accounting = deps.storage.read_item::<AccountingStateStore>()?;
+    if owner_transfer_min_time_seconds > env.block.time.seconds() {
+        return Err(ContractError::OwnershipTransferNotReady {
+            time_to_claim_seconds: owner_transfer_min_time_seconds,
+        });
+    }
 
-//     if let Some(owner_transfer_min_time) = accounting.owner_transfer_min_time {
-//         if owner_transfer_min_time > env.block.time {
-//             return Err(ContractError::OwnershipTransferNotReady {
-//                 time_to_claim: Timestamp::from_seconds(
-//                     accounting.owner_transfer_min_time.unwrap().seconds(),
-//                 ),
-//             });
-//         }
-//     }
-
-//     match accounting.pending_owner {
-//         Some(pending_owner) => {
-//             if pending_owner == info.sender {
-//                 accounting.pending_owner = None;
-//                 STATE.save(deps.storage, &accounting)?;
-
-//                 ADMIN.set(deps, Some(pending_owner))?;
-//                 Ok(Response::new()
-//                     .add_attribute("action", "accept_ownership")
-//                     .add_attribute("new_owner", info.sender))
-//             } else {
-//                 Err(ContractError::CallerIsNotPendingOwner)
-//             }
-//         }
-//         _ => Err(ContractError::NoPendingOwner),
-//     }
-// }
+    if pending_owner == info.sender.as_str() {
+        deps.storage.delete_item::<PendingOwnerStore>();
+        deps.storage.write_item::<Admin>(&info.sender);
+        Ok(Response::new().add_event(
+            Event::new("accept_ownership").add_attributes([attr("new_owner", info.sender)]),
+        ))
+    } else {
+        Err(ContractError::CallerIsNotPendingOwner)
+    }
+}
 
 // TODO: Implement once basic functionality is completed
 // // Update the config; callable by the owner
@@ -709,41 +712,31 @@ pub fn resume_contract(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    total_bonded_native_tokens: u128,
-    total_liquid_stake_token: u128,
-    total_reward_amount: u128,
+    new_accounting_state: AccountingState,
 ) -> ContractResult<Response> {
-    // ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+    ensure_admin(deps.as_ref(), &info)?;
 
-    // CONFIG.update::<_, ContractError>(deps.storage, |mut config| {
-    //     if !config.stopped {
-    //         return Err(ContractError::NotStopped);
-    //     }
+    if !deps.storage.read_item::<Stopped>()? {
+        return Err(ContractError::NotStopped);
+    };
 
-    //     config.stopped = false;
-
-    //     Ok(config)
-    // })?;
-
-    // STATE.update::<_, ContractError>(deps.storage, |mut state| {
-    //     state.total_bonded_native_tokens = total_bonded_native_tokens;
-    //     state.total_issued_lst = total_liquid_stake_token;
-    //     state.total_reward_amount = total_reward_amount;
-
-    //     Ok(state)
-    // })?;
+    deps.storage
+        .write_item::<AccountingStateStore>(&new_accounting_state);
 
     Ok(Response::new().add_event(
         Event::new("resume_contract")
             .add_attribute(
                 "total_bonded_native_tokens",
-                total_bonded_native_tokens.to_string(),
+                new_accounting_state.total_bonded_native_tokens.to_string(),
+            )
+            .add_total_issued_lstattribute(
+                "total_issued_lst",
+                new_accounting_state.total_issued_lst.to_string(),
             )
             .add_attribute(
-                "total_liquid_stake_token",
-                total_liquid_stake_token.to_string(),
-            )
-            .add_attribute("total_reward_amount", total_reward_amount.to_string()),
+                "total_reward_amount",
+                new_accounting_state.total_reward_amount.to_string(),
+            ),
     ))
 }
 
