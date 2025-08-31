@@ -7,7 +7,7 @@ use crate::{
     contract::instantiate,
     state::BATCHES,
     tests::test_helper::{mock_deps_with_unbonding_time, mock_init_msg, UNION1},
-    types::{BatchState, MAX_TREASURY_FEE},
+    types::{BatchState, MAX_FEE_RATE},
 };
 
 #[test]
@@ -16,7 +16,7 @@ fn invalid_native_token_denom_fails() {
     let info = message_info(&Addr::unchecked(UNION1), &[]);
     let mut msg = mock_init_msg();
 
-    msg.protocol_fee_config.fee_rate = MAX_TREASURY_FEE;
+    msg.protocol_fee_config.fee_rate = MAX_FEE_RATE;
     let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg);
     assert!(res.is_err());
 }
@@ -35,7 +35,7 @@ fn init_properly() {
     assert_eq!(
         BATCHES.load(&deps.storage, 1).unwrap().state,
         BatchState::Pending {
-            submit_time: mock_env().block.time.seconds() + mock_init_msg().batch_period
+            submit_time: mock_env().block.time.seconds() + mock_init_msg().batch_period_seconds
         },
     );
 }

@@ -74,7 +74,7 @@ fn submit_batch_works() {
         mock_env(),
         message_info(&Addr::unchecked(UNION3), &[]),
         ExecuteMsg::Unbond {
-            staker: UNION3.to_string(),
+            staker: UNION3.as_bytes().into(),
             amount: union3_unbond_amount,
         },
     )
@@ -105,7 +105,7 @@ fn submit_batch_works() {
     assert_eq!(
         new_batch,
         Batch::new_pending(
-            env.block.time.seconds() + CONFIG.load(&deps.storage).unwrap().batch_period
+            env.block.time.seconds() + CONFIG.load(&deps.storage).unwrap().batch_period_seconds
         ),
     );
 

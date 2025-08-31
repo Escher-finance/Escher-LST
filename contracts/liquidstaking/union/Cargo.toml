@@ -13,6 +13,7 @@ library = []
 [dependencies]
 alloy                = { workspace = true, features = ["sol-types"] }
 bech32               = { workspace = true }
+bincode              = { workspace = true, features = ["derive"] }
 cosmwasm-schema      = { workspace = true }
 cosmwasm-std         = { workspace = true, features = ["cosmwasm_2_0"] }
 cw-controllers       = { workspace = true }
@@ -20,20 +21,25 @@ cw-storage-plus      = { workspace = true }
 cw-utils             = { workspace = true }
 cw2                  = { workspace = true }
 cw20                 = { workspace = true }
+depolama             = { workspace = true }
 enum-repr            = "0.2.6"
 hex                  = "0.4.3"
-ibc-union-spec       = { workspace = true, features = ["serde"] }
-itertools = "0.14.0"
+ibc-union-spec       = { workspace = true, features = ["serde", "bincode"] }
+itertools            = "0.14.0"
+num-traits = "0.2.19"
+on-zkgm-call-proxy   = { workspace = true, features = ["library"] }
 prost                = { version = "0.12.3", default-features = false, features = ["prost-derive"] }
 prost-derive         = "0.12.3"
 schemars             = { workspace = true }
 semver               = { workspace = true }
 serde                = { workspace = true }
+serde-utils.workspace = true
 serde_json           = "1.0"
 sha2                 = "0.10.8"
 thiserror            = { workspace = true }
 ucs03-zkgm           = { workspace = true, features = ["library"] }
-unionlabs-primitives = { workspace = true }
+unionlabs-encoding   = { workspace = true, features = ["bincode"] }
+unionlabs-primitives = { workspace = true, features = ["bincode"] }
 
 [dev-dependencies]
 cw-multi-test = "0.17.0"

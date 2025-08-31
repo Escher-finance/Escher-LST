@@ -1,45 +1,49 @@
 use cosmwasm_std::{Decimal, Deps, StdError, Uint128};
 use prost::Message;
 
-use crate::{error::ContractError, state::State};
+use crate::{error::ContractError, types::AccountingState};
 
 pub fn compute_mint_amount(
-    total_bonded_native_tokens: Uint128,
-    total_issued_lst: Uint128,
-    native_to_stake: Uint128,
-) -> Uint128 {
+    total_bonded_native_tokens: u128,
+    total_issued_lst: u128,
+    native_to_stake: u128,
+) -> u128 {
     // Possible truncation issues when quantities are small
     // Initial very large total_bonded_native_tokens would cause round to 0 and block minting
     // Mint at a 1:1 ratio if there is no total native token
     // Amount = Total stTIA * (Amount of native token / Total native token)
-    if total_bonded_native_tokens.is_zero() {
+    if total_bonded_native_tokens == 0 {
         native_to_stake
     } else {
-        total_issued_lst.multiply_ratio(native_to_stake, total_bonded_native_tokens)
+        Uint128::new(total_issued_lst)
+            .multiply_ratio(native_to_stake, total_bonded_native_tokens)
+            .u128()
     }
 }
 
 pub fn compute_unbond_amount(
-    total_bonded_native_tokens: Uint128,
-    total_issued_lst: Uint128,
-    batch_liquid_stake_token: Uint128,
-) -> Uint128 {
-    if batch_liquid_stake_token.is_zero() {
-        Uint128::zero()
+    total_bonded_native_tokens: u128,
+    total_issued_lst: u128,
+    batch_liquid_stake_token: u128,
+) -> u128 {
+    if batch_liquid_stake_token == 0 {
+        0
     } else {
         // unbond amount is calculated at the batch level
         // total_bonded_native_tokens - total TIA delegated by MilkyWay
         // batch_liquid_stake_token - total stTIA in submitted batch
         // total_issued_lst - total stTIA minted by MilkyWay
 
-        total_bonded_native_tokens.multiply_ratio(batch_liquid_stake_token, total_issued_lst)
+        Uint128::new(total_bonded_native_tokens)
+            .multiply_ratio(batch_liquid_stake_token, total_issued_lst)
+            .into()
     }
 }
 
-pub fn get_rates(state: &State) -> (Decimal, Decimal) {
+pub fn get_rates(state: &AccountingState) -> (Decimal, Decimal) {
     let total_bonded_native_tokens = state.total_bonded_native_tokens;
     let total_issued_lst = state.total_issued_lst;
-    if total_issued_lst.is_zero() || total_bonded_native_tokens.is_zero() {
+    if total_issued_lst == 0 || total_bonded_native_tokens == 0 {
         (Decimal::one(), Decimal::one())
     } else {
         // return redemption_rate, purchase_rate

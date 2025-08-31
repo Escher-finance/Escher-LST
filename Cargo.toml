@@ -48,9 +48,13 @@ serde_bytes      = { version = "0.11.15" }
 thiserror        = { version = "1.0.58" }
 
 # unionlabs
+depolama             = { git = "https://github.com/unionlabs/union", default-features = false }
 embed-commit         = { git = "https://github.com/unionlabs/union", default-features = false }
 ibc-union-spec       = { git = "https://github.com/unionlabs/union", default-features = false }
+on-zkgm-call-proxy   = { git = "https://github.com/unionlabs/union", default-features = false }
+serde-utils          = { git = "https://github.com/unionlabs/union", default-features = false }
 ucs03-zkgm           = { git = "https://github.com/unionlabs/union", default-features = false }
+unionlabs-encoding   = { git = "https://github.com/unionlabs/union", default-features = false }
 unionlabs-primitives = { git = "https://github.com/unionlabs/union", default-features = false }
 
 # [dev-dependencies]

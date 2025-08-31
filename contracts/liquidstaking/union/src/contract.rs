@@ -1,17 +1,18 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint128,
+    StdResult,
 };
 use cw2::set_contract_version;
+use depolama::StorageExt;
 use semver::Version;
 
 use crate::{
     error::ContractError,
     execute::{
-        circuit_breaker, execute_accept_ownership, execute_bond, execute_revoke_ownership_transfer,
-        execute_submit_batch, execute_transfer_ownership, execute_unbond, execute_withdraw,
-        receive_rewards, receive_unstaked_tokens, resume_contract, slash_batches,
+        accept_ownership, bond, circuit_breaker, receive_rewards, receive_unstaked_tokens,
+        resume_contract, revoke_ownership_transfer, submit_batch, transfer_ownership, unbond,
+        withdraw,
     },
     helpers::query_and_validate_unbonding_period,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
@@ -20,10 +21,10 @@ use crate::{
         query_pending_batch, query_state, query_unstake_requests,
     },
     state::{
-        assert_not_migrating, Config, State, ADMIN, BATCHES, CONFIG, MIGRATING, PENDING_BATCH_ID,
-        STATE,
+        AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
+        PendingBatchId, ProtocolFeeConfigStore, StakerAddress, Zkgm,
     },
-    types::{Batch, MAX_TREASURY_FEE},
+    types::{AccountingState, Batch, BatchId, Config, MAX_FEE_RATE},
 };
 
 // Version information for migration
@@ -41,51 +42,63 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    let InstantiateMsg {
+        native_token_denom,
+        minimum_liquid_stake_amount,
+        staker_address,
+        protocol_fee_config,
+        lst_address,
+        batch_period_seconds,
+        monitors,
+        admin,
+        ucs03_zkgm_address,
+        on_zkgm_call_proxy_address,
+    } = msg;
+
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    if msg.protocol_fee_config.fee_rate > MAX_TREASURY_FEE {
-        return Err(ContractError::InvalidDaoTreasuryFee {});
+    query_and_validate_unbonding_period(deps.as_ref(), batch_period_seconds)?;
+
+    if protocol_fee_config.fee_rate > MAX_FEE_RATE {
+        return Err(ContractError::InvalidProtocolFeeRate);
     }
 
-    ADMIN.set(deps.branch(), Some(msg.admin.clone()))?;
+    // save various addresses
+    deps.storage.write_item::<Admin>(&admin);
+    deps.storage.write_item::<StakerAddress>(&staker_address);
+    deps.storage.write_item::<LstAddress>(&lst_address);
+    deps.storage.write_item::<Zkgm>(&ucs03_zkgm_address);
+    deps.storage
+        .write_item::<OnZkgmCallProxy>(&on_zkgm_call_proxy_address);
+    for monitor in monitors {
+        deps.storage.write::<Monitors>(&monitor, &());
+    }
 
-    query_and_validate_unbonding_period(deps.as_ref(), msg.batch_period)?;
+    // save configs
+    deps.storage
+        .write_item::<ProtocolFeeConfigStore>(&protocol_fee_config);
+    deps.storage.write_item::<ConfigStore>(&Config {
+        native_token_denom,
+        minimum_liquid_stake_amount,
+        batch_period_seconds,
+    });
+    deps.storage
+        .write_item::<AccountingStateStore>(&AccountingState {
+            total_bonded_native_tokens: 0,
+            total_issued_lst: 0,
+            total_reward_amount: 0,
+        });
 
-    let config = Config {
-        protocol_fee_config: msg.protocol_fee_config,
-        liquid_stake_token_address: msg.liquid_stake_token_address,
-        monitors: msg.monitors,
-        batch_period: msg.batch_period,
-        stopped: true, // we start stopped
-        native_token_denom: msg.native_token_denom,
-        minimum_liquid_stake_amount: msg.minimum_liquid_stake_amount,
-        ucs03_zkgm_address: msg.ucs03_zkgm_address,
-        funded_dispatch_address: msg.funded_dispatch_address,
-        staker_address: msg.staker_address,
-    };
-
-    // Init State
-    let state = State {
-        total_bonded_native_tokens: Uint128::zero(),
-        total_issued_lst: Uint128::zero(),
-        pending_owner: None,
-        total_reward_amount: Uint128::zero(),
-        owner_transfer_min_time: None,
-    };
-
-    // Set pending batch and batches
-    BATCHES.save(
-        deps.storage,
-        1,
-        &Batch::new_pending(env.block.time.seconds() + config.batch_period),
-    )?;
-    PENDING_BATCH_ID.save(deps.storage, &1)?;
-    CONFIG.save(deps.storage, &config)?;
-    STATE.save(deps.storage, &state)?;
+    // init first batch
+    deps.storage.write::<Batches>(
+        &BatchId::ONE,
+        &Batch::new_pending(env.block.time.seconds() + batch_period_seconds),
+    );
+    deps.storage.write_item::<PendingBatchId>(&BatchId::ONE);
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
-        .add_attribute("owner", msg.admin))
+        .add_attribute("owner", admin))
 }
 
 ///////////////
@@ -99,35 +112,23 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
-    assert_not_migrating(deps.as_ref())?;
-
     match msg {
         ExecuteMsg::Bond {
             mint_to,
-            recipient_channel_id,
             min_mint_amount,
-        } => execute_bond(
-            deps,
-            env,
-            info,
-            mint_to,
-            recipient_channel_id,
-            min_mint_amount,
-        ),
-        ExecuteMsg::Unbond { amount, staker } => execute_unbond(deps, env, info, amount, staker),
+        } => bond(deps, env, info, mint_to, min_mint_amount),
+        ExecuteMsg::Unbond { amount, staker } => unbond(deps, env, info, amount, staker),
 
-        ExecuteMsg::SubmitBatch {} => execute_submit_batch(deps, env),
+        ExecuteMsg::SubmitBatch {} => submit_batch(deps, env),
 
-        ExecuteMsg::Withdraw { batch_id, staker } => execute_withdraw(deps, info, batch_id, staker),
+        ExecuteMsg::Withdraw { batch_id, staker } => withdraw(deps, info, batch_id, staker),
 
         // ownership msgs
         ExecuteMsg::TransferOwnership { new_owner } => {
-            execute_transfer_ownership(deps, env, info, new_owner)
+            transfer_ownership(deps, env, info, new_owner)
         }
-        ExecuteMsg::AcceptOwnership {} => execute_accept_ownership(deps, env, info),
-        ExecuteMsg::RevokeOwnershipTransfer {} => {
-            execute_revoke_ownership_transfer(deps, env, info)
-        }
+        ExecuteMsg::AcceptOwnership {} => accept_ownership(deps, env, info),
+        ExecuteMsg::RevokeOwnershipTransfer {} => revoke_ownership_transfer(deps, env, info),
 
         // ExecuteMsg::UpdateConfig {
         //     native_chain_config,
@@ -185,9 +186,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         } => to_json_binary(&query_batches(deps, start_after, limit, status)?),
         QueryMsg::BatchesByIds { ids } => to_json_binary(&query_batches_by_ids(deps, ids)?),
         QueryMsg::PendingBatch {} => to_json_binary(&query_pending_batch(deps)?),
-        QueryMsg::UnstakeRequests { user } => {
-            to_json_binary(&query_unstake_requests(deps, user.into_string())?)
-        }
+        QueryMsg::UnstakeRequests { user } => to_json_binary(&query_unstake_requests(deps, user)?),
         QueryMsg::AllUnstakeRequests { start_after, limit } => {
             to_json_binary(&query_all_unstake_requests(deps, start_after, limit)?)
         }
@@ -219,13 +218,6 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     // Prevent downgrade
     if version > new_version {
         return Err(StdError::generic_err("Cannot upgrade to a previous contract version").into());
-    }
-    // if same version return
-    if version == new_version {
-        let is_migrating = MIGRATING.may_load(deps.storage)?.unwrap_or(false);
-        if !is_migrating {
-            return Err(StdError::generic_err("Cannot migrate to the same version.").into());
-        }
     }
 
     Ok(Response::new())

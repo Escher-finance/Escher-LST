@@ -31,14 +31,14 @@ fn unbond_works() {
         mock_env(),
         info.clone(),
         ExecuteMsg::Unbond {
-            staker: UNION1.into(),
+            staker: UNION1.as_bytes().into(),
             amount: union1_amount_1,
         },
     )
     .unwrap();
 
     let unstake_req = unstake_requests()
-        .load(&deps.storage, (1, UNION1.into()))
+        .load(&deps.storage, (1, UNION1.as_bytes().into()))
         .unwrap();
 
     // a new unstake request is created
@@ -46,7 +46,7 @@ fn unbond_works() {
         unstake_req,
         UnstakeRequest {
             batch_id: 1,
-            user: UNION1.into(),
+            user: UNION1.as_bytes().into(),
             amount: union1_amount_1
         }
     );
@@ -92,14 +92,14 @@ fn unbond_works() {
         mock_env(),
         info.clone(),
         ExecuteMsg::Unbond {
-            staker: UNION1.into(),
+            staker: UNION1.as_bytes().into(),
             amount: union1_amount_2,
         },
     )
     .unwrap();
 
     let unstake_req = unstake_requests()
-        .load(&deps.storage, (1, UNION1.into()))
+        .load(&deps.storage, (1, UNION1.as_bytes().into()))
         .unwrap();
 
     // the unstake request is updated
@@ -107,7 +107,7 @@ fn unbond_works() {
         unstake_req,
         UnstakeRequest {
             batch_id: 1,
-            user: UNION1.into(),
+            user: UNION1.as_bytes().into(),
             amount: union1_amount_1 + union1_amount_2
         }
     );
@@ -126,7 +126,7 @@ fn unbond_works() {
         mock_env(),
         message_info(&Addr::unchecked(UNION2), &[]),
         ExecuteMsg::Unbond {
-            staker: UNION2.into(),
+            staker: UNION2.as_bytes().into(),
             amount: union2_amount_1,
         },
     )
@@ -141,7 +141,7 @@ fn unbond_works() {
         unstake_req,
         UnstakeRequest {
             batch_id: 1,
-            user: UNION2.into(),
+            user: UNION2.as_bytes().into(),
             amount: union2_amount_1
         }
     );
@@ -174,7 +174,7 @@ fn receive_unstaked_tokens_works() {
         mock_env(),
         message_info(&Addr::unchecked(UNION1), &[]),
         ExecuteMsg::Unbond {
-            staker: UNION1.to_string(),
+            staker: UNION1.as_bytes().into(),
             amount: union1_unbond_amount,
         },
     )
@@ -187,7 +187,7 @@ fn receive_unstaked_tokens_works() {
         mock_env(),
         message_info(&Addr::unchecked(UNION2), &[]),
         ExecuteMsg::Unbond {
-            staker: UNION2.to_string(),
+            staker: UNION2.as_bytes().into(),
             amount: union2_unbond_amount,
         },
     )
@@ -200,7 +200,7 @@ fn receive_unstaked_tokens_works() {
         mock_env(),
         message_info(&Addr::unchecked(UNION3), &[]),
         ExecuteMsg::Unbond {
-            staker: UNION3.to_string(),
+            staker: UNION3.as_bytes().into(),
             amount: union3_unbond_amount,
         },
     )

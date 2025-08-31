@@ -3,13 +3,13 @@ use std::collections::BTreeMap;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use ibc_union_spec::ChannelId;
+use on_zkgm_call_proxy::OnProxyOnZkgmCall;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use unionlabs_primitives::Bytes;
 
-use crate::{
-    state::{ProtocolFeeConfig, UnstakeRequest},
-    types::{Batch, BatchExpectedAmount, BatchStatus},
+use crate::types::{
+    Batch, BatchExpectedAmount, BatchId, BatchStatus, ProtocolFeeConfig, UnstakeRequest,
 };
 
 #[cw_serde]
@@ -22,17 +22,14 @@ pub struct InstantiateMsg {
     /// toward the validators.
     pub staker_address: Addr,
 
-    /// Address where the staking rewards are withdrawn.
-    pub reward_collector_address: Addr,
-
     /// Protocol fee configuration.
     pub protocol_fee_config: ProtocolFeeConfig,
 
     /// Address of the LST contract.
-    pub liquid_stake_token_address: String,
+    pub lst_address: Addr,
 
     /// Frequency (in seconds) at which the unbonding queue is executed.
-    pub batch_period: u64,
+    pub batch_period_seconds: u64,
 
     /// Set of addresses allowed to trigger a circuit break.
     pub monitors: Vec<Addr>,
@@ -40,7 +37,7 @@ pub struct InstantiateMsg {
 
     pub ucs03_zkgm_address: Addr,
 
-    pub funded_dispatch_address: Addr,
+    pub on_zkgm_call_proxy_address: Addr,
 }
 
 #[cw_serde]
@@ -49,14 +46,7 @@ pub enum ExecuteMsg {
     /// Initiates the bonding process for a user.
     Bond {
         /// The address to mint the LST to.
-        ///
-        /// This must be a valid address for this chain, otherwise it must be a valid address for the destination chain as specified in `recipient_channel_id`.
-        mint_to: Bytes,
-
-        /// The channel to send the LST over once minted.
-        ///
-        /// If `None`, the LST will be minted on this chain.
-        recipient_channel_id: Option<ChannelId>,
+        mint_to: Addr,
 
         /// Minimum expected amount of LST tokens to be received
         /// for the operation to be considered valid.
@@ -66,9 +56,7 @@ pub enum ExecuteMsg {
     /// Initiates the unbonding process for a user.
     Unbond {
         /// The address that will receive the native tokens on.
-        ///
-        /// This must be the same as info.sender, unless this is being called via the funded-dispatch contract.
-        staker: String,
+        staker: Addr,
 
         /// The amount to unstake.
         ///
@@ -79,11 +67,9 @@ pub enum ExecuteMsg {
     /// Withdraws unstaked tokens.
     Withdraw {
         /// The address that will receive the funds.
-        ///
-        /// This must be the same as info.sender, unless this is being called via the funded-dispatch contract.
-        staker: String,
+        staker: Addr,
         /// ID of the batch from which to withdraw.
-        batch_id: u64,
+        batch_id: BatchId,
     },
 
     /// Processes the pending batch.
@@ -118,7 +104,7 @@ pub enum ExecuteMsg {
     /// Receives unstaked tokens from the native chain.
     ReceiveUnstakedTokens {
         /// ID of the batch that originated the unstake request.
-        batch_id: u64,
+        batch_id: BatchId,
     },
 
     /// Stops the contract due to irregularities; callable by monitors and admin.
@@ -138,7 +124,10 @@ pub enum ExecuteMsg {
     SlashBatches {
         new_amounts: Vec<BatchExpectedAmount>,
     },
+    OnProxyOnZkgmCall(OnProxyOnZkgmCall),
 }
+
+pub enum RemoteExecuteMsg {}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ConfigResponse {
@@ -164,7 +153,7 @@ pub struct BatchesResponse {
 }
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct UnstakeRequestResponse {
-    pub batch_id: u64,
+    pub batch_id: BatchId,
     pub batch_total_liquid_stake: Uint128,
     pub expected_native_unstaked: Uint128,
     pub received_native_unstaked: Uint128,
@@ -222,7 +211,7 @@ pub enum QueryMsg {
     #[returns(Vec<UnstakeRequest>)]
     UnstakeRequests {
         /// Address of the user whose unstake requests are to be queried.
-        user: Addr,
+        user: Bytes,
     },
 
     /// Queries all unstake requests in the contract.

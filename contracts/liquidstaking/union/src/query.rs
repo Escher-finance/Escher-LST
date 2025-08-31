@@ -1,6 +1,7 @@
 use cosmwasm_std::{Deps, Order, StdResult};
 use cw_storage_plus::Bound;
 use itertools::Itertools;
+use unionlabs_primitives::Bytes;
 
 use crate::{
     helpers::get_rates,
@@ -16,7 +17,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         protocol_fee_config: config.protocol_fee_config,
         liquid_stake_token_denom: config.liquid_stake_token_address,
         monitors: config.monitors,
-        batch_period: config.batch_period,
+        batch_period: config.batch_period_seconds,
         stopped: config.stopped,
     };
     Ok(res)
@@ -76,11 +77,11 @@ pub fn query_pending_batch(deps: Deps) -> StdResult<Batch> {
     BATCHES.load(deps.storage, PENDING_BATCH_ID.load(deps.storage)?)
 }
 
-pub fn query_unstake_requests(deps: Deps, user: String) -> StdResult<Vec<UnstakeRequest>> {
+pub fn query_unstake_requests(deps: Deps, user: Bytes) -> StdResult<Vec<UnstakeRequest>> {
     unstake_requests()
         .idx
         .by_user
-        .prefix(user.to_string())
+        .prefix(user.into_vec())
         .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
         .map(|r| r.map(|(_, r)| r))
         .collect()
@@ -96,7 +97,7 @@ pub fn query_all_unstake_requests(
         .by_user
         .range(
             deps.storage,
-            start_after.map(|s| Bound::exclusive(("".to_string(), s))),
+            start_after.map(|s| Bound::exclusive((vec![], s))),
             None,
             cosmwasm_std::Order::Ascending,
         )

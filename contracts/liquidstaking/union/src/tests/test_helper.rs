@@ -28,12 +28,12 @@ pub fn mock_init_msg() -> InstantiateMsg {
     InstantiateMsg {
         staker_address: Addr::unchecked(UNION_STAKER),
         minimum_liquid_stake_amount: Uint128::from(100u128),
-        liquid_stake_token_address: LIQUID_STAKE_TOKEN_ADDRESS.to_string(),
+        lst_address: LIQUID_STAKE_TOKEN_ADDRESS.to_string(),
         monitors: vec![
             Addr::unchecked(UNION_MONITOR_1),
             Addr::unchecked(UNION_MONITOR_2),
         ],
-        batch_period: 86400,
+        batch_period_seconds: 86400,
         protocol_fee_config: ProtocolFeeConfig {
             fee_rate: Uint128::from(10_000u128),
             fee_recipient: Addr::unchecked(UNION_STAKER),
@@ -42,7 +42,7 @@ pub fn mock_init_msg() -> InstantiateMsg {
         native_token_denom: "au".to_owned(),
         reward_collector_address: Addr::unchecked(UNION_STAKER),
         ucs03_zkgm_address: Addr::unchecked(ZKGM_ADDRESS),
-        funded_dispatch_address: Addr::unchecked(FUNDED_DISPATCH_ADDRESS),
+        on_zkgm_call_proxy_address: Addr::unchecked(FUNDED_DISPATCH_ADDRESS),
     }
 }
 

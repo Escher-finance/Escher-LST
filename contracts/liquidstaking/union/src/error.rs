@@ -1,9 +1,11 @@
-use cosmwasm_std::{StdError, Timestamp, Uint128};
+use cosmwasm_std::{StdError, Timestamp};
 use cw2::VersionError;
 use cw_controllers::AdminError;
 use cw_utils::PaymentError;
-use crate::types::BatchState;
 use thiserror::Error;
+use unionlabs_primitives::Bytes;
+
+use crate::types::{BatchId, BatchState, Staker, MAX_FEE_RATE};
 
 pub type ContractResult<T> = core::result::Result<T, ContractError>;
 
@@ -35,8 +37,8 @@ pub enum ContractError {
 
     #[error("Minimum liquid stake amount not met")]
     MinimumLiquidStakeAmount {
-        minimum_stake_amount: Uint128,
-        sent_amount: Uint128,
+        minimum_stake_amount: u128,
+        sent_amount: u128,
     },
 
     #[error("Unable to mint liquid staking token")]
@@ -61,7 +63,7 @@ pub enum ContractError {
     BatchEmpty,
 
     #[error("batch not found")]
-    BatchNotFound { batch_id: u64 },
+    BatchNotFound { batch_id: BatchId },
 
     #[error("the batch is still pending")]
     BatchStillPending,
@@ -70,33 +72,36 @@ pub enum ContractError {
     BatchAlreadyReceived,
 
     #[error("Batch is either already closed or is in an error state")]
-    BatchNotClaimable { batch_id: u64, status: BatchState },
+    BatchNotClaimable {
+        batch_id: BatchId,
+        status: BatchState,
+    },
 
     #[error("the batch has not yet been submitted")]
-    BatchNotYetSubmitted { batch_id: u64 },
+    BatchNotYetSubmitted { batch_id: BatchId },
 
     #[error("Batch {batch_id} don't have the expected native amount")]
-    BatchWithoutExpectedNativeAmount { batch_id: u64 },
+    BatchWithoutExpectedNativeAmount { batch_id: BatchId },
 
     #[error(
         "Received wrong batch amount, batch_id {batch_id} expected {expected}, got {received}"
     )]
     ReceivedWrongBatchAmount {
-        batch_id: u64,
-        expected: Uint128,
-        received: Uint128,
+        batch_id: BatchId,
+        expected: u128,
+        received: u128,
     },
 
     #[error("the batch is not yet received")]
     BatchNotYetReceived,
 
-    #[error("staker '{staker}' not found in batch")]
-    NoRequestInBatch { staker: String },
+    #[error("staker {staker} not found in batch (hash={})", staker.hash())]
+    NoRequestInBatch { staker: Staker },
 
     #[error("Minimum liquid stake amount not met")]
     InvalidUnstakeAmount {
-        total_liquid_stake_token: Uint128,
-        amount_to_unstake: Uint128,
+        total_liquid_stake_token: u128,
+        amount_to_unstake: u128,
     },
 
     #[error("contract was intentionally stopped")]
@@ -105,55 +110,23 @@ pub enum ContractError {
     #[error("contract is not stopped")]
     NotStopped,
 
-    #[error("Config provided is wrong")]
-    ConfigWrong,
-
-    #[error("format error")]
-    FormatError,
-
-    #[error("Failed ibc transfer")]
-    FailedIBCTransfer { msg: String },
-
-    #[error("Contract already locked")]
-    ContractLocked { msg: String },
-
     #[error("Receive rewards are smaller then the fee")]
-    ReceiveRewardsTooSmall { amount: Uint128, minimum: Uint128 },
+    ReceiveRewardsTooSmall { amount: u128, minimum: u128 },
 
     #[error("The computed fees are zero for the received rewards: {received_rewards}")]
-    ComputedFeesAreZero { received_rewards: Uint128 },
+    ComputedFeesAreZero { received_rewards: u128 },
 
     #[error("No liquid stake to distribute rewards to")]
     NoLiquidStake,
 
     #[error("Calculated mint amount not as expected")]
-    MintAmountMismatch { expected: Uint128, actual: Uint128 },
-
-    #[error("Insufficient funds")]
-    InsufficientFunds,
-
-    #[error(
-        "If liquid staking is done from a non native Osmosis address you need to provide an address via 'mint_to'"
-    )]
-    MissingMintAddress,
-
-    #[error("The treasury address has not been configured")]
-    TreasuryNotConfigured,
+    MintAmountMismatch { expected: u128, actual: u128 },
 
     #[error("{0}")]
     Version(#[from] VersionError),
 
-    #[error("Can't recover packets with different receivers")]
-    InvalidReceiver,
-
-    #[error("Can't recover packets with different denoms")]
-    InconsistentDenom,
-
-    #[error("The contract is migrating to a newer version")]
-    Migrating,
-
-    #[error("DAO treasury fee can't be higher then 100000")]
-    InvalidDaoTreasuryFee,
+    #[error("protocol fee rate can't be higher then {MAX_FEE_RATE}")]
+    InvalidProtocolFeeRate,
     #[error(
         "the batch period ({batch_period}) is larger than the \
         queried unbonding period ({unbonding_period})"

@@ -1,28 +1,79 @@
-use std::collections::BTreeMap;
+use core::fmt;
+use std::{collections::BTreeMap, num::NonZeroU64};
 
-use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Uint128};
-use schemars::JsonSchema;
+use cosmwasm_std::{StdError, StdResult};
+use ibc_union_spec::ChannelId;
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
+use unionlabs_encoding::{Bincode, EncodeAs};
+use unionlabs_primitives::{Bytes, H256, U256};
 
-pub const MAX_TREASURY_FEE: Uint128 = Uint128::new(100_000);
+pub const MAX_FEE_RATE: u128 = 100_000;
 /// The maximum allowed unbonding period is 42 days,
 /// which is twice the typical staking period of a Cosmos SDK-based chain.
 pub const MAX_UNBONDING_PERIOD: u64 = 3_628_800;
 
-#[cw_serde]
-pub struct BatchExpectedAmount {
-    pub batch_id: u64,
-    pub amount: Uint128,
+#[derive(
+    Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode,
+)]
+pub struct BatchId(#[serde(with = "::serde_utils::string")] NonZeroU64);
+
+impl fmt::Display for BatchId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.get(), f)
+    }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+impl BatchId {
+    pub const ONE: Self = Self::from_raw(1).unwrap();
+
+    pub const fn new(id: NonZeroU64) -> Self {
+        Self(id)
+    }
+
+    pub const fn from_raw(raw_id: u64) -> Option<Self> {
+        match NonZeroU64::new(raw_id) {
+            Some(id) => Some(Self(id)),
+            None => None,
+        }
+    }
+
+    pub const fn get(&self) -> NonZeroU64 {
+        self.0
+    }
+
+    pub const fn increment(&self) -> Self {
+        Self(self.get().checked_add(1).expect("holy batches, batman"))
+    }
+
+    pub fn to_be_bytes(&self) -> [u8; 8] {
+        self.get().get().to_be_bytes()
+    }
+
+    pub fn from_be_bytes(raw: [u8; 8]) -> StdResult<Self> {
+        BatchId::from_raw(u64::from_be_bytes(raw))
+            .ok_or_else(|| StdError::generic_err("invalid key: batch id must be non-zero"))
+    }
+
+    pub fn try_from_be_bytes(raw: &Bytes) -> StdResult<Self> {
+        raw.try_into()
+            .map_err(|_| {
+                StdError::generic_err(format!(
+                    "invalid key: expected 8 bytes, found {}: {raw}",
+                    raw.len(),
+                ))
+            })
+            .and_then(BatchId::try_from_be_bytes)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
 pub struct Batch {
-    /// Total amount of `stTIA` to be burned in this batch
-    pub total_lst_to_burn: Uint128,
+    /// Total amount of the LST to be burned in this batch
+    pub total_lst_to_burn: u128,
 
     // TODO: This should be a separate mapping storage
-    pub liquid_unbond_requests: BTreeMap<String, LiquidUnbondRequest>,
+    pub liquid_unbond_requests: BTreeMap<Staker, LiquidUnbondRequest>,
 
     /// The length of the unstake requests list.
     ///
@@ -32,10 +83,7 @@ pub struct Batch {
     pub state: BatchState,
 }
 
-// Batch should always be constructed with a pending status
-// Contract: Caller determines batch data
 impl Batch {
-    // TODO: BatchId type
     pub fn new_pending(submit_time: u64) -> Self {
         Self {
             total_lst_to_burn: 0_u128.into(),
@@ -46,7 +94,7 @@ impl Batch {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
 pub enum BatchState {
     /// Initial state of a batch. Only one batch is pending at a time (see [`crate::state::PENDING_BATCH_ID`].
     Pending {
@@ -66,12 +114,12 @@ pub enum BatchState {
         /// This will be `submission_time + unbonding_period`.
         receive_time: u64,
         /// The amount of native tokens that should be received after unstaking.
-        expected_native_unstaked: Uint128,
+        expected_native_unstaked: u128,
     },
     /// The unbonding period has elapsed and the unbonded tokens have been sent back to this contract. The unbonded stakers from this batch are now able to claim their unbonded tokens.
     Received {
         /// The amount of native tokens received after unbonding.
-        received_native_unstaked: Uint128,
+        received_native_unstaked: u128,
     },
 }
 
@@ -85,7 +133,7 @@ impl BatchState {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Eq, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
 pub enum BatchStatus {
     /// See [`BatchState::Pending`].
     Pending,
@@ -95,11 +143,139 @@ pub enum BatchStatus {
     Received,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+pub struct BatchExpectedAmount {
+    pub batch_id: u64,
+    pub amount: u128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
 pub struct LiquidUnbondRequest {
     /// The user's address
-    pub user: Addr,
+    pub user: Bytes,
     /// The user's share in the batch
-    pub shares: Uint128,
+    pub shares: u128,
     pub redeemed: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+pub struct Config {
+    /// The denom of the native token to liquid stake against.
+    ///
+    /// for `eU`, this will be `au` (the base denom of `U`).
+    pub native_token_denom: String,
+
+    /// Minimum amount of token that can be liquid staked.
+    pub minimum_liquid_stake_amount: u128,
+
+    /// Time in seconds between each batch.
+    pub batch_period_seconds: u64,
+}
+
+/// Config related to the fees collected by the contract to
+/// operate the liquid staking protocol.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+pub struct ProtocolFeeConfig {
+    // NOTE: Previously called `dao_treasury_fee`
+    pub fee_rate: u128, // not using a fraction, fee percentage=x/100000
+
+    /// Address where the collected fees are sent.
+    pub fee_recipient: String,
+}
+
+/// State of various balances this contract keeps track of.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+pub struct AccountingState {
+    /// The total amount of native tokens that have been bonded.
+    pub total_bonded_native_tokens: u128,
+    /// The total issuance of the LST.
+    ///
+    /// Note that this is *not* the same as the total supply of the LST contract, but rather the total *cross-chain* supply of the LST. For example, when the LST is bridged, it will be burned on the source chain and minted on the destination chain.
+    pub total_issued_lst: u128,
+
+    // REVIEW: Unused? If this is only used for off-chain actions/ accounting then this is probably better off in a separate storage
+    pub total_reward_amount: u128,
+}
+
+#[derive(
+    Serialize,
+    Deserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    bincode::Encode,
+    bincode::Decode,
+)]
+pub enum Staker {
+    /// The staking was initiated on this chain.
+    Local { address: String },
+    /// The staking was initiated from a different chain.
+    ///
+    /// This tuple of `(source address, destination channel id, path)` is required to uniquely identify cross-chain liquid staking operations.
+    Remote {
+        /// The address of the staker on the *counterparty* chain.
+        address: Bytes,
+        /// The id of the channel on *this* chain.
+        channel_id: ChannelId,
+        /// The path of the packet. This will typically be `0`, but if the packet was a forward packet, then this will contain the path to the source chain.
+        path: U256,
+    },
+}
+
+impl fmt::Display for Staker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Staker::Local { address } => write!(f, "local:{address}"),
+            Staker::Remote {
+                address,
+                channel_id,
+                path,
+            } => write!(f, "remote:{address}/{channel_id}/{path}"),
+        }
+    }
+}
+
+impl Staker {
+    /// Calculate the hash of this staker. This is used to more concisely uniquely identify the staker.
+    pub fn hash(&self) -> H256 {
+        sha2::Sha256::digest(self.encode_as::<Bincode>()).into()
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+pub struct PendingOwner {
+    pub pending_owner: String,
+    pub owner_transfer_min_time: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+pub struct UnstakeRequestKey {
+    pub batch_id: BatchId,
+    /// The staker hash for the [`Staker`] of the associated [`UnstakeRequest`].
+    ///
+    /// This is `sha256(bincode(staker))` (see [`Staker::hash`]).
+    pub staker_hash: H256,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+pub struct UnstakeRequest {
+    pub batch_id: BatchId,
+    pub staker: Staker,
+    pub amount: u128,
+    // TODO:
+    //
+    // Withdrawing unstaked tokens aggregates over (user, recipient_channel_id).
+    //
+    // If a user stakes 400, then unstakes:
+    //
+    // 100 to channel 1
+    // 100 to channel 2
+    // 100 to channel 1
+    // 100 to no channel
+    //
+    // The user would then receive 200 on channel 1, 100 on channel 2, and 100 on the host chain.
+    // pub recipient_channel_id: Option<ChannelId>,
 }
