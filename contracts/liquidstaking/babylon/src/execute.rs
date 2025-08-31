@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo,
-    Response, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
+    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
+    DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
@@ -22,14 +22,14 @@ use crate::{
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        CONFIG, Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
-        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
-        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, CONFIG,
+        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE,
+        STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{BatchStatus, batches},
+        batch::{batches, BatchStatus},
         calc::{
             calculate_exchange_rate, calculate_fee_from_reward, check_slippage,
             get_last_epoch_block, get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
@@ -182,19 +182,28 @@ pub fn zkgm_unbond(
     )?; // salt is not required in unbond request
 
     let params = PARAMETERS.load(deps.storage)?;
-
+    let current_pending_batch_id = PENDING_BATCH_ID.load(deps.storage)?;
+    let current_pending_batch = batches().load(deps.storage, current_pending_batch_id)?;
     let sender = info.sender.clone();
     let delegator = env.contract.address.clone();
 
-    let msg = cw20::Cw20QueryMsg::Balance {
-        address: delegator.to_string(),
-    };
-    let balance: cw20::BalanceResponse = deps
-        .querier
-        .query_wasm_smart(params.cw20_address.clone(), &msg)?;
+    // contract liquid staking balance should have balance equals to sum of current_pending_batch.total_liquid_stake and incoming unbond amount
+    let expected_contract_liquid_staking_balance =
+        current_pending_batch.total_liquid_stake + amount;
 
-    if balance.balance < amount {
-        return Err(ContractError::NotEnoughAvailableFund {});
+    let contract_liquid_staking_balance: cw20::BalanceResponse = deps.querier.query_wasm_smart(
+        params.cw20_address.clone(),
+        &cw20::Cw20QueryMsg::Balance {
+            address: delegator.to_string(),
+        },
+    )?;
+
+    if contract_liquid_staking_balance.balance < expected_contract_liquid_staking_balance {
+        let required_amount =
+            expected_contract_liquid_staking_balance - contract_liquid_staking_balance.balance;
+        return Err(ContractError::RequiresLiquidStakingToken {
+            amount: required_amount,
+        });
     }
 
     let unstake_request_event = utils::delegation::unstake_request_in_batch(
@@ -1253,7 +1262,7 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
 
     let mut last_epoch = get_last_epoch_block(block_height, supply_queue.epoch_period);
 
-    if epoch_diff.is_multiple_of(supply_queue.epoch_period as u64) {
+    if epoch_diff % supply_queue.epoch_period as u64 == 0 {
         last_epoch -= supply_queue.epoch_period as u64;
         next_epoch -= supply_queue.epoch_period as u64;
     }

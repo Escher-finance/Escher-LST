@@ -146,4 +146,7 @@ pub enum ContractError {
 
     #[error("recipient ibc channel id not found for unbond record with id: {id}")]
     UnbondRecordIbcChannelNotFound { id: u64 },
+
+    #[error("unbond requires {amount} liquid staking token")]
+    RequiresLiquidStakingToken { amount: cosmwasm_std::Uint128 },
 }
