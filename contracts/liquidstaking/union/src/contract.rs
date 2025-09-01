@@ -18,8 +18,8 @@ use crate::{
     helpers::query_and_validate_unbonding_period,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, RemoteExecuteMsg},
     query::{
-        query_all_unstake_requests, query_batches, query_batches_by_ids, query_pending_batch,
-        query_unstake_requests,
+        query_all_unstake_requests, query_batch, query_batches, query_batches_by_ids, query_config,
+        query_pending_batch, query_state, query_unstake_requests_by_staker_hash,
     },
     state::{
         AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
@@ -153,14 +153,13 @@ pub fn execute(
         ExecuteMsg::ReceiveUnstakedTokens { batch_id } => {
             receive_unstaked_tokens(deps, env, info, batch_id)
         }
-        ExecuteMsg::CircuitBreaker {} => circuit_breaker(deps, env, info),
+        ExecuteMsg::CircuitBreaker {} => circuit_breaker(deps, info),
         ExecuteMsg::ResumeContract {
             total_bonded_native_tokens,
             total_issued_lst,
             total_reward_amount,
         } => resume_contract(
             deps,
-            env,
             info,
             AccountingState {
                 total_bonded_native_tokens: total_bonded_native_tokens.u128(),
@@ -227,19 +226,26 @@ pub fn execute(
 /////////////
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
         QueryMsg::State {} => to_json_binary(&query_state(deps)?),
-        QueryMsg::Batch { id } => to_json_binary(&query_batch(deps, id)?),
+        QueryMsg::Batch { batch_id } => to_json_binary(&query_batch(deps, batch_id)?),
         QueryMsg::Batches {
             start_after,
             limit,
             status,
         } => to_json_binary(&query_batches(deps, start_after, limit, status)?),
-        QueryMsg::BatchesByIds { ids } => to_json_binary(&query_batches_by_ids(deps, ids)?),
+        QueryMsg::BatchesByIds { batch_ids } => {
+            to_json_binary(&query_batches_by_ids(deps, &batch_ids)?)
+        }
         QueryMsg::PendingBatch {} => to_json_binary(&query_pending_batch(deps)?),
-        QueryMsg::UnstakeRequests { user } => to_json_binary(&query_unstake_requests(deps, user)?),
+        QueryMsg::UnstakeRequestsByStaker { staker } => {
+            to_json_binary(&query_unstake_requests_by_staker_hash(deps, staker.hash())?)
+        }
+        QueryMsg::UnstakeRequestsByStakerHash { staker_hash } => {
+            to_json_binary(&query_unstake_requests_by_staker_hash(deps, staker_hash)?)
+        }
         QueryMsg::AllUnstakeRequests { start_after, limit } => {
             to_json_binary(&query_all_unstake_requests(deps, start_after, limit)?)
         }

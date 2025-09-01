@@ -90,7 +90,7 @@ pub fn bond(
 
     // If mint amount is zero it is likely there was a an issue with rounding, return error and do not mint
     if mint_amount == 0 {
-        return Err(ContractError::MintError);
+        return Err(ContractError::ComputedMintAmountIsZero);
     }
 
     let (mint_amount, slippage_and_relayer) =
@@ -301,31 +301,45 @@ pub fn submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response> {
 
     let pending_batch_id = deps.storage.read_item::<PendingBatchId>()?;
 
-    let mut batch = deps.storage.read::<Batches>(&pending_batch_id)?;
+    let batch = deps.storage.read::<Batches>(&pending_batch_id)?;
 
     let BatchState::Pending { submit_time } = batch.state else {
-        return Err(ContractError::BatchAlreadySubmitted);
+        return Err(ContractError::BatchAlreadySubmitted {
+            batch_id: pending_batch_id,
+        });
     };
 
     ensure!(
         env.block.time.seconds() >= submit_time,
         ContractError::BatchNotReady {
-            actual: env.block.time.seconds(),
-            expected: submit_time,
+            now: env.block.time.seconds(),
+            ready_at: submit_time,
         }
     );
-
-    ensure!(batch.unstake_requests_count > 0, ContractError::BatchEmpty);
-
-    let mut accounting_state = deps.storage.read_item::<AccountingStateStore>()?;
 
     ensure!(
-        accounting_state.total_issued_lst >= batch.total_lst_to_burn,
-        ContractError::InvalidUnstakeAmount {
-            total_liquid_stake_token: accounting_state.total_issued_lst,
-            amount_to_unstake: batch.total_lst_to_burn
+        batch.unstake_requests_count > 0,
+        ContractError::BatchEmpty {
+            batch_id: pending_batch_id
         }
     );
+
+    let accounting_state = deps.storage.read_item::<AccountingStateStore>()?;
+
+    // reduce underlying LST balance by batch total
+    // ensure we have more issued LST than LST we're trying to burn
+    let new_total_issued_lst = match accounting_state
+        .total_issued_lst
+        .checked_sub(batch.total_lst_to_burn)
+    {
+        Some(new_total_issued_lst) => new_total_issued_lst,
+        None => {
+            return Err(ContractError::UnbondSlippageExceeded {
+                total_issued_lst: accounting_state.total_issued_lst,
+                amount_to_unstake: batch.total_lst_to_burn,
+            })
+        }
+    };
 
     let unbond_amount = compute_unbond_amount(
         accounting_state.total_bonded_native_tokens,
@@ -333,29 +347,34 @@ pub fn submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response> {
         batch.total_lst_to_burn,
     );
 
-    // reduce underlying native token balance by unbonded amount
-    accounting_state.total_bonded_native_tokens = accounting_state
-        .total_bonded_native_tokens
-        .checked_sub(unbond_amount)
-        .unwrap_or_default();
-
-    // reduce underlying LST balance by batch total
-    accounting_state.total_issued_lst = accounting_state
-        .total_issued_lst
-        .checked_sub(batch.total_lst_to_burn)
-        .unwrap_or_default();
+    deps.storage
+        .write_item::<AccountingStateStore>(&AccountingState {
+            // reduce underlying native token balance by unbonded amount
+            total_bonded_native_tokens: accounting_state
+                .total_bonded_native_tokens
+                .checked_sub(unbond_amount)
+                .ok_or_else(|| ContractError::AttemptedToUnbondMoreThanBonded {
+                    unbond_amount,
+                    total_bonded_native_tokens: accounting_state.total_bonded_native_tokens,
+                })?,
+            total_issued_lst: new_total_issued_lst,
+            ..accounting_state
+        });
 
     let unbonding_period =
         query_and_validate_unbonding_period(deps.as_ref(), config.batch_period_seconds)?;
 
-    batch.state = BatchState::Submitted {
-        receive_time: env.block.time.seconds() + unbonding_period,
-        expected_native_unstaked: unbond_amount,
-    };
-
-    deps.storage.write::<Batches>(&pending_batch_id, &batch);
-    deps.storage
-        .write_item::<AccountingStateStore>(&accounting_state);
+    // save previously pending batch as submitted
+    deps.storage.write::<Batches>(
+        &pending_batch_id,
+        &Batch {
+            state: BatchState::Submitted {
+                receive_time: env.block.time.seconds() + unbonding_period,
+                expected_native_unstaked: unbond_amount,
+            },
+            ..batch
+        },
+    );
 
     // finally, save new pending batch
     let new_pending_batch_id = pending_batch_id.increment();
@@ -410,7 +429,7 @@ pub fn withdraw(
         received_native_unstaked,
     } = batch.state
     else {
-        return Err(ContractError::BatchNotYetReceived);
+        return Err(ContractError::BatchNotYetReceived { batch_id });
     };
 
     let unstake_request_key = UnstakeRequestKey {
@@ -421,6 +440,7 @@ pub fn withdraw(
         .storage
         .maybe_read::<UnstakeRequests>(&unstake_request_key)?
         .ok_or_else(|| ContractError::NoRequestInBatch {
+            batch_id,
             staker: staker.clone(),
         })?;
 
@@ -428,6 +448,7 @@ pub fn withdraw(
         .multiply_ratio(liquid_unstake_request.amount, batch.total_lst_to_burn)
         .u128();
 
+    // delete unstake request from both maps
     deps.storage.delete::<UnstakeRequests>(&unstake_request_key);
     deps.storage
         .delete::<UnstakeRequestsByStakerHash>(&unstake_request_key);
@@ -475,11 +496,7 @@ pub fn transfer_ownership(
 }
 
 // Revoke transfer ownership, callable by the owner
-pub fn revoke_ownership_transfer(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-) -> ContractResult<Response> {
+pub fn revoke_ownership_transfer(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
     ensure_admin(deps.as_ref(), &info)?;
 
     deps.storage.delete_item::<PendingOwnerStore>();
@@ -584,25 +601,25 @@ pub fn receive_rewards(deps: DepsMut, info: MessageInfo) -> ContractResult<Respo
 
     ensure_not_stopped(deps.as_ref())?;
 
-    let amount = must_pay(&info, &config.native_token_denom)?.u128();
+    let received_rewards = must_pay(&info, &config.native_token_denom)?.u128();
 
     let protocol_fee_config = deps.storage.read_item::<ProtocolFeeConfigStore>()?;
 
-    let fee = Uint128::new(protocol_fee_config.fee_rate)
-        .multiply_ratio(amount, FEE_RATE_DENOMINATOR)
+    let protocol_fee = Uint128::new(protocol_fee_config.fee_rate)
+        .multiply_ratio(received_rewards, FEE_RATE_DENOMINATOR)
         .u128();
-    if fee == 0 {
-        return Err(ContractError::ComputedFeesAreZero {
-            received_rewards: amount,
-        });
+
+    if protocol_fee == 0 {
+        return Err(ContractError::ComputedFeesAreZero { received_rewards });
     }
-    let amount_after_fees =
-        amount
-            .checked_sub(fee)
-            .ok_or_else(|| ContractError::ReceiveRewardsTooSmall {
-                amount,
-                minimum: fee,
-            })?;
+
+    let amount_after_protocol_fee =
+        received_rewards.checked_sub(protocol_fee).ok_or_else(|| {
+            ContractError::RewardsReceivedLessThanProtocolFee {
+                received_rewards,
+                protocol_fee,
+            }
+        })?;
 
     deps.storage
         .upsert_item::<AccountingStateStore, ContractError>(|accounting_state| {
@@ -612,26 +629,37 @@ pub fn receive_rewards(deps: DepsMut, info: MessageInfo) -> ContractResult<Respo
             }
 
             // update the accounting of tokens
-            accounting_state.total_bonded_native_tokens += amount_after_fees;
-            accounting_state.total_reward_amount += amount;
+            accounting_state.total_bonded_native_tokens += amount_after_protocol_fee;
+            accounting_state.total_reward_amount += received_rewards;
 
             Ok(accounting_state)
         });
 
     Ok(Response::new()
-        .add_attribute("action", "receive_rewards")
-        .add_attribute("action", "transfer_stake")
-        .add_attribute("amount", amount.to_string())
-        .add_attribute("amount_after_fees", amount_after_fees.to_string())
+        .add_event(
+            Event::new("receive_rewards")
+                .add_attribute("amount", received_rewards.to_string())
+                .add_attribute(
+                    "amount_after_protocol_fee",
+                    amount_after_protocol_fee.to_string(),
+                )
+                .add_attribute("protocol_fee", protocol_fee.to_string()),
+        )
         // send amount after fees to the staker
         .add_message(BankMsg::Send {
             to_address: deps.storage.read_item::<StakerAddress>()?.to_string(),
-            amount: vec![Coin::new(amount_after_fees, &config.native_token_denom)],
+            amount: vec![Coin::new(
+                amount_after_protocol_fee,
+                &config.native_token_denom,
+            )],
         })
         // send fees to the fee recipient
         .add_message(BankMsg::Send {
             to_address: protocol_fee_config.fee_recipient.to_string(),
-            amount: vec![cosmwasm_std::Coin::new(fee, config.native_token_denom)],
+            amount: vec![cosmwasm_std::Coin::new(
+                protocol_fee,
+                config.native_token_denom,
+            )],
         }))
 }
 
@@ -654,7 +682,9 @@ pub fn receive_unstaked_tokens(
             let mut batch = batch.ok_or(ContractError::BatchNotFound { batch_id })?;
 
             let expected_native_unstaked = match batch.state {
-                BatchState::Pending { .. } => return Err(ContractError::BatchStillPending),
+                BatchState::Pending { .. } => {
+                    return Err(ContractError::BatchStillPending { batch_id })
+                }
                 BatchState::Submitted {
                     receive_time,
                     expected_native_unstaked,
@@ -662,13 +692,15 @@ pub fn receive_unstaked_tokens(
                     ensure!(
                         receive_time <= env.block.time.seconds(),
                         ContractError::BatchNotReady {
-                            actual: env.block.time.seconds(),
-                            expected: receive_time,
+                            now: env.block.time.seconds(),
+                            ready_at: receive_time,
                         }
                     );
                     expected_native_unstaked
                 }
-                BatchState::Received { .. } => return Err(ContractError::BatchAlreadyReceived),
+                BatchState::Received { .. } => {
+                    return Err(ContractError::BatchAlreadyReceived { batch_id })
+                }
             };
 
             ensure!(
@@ -693,7 +725,7 @@ pub fn receive_unstaked_tokens(
         .add_attribute("amount", amount.to_string()))
 }
 
-pub fn circuit_breaker(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult<Response> {
+pub fn circuit_breaker(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
     // must either be admin or a monitor to halt the contract
     if deps.storage.read_item::<Admin>()? == info.sender
         || deps.storage.maybe_read::<Monitors>(&info.sender)?.is_some()
@@ -710,7 +742,6 @@ pub fn circuit_breaker(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractR
 
 pub fn resume_contract(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     new_accounting_state: AccountingState,
 ) -> ContractResult<Response> {
@@ -719,6 +750,8 @@ pub fn resume_contract(
     if !deps.storage.read_item::<Stopped>()? {
         return Err(ContractError::NotStopped);
     };
+
+    deps.storage.write_item::<Stopped>(&false);
 
     deps.storage
         .write_item::<AccountingStateStore>(&new_accounting_state);
@@ -729,7 +762,7 @@ pub fn resume_contract(
                 "total_bonded_native_tokens",
                 new_accounting_state.total_bonded_native_tokens.to_string(),
             )
-            .add_total_issued_lstattribute(
+            .add_attribute(
                 "total_issued_lst",
                 new_accounting_state.total_issued_lst.to_string(),
             )

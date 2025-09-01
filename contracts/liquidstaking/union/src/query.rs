@@ -1,41 +1,50 @@
 use cosmwasm_std::{Deps, Order, StdResult};
-use cw_storage_plus::Bound;
 use depolama::StorageExt;
 use itertools::Itertools;
-use unionlabs_primitives::{Bytes, H256};
+use unionlabs_primitives::H256;
 
 use crate::{
     helpers::get_rates,
-    msg::{BatchesResponse, ConfigResponse, StateResponse},
-    state::{Batches, PendingBatchId, UnstakeRequests, UnstakeRequestsByStakerHash},
-    types::{Batch, BatchId, BatchStatus, Staker, UnstakeRequest, UnstakeRequestKey},
+    msg::{AccountingStateResponse, BatchesResponse, ConfigResponse},
+    state::{
+        AccountingStateStore, Batches, ConfigStore, LstAddress, Monitors, PendingBatchId,
+        ProtocolFeeConfigStore, Stopped, UnstakeRequestsByStakerHash,
+    },
+    types::{Batch, BatchId, BatchStatus, Config, UnstakeRequest, UnstakeRequestKey},
 };
 
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
-    let config = CONFIG.load(deps.storage)?;
+    let Config {
+        native_token_denom,
+        minimum_liquid_stake_amount,
+        batch_period_seconds,
+    } = deps.storage.read_item::<ConfigStore>()?;
 
-    let res = ConfigResponse {
-        protocol_fee_config: config.protocol_fee_config,
-        liquid_stake_token_denom: config.liquid_stake_token_address,
-        monitors: config.monitors,
-        batch_period: config.batch_period_seconds,
-        stopped: config.stopped,
-    };
-    Ok(res)
+    Ok(ConfigResponse {
+        native_token_denom,
+        minimum_liquid_stake_amount: minimum_liquid_stake_amount.into(),
+        protocol_fee_config: deps.storage.read_item::<ProtocolFeeConfigStore>()?,
+        lst_address: deps.storage.read_item::<LstAddress>()?,
+        monitors: deps
+            .storage
+            .iter_range::<Monitors>(Order::Ascending, ..)
+            .map_ok(|(monitor, ())| monitor)
+            .collect::<Result<_, _>>()?,
+        batch_period_seconds,
+        stopped: deps.storage.read_item::<Stopped>()?,
+    })
 }
 
-pub fn query_state(deps: Deps) -> StdResult<StateResponse> {
-    let state = STATE.load(deps.storage)?;
-    let (_, purchase_rate) = get_rates(&state);
-    let res = StateResponse {
-        total_bonded_native_tokens: state.total_bonded_native_tokens,
-        total_liquid_stake_token: state.total_issued_lst,
-        rate: purchase_rate,
-        pending_owner: state
-            .pending_owner
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
-        total_reward_amount: state.total_reward_amount,
+pub fn query_state(deps: Deps) -> StdResult<AccountingStateResponse> {
+    let accounting_state = deps.storage.read_item::<AccountingStateStore>()?;
+
+    let (redemption_rate, purchase_rate) = get_rates(&accounting_state);
+    let res = AccountingStateResponse {
+        total_bonded_native_tokens: accounting_state.total_bonded_native_tokens.into(),
+        total_issued_lst: accounting_state.total_issued_lst.into(),
+        total_reward_amount: accounting_state.total_reward_amount.into(),
+        redemption_rate,
+        purchase_rate,
     };
     Ok(res)
 }
@@ -83,16 +92,19 @@ pub fn query_pending_batch(deps: Deps) -> StdResult<Batch> {
         .read::<Batches>(&deps.storage.read_item::<PendingBatchId>()?)
 }
 
-pub fn query_unstake_requests(deps: Deps, staker: Staker) -> StdResult<Vec<UnstakeRequest>> {
+pub fn query_unstake_requests_by_staker_hash(
+    deps: Deps,
+    staker_hash: H256,
+) -> StdResult<Vec<UnstakeRequest>> {
     deps.storage
         .iter_range::<UnstakeRequestsByStakerHash>(
             Order::Ascending,
             UnstakeRequestKey {
                 batch_id: BatchId::ONE,
-                staker_hash: staker.hash(),
+                staker_hash,
             }..=UnstakeRequestKey {
                 batch_id: BatchId::MAX,
-                staker_hash: staker.hash(),
+                staker_hash,
             },
         )
         .map_ok(|(_, unstake_request)| unstake_request)

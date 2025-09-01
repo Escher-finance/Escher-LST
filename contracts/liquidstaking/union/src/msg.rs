@@ -6,10 +6,11 @@ use ibc_union_spec::ChannelId;
 use on_zkgm_call_proxy::OnProxyOnZkgmCall;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use unionlabs_primitives::Bytes;
+use unionlabs_primitives::{Bytes, H256};
 
 use crate::types::{
     Batch, BatchExpectedAmount, BatchId, BatchStatus, ProtocolFeeConfig, Staker, UnstakeRequest,
+    UnstakeRequestKey,
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -173,14 +174,14 @@ pub enum QueryMsg {
     // #[returns(Batch)]
     Batch {
         /// ID of the batch to query.
-        id: u64,
+        batch_id: BatchId,
     },
 
     /// Queries a paginated list of all batches stored in contract storage.
     // #[returns(BatchesResponse)]
     Batches {
         /// If provided, starts listing batches after this batch ID.
-        start_after: Option<u64>,
+        start_after: Option<BatchId>,
 
         /// Maximum number of batches to return.
         limit: Option<usize>,
@@ -193,25 +194,32 @@ pub enum QueryMsg {
     // #[returns(BatchesResponse)]
     BatchesByIds {
         /// List of batch IDs to fetch.
-        ids: Vec<u64>,
+        batch_ids: Vec<BatchId>,
     },
 
     /// Queries the current batch that is pending processing (if any).
     // #[returns(Batch)]
     PendingBatch {},
 
-    /// Queries the unstake requests made by a specific user.
+    /// Queries the unstake requests made by a specific staker.
     // #[returns(Vec<UnstakeRequest>)]
-    UnstakeRequests {
+    UnstakeRequestsByStaker {
         /// Address of the user whose unstake requests are to be queried.
-        user: Bytes,
+        staker: Staker,
+    },
+
+    /// Queries the unstake requests made by a specific staker, by the staker hash.
+    // #[returns(Vec<UnstakeRequest>)]
+    UnstakeRequestsByStakerHash {
+        /// Address of the user whose unstake requests are to be queried.
+        staker_hash: H256,
     },
 
     /// Queries all unstake requests in the contract.
     // #[returns(Vec<UnstakeRequestResponse>)]
     AllUnstakeRequests {
-        /// If provided, starts listing unstake requests after this ID.
-        start_after: Option<BatchId>,
+        /// If provided, starts listing unstake requests after this key.
+        start_after: Option<UnstakeRequestKey>,
 
         /// Maximum number of unstake requests to return.
         limit: Option<usize>,
@@ -220,18 +228,22 @@ pub enum QueryMsg {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConfigResponse {
+    pub native_token_denom: String,
+    pub minimum_liquid_stake_amount: Uint128,
     pub protocol_fee_config: ProtocolFeeConfig,
     pub monitors: Vec<Addr>,
-    pub liquid_stake_token_address: String,
-    pub batch_period: u64,
+    pub lst_address: Addr,
+    pub batch_period_seconds: u64,
     pub stopped: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StateResponse {
+pub struct AccountingStateResponse {
     pub total_bonded_native_tokens: Uint128,
-    pub total_liquid_stake_token: Uint128,
-    pub rate: Decimal,
+    pub total_issued_lst: Uint128,
+    pub total_reward_amount: Uint128,
+    pub redemption_rate: Decimal,
+    pub purchase_rate: Decimal,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

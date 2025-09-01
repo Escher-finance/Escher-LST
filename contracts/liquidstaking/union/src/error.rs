@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, StdError, Timestamp};
+use cosmwasm_std::{Addr, StdError};
 use cw2::VersionError;
 use cw_utils::PaymentError;
 use thiserror::Error;
@@ -15,6 +15,9 @@ pub enum ContractError {
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
 
+    #[error(transparent)]
+    Payment(#[from] PaymentError),
+
     #[error("unauthorized: {sender}")]
     Unauthorized { sender: Addr },
 
@@ -27,59 +30,39 @@ pub enum ContractError {
     #[error("ownership transfer not ready, claimable at {time_to_claim_seconds}")]
     OwnershipTransferNotReady { time_to_claim_seconds: u64 },
 
-    #[error("Payment error: {0}")]
-    Payment(#[from] PaymentError),
-
-    #[error("Minimum liquid stake amount not met")]
+    #[error(
+        "attempted to bond less than minimum stake amount \
+        (min={minimum_stake_amount}, sent={sent_amount})"
+    )]
     MinimumLiquidStakeAmount {
         minimum_stake_amount: u128,
         sent_amount: u128,
     },
 
-    #[error("Unable to mint liquid staking token")]
-    MintError,
+    #[error("computed mint amount is zero")]
+    ComputedMintAmountIsZero,
 
-    #[error("Validator already exists")]
-    DuplicateValidator { validator: String },
+    #[error("batch is not ready to be submitted (now={now}, ready_at={ready_at})")]
+    BatchNotReady { now: u64, ready_at: u64 },
 
-    #[error("Validator not found")]
-    ValidatorNotFound { validator: String },
+    #[error("batch {batch_id} has already been submitted")]
+    BatchAlreadySubmitted { batch_id: BatchId },
 
-    #[error("Address is not valid")]
-    InvalidAddress,
+    #[error("no liquid unstake requests in batch {batch_id}")]
+    BatchEmpty { batch_id: BatchId },
 
-    #[error("Batch is not ready to be submitted")]
-    BatchNotReady { actual: u64, expected: u64 },
-
-    #[error("Batch has already been submitted")]
-    BatchAlreadySubmitted,
-
-    #[error("No liquid unstake requests in batch")]
-    BatchEmpty,
-
-    #[error("batch not found")]
+    #[error("batch {batch_id} not found")]
     BatchNotFound { batch_id: BatchId },
 
-    #[error("the batch is still pending")]
-    BatchStillPending,
+    #[error("batch {batch_id} is still pending")]
+    BatchStillPending { batch_id: BatchId },
 
-    #[error("the batch has already been received")]
-    BatchAlreadyReceived,
-
-    #[error("Batch is either already closed or is in an error state")]
-    BatchNotClaimable {
-        batch_id: BatchId,
-        status: BatchState,
-    },
-
-    #[error("the batch has not yet been submitted")]
-    BatchNotYetSubmitted { batch_id: BatchId },
-
-    #[error("Batch {batch_id} don't have the expected native amount")]
-    BatchWithoutExpectedNativeAmount { batch_id: BatchId },
+    #[error("batch {batch_id} has already been received")]
+    BatchAlreadyReceived { batch_id: BatchId },
 
     #[error(
-        "Received wrong batch amount, batch_id {batch_id} expected {expected}, got {received}"
+        "received wrong batch amount, batch_id {batch_id} \
+        expected {expected}, got {received}"
     )]
     ReceivedWrongBatchAmount {
         batch_id: BatchId,
@@ -87,15 +70,18 @@ pub enum ContractError {
         received: u128,
     },
 
-    #[error("the batch is not yet received")]
-    BatchNotYetReceived,
+    #[error("batch {batch_id} is not yet received")]
+    BatchNotYetReceived { batch_id: BatchId },
 
-    #[error("staker {staker} not found in batch (hash={})", staker.hash())]
-    NoRequestInBatch { staker: Staker },
+    #[error("staker {staker} not found in batch {batch_id} (hash={})", staker.hash())]
+    NoRequestInBatch { batch_id: BatchId, staker: Staker },
 
-    #[error("Minimum liquid stake amount not met")]
-    InvalidUnstakeAmount {
-        total_liquid_stake_token: u128,
+    #[error(
+        "unbond slippage exceeded (total_issued_lst={total_issued_lst}, \
+        amount_to_unstake={amount_to_unstake})"
+    )]
+    UnbondSlippageExceeded {
+        total_issued_lst: u128,
         amount_to_unstake: u128,
     },
 
@@ -105,10 +91,16 @@ pub enum ContractError {
     #[error("contract is not stopped")]
     NotStopped,
 
-    #[error("Receive rewards are smaller then the fee")]
-    ReceiveRewardsTooSmall { amount: u128, minimum: u128 },
+    #[error(
+        "received rewards ({received_rewards}) are \
+        less than the protocol fee ({protocol_fee})"
+    )]
+    RewardsReceivedLessThanProtocolFee {
+        received_rewards: u128,
+        protocol_fee: u128,
+    },
 
-    #[error("The computed fees are zero for the received rewards: {received_rewards}")]
+    #[error("computed fees are zero for the received rewards ({received_rewards})")]
     ComputedFeesAreZero { received_rewards: u128 },
 
     #[error("No liquid stake to distribute rewards to")]
@@ -129,5 +121,14 @@ pub enum ContractError {
     BatchPeriodLargerThanUnbondingPeriod {
         batch_period: u64,
         unbonding_period: u64,
+    },
+
+    #[error(
+        "attempted to unbond more native tokens {unbond_amount} than \
+        total bonded native tokens {total_bonded_native_tokens}"
+    )]
+    AttemptedToUnbondMoreThanBonded {
+        unbond_amount: u128,
+        total_bonded_native_tokens: u128,
     },
 }

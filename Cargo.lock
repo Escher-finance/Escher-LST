@@ -1557,17 +1557,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "enum-repr"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bad30c9c0fa1aaf1ae5010dab11f1117b15d35faf62cda4bbbc53b9987950f18"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "enumorph"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2610,25 +2599,18 @@ dependencies = [
 name = "liquidstaking-union"
 version = "0.0.0"
 dependencies = [
- "alloy 0.15.11",
- "bech32 0.11.0",
  "bincode",
  "cosmwasm-schema 2.2.2",
  "cosmwasm-std 2.2.2",
  "cw-multi-test 0.17.0",
- "cw-storage-plus 2.0.0",
  "cw-utils 2.0.0",
  "cw2 2.0.0",
  "cw20",
  "depolama",
- "enum-repr",
- "hex",
  "ibc-union-spec",
  "itertools 0.14.0",
- "num-traits",
  "on-zkgm-call-proxy",
  "prost 0.12.6",
- "prost-derive 0.12.6",
  "schemars",
  "semver 1.0.26",
  "serde",
@@ -2636,7 +2618,6 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror 1.0.69",
- "ucs03-zkgm",
  "unionlabs-encoding",
  "unionlabs-primitives",
 ]
