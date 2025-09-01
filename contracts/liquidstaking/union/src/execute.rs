@@ -1,9 +1,9 @@
 use cosmwasm_std::{
-    attr, ensure, wasm_execute, Addr, BankMsg, Coin, Deps, DepsMut, Env, Event, MessageInfo,
-    Response, Uint128,
+    Addr, BankMsg, Coin, Deps, DepsMut, Env, Event, MessageInfo, Response, Uint128, attr, ensure,
+    wasm_execute,
 };
-use cw20::Cw20ExecuteMsg;
 use cw_utils::must_pay;
+use cw20::Cw20ExecuteMsg;
 use depolama::StorageExt;
 
 use crate::{
@@ -343,7 +343,7 @@ pub fn submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response> {
             return Err(ContractError::UnbondSlippageExceeded {
                 total_issued_lst: accounting_state.total_issued_lst,
                 amount_to_unstake: batch.total_lst_to_burn,
-            })
+            });
         }
     };
 
@@ -686,7 +686,7 @@ pub fn receive_unstaked_tokens(
 
             let expected_native_unstaked = match batch.state {
                 BatchState::Pending { .. } => {
-                    return Err(ContractError::BatchStillPending { batch_id })
+                    return Err(ContractError::BatchStillPending { batch_id });
                 }
                 BatchState::Submitted {
                     receive_time,
@@ -702,7 +702,7 @@ pub fn receive_unstaked_tokens(
                     expected_native_unstaked
                 }
                 BatchState::Received { .. } => {
-                    return Err(ContractError::BatchAlreadyReceived { batch_id })
+                    return Err(ContractError::BatchAlreadyReceived { batch_id });
                 }
             };
 

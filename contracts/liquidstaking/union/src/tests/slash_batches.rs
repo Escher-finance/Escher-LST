@@ -1,8 +1,7 @@
 use cosmwasm_std::{
-    testing::{mock_env, mock_info},
     Uint128,
+    testing::{mock_env, mock_info},
 };
-use crate::types::{Batch, BatchState};
 
 use super::test_helper::init;
 use crate::{
@@ -11,7 +10,7 @@ use crate::{
     msg::ExecuteMsg,
     state::{BATCHES, CONFIG},
     tests::test_helper::ADMIN,
-    types::BatchExpectedAmount,
+    types::{Batch, BatchExpectedAmount, BatchState},
 };
 
 #[test]

@@ -2608,6 +2608,7 @@ dependencies = [
  "cw2 2.0.0",
  "cw20",
  "depolama",
+ "embed-commit",
  "ibc-union-spec",
  "itertools 0.14.0",
  "on-zkgm-call-proxy",

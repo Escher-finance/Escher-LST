@@ -1,7 +1,7 @@
 use cosmwasm_std::{
-    attr,
+    Addr, Coin, CosmosMsg, Timestamp, Uint128, WasmMsg, attr,
     testing::{message_info, mock_env},
-    to_json_binary, Addr, Coin, CosmosMsg, Timestamp, Uint128, WasmMsg,
+    to_json_binary,
 };
 use cw20::Cw20ExecuteMsg;
 
@@ -9,7 +9,7 @@ use crate::{
     contract::execute,
     msg::ExecuteMsg,
     state::{BATCHES, CONFIG, PENDING_BATCH_ID, STATE},
-    tests::test_helper::{init, LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION1, UNION2, UNION3},
+    tests::test_helper::{LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION1, UNION2, UNION3, init},
     types::{Batch, BatchState},
 };
 

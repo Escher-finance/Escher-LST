@@ -3,12 +3,12 @@ use cosmwasm_std::{Addr, Uint128};
 use crate::{
     state::CONFIG,
     tests::test_helper::{
-        init, ADMIN, CELESTIA1, CELESTIA2, CELESTIAVAL1, CHANNEL_ID, NATIVE_TOKEN, OSMO1, OSMO3,
-        OSMO4,
+        ADMIN, CELESTIA1, CELESTIA2, CELESTIAVAL1, CHANNEL_ID, NATIVE_TOKEN, OSMO1, OSMO3, OSMO4,
+        init,
     },
     types::{
-        UnsafeNativeChainConfig, UnsafeProtocolChainConfig, UnsafeProtocolFeeConfig,
-        MAX_UNBONDING_PERIOD,
+        MAX_UNBONDING_PERIOD, UnsafeNativeChainConfig, UnsafeProtocolChainConfig,
+        UnsafeProtocolFeeConfig,
     },
 };
 

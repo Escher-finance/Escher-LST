@@ -1,12 +1,12 @@
 use cosmwasm_std::{
-    testing::{message_info, mock_dependencies, mock_env},
     Addr,
+    testing::{message_info, mock_dependencies, mock_env},
 };
 
 use crate::{
     contract::instantiate,
     state::BATCHES,
-    tests::test_helper::{mock_deps_with_unbonding_time, mock_init_msg, UNION1},
+    tests::test_helper::{UNION1, mock_deps_with_unbonding_time, mock_init_msg},
     types::{BatchState, MAX_FEE_RATE},
 };
 

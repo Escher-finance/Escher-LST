@@ -1,14 +1,13 @@
 use cosmwasm_std::{
-    coins,
+    Coin, Uint128, coins,
     testing::{mock_env, mock_info},
-    Coin, Uint128,
 };
 
 use crate::{
     contract::execute,
     msg::{self, ExecuteMsg},
-    state::{new_unstake_request, State, BATCHES, CONFIG, STATE},
-    tests::test_helper::{init, ADMIN, NATIVE_TOKEN, OSMO2, OSMO3},
+    state::{BATCHES, CONFIG, STATE, State, new_unstake_request},
+    tests::test_helper::{ADMIN, NATIVE_TOKEN, OSMO2, OSMO3, init},
     types::Batch,
 };
 

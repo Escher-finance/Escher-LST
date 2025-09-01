@@ -100,7 +100,7 @@
 
           packages = {
             liquidstaking-babylon = crane.buildWasmContract "contracts/liquidstaking/babylon" { };
-            # liquidstaking-union = crane.buildWasmContract "contracts/liquidstaking/union" { };
+            liquidstaking-union = crane.buildWasmContract "contracts/liquidstaking/union" { };
             reward = crane.buildWasmContract "contracts/reward" { };
             cw20-base = crane.buildWasmContract "contracts/cw20-base" { };
           };

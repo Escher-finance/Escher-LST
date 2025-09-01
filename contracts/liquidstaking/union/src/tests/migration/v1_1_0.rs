@@ -1,17 +1,17 @@
 use cosmwasm_std::{
-    testing::{mock_dependencies, mock_env},
     Addr, Coin, Uint128,
+    testing::{mock_dependencies, mock_env},
 };
 use cw2::set_contract_version;
 
 use crate::{
-    contract::{migrate, CONTRACT_NAME},
+    contract::{CONTRACT_NAME, migrate},
     migrations::states::v1_0_0,
     msg::MigrateMsg,
     state::{
+        CONFIG, Config, IBC_WAITING_FOR_REPLY, INFLIGHT_PACKETS, IbcWaitingForReply, MIGRATING,
+        NativeChainConfig, ProtocolChainConfig, ProtocolFeeConfig,
         ibc::{IBCTransfer, PacketLifecycleStatus},
-        Config, IbcWaitingForReply, NativeChainConfig, ProtocolChainConfig, ProtocolFeeConfig,
-        CONFIG, IBC_WAITING_FOR_REPLY, INFLIGHT_PACKETS, MIGRATING,
     },
     tests::test_helper::{
         CELESTIA2, CHANNEL_ID, LIQUID_STAKE_TOKEN_DENOM, NATIVE_TOKEN, OSMO1, OSMO4, STAKER_ADDRESS,

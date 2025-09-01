@@ -1,5 +1,5 @@
 use cosmwasm_std::{Addr, StdError, StdResult};
-use depolama::{value::ValueCodecViaEncoding, KeyCodec, Prefix, Store, ValueCodec};
+use depolama::{KeyCodec, Prefix, Store, ValueCodec, value::ValueCodecViaEncoding};
 use unionlabs_encoding::Bincode;
 use unionlabs_primitives::{ByteArrayExt, Bytes};
 

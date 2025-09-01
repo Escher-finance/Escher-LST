@@ -1,23 +1,23 @@
 use alloy::{primitives::U256, sol_types::SolValue};
 use cosmwasm_std::{
-    attr, coins,
+    Addr, BankMsg, CosmosMsg, StdError, Uint128, WasmMsg, attr, coins,
     testing::{message_info, mock_env},
-    to_json_binary, Addr, BankMsg, CosmosMsg, StdError, Uint128, WasmMsg,
+    to_json_binary,
 };
 use cw20::Cw20ExecuteMsg;
 use ibc_union_spec::ChannelId;
 use ucs03_zkgm::com::{
-    Instruction, TokenOrderV2, INSTR_VERSION_2, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_SOLVE,
+    INSTR_VERSION_2, Instruction, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_SOLVE, TokenOrderV2,
 };
-use unionlabs_primitives::{encoding::HexPrefixed, Bytes};
+use unionlabs_primitives::{Bytes, encoding::HexPrefixed};
 
 use crate::{
     contract::execute,
     msg::ExecuteMsg,
     state::{CounterpartyConfig, FUNGIBLE_RECIPIENT_CHANNEL, STATE},
     tests::test_helper::{
-        init, FUNDED_DISPATCH_ADDRESS, LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION2,
-        UNION_STAKER, ZKGM_ADDRESS,
+        FUNDED_DISPATCH_ADDRESS, LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION_STAKER, UNION2,
+        ZKGM_ADDRESS, init,
     },
 };
 

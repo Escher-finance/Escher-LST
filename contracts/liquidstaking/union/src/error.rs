@@ -1,9 +1,9 @@
 use cosmwasm_std::{Addr, StdError};
-use cw2::VersionError;
 use cw_utils::PaymentError;
+use cw2::VersionError;
 use thiserror::Error;
 
-use crate::types::{BatchId, Staker, MAX_FEE_RATE};
+use crate::types::{BatchId, MAX_FEE_RATE, Staker};
 
 pub type ContractResult<T> = core::result::Result<T, ContractError>;
 

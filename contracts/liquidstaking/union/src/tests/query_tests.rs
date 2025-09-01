@@ -1,7 +1,6 @@
 use cosmwasm_std::{
-    coins, from_json,
+    Addr, Decimal, Uint128, coins, from_json,
     testing::{mock_env, mock_info},
-    Addr, Decimal, Uint128,
 };
 
 use crate::{
@@ -10,8 +9,8 @@ use crate::{
     query::query_pending_batch,
     state::{CONFIG, STATE},
     tests::test_helper::{
-        init, CELESTIA2, CELESTIAVAL1, CELESTIAVAL2, CHANNEL_ID, LIQUID_STAKE_TOKEN_DENOM,
-        NATIVE_TOKEN, OSMO2, OSMO3, OSMO4, STAKER_ADDRESS,
+        CELESTIA2, CELESTIAVAL1, CELESTIAVAL2, CHANNEL_ID, LIQUID_STAKE_TOKEN_DENOM, NATIVE_TOKEN,
+        OSMO2, OSMO3, OSMO4, STAKER_ADDRESS, init,
     },
 };
 

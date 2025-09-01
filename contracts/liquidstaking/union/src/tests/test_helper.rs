@@ -1,14 +1,13 @@
 use cosmwasm_std::{
-    coins,
-    testing::{message_info, mock_env, MockApi, MockStorage},
-    Addr, OwnedDeps, Uint128,
+    Addr, OwnedDeps, Uint128, coins,
+    testing::{MockApi, MockStorage, message_info, mock_env},
 };
 use prost::Message;
 
 use crate::{
     contract::instantiate,
     msg::InstantiateMsg,
-    state::{ProtocolFeeConfig, CONFIG},
+    state::{CONFIG, ProtocolFeeConfig},
 };
 
 pub const NATIVE_TOKEN: &str = "au";

@@ -1,15 +1,14 @@
 use cosmwasm_std::{
-    from_json,
-    testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR},
-    Addr, CosmosMsg, ReplyOn, SubMsg, Uint128,
+    Addr, CosmosMsg, ReplyOn, SubMsg, Uint128, from_json,
+    testing::{MOCK_CONTRACT_ADDR, mock_env, mock_info},
 };
 use osmosis_std::types::cosmos::{bank::v1beta1::MsgSend, base::v1beta1::Coin};
 
 use crate::{
     contract::{execute, query},
     msg::{ExecuteMsg, QueryMsg},
-    state::{new_unstake_request, UnstakeRequest, BATCHES, CONFIG, STATE},
-    tests::test_helper::{init, ADMIN, NATIVE_TOKEN, OSMO1},
+    state::{BATCHES, CONFIG, STATE, UnstakeRequest, new_unstake_request},
+    tests::test_helper::{ADMIN, NATIVE_TOKEN, OSMO1, init},
     types::Batch,
 };
 

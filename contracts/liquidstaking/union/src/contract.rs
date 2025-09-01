@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    entry_point, from_json, to_json_binary, Binary, Deps, DepsMut, Env, Event, MessageInfo,
-    Response, StdError, StdResult,
+    Binary, Deps, DepsMut, Env, Event, MessageInfo, Response, StdError, StdResult, entry_point,
+    from_json, to_json_binary,
 };
 use cw2::set_contract_version;
 use depolama::StorageExt;
@@ -26,7 +26,7 @@ use crate::{
         AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
         PendingBatchId, ProtocolFeeConfigStore, StakerAddress, Zkgm,
     },
-    types::{AccountingState, Batch, BatchId, Config, Staker, MAX_FEE_RATE},
+    types::{AccountingState, Batch, BatchId, Config, MAX_FEE_RATE, Staker},
 };
 
 // Version information for migration

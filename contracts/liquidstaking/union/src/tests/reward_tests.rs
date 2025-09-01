@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    testing::{message_info, mock_env},
     Addr, Attribute, BankMsg, Coin, CosmosMsg, StdError,
+    testing::{message_info, mock_env},
 };
 
 use super::test_helper::UNION1;
@@ -8,7 +8,7 @@ use crate::{
     contract::execute,
     msg::ExecuteMsg,
     state::STATE,
-    tests::test_helper::{init, mock_init_msg, NATIVE_TOKEN, UNION_STAKER},
+    tests::test_helper::{NATIVE_TOKEN, UNION_STAKER, init, mock_init_msg},
 };
 
 #[test]
