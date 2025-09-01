@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    to_json_binary, Addr, Coin, CosmosMsg, Decimal, Deps, StdResult, Uint128, WasmMsg,
+    Addr, Coin, CosmosMsg, Decimal, Deps, StdResult, Uint128, WasmMsg, to_json_binary,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

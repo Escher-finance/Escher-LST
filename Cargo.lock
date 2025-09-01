@@ -2609,6 +2609,7 @@ dependencies = [
  "cw20",
  "depolama",
  "embed-commit",
+ "hex-literal",
  "ibc-union-spec",
  "itertools 0.14.0",
  "on-zkgm-call-proxy",
@@ -2620,6 +2621,7 @@ dependencies = [
  "serde-utils",
  "sha2 0.10.9",
  "thiserror 1.0.69",
+ "ucs03-zkgm",
  "unionlabs-encoding",
  "unionlabs-primitives",
 ]

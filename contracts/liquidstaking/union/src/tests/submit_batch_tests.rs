@@ -1,31 +1,32 @@
 use cosmwasm_std::{
-    Addr, Coin, CosmosMsg, Timestamp, Uint128, WasmMsg, attr,
+    Addr, Coin, CosmosMsg, Event, StdError, Timestamp, WasmMsg,
     testing::{message_info, mock_env},
     to_json_binary,
 };
 use cw20::Cw20ExecuteMsg;
+use depolama::StorageExt;
 
 use crate::{
     contract::execute,
     msg::ExecuteMsg,
-    state::{BATCHES, CONFIG, PENDING_BATCH_ID, STATE},
+    state::{AccountingStateStore, Batches, ConfigStore, PendingBatchId},
     tests::test_helper::{LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION1, UNION2, UNION3, init},
-    types::{Batch, BatchState},
+    types::{Batch, BatchId, BatchState},
 };
 
 #[test]
 fn submit_batch_works() {
     let mut deps = init();
 
-    let mut state = STATE.load(&deps.storage).unwrap();
-
-    let initial_total_bonded_native_tokens = Uint128::from(1_100u128);
-    state.total_bonded_native_tokens = initial_total_bonded_native_tokens;
-
-    let initial_total_liquid_stake_token = Uint128::from(1_000u128);
-    state.total_issued_lst = initial_total_liquid_stake_token;
-
-    STATE.save(&mut deps.storage, &state).unwrap();
+    let _ = deps
+        .storage
+        .upsert_item::<AccountingStateStore, StdError>(|s| {
+            let mut s = s.unwrap();
+            s.total_bonded_native_tokens = 1_100;
+            s.total_issued_lst = 1_000;
+            Ok(s)
+        })
+        .unwrap();
 
     // UNION1 bonds 1000 tokens
     let union1_bond_amount = 1000u128.into();
@@ -40,9 +41,8 @@ fn submit_batch_works() {
             }],
         ),
         ExecuteMsg::Bond {
-            mint_to: UNION2.as_bytes().to_vec().into(),
-            recipient_channel_id: None,
-            min_mint_amount: None,
+            mint_to: Addr::unchecked(UNION1),
+            min_mint_amount: 909u128.into(),
         },
     )
     .unwrap();
@@ -60,9 +60,8 @@ fn submit_batch_works() {
             }],
         ),
         ExecuteMsg::Bond {
-            mint_to: UNION2.as_bytes().to_vec().into(),
-            recipient_channel_id: None,
-            min_mint_amount: None,
+            mint_to: Addr::unchecked(UNION2),
+            min_mint_amount: 1818u128.into(),
         },
     )
     .unwrap();
@@ -74,13 +73,16 @@ fn submit_batch_works() {
         mock_env(),
         message_info(&Addr::unchecked(UNION3), &[]),
         ExecuteMsg::Unbond {
-            staker: UNION3.as_bytes().into(),
+            staker: Addr::unchecked(UNION3),
             amount: union3_unbond_amount,
         },
     )
     .unwrap();
 
-    let batch = BATCHES.load(&deps.storage, 1).unwrap();
+    let batch = deps
+        .storage
+        .read::<Batches>(&BatchId::from_raw(1).unwrap())
+        .unwrap();
 
     let mut env = mock_env();
     env.block.time = if let BatchState::Pending { submit_time } = batch.state {
@@ -97,38 +99,45 @@ fn submit_batch_works() {
     )
     .unwrap();
 
+    let new_batch_id = BatchId::from_raw(2).unwrap();
+
     // latest batch id is increased
-    assert_eq!(PENDING_BATCH_ID.load(&deps.storage).unwrap(), 2);
+    assert_eq!(
+        deps.storage.read_item::<PendingBatchId>().unwrap(),
+        new_batch_id
+    );
 
     // new pending batch is pushed to the batches
-    let new_batch = BATCHES.load(&deps.storage, 2).unwrap();
+    let new_batch = deps.storage.read::<Batches>(&new_batch_id).unwrap();
     assert_eq!(
         new_batch,
         Batch::new_pending(
-            env.block.time.seconds() + CONFIG.load(&deps.storage).unwrap().batch_period_seconds
+            env.block.time.seconds()
+                + deps
+                    .storage
+                    .read_item::<ConfigStore>()
+                    .unwrap()
+                    .batch_period_seconds
         ),
     );
 
-    let state = STATE.load(&deps.storage).unwrap();
+    let state = deps.storage.read_item::<AccountingStateStore>().unwrap();
 
     // the rate is updated properly
-    let expected_total_bonded_native_tokens: Uint128 = 3550u128.into();
-    assert_eq!(
-        state.total_bonded_native_tokens,
-        expected_total_bonded_native_tokens
-    );
+    assert_eq!(state.total_bonded_native_tokens, 3550);
+    assert_eq!(state.total_issued_lst, 3227);
 
-    let expected_total_liquid_token: Uint128 = 3227u128.into();
-    assert_eq!(state.total_issued_lst, expected_total_liquid_token);
-
-    let batch = BATCHES.load(&deps.storage, 1).unwrap();
+    let batch = deps
+        .storage
+        .read::<Batches>(&BatchId::from_raw(1).unwrap())
+        .unwrap();
 
     // batch status is properly updated
     assert_eq!(
         batch.state,
         BatchState::Submitted {
             receive_time: env.block.time.seconds() + 100_000,
-            expected_native_unstaked: 550u128.into()
+            expected_native_unstaked: 550
         }
     );
 
@@ -150,15 +159,13 @@ fn submit_batch_works() {
 
     // event is emitted correctly
     assert_eq!(
-        res.attributes,
-        vec![
-            attr("action", "submit_batch"),
-            attr("batch_id", "1"),
-            attr("batch_total", "500"),
-            attr("expected_unstaked", "550"),
-            attr("unbonding_period", "100000"),
-        ]
-    )
+        res.events[0],
+        Event::new("submit_batch")
+            .add_attribute("batch_id", "1")
+            .add_attribute("batch_total", "500")
+            .add_attribute("expected_unstaked", "550")
+            .add_attribute("current_unbonding_period", "100000"),
+    );
 }
 
 // #[test]

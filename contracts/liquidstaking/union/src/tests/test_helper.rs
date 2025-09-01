@@ -1,16 +1,14 @@
 use cosmwasm_std::{
-    Addr, OwnedDeps, Uint128, coins,
+    Addr, OwnedDeps, coins,
     testing::{MockApi, MockStorage, message_info, mock_env},
 };
+use hex_literal::hex;
 use prost::Message;
 
-use crate::{
-    contract::instantiate,
-    msg::InstantiateMsg,
-    state::{CONFIG, ProtocolFeeConfig},
-};
+use crate::{contract::instantiate, msg::InstantiateMsg, types::ProtocolFeeConfig};
 
 pub const NATIVE_TOKEN: &str = "au";
+pub const ETH_SENDER: &[u8] = hex!("c6a7e3a4b1f7aae0ce2470fcd57ed72a76a178d1").as_slice();
 pub const ADMIN: &str = "union1fktal7292h36h7glff5edq59vpdfn7504duw5m";
 pub const UNION1: &str = "union1jk9psyhvgkrt2cumz8eytll2244m2nnz4yt2g2";
 pub const UNION2: &str = "union1a8k05kaazq576sd0n07ewhsplwtpecxjx8ygx9";
@@ -26,20 +24,19 @@ pub const ZKGM_ADDRESS: &str = "union1xwfgw7n6vwgkyv8syjskzak7lh8kmrcthmv2jsmywh
 pub fn mock_init_msg() -> InstantiateMsg {
     InstantiateMsg {
         staker_address: Addr::unchecked(UNION_STAKER),
-        minimum_liquid_stake_amount: Uint128::from(100u128),
-        lst_address: LIQUID_STAKE_TOKEN_ADDRESS.to_string(),
+        minimum_liquid_stake_amount: 100,
+        lst_address: Addr::unchecked(LIQUID_STAKE_TOKEN_ADDRESS),
         monitors: vec![
             Addr::unchecked(UNION_MONITOR_1),
             Addr::unchecked(UNION_MONITOR_2),
         ],
         batch_period_seconds: 86400,
         protocol_fee_config: ProtocolFeeConfig {
-            fee_rate: Uint128::from(10_000u128),
-            fee_recipient: Addr::unchecked(UNION_STAKER),
+            fee_rate: 10_000,
+            fee_recipient: UNION_STAKER.to_string(),
         },
         admin: Addr::unchecked(ADMIN),
         native_token_denom: "au".to_owned(),
-        reward_collector_address: Addr::unchecked(UNION_STAKER),
         ucs03_zkgm_address: Addr::unchecked(ZKGM_ADDRESS),
         on_zkgm_call_proxy_address: Addr::unchecked(FUNDED_DISPATCH_ADDRESS),
     }
@@ -50,15 +47,7 @@ pub fn init() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     let msg = mock_init_msg();
     let info = message_info(&Addr::unchecked(ADMIN), &coins(1000, "uosmo"));
 
-    let res = instantiate(deps.as_mut(), mock_env(), info, msg);
-    if res.is_err() {
-        panic!("error: {:?}", res);
-    }
-    assert!(res.is_ok());
-
-    let mut config = CONFIG.load(&deps.storage).unwrap();
-    config.stopped = false;
-    CONFIG.save(&mut deps.storage, &config).unwrap();
+    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     deps
 }

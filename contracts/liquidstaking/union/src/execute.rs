@@ -141,7 +141,7 @@ pub fn bond(
             // eU address
             &lst_address,
             &Cw20ExecuteMsg::Mint {
-                amount: min_mint_amount.into(),
+                amount: mint_amount.into(),
                 recipient: mint_to_address.to_string(),
             },
             vec![],

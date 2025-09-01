@@ -1,40 +1,37 @@
-use alloy::{primitives::U256, sol_types::SolValue};
 use cosmwasm_std::{
-    Addr, BankMsg, CosmosMsg, StdError, Uint128, WasmMsg, attr, coins,
+    Addr, BankMsg, CosmosMsg, Event, StdError, Uint256, WasmMsg, coins,
     testing::{message_info, mock_env},
     to_json_binary,
 };
 use cw20::Cw20ExecuteMsg;
+use depolama::StorageExt;
 use ibc_union_spec::ChannelId;
-use ucs03_zkgm::com::{
-    INSTR_VERSION_2, Instruction, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_SOLVE, TokenOrderV2,
-};
-use unionlabs_primitives::{Bytes, encoding::HexPrefixed};
+use ucs03_zkgm::msg::OnZkgm;
 
 use crate::{
     contract::execute,
     msg::ExecuteMsg,
-    state::{CounterpartyConfig, FUNGIBLE_RECIPIENT_CHANNEL, STATE},
+    state::AccountingStateStore,
     tests::test_helper::{
-        FUNDED_DISPATCH_ADDRESS, LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN, UNION_STAKER, UNION2,
-        ZKGM_ADDRESS, init,
+        ETH_SENDER, FUNDED_DISPATCH_ADDRESS, LIQUID_STAKE_TOKEN_ADDRESS, NATIVE_TOKEN,
+        UNION_STAKER, UNION1, UNION2, init,
     },
 };
 
 #[test]
-fn bond_with_local_recipient_works() {
+fn bond_local_works() {
     let mut deps = init();
     let info = message_info(
         &Addr::unchecked(FUNDED_DISPATCH_ADDRESS),
         &coins(1000, NATIVE_TOKEN),
     );
+    let mint_amount = 1000u128.into();
     let msg = ExecuteMsg::Bond {
-        mint_to: UNION2.to_string().as_bytes().into(),
-        recipient_channel_id: None,
-        min_mint_amount: None,
+        mint_to: Addr::unchecked(UNION2),
+        min_mint_amount: mint_amount,
     };
 
-    let mut prev_state = STATE.load(&deps.storage).unwrap();
+    let mut prev_state = deps.storage.read_item::<AccountingStateStore>().unwrap();
 
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
@@ -55,7 +52,7 @@ fn bond_with_local_recipient_works() {
             contract_addr: LIQUID_STAKE_TOKEN_ADDRESS.into(),
             msg: to_json_binary(&Cw20ExecuteMsg::Mint {
                 recipient: UNION2.into(),
-                amount: 1000u128.into()
+                amount: mint_amount
             })
             .unwrap(),
             funds: vec![]
@@ -67,42 +64,50 @@ fn bond_with_local_recipient_works() {
 
     // the event is correct
     assert_eq!(
-        res.attributes,
-        vec![
-            attr(
-                "mint_to_address",
-                <Bytes>::new(UNION2.as_bytes().to_vec()).to_string()
-            ),
-            attr("action", "bond"),
-            attr("sender", FUNDED_DISPATCH_ADDRESS),
-            attr("in_amount", 1000.to_string()),
-            attr("mint_amount", 1000.to_string()),
-        ]
+        res.events[0],
+        Event::new("bond")
+            .add_attribute("mint_to_address", UNION2)
+            .add_attribute("sender", FUNDED_DISPATCH_ADDRESS)
+            .add_attribute("in_amount", mint_amount.to_string())
+            .add_attribute("mint_amount", mint_amount.to_string())
     );
 
-    let state = STATE.load(&deps.storage).unwrap();
+    let state = deps.storage.read_item::<AccountingStateStore>().unwrap();
 
     // state is properly adjusted
-    assert_eq!(state.total_bonded_native_tokens.u128(), 1000);
-    assert_eq!(state.total_issued_lst.u128(), 1000);
+    assert_eq!(state.total_bonded_native_tokens, 1000);
+    assert_eq!(state.total_issued_lst, 1000);
 
-    prev_state.total_bonded_native_tokens = 1000u128.into();
-    prev_state.total_issued_lst = 1000u128.into();
+    prev_state.total_bonded_native_tokens = 1000;
+    prev_state.total_issued_lst = 1000;
 
     // there is no further state change
     assert_eq!(state, prev_state);
 
     // manually changing the rate instead of going through the `rewards` entrypoint
-    STATE
-        .update::<_, StdError>(&mut deps.storage, |mut s| {
-            s.total_bonded_native_tokens += Uint128::new(100);
+    let _ = deps
+        .storage
+        .upsert::<AccountingStateStore, StdError>(&(), |s| {
+            let mut s = s.expect("exists");
+            s.total_bonded_native_tokens += 100;
             Ok(s)
         })
         .unwrap();
 
-    let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+    let res = execute(
+        deps.as_mut(),
+        mock_env(),
+        info.clone(),
+        ExecuteMsg::Bond {
+            mint_to: Addr::unchecked(UNION2),
+            min_mint_amount: 700u128.into(),
+        }
+        .clone(),
+    )
+    .unwrap();
 
-    // Now, since the rate is 1000/1100, we should mint 909 lst tokens for 1000 U's.
+    // Since this is a local call, there will be no slippage and all payments will be done to
+    // the sender. Hence, the calculated 909 is paid to the sender.
     assert_eq!(
         res.messages[1].msg,
         CosmosMsg::Wasm(WasmMsg::Execute {
@@ -115,146 +120,100 @@ fn bond_with_local_recipient_works() {
             funds: vec![]
         })
     );
+
+    // no further messages (no slippage payment)
+    assert_eq!(res.messages.len(), 2);
 }
+
 #[test]
-fn bond_with_remote_recipient_works() {
+fn bond_remote_with_slippage_works() {
     let mut deps = init();
-    let env = mock_env();
     let info = message_info(
         &Addr::unchecked(FUNDED_DISPATCH_ADDRESS),
         &coins(1000, NATIVE_TOKEN),
     );
-    let msg = ExecuteMsg::Bond {
-        mint_to: UNION2.to_string().as_bytes().into(),
-        recipient_channel_id: Some(ChannelId!(1)),
-        min_mint_amount: None,
-    };
+    let min_mint_amount = 700u128.into();
+    let msg = ExecuteMsg::OnProxyOnZkgmCall(on_zkgm_call_proxy::OnProxyOnZkgmCall {
+        on_zkgm_msg: OnZkgm {
+            caller: Addr::unchecked(UNION1),
+            path: Uint256::zero(),
+            source_channel_id: ChannelId!(1),
+            destination_channel_id: ChannelId!(2),
+            sender: ETH_SENDER.to_vec().into(),
+            // we are ignoring the message since it's only handled at the funded dispatch contract
+            message: Default::default(),
+            relayer: Addr::unchecked(UNION_STAKER),
+            relayer_msg: Default::default(),
+        },
+        msg: to_json_binary(&ExecuteMsg::Bond {
+            mint_to: Addr::unchecked(UNION2),
+            min_mint_amount,
+        })
+        .unwrap(),
+    });
 
-    let counterparty_config = CounterpartyConfig {
-        quote_token: b"quote_token".to_vec().into(),
-        kind: TOKEN_ORDER_KIND_SOLVE,
-        metadata: b"metadata".to_vec().into(),
-    };
-
-    // setting the fungible recipient so that we can send tokens through zkgm
-    FUNGIBLE_RECIPIENT_CHANNEL
-        .save(&mut deps.storage, 1, &counterparty_config)
-        .unwrap();
-
-    // starting with a rate that is different than 1
-    STATE
-        .update(&mut deps.storage, |mut s| {
-            s.total_bonded_native_tokens += Uint128::new(1100);
-            s.total_issued_lst += Uint128::new(1000);
-            Ok::<_, StdError>(s)
+    let _ = deps
+        .storage
+        .upsert::<AccountingStateStore, StdError>(&(), |s| {
+            let mut s = s.expect("exists");
+            s.total_bonded_native_tokens += 1100;
+            s.total_issued_lst += 1000;
+            Ok(s)
         })
         .unwrap();
 
     let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
 
-    let mint_amount: Uint128 = 909u128.into();
-
-    // the native funds are sent to the staker
-    assert_eq!(
-        res.messages[0].msg,
-        CosmosMsg::Bank(BankMsg::Send {
-            to_address: UNION_STAKER.into(),
-            amount: info.funds.clone()
-        })
-    );
-
-    // 909 LST token is minted for 1000 U tokens to this contract to be sent through zkgm
+    // Since this is a local call, there will be no slippage and all payments will be done to
+    // the sender. Hence, the calculated 909 is paid to the sender.
     assert_eq!(
         res.messages[1].msg,
         CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: LIQUID_STAKE_TOKEN_ADDRESS.into(),
             msg: to_json_binary(&Cw20ExecuteMsg::Mint {
-                recipient: env.contract.address.into(),
-                amount: mint_amount
+                recipient: UNION2.into(),
+                amount: min_mint_amount
             })
             .unwrap(),
             funds: vec![]
         })
     );
 
-    // allowing zkgm to spend 909 LST tokens on behalf of this contract
+    // although the computed mint amount is 909, the `min_mint_amount` is paid to the user
+    assert_eq!(
+        res.messages[1].msg,
+        CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: LIQUID_STAKE_TOKEN_ADDRESS.into(),
+            msg: to_json_binary(&Cw20ExecuteMsg::Mint {
+                recipient: UNION2.into(),
+                amount: min_mint_amount
+            })
+            .unwrap(),
+            funds: vec![]
+        })
+    );
+
+    // and the rest 209 slippage is paid to the relayer
     assert_eq!(
         res.messages[2].msg,
         CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: LIQUID_STAKE_TOKEN_ADDRESS.into(),
-            msg: to_json_binary(&Cw20ExecuteMsg::IncreaseAllowance {
-                spender: ZKGM_ADDRESS.into(),
-                amount: mint_amount,
-                expires: None
+            msg: to_json_binary(&Cw20ExecuteMsg::Mint {
+                recipient: UNION_STAKER.into(),
+                amount: 209u128.into()
             })
             .unwrap(),
             funds: vec![]
         })
     );
-
-    let amount = U256::from(mint_amount.u128());
-
-    // sending the minted tokens through zkgm
-    assert_eq!(
-        res.messages[3].msg,
-        CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: ZKGM_ADDRESS.into(),
-            msg: to_json_binary(&ucs03_zkgm::msg::ExecuteMsg::Send {
-                channel_id: ChannelId!(1),
-                timeout_height: 0u64.into(),
-                timeout_timestamp: ibc_union_spec::Timestamp::from_nanos(
-                    mock_env().block.time.plus_days(3).nanos()
-                ),
-                salt: Default::default(),
-                instruction: Instruction {
-                    // version 2 since we are using the solver api
-                    version: INSTR_VERSION_2,
-                    opcode: OP_TOKEN_ORDER,
-                    operand: TokenOrderV2 {
-                        // union staker as a fallback address
-                        sender: UNION_STAKER.to_string().into_bytes().into(),
-                        receiver: UNION2.to_string().into_bytes().into(),
-                        base_token: LIQUID_STAKE_TOKEN_ADDRESS.as_bytes().to_vec().into(),
-                        base_amount: amount,
-                        quote_token: counterparty_config.quote_token.into(),
-                        quote_amount: amount,
-                        kind: counterparty_config.kind,
-                        metadata: counterparty_config.metadata.into()
-                    }
-                    .abi_encode_params()
-                    .into()
-                }
-                .abi_encode_params()
-                .into()
-            })
-            .unwrap(),
-            funds: vec![]
-        })
-    );
-
-    // there should be no further messages
-    assert_eq!(res.messages.len(), 4);
 
     // the event is correct
     assert_eq!(
-        res.attributes,
-        vec![
-            attr(
-                "mint_to_address",
-                Bytes::<HexPrefixed>::new(UNION2.as_bytes().to_vec()).to_string()
-            ),
-            attr("action", "bond"),
-            attr("sender", FUNDED_DISPATCH_ADDRESS),
-            attr("in_amount", 1000.to_string()),
-            attr("mint_amount", 909.to_string()),
-        ]
+        res.events[1],
+        Event::new("bond_slippage_paid")
+            .add_attribute("slippage", 209.to_string())
+            .add_attribute("relayer", UNION_STAKER)
     );
-
-    let state = STATE.load(&deps.storage).unwrap();
-
-    // state is properly adjusted
-    assert_eq!(state.total_bonded_native_tokens.u128(), 2100);
-    assert_eq!(state.total_issued_lst.u128(), 1909);
 }
 
 // #[test]

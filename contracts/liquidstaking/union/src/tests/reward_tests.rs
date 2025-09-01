@@ -1,13 +1,14 @@
 use cosmwasm_std::{
-    Addr, Attribute, BankMsg, Coin, CosmosMsg, StdError,
+    Addr, BankMsg, Coin, CosmosMsg, Event, StdError,
     testing::{message_info, mock_env},
 };
+use depolama::StorageExt;
 
 use super::test_helper::UNION1;
 use crate::{
     contract::execute,
     msg::ExecuteMsg,
-    state::STATE,
+    state::AccountingStateStore,
     tests::test_helper::{NATIVE_TOKEN, UNION_STAKER, init, mock_init_msg},
 };
 
@@ -15,11 +16,13 @@ use crate::{
 fn receive_rewards_works() {
     let mut deps = init();
 
-    let state = STATE
-        .update(&mut deps.storage, |mut s| {
-            s.total_bonded_native_tokens = 100_000u128.into();
-            s.total_issued_lst = 100_000u128.into();
-            Ok::<_, StdError>(s)
+    let state = deps
+        .storage
+        .upsert_item::<AccountingStateStore, StdError>(|s| {
+            let mut s = s.unwrap();
+            s.total_bonded_native_tokens = 1_100;
+            s.total_issued_lst = 1_000;
+            Ok(s)
         })
         .unwrap();
 
@@ -66,22 +69,23 @@ fn receive_rewards_works() {
     );
 
     // the state must be updated correctly
-    let new_state = STATE.load(&deps.storage).unwrap();
+    let new_state = deps.storage.read_item::<AccountingStateStore>().unwrap();
     assert_eq!(
-        new_state.total_bonded_native_tokens.u128(),
-        state.total_bonded_native_tokens.u128() + (reward_amount - fee)
+        new_state.total_bonded_native_tokens,
+        state.total_bonded_native_tokens + (reward_amount - fee)
     );
-    assert_eq!(new_state.total_reward_amount.u128(), reward_amount);
+    assert_eq!(new_state.total_reward_amount, reward_amount);
 
     // the event must be emitted correctly
     assert_eq!(
-        res.attributes,
-        vec![
-            Attribute::new("action", "receive_rewards"),
-            Attribute::new("action", "transfer_stake"),
-            Attribute::new("amount", reward_amount.to_string()),
-            Attribute::new("amount_after_fees", (reward_amount - fee).to_string()),
-        ]
+        res.events[0],
+        Event::new("receive_rewards")
+            .add_attribute("amount", reward_amount.to_string())
+            .add_attribute(
+                "amount_after_protocol_fee",
+                (reward_amount - fee).to_string(),
+            )
+            .add_attribute("protocol_fee", fee.to_string()),
     );
 }
 

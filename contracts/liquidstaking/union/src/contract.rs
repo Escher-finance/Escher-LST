@@ -24,7 +24,7 @@ use crate::{
     },
     state::{
         AccountingStateStore, Admin, Batches, ConfigStore, LstAddress, Monitors, OnZkgmCallProxy,
-        PendingBatchId, ProtocolFeeConfigStore, StakerAddress, Zkgm,
+        PendingBatchId, ProtocolFeeConfigStore, StakerAddress, Stopped, Zkgm,
     },
     types::{AccountingState, Batch, BatchId, Config, MAX_FEE_RATE, Staker},
 };
@@ -97,6 +97,8 @@ pub fn instantiate(
         &Batch::new_pending(env.block.time.seconds() + batch_period_seconds),
     );
     deps.storage.write_item::<PendingBatchId>(&BatchId::ONE);
+
+    deps.storage.write_item::<Stopped>(&false);
 
     Ok(Response::new().add_event(
         Event::new("init")

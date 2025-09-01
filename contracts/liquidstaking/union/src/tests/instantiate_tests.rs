@@ -2,12 +2,13 @@ use cosmwasm_std::{
     Addr,
     testing::{message_info, mock_dependencies, mock_env},
 };
+use depolama::StorageExt;
 
 use crate::{
     contract::instantiate,
-    state::BATCHES,
+    state::Batches,
     tests::test_helper::{UNION1, mock_deps_with_unbonding_time, mock_init_msg},
-    types::{BatchState, MAX_FEE_RATE},
+    types::{Batch, BatchId, MAX_FEE_RATE},
 };
 
 #[test]
@@ -33,9 +34,7 @@ fn init_properly() {
     .unwrap();
 
     assert_eq!(
-        BATCHES.load(&deps.storage, 1).unwrap().state,
-        BatchState::Pending {
-            submit_time: mock_env().block.time.seconds() + mock_init_msg().batch_period_seconds
-        },
+        deps.storage.read::<Batches>(&BatchId::ONE).unwrap(),
+        Batch::new_pending(mock_env().block.time.seconds() + mock_init_msg().batch_period_seconds),
     );
 }
