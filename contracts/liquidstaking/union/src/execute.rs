@@ -1,9 +1,9 @@
 use cosmwasm_std::{
-    attr, ensure, wasm_execute, Addr, BankMsg, Coin, Deps, DepsMut, Env, Event, MessageInfo,
-    Response, Uint128,
+    Addr, BankMsg, Coin, Deps, DepsMut, Env, Event, MessageInfo, Response, Uint128, attr, ensure,
+    wasm_execute,
 };
-use cw20::Cw20ExecuteMsg;
 use cw_utils::must_pay;
+use cw20::Cw20ExecuteMsg;
 use depolama::StorageExt;
 
 use crate::{
