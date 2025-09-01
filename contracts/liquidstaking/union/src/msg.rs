@@ -10,10 +10,14 @@ use crate::types::{
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct InstantiateMsg {
+    #[cfg_attr(feature = "schemars", schemars(with = "Addr"))]
     pub native_token_denom: String,
 
-    pub minimum_liquid_stake_amount: Uint128,
+    #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
+    pub minimum_liquid_stake_amount: u128,
 
     /// Address of the account that delegates the tokens
     /// toward the validators.
@@ -26,6 +30,8 @@ pub struct InstantiateMsg {
     pub lst_address: Addr,
 
     /// Frequency (in seconds) at which the unbonding queue is executed.
+    #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
     pub batch_period_seconds: u64,
 
     /// Set of addresses allowed to trigger a circuit break.
@@ -38,6 +44,7 @@ pub struct InstantiateMsg {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[allow(clippy::large_enum_variant)]
 pub enum ExecuteMsg {
     /// Initiates the bonding process for a user.
@@ -76,6 +83,7 @@ pub enum ExecuteMsg {
 
     TransferOwnership {
         /// Address of the new owner on the protocol chain.
+        #[cfg_attr(feature = "schemars", schemars(with = "Addr"))]
         new_owner: String,
     },
 
@@ -152,28 +160,31 @@ pub enum RemoteExecuteMsg {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// #[derive(QueryResponses)]
+#[cfg_attr(
+    feature = "schemars",
+    derive(schemars::JsonSchema, cosmwasm_schema::QueryResponses)
+)]
 pub enum QueryMsg {
     /// Queries the contract configuration.
     /// Returns the current `native_chain_config`, `protocol_chain_config`,
     /// `protocol_fee_config`, `liquid_stake_token_denom`, and other settings.
-    // #[returns(ConfigResponse)]
+    #[cfg_attr(feature = "schemars", returns(ConfigResponse))]
     Config {},
 
-    /// Queries the current state of the contract.
+    /// Queries the current accounting state of the contract.
     /// Returns totals such as delegated native tokens, LST supply, and rewards.
-    // #[returns(StateResponse)]
-    State {},
+    #[cfg_attr(feature = "schemars", returns(AccountingStateResponse))]
+    AccountingState {},
 
     /// Queries the information of a specific batch by its ID.
-    // #[returns(Batch)]
+    #[cfg_attr(feature = "schemars", returns(Batch))]
     Batch {
         /// ID of the batch to query.
         batch_id: BatchId,
     },
 
     /// Queries a paginated list of all batches stored in contract storage.
-    // #[returns(BatchesResponse)]
+    #[cfg_attr(feature = "schemars", returns(BatchesResponse))]
     Batches {
         /// If provided, starts listing batches after this batch ID.
         start_after: Option<BatchId>,
@@ -186,32 +197,32 @@ pub enum QueryMsg {
     },
 
     /// Queries the batches with the provided list of IDs.
-    // #[returns(BatchesResponse)]
+    #[cfg_attr(feature = "schemars", returns(BatchesResponse))]
     BatchesByIds {
         /// List of batch IDs to fetch.
         batch_ids: Vec<BatchId>,
     },
 
     /// Queries the current batch that is pending processing (if any).
-    // #[returns(Batch)]
+    #[cfg_attr(feature = "schemars", returns(Batch))]
     PendingBatch {},
 
     /// Queries the unstake requests made by a specific staker.
-    // #[returns(Vec<UnstakeRequest>)]
+    #[cfg_attr(feature = "schemars", returns(Vec<crate::types::UnstakeRequest>))]
     UnstakeRequestsByStaker {
         /// Address of the user whose unstake requests are to be queried.
         staker: Staker,
     },
 
     /// Queries the unstake requests made by a specific staker, by the staker hash.
-    // #[returns(Vec<UnstakeRequest>)]
+    #[cfg_attr(feature = "schemars", returns(Vec<crate::types::UnstakeRequest>))]
     UnstakeRequestsByStakerHash {
         /// Address of the user whose unstake requests are to be queried.
         staker_hash: H256,
     },
 
     /// Queries all unstake requests in the contract.
-    // #[returns(Vec<UnstakeRequestResponse>)]
+    #[cfg_attr(feature = "schemars", returns(Vec<crate::types::UnstakeRequest>))]
     AllUnstakeRequests {
         /// If provided, starts listing unstake requests after this key.
         start_after: Option<UnstakeRequestKey>,
@@ -222,6 +233,7 @@ pub enum QueryMsg {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConfigResponse {
     pub native_token_denom: String,
     pub minimum_liquid_stake_amount: Uint128,
@@ -233,6 +245,7 @@ pub struct ConfigResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AccountingStateResponse {
     pub total_bonded_native_tokens: Uint128,
     pub total_issued_lst: Uint128,
@@ -242,22 +255,14 @@ pub struct AccountingStateResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct OwnershipResponse {
-    pub pending_owner: String,
+    pub pending_owner: Addr,
     pub total_reward_amount: Uint128,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct BatchesResponse {
     pub batches: BTreeMap<BatchId, Batch>,
-}
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct UnstakeRequestResponse {
-    pub batch_id: BatchId,
-    pub batch_total_liquid_stake: Uint128,
-    pub expected_native_unstaked: Uint128,
-    pub received_native_unstaked: Uint128,
-    pub status: String,
-    pub unstake_amount: Uint128,
-    pub user: String,
 }

@@ -1,0 +1,2048 @@
+{
+  "contract_name": "liquidstaking-union",
+  "contract_version": "0.0.0",
+  "idl_version": "1.0.0",
+  "instantiate": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "InstantiateMsg",
+    "type": "object",
+    "required": [
+      "admin",
+      "batch_period_seconds",
+      "lst_address",
+      "minimum_liquid_stake_amount",
+      "monitors",
+      "native_token_denom",
+      "on_zkgm_call_proxy_address",
+      "protocol_fee_config",
+      "staker_address",
+      "ucs03_zkgm_address"
+    ],
+    "properties": {
+      "admin": {
+        "$ref": "#/definitions/Addr"
+      },
+      "batch_period_seconds": {
+        "description": "Frequency (in seconds) at which the unbonding queue is executed.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/Uint128"
+          }
+        ]
+      },
+      "lst_address": {
+        "description": "Address of the LST contract.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/Addr"
+          }
+        ]
+      },
+      "minimum_liquid_stake_amount": {
+        "$ref": "#/definitions/Uint128"
+      },
+      "monitors": {
+        "description": "Set of addresses allowed to trigger a circuit break.",
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/Addr"
+        }
+      },
+      "native_token_denom": {
+        "$ref": "#/definitions/Addr"
+      },
+      "on_zkgm_call_proxy_address": {
+        "$ref": "#/definitions/Addr"
+      },
+      "protocol_fee_config": {
+        "description": "Protocol fee configuration.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/ProtocolFeeConfig"
+          }
+        ]
+      },
+      "staker_address": {
+        "description": "Address of the account that delegates the tokens toward the validators.",
+        "allOf": [
+          {
+            "$ref": "#/definitions/Addr"
+          }
+        ]
+      },
+      "ucs03_zkgm_address": {
+        "$ref": "#/definitions/Addr"
+      }
+    },
+    "additionalProperties": false,
+    "definitions": {
+      "Addr": {
+        "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+        "type": "string"
+      },
+      "ProtocolFeeConfig": {
+        "description": "Config related to the fees collected by the contract to operate the liquid staking protocol.",
+        "type": "object",
+        "required": [
+          "fee_rate",
+          "fee_recipient"
+        ],
+        "properties": {
+          "fee_rate": {
+            "$ref": "#/definitions/Uint128"
+          },
+          "fee_recipient": {
+            "description": "Address where the collected fees are sent.",
+            "allOf": [
+              {
+                "$ref": "#/definitions/Addr"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Uint128": {
+        "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+        "type": "string"
+      }
+    }
+  },
+  "execute": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ExecuteMsg",
+    "oneOf": [
+      {
+        "description": "Initiates the bonding process for a user.",
+        "type": "object",
+        "required": [
+          "Bond"
+        ],
+        "properties": {
+          "Bond": {
+            "type": "object",
+            "required": [
+              "min_mint_amount",
+              "mint_to"
+            ],
+            "properties": {
+              "min_mint_amount": {
+                "description": "Minimum expected amount of LST tokens to be received for the operation to be considered valid.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  }
+                ]
+              },
+              "mint_to": {
+                "description": "The address to mint the LST to.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Addr"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Initiates the unbonding process for a user.",
+        "type": "object",
+        "required": [
+          "Unbond"
+        ],
+        "properties": {
+          "Unbond": {
+            "type": "object",
+            "required": [
+              "amount",
+              "staker"
+            ],
+            "properties": {
+              "amount": {
+                "description": "The amount to unstake.\n\nNOTE: In the original milkyway implementation, the contract expected funds to be sent to it (verified with must_pay) since the tokens were all native (ibc denoms for the base token, tokenfactory for the lst)",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  }
+                ]
+              },
+              "staker": {
+                "description": "The address that will receive the native tokens on.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Addr"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Withdraws unstaked tokens.",
+        "type": "object",
+        "required": [
+          "Withdraw"
+        ],
+        "properties": {
+          "Withdraw": {
+            "type": "object",
+            "required": [
+              "batch_id",
+              "staker",
+              "withdraw_to_address"
+            ],
+            "properties": {
+              "batch_id": {
+                "description": "ID of the batch from which to withdraw.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/BatchId"
+                  }
+                ]
+              },
+              "staker": {
+                "description": "The address that will receive the funds.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Addr"
+                  }
+                ]
+              },
+              "withdraw_to_address": {
+                "description": "The address to withdraw the funds to on this chain.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Addr"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Processes the pending batch.",
+        "type": "object",
+        "required": [
+          "SubmitBatch"
+        ],
+        "properties": {
+          "SubmitBatch": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "TransferOwnership"
+        ],
+        "properties": {
+          "TransferOwnership": {
+            "type": "object",
+            "required": [
+              "new_owner"
+            ],
+            "properties": {
+              "new_owner": {
+                "description": "Address of the new owner on the protocol chain.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Addr"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Accepts ownership transfer; callable by the new owner.",
+        "type": "object",
+        "required": [
+          "AcceptOwnership"
+        ],
+        "properties": {
+          "AcceptOwnership": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Revokes ownership transfer; callable by the current owner.",
+        "type": "object",
+        "required": [
+          "RevokeOwnershipTransfer"
+        ],
+        "properties": {
+          "RevokeOwnershipTransfer": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Updates contract configuration; callable by the owner.",
+        "type": "object",
+        "required": [
+          "UpdateConfig"
+        ],
+        "properties": {
+          "UpdateConfig": {
+            "type": "object",
+            "properties": {
+              "batch_period": {
+                "description": "Updated unbonding batch execution frequency (in seconds).",
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0.0
+              },
+              "monitors": {
+                "description": "Updated list of circuit breaker monitors.",
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "$ref": "#/definitions/Addr"
+                }
+              },
+              "protocol_fee_config": {
+                "description": "Updated protocol fee configuration.",
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/ProtocolFeeConfig"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Receives rewards from the native chain.",
+        "type": "object",
+        "required": [
+          "ReceiveRewards"
+        ],
+        "properties": {
+          "ReceiveRewards": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Receives unstaked tokens from the native chain.",
+        "type": "object",
+        "required": [
+          "ReceiveUnstakedTokens"
+        ],
+        "properties": {
+          "ReceiveUnstakedTokens": {
+            "type": "object",
+            "required": [
+              "batch_id"
+            ],
+            "properties": {
+              "batch_id": {
+                "description": "ID of the batch that originated the unstake request.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/BatchId"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Stops the contract due to irregularities; callable by monitors and admin.",
+        "type": "object",
+        "required": [
+          "CircuitBreaker"
+        ],
+        "properties": {
+          "CircuitBreaker": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Resumes the contract; callable by the admin.",
+        "type": "object",
+        "required": [
+          "ResumeContract"
+        ],
+        "properties": {
+          "ResumeContract": {
+            "type": "object",
+            "required": [
+              "total_bonded_native_tokens",
+              "total_issued_lst",
+              "total_reward_amount"
+            ],
+            "properties": {
+              "total_bonded_native_tokens": {
+                "description": "Updated total native tokens delegated (used post-slashing).",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  }
+                ]
+              },
+              "total_issued_lst": {
+                "description": "Updated total issued liquid staked tokens.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  }
+                ]
+              },
+              "total_reward_amount": {
+                "description": "Updated total protocol rewards.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "SlashBatches"
+        ],
+        "properties": {
+          "SlashBatches": {
+            "type": "object",
+            "required": [
+              "new_amounts"
+            ],
+            "properties": {
+              "new_amounts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/BatchExpectedAmount"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "OnProxyOnZkgmCall"
+        ],
+        "properties": {
+          "OnProxyOnZkgmCall": {
+            "$ref": "#/definitions/OnProxyOnZkgmCall"
+          }
+        },
+        "additionalProperties": false
+      }
+    ],
+    "definitions": {
+      "Addr": {
+        "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+        "type": "string"
+      },
+      "BatchExpectedAmount": {
+        "type": "object",
+        "required": [
+          "batch_id",
+          "expected_native_amount"
+        ],
+        "properties": {
+          "batch_id": {
+            "$ref": "#/definitions/BatchId"
+          },
+          "expected_native_amount": {
+            "$ref": "#/definitions/Uint128"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BatchId": {
+        "$ref": "#/definitions/Uint64"
+      },
+      "Binary": {
+        "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>. See also <https://github.com/CosmWasm/cosmwasm/blob/main/docs/MESSAGE_TYPES.md>.",
+        "type": "string"
+      },
+      "Bytes<HexPrefixed>": {
+        "description": "A string representation of bytes, encoded via HexPrefixed",
+        "type": "string"
+      },
+      "OnProxyOnZkgmCall": {
+        "type": "object",
+        "required": [
+          "msg",
+          "on_zkgm_msg"
+        ],
+        "properties": {
+          "msg": {
+            "$ref": "#/definitions/Binary"
+          },
+          "on_zkgm_msg": {
+            "$ref": "#/definitions/OnZkgm"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OnZkgm": {
+        "type": "object",
+        "required": [
+          "caller",
+          "destination_channel_id",
+          "message",
+          "path",
+          "relayer",
+          "relayer_msg",
+          "sender",
+          "source_channel_id"
+        ],
+        "properties": {
+          "caller": {
+            "$ref": "#/definitions/Addr"
+          },
+          "destination_channel_id": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 1.0
+          },
+          "message": {
+            "$ref": "#/definitions/Bytes<HexPrefixed>"
+          },
+          "path": {
+            "$ref": "#/definitions/Uint256"
+          },
+          "relayer": {
+            "$ref": "#/definitions/Addr"
+          },
+          "relayer_msg": {
+            "$ref": "#/definitions/Bytes<HexPrefixed>"
+          },
+          "sender": {
+            "$ref": "#/definitions/Bytes<HexPrefixed>"
+          },
+          "source_channel_id": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 1.0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProtocolFeeConfig": {
+        "description": "Config related to the fees collected by the contract to operate the liquid staking protocol.",
+        "type": "object",
+        "required": [
+          "fee_rate",
+          "fee_recipient"
+        ],
+        "properties": {
+          "fee_rate": {
+            "$ref": "#/definitions/Uint128"
+          },
+          "fee_recipient": {
+            "description": "Address where the collected fees are sent.",
+            "allOf": [
+              {
+                "$ref": "#/definitions/Addr"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Uint128": {
+        "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+        "type": "string"
+      },
+      "Uint256": {
+        "description": "An implementation of u256 that is using strings for JSON encoding/decoding, such that the full u256 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances out of primitive uint types or `new` to provide big endian bytes:\n\n``` # use cosmwasm_std::Uint256; let a = Uint256::from(258u128); let b = Uint256::new([ 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 1u8, 2u8, ]); assert_eq!(a, b); ```",
+        "type": "string"
+      },
+      "Uint64": {
+        "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+        "type": "string"
+      }
+    }
+  },
+  "query": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "QueryMsg",
+    "oneOf": [
+      {
+        "description": "Queries the contract configuration. Returns the current `native_chain_config`, `protocol_chain_config`, `protocol_fee_config`, `liquid_stake_token_denom`, and other settings.",
+        "type": "object",
+        "required": [
+          "Config"
+        ],
+        "properties": {
+          "Config": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Queries the current accounting state of the contract. Returns totals such as delegated native tokens, LST supply, and rewards.",
+        "type": "object",
+        "required": [
+          "AccountingState"
+        ],
+        "properties": {
+          "AccountingState": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Queries the information of a specific batch by its ID.",
+        "type": "object",
+        "required": [
+          "Batch"
+        ],
+        "properties": {
+          "Batch": {
+            "type": "object",
+            "required": [
+              "batch_id"
+            ],
+            "properties": {
+              "batch_id": {
+                "description": "ID of the batch to query.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/BatchId"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Queries a paginated list of all batches stored in contract storage.",
+        "type": "object",
+        "required": [
+          "Batches"
+        ],
+        "properties": {
+          "Batches": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "description": "Maximum number of batches to return.",
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint",
+                "minimum": 0.0
+              },
+              "start_after": {
+                "description": "If provided, starts listing batches after this batch ID.",
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/BatchId"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "description": "Optional filter to return only batches with the given status.",
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/BatchStatus"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Queries the batches with the provided list of IDs.",
+        "type": "object",
+        "required": [
+          "BatchesByIds"
+        ],
+        "properties": {
+          "BatchesByIds": {
+            "type": "object",
+            "required": [
+              "batch_ids"
+            ],
+            "properties": {
+              "batch_ids": {
+                "description": "List of batch IDs to fetch.",
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/BatchId"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Queries the current batch that is pending processing (if any).",
+        "type": "object",
+        "required": [
+          "PendingBatch"
+        ],
+        "properties": {
+          "PendingBatch": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Queries the unstake requests made by a specific staker.",
+        "type": "object",
+        "required": [
+          "UnstakeRequestsByStaker"
+        ],
+        "properties": {
+          "UnstakeRequestsByStaker": {
+            "type": "object",
+            "required": [
+              "staker"
+            ],
+            "properties": {
+              "staker": {
+                "description": "Address of the user whose unstake requests are to be queried.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/Staker"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Queries the unstake requests made by a specific staker, by the staker hash.",
+        "type": "object",
+        "required": [
+          "UnstakeRequestsByStakerHash"
+        ],
+        "properties": {
+          "UnstakeRequestsByStakerHash": {
+            "type": "object",
+            "required": [
+              "staker_hash"
+            ],
+            "properties": {
+              "staker_hash": {
+                "description": "Address of the user whose unstake requests are to be queried.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/FixedBytes<HexPrefixed, 32>"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Queries all unstake requests in the contract.",
+        "type": "object",
+        "required": [
+          "AllUnstakeRequests"
+        ],
+        "properties": {
+          "AllUnstakeRequests": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "description": "Maximum number of unstake requests to return.",
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint",
+                "minimum": 0.0
+              },
+              "start_after": {
+                "description": "If provided, starts listing unstake requests after this key.",
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/UnstakeRequestKey"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    ],
+    "definitions": {
+      "Addr": {
+        "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+        "type": "string"
+      },
+      "BatchId": {
+        "$ref": "#/definitions/Uint64"
+      },
+      "BatchStatus": {
+        "oneOf": [
+          {
+            "description": "See [`BatchState::Pending`].",
+            "type": "string",
+            "enum": [
+              "Pending"
+            ]
+          },
+          {
+            "description": "See [`BatchState::Submitted`].",
+            "type": "string",
+            "enum": [
+              "Submitted"
+            ]
+          },
+          {
+            "description": "See [`BatchState::Received`].",
+            "type": "string",
+            "enum": [
+              "Received"
+            ]
+          }
+        ]
+      },
+      "Bytes<HexPrefixed>": {
+        "description": "A string representation of bytes, encoded via HexPrefixed",
+        "type": "string"
+      },
+      "FixedBytes<HexPrefixed, 32>": {
+        "description": "A string representation of fixed bytes of length 32, encoded via HexPrefixed",
+        "type": "string"
+      },
+      "Staker": {
+        "oneOf": [
+          {
+            "description": "The staking was initiated on this chain.",
+            "type": "object",
+            "required": [
+              "Local"
+            ],
+            "properties": {
+              "Local": {
+                "type": "object",
+                "required": [
+                  "address"
+                ],
+                "properties": {
+                  "address": {
+                    "$ref": "#/definitions/Addr"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "description": "The staking was initiated from a different chain.\n\nThis tuple of `(source address, destination channel id, path)` is required to uniquely identify cross-chain liquid staking operations.",
+            "type": "object",
+            "required": [
+              "Remote"
+            ],
+            "properties": {
+              "Remote": {
+                "type": "object",
+                "required": [
+                  "address",
+                  "channel_id",
+                  "path"
+                ],
+                "properties": {
+                  "address": {
+                    "description": "The address of the staker on the *counterparty* chain.",
+                    "allOf": [
+                      {
+                        "$ref": "#/definitions/Bytes<HexPrefixed>"
+                      }
+                    ]
+                  },
+                  "channel_id": {
+                    "description": "The id of the channel on *this* chain.",
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 1.0
+                  },
+                  "path": {
+                    "description": "The path of the packet. This will typically be `0`, but if the packet was a forward packet, then this will contain the path to the source chain.",
+                    "allOf": [
+                      {
+                        "$ref": "#/definitions/U256"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "U256": {
+        "description": "256-bit unsigned integer, represented as a decimal string",
+        "type": "string",
+        "pattern": "\\d+"
+      },
+      "Uint64": {
+        "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+        "type": "string"
+      },
+      "UnstakeRequestKey": {
+        "type": "object",
+        "required": [
+          "batch_id",
+          "staker_hash"
+        ],
+        "properties": {
+          "batch_id": {
+            "$ref": "#/definitions/BatchId"
+          },
+          "staker_hash": {
+            "description": "The staker hash for the [`Staker`] of the associated [`UnstakeRequest`].\n\nThis is `sha256(bincode(staker))` (see [`Staker::hash`]).",
+            "allOf": [
+              {
+                "$ref": "#/definitions/FixedBytes<HexPrefixed, 32>"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "migrate": null,
+  "sudo": null,
+  "responses": {
+    "accounting_state": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AccountingStateResponse",
+      "type": "object",
+      "required": [
+        "purchase_rate",
+        "redemption_rate",
+        "total_bonded_native_tokens",
+        "total_issued_lst",
+        "total_reward_amount"
+      ],
+      "properties": {
+        "purchase_rate": {
+          "$ref": "#/definitions/Decimal"
+        },
+        "redemption_rate": {
+          "$ref": "#/definitions/Decimal"
+        },
+        "total_bonded_native_tokens": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "total_issued_lst": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "total_reward_amount": {
+          "$ref": "#/definitions/Uint128"
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Decimal": {
+          "description": "A fixed-point decimal value with 18 fractional digits, i.e. Decimal(1_000_000_000_000_000_000) == 1.0\n\nThe greatest possible value that can be represented is 340282366920938463463.374607431768211455 (which is (2^128 - 1) / 10^18)",
+          "type": "string"
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        }
+      }
+    },
+    "all_unstake_requests": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Array_of_UnstakeRequest",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/UnstakeRequest"
+      },
+      "definitions": {
+        "Addr": {
+          "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+          "type": "string"
+        },
+        "BatchId": {
+          "$ref": "#/definitions/Uint64"
+        },
+        "Bytes<HexPrefixed>": {
+          "description": "A string representation of bytes, encoded via HexPrefixed",
+          "type": "string"
+        },
+        "Staker": {
+          "oneOf": [
+            {
+              "description": "The staking was initiated on this chain.",
+              "type": "object",
+              "required": [
+                "Local"
+              ],
+              "properties": {
+                "Local": {
+                  "type": "object",
+                  "required": [
+                    "address"
+                  ],
+                  "properties": {
+                    "address": {
+                      "$ref": "#/definitions/Addr"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The staking was initiated from a different chain.\n\nThis tuple of `(source address, destination channel id, path)` is required to uniquely identify cross-chain liquid staking operations.",
+              "type": "object",
+              "required": [
+                "Remote"
+              ],
+              "properties": {
+                "Remote": {
+                  "type": "object",
+                  "required": [
+                    "address",
+                    "channel_id",
+                    "path"
+                  ],
+                  "properties": {
+                    "address": {
+                      "description": "The address of the staker on the *counterparty* chain.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Bytes<HexPrefixed>"
+                        }
+                      ]
+                    },
+                    "channel_id": {
+                      "description": "The id of the channel on *this* chain.",
+                      "type": "integer",
+                      "format": "uint32",
+                      "minimum": 1.0
+                    },
+                    "path": {
+                      "description": "The path of the packet. This will typically be `0`, but if the packet was a forward packet, then this will contain the path to the source chain.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/U256"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "U256": {
+          "description": "256-bit unsigned integer, represented as a decimal string",
+          "type": "string",
+          "pattern": "\\d+"
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        },
+        "Uint64": {
+          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+          "type": "string"
+        },
+        "UnstakeRequest": {
+          "type": "object",
+          "required": [
+            "amount",
+            "batch_id",
+            "staker"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "batch_id": {
+              "$ref": "#/definitions/BatchId"
+            },
+            "staker": {
+              "$ref": "#/definitions/Staker"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "batch": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Batch",
+      "type": "object",
+      "required": [
+        "state",
+        "total_lst_to_burn",
+        "unstake_requests_count"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/BatchState"
+        },
+        "total_lst_to_burn": {
+          "description": "Total amount of the LST to be burned in this batch",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "unstake_requests_count": {
+          "description": "The length of the unstake requests list.\n\nMultiple unbond requests in a batch are aggregated into one unstake request per user.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint64"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "BatchState": {
+          "oneOf": [
+            {
+              "description": "Initial state of a batch. Only one batch is pending at a time (see [`crate::state::PENDING_BATCH_ID`].",
+              "type": "object",
+              "required": [
+                "Pending"
+              ],
+              "properties": {
+                "Pending": {
+                  "type": "object",
+                  "required": [
+                    "submit_time"
+                  ],
+                  "properties": {
+                    "submit_time": {
+                      "description": "The earliest timestamp at which the batch can be submitted.\n\nThis will be `creation_time + batch_period`.\n\nNote that this is a *minimum* timestamp - empty batches will not be submitted.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint64"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The batch has been submitted, and all unbonding requests have been processed. The unbonded tokens have not yet been sent back to this contract for withdrawing by the unbonded stakers.\n\nUnbonding requests can only be processed after the unbonding period of the chain this contract is running on.",
+              "type": "object",
+              "required": [
+                "Submitted"
+              ],
+              "properties": {
+                "Submitted": {
+                  "type": "object",
+                  "required": [
+                    "expected_native_unstaked",
+                    "receive_time"
+                  ],
+                  "properties": {
+                    "expected_native_unstaked": {
+                      "description": "The amount of native tokens that should be received after unstaking.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint128"
+                        }
+                      ]
+                    },
+                    "receive_time": {
+                      "description": "Estimated time when the batch will be received.\n\nThis will be `submission_time + unbonding_period`.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint64"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The unbonding period has elapsed and the unbonded tokens have been sent back to this contract. The unbonded stakers from this batch are now able to claim their unbonded tokens.",
+              "type": "object",
+              "required": [
+                "Received"
+              ],
+              "properties": {
+                "Received": {
+                  "type": "object",
+                  "required": [
+                    "received_native_unstaked"
+                  ],
+                  "properties": {
+                    "received_native_unstaked": {
+                      "description": "The amount of native tokens received after unbonding.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint128"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        },
+        "Uint64": {
+          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+          "type": "string"
+        }
+      }
+    },
+    "batches": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BatchesResponse",
+      "type": "object",
+      "required": [
+        "batches"
+      ],
+      "properties": {
+        "batches": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Batch": {
+          "type": "object",
+          "required": [
+            "state",
+            "total_lst_to_burn",
+            "unstake_requests_count"
+          ],
+          "properties": {
+            "state": {
+              "$ref": "#/definitions/BatchState"
+            },
+            "total_lst_to_burn": {
+              "description": "Total amount of the LST to be burned in this batch",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "unstake_requests_count": {
+              "description": "The length of the unstake requests list.\n\nMultiple unbond requests in a batch are aggregated into one unstake request per user.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint64"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "BatchState": {
+          "oneOf": [
+            {
+              "description": "Initial state of a batch. Only one batch is pending at a time (see [`crate::state::PENDING_BATCH_ID`].",
+              "type": "object",
+              "required": [
+                "Pending"
+              ],
+              "properties": {
+                "Pending": {
+                  "type": "object",
+                  "required": [
+                    "submit_time"
+                  ],
+                  "properties": {
+                    "submit_time": {
+                      "description": "The earliest timestamp at which the batch can be submitted.\n\nThis will be `creation_time + batch_period`.\n\nNote that this is a *minimum* timestamp - empty batches will not be submitted.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint64"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The batch has been submitted, and all unbonding requests have been processed. The unbonded tokens have not yet been sent back to this contract for withdrawing by the unbonded stakers.\n\nUnbonding requests can only be processed after the unbonding period of the chain this contract is running on.",
+              "type": "object",
+              "required": [
+                "Submitted"
+              ],
+              "properties": {
+                "Submitted": {
+                  "type": "object",
+                  "required": [
+                    "expected_native_unstaked",
+                    "receive_time"
+                  ],
+                  "properties": {
+                    "expected_native_unstaked": {
+                      "description": "The amount of native tokens that should be received after unstaking.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint128"
+                        }
+                      ]
+                    },
+                    "receive_time": {
+                      "description": "Estimated time when the batch will be received.\n\nThis will be `submission_time + unbonding_period`.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint64"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The unbonding period has elapsed and the unbonded tokens have been sent back to this contract. The unbonded stakers from this batch are now able to claim their unbonded tokens.",
+              "type": "object",
+              "required": [
+                "Received"
+              ],
+              "properties": {
+                "Received": {
+                  "type": "object",
+                  "required": [
+                    "received_native_unstaked"
+                  ],
+                  "properties": {
+                    "received_native_unstaked": {
+                      "description": "The amount of native tokens received after unbonding.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint128"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        },
+        "Uint64": {
+          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+          "type": "string"
+        }
+      }
+    },
+    "batches_by_ids": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BatchesResponse",
+      "type": "object",
+      "required": [
+        "batches"
+      ],
+      "properties": {
+        "batches": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Batch": {
+          "type": "object",
+          "required": [
+            "state",
+            "total_lst_to_burn",
+            "unstake_requests_count"
+          ],
+          "properties": {
+            "state": {
+              "$ref": "#/definitions/BatchState"
+            },
+            "total_lst_to_burn": {
+              "description": "Total amount of the LST to be burned in this batch",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                }
+              ]
+            },
+            "unstake_requests_count": {
+              "description": "The length of the unstake requests list.\n\nMultiple unbond requests in a batch are aggregated into one unstake request per user.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Uint64"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "BatchState": {
+          "oneOf": [
+            {
+              "description": "Initial state of a batch. Only one batch is pending at a time (see [`crate::state::PENDING_BATCH_ID`].",
+              "type": "object",
+              "required": [
+                "Pending"
+              ],
+              "properties": {
+                "Pending": {
+                  "type": "object",
+                  "required": [
+                    "submit_time"
+                  ],
+                  "properties": {
+                    "submit_time": {
+                      "description": "The earliest timestamp at which the batch can be submitted.\n\nThis will be `creation_time + batch_period`.\n\nNote that this is a *minimum* timestamp - empty batches will not be submitted.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint64"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The batch has been submitted, and all unbonding requests have been processed. The unbonded tokens have not yet been sent back to this contract for withdrawing by the unbonded stakers.\n\nUnbonding requests can only be processed after the unbonding period of the chain this contract is running on.",
+              "type": "object",
+              "required": [
+                "Submitted"
+              ],
+              "properties": {
+                "Submitted": {
+                  "type": "object",
+                  "required": [
+                    "expected_native_unstaked",
+                    "receive_time"
+                  ],
+                  "properties": {
+                    "expected_native_unstaked": {
+                      "description": "The amount of native tokens that should be received after unstaking.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint128"
+                        }
+                      ]
+                    },
+                    "receive_time": {
+                      "description": "Estimated time when the batch will be received.\n\nThis will be `submission_time + unbonding_period`.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint64"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The unbonding period has elapsed and the unbonded tokens have been sent back to this contract. The unbonded stakers from this batch are now able to claim their unbonded tokens.",
+              "type": "object",
+              "required": [
+                "Received"
+              ],
+              "properties": {
+                "Received": {
+                  "type": "object",
+                  "required": [
+                    "received_native_unstaked"
+                  ],
+                  "properties": {
+                    "received_native_unstaked": {
+                      "description": "The amount of native tokens received after unbonding.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint128"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        },
+        "Uint64": {
+          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+          "type": "string"
+        }
+      }
+    },
+    "config": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ConfigResponse",
+      "type": "object",
+      "required": [
+        "batch_period_seconds",
+        "lst_address",
+        "minimum_liquid_stake_amount",
+        "monitors",
+        "native_token_denom",
+        "protocol_fee_config",
+        "stopped"
+      ],
+      "properties": {
+        "batch_period_seconds": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "lst_address": {
+          "$ref": "#/definitions/Addr"
+        },
+        "minimum_liquid_stake_amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "monitors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Addr"
+          }
+        },
+        "native_token_denom": {
+          "type": "string"
+        },
+        "protocol_fee_config": {
+          "$ref": "#/definitions/ProtocolFeeConfig"
+        },
+        "stopped": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Addr": {
+          "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+          "type": "string"
+        },
+        "ProtocolFeeConfig": {
+          "description": "Config related to the fees collected by the contract to operate the liquid staking protocol.",
+          "type": "object",
+          "required": [
+            "fee_rate",
+            "fee_recipient"
+          ],
+          "properties": {
+            "fee_rate": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "fee_recipient": {
+              "description": "Address where the collected fees are sent.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Addr"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        }
+      }
+    },
+    "pending_batch": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Batch",
+      "type": "object",
+      "required": [
+        "state",
+        "total_lst_to_burn",
+        "unstake_requests_count"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/BatchState"
+        },
+        "total_lst_to_burn": {
+          "description": "Total amount of the LST to be burned in this batch",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "unstake_requests_count": {
+          "description": "The length of the unstake requests list.\n\nMultiple unbond requests in a batch are aggregated into one unstake request per user.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint64"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "BatchState": {
+          "oneOf": [
+            {
+              "description": "Initial state of a batch. Only one batch is pending at a time (see [`crate::state::PENDING_BATCH_ID`].",
+              "type": "object",
+              "required": [
+                "Pending"
+              ],
+              "properties": {
+                "Pending": {
+                  "type": "object",
+                  "required": [
+                    "submit_time"
+                  ],
+                  "properties": {
+                    "submit_time": {
+                      "description": "The earliest timestamp at which the batch can be submitted.\n\nThis will be `creation_time + batch_period`.\n\nNote that this is a *minimum* timestamp - empty batches will not be submitted.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint64"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The batch has been submitted, and all unbonding requests have been processed. The unbonded tokens have not yet been sent back to this contract for withdrawing by the unbonded stakers.\n\nUnbonding requests can only be processed after the unbonding period of the chain this contract is running on.",
+              "type": "object",
+              "required": [
+                "Submitted"
+              ],
+              "properties": {
+                "Submitted": {
+                  "type": "object",
+                  "required": [
+                    "expected_native_unstaked",
+                    "receive_time"
+                  ],
+                  "properties": {
+                    "expected_native_unstaked": {
+                      "description": "The amount of native tokens that should be received after unstaking.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint128"
+                        }
+                      ]
+                    },
+                    "receive_time": {
+                      "description": "Estimated time when the batch will be received.\n\nThis will be `submission_time + unbonding_period`.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint64"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The unbonding period has elapsed and the unbonded tokens have been sent back to this contract. The unbonded stakers from this batch are now able to claim their unbonded tokens.",
+              "type": "object",
+              "required": [
+                "Received"
+              ],
+              "properties": {
+                "Received": {
+                  "type": "object",
+                  "required": [
+                    "received_native_unstaked"
+                  ],
+                  "properties": {
+                    "received_native_unstaked": {
+                      "description": "The amount of native tokens received after unbonding.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Uint128"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        },
+        "Uint64": {
+          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+          "type": "string"
+        }
+      }
+    },
+    "unstake_requests_by_staker": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Array_of_UnstakeRequest",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/UnstakeRequest"
+      },
+      "definitions": {
+        "Addr": {
+          "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+          "type": "string"
+        },
+        "BatchId": {
+          "$ref": "#/definitions/Uint64"
+        },
+        "Bytes<HexPrefixed>": {
+          "description": "A string representation of bytes, encoded via HexPrefixed",
+          "type": "string"
+        },
+        "Staker": {
+          "oneOf": [
+            {
+              "description": "The staking was initiated on this chain.",
+              "type": "object",
+              "required": [
+                "Local"
+              ],
+              "properties": {
+                "Local": {
+                  "type": "object",
+                  "required": [
+                    "address"
+                  ],
+                  "properties": {
+                    "address": {
+                      "$ref": "#/definitions/Addr"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The staking was initiated from a different chain.\n\nThis tuple of `(source address, destination channel id, path)` is required to uniquely identify cross-chain liquid staking operations.",
+              "type": "object",
+              "required": [
+                "Remote"
+              ],
+              "properties": {
+                "Remote": {
+                  "type": "object",
+                  "required": [
+                    "address",
+                    "channel_id",
+                    "path"
+                  ],
+                  "properties": {
+                    "address": {
+                      "description": "The address of the staker on the *counterparty* chain.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Bytes<HexPrefixed>"
+                        }
+                      ]
+                    },
+                    "channel_id": {
+                      "description": "The id of the channel on *this* chain.",
+                      "type": "integer",
+                      "format": "uint32",
+                      "minimum": 1.0
+                    },
+                    "path": {
+                      "description": "The path of the packet. This will typically be `0`, but if the packet was a forward packet, then this will contain the path to the source chain.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/U256"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "U256": {
+          "description": "256-bit unsigned integer, represented as a decimal string",
+          "type": "string",
+          "pattern": "\\d+"
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        },
+        "Uint64": {
+          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+          "type": "string"
+        },
+        "UnstakeRequest": {
+          "type": "object",
+          "required": [
+            "amount",
+            "batch_id",
+            "staker"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "batch_id": {
+              "$ref": "#/definitions/BatchId"
+            },
+            "staker": {
+              "$ref": "#/definitions/Staker"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "unstake_requests_by_staker_hash": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Array_of_UnstakeRequest",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/UnstakeRequest"
+      },
+      "definitions": {
+        "Addr": {
+          "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+          "type": "string"
+        },
+        "BatchId": {
+          "$ref": "#/definitions/Uint64"
+        },
+        "Bytes<HexPrefixed>": {
+          "description": "A string representation of bytes, encoded via HexPrefixed",
+          "type": "string"
+        },
+        "Staker": {
+          "oneOf": [
+            {
+              "description": "The staking was initiated on this chain.",
+              "type": "object",
+              "required": [
+                "Local"
+              ],
+              "properties": {
+                "Local": {
+                  "type": "object",
+                  "required": [
+                    "address"
+                  ],
+                  "properties": {
+                    "address": {
+                      "$ref": "#/definitions/Addr"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "description": "The staking was initiated from a different chain.\n\nThis tuple of `(source address, destination channel id, path)` is required to uniquely identify cross-chain liquid staking operations.",
+              "type": "object",
+              "required": [
+                "Remote"
+              ],
+              "properties": {
+                "Remote": {
+                  "type": "object",
+                  "required": [
+                    "address",
+                    "channel_id",
+                    "path"
+                  ],
+                  "properties": {
+                    "address": {
+                      "description": "The address of the staker on the *counterparty* chain.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/Bytes<HexPrefixed>"
+                        }
+                      ]
+                    },
+                    "channel_id": {
+                      "description": "The id of the channel on *this* chain.",
+                      "type": "integer",
+                      "format": "uint32",
+                      "minimum": 1.0
+                    },
+                    "path": {
+                      "description": "The path of the packet. This will typically be `0`, but if the packet was a forward packet, then this will contain the path to the source chain.",
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/U256"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "U256": {
+          "description": "256-bit unsigned integer, represented as a decimal string",
+          "type": "string",
+          "pattern": "\\d+"
+        },
+        "Uint128": {
+          "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+          "type": "string"
+        },
+        "Uint64": {
+          "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+          "type": "string"
+        },
+        "UnstakeRequest": {
+          "type": "object",
+          "required": [
+            "amount",
+            "batch_id",
+            "staker"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "batch_id": {
+              "$ref": "#/definitions/BatchId"
+            },
+            "staker": {
+              "$ref": "#/definitions/Staker"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  }
+}

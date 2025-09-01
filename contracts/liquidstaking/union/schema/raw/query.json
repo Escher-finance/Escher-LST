@@ -1,0 +1,379 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "oneOf": [
+    {
+      "description": "Queries the contract configuration. Returns the current `native_chain_config`, `protocol_chain_config`, `protocol_fee_config`, `liquid_stake_token_denom`, and other settings.",
+      "type": "object",
+      "required": [
+        "Config"
+      ],
+      "properties": {
+        "Config": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Queries the current accounting state of the contract. Returns totals such as delegated native tokens, LST supply, and rewards.",
+      "type": "object",
+      "required": [
+        "AccountingState"
+      ],
+      "properties": {
+        "AccountingState": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Queries the information of a specific batch by its ID.",
+      "type": "object",
+      "required": [
+        "Batch"
+      ],
+      "properties": {
+        "Batch": {
+          "type": "object",
+          "required": [
+            "batch_id"
+          ],
+          "properties": {
+            "batch_id": {
+              "description": "ID of the batch to query.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/BatchId"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Queries a paginated list of all batches stored in contract storage.",
+      "type": "object",
+      "required": [
+        "Batches"
+      ],
+      "properties": {
+        "Batches": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "Maximum number of batches to return.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint",
+              "minimum": 0.0
+            },
+            "start_after": {
+              "description": "If provided, starts listing batches after this batch ID.",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/BatchId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "description": "Optional filter to return only batches with the given status.",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/BatchStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Queries the batches with the provided list of IDs.",
+      "type": "object",
+      "required": [
+        "BatchesByIds"
+      ],
+      "properties": {
+        "BatchesByIds": {
+          "type": "object",
+          "required": [
+            "batch_ids"
+          ],
+          "properties": {
+            "batch_ids": {
+              "description": "List of batch IDs to fetch.",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/BatchId"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Queries the current batch that is pending processing (if any).",
+      "type": "object",
+      "required": [
+        "PendingBatch"
+      ],
+      "properties": {
+        "PendingBatch": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Queries the unstake requests made by a specific staker.",
+      "type": "object",
+      "required": [
+        "UnstakeRequestsByStaker"
+      ],
+      "properties": {
+        "UnstakeRequestsByStaker": {
+          "type": "object",
+          "required": [
+            "staker"
+          ],
+          "properties": {
+            "staker": {
+              "description": "Address of the user whose unstake requests are to be queried.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Staker"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Queries the unstake requests made by a specific staker, by the staker hash.",
+      "type": "object",
+      "required": [
+        "UnstakeRequestsByStakerHash"
+      ],
+      "properties": {
+        "UnstakeRequestsByStakerHash": {
+          "type": "object",
+          "required": [
+            "staker_hash"
+          ],
+          "properties": {
+            "staker_hash": {
+              "description": "Address of the user whose unstake requests are to be queried.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/FixedBytes<HexPrefixed, 32>"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Queries all unstake requests in the contract.",
+      "type": "object",
+      "required": [
+        "AllUnstakeRequests"
+      ],
+      "properties": {
+        "AllUnstakeRequests": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "Maximum number of unstake requests to return.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint",
+              "minimum": 0.0
+            },
+            "start_after": {
+              "description": "If provided, starts listing unstake requests after this key.",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/UnstakeRequestKey"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "Addr": {
+      "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+      "type": "string"
+    },
+    "BatchId": {
+      "$ref": "#/definitions/Uint64"
+    },
+    "BatchStatus": {
+      "oneOf": [
+        {
+          "description": "See [`BatchState::Pending`].",
+          "type": "string",
+          "enum": [
+            "Pending"
+          ]
+        },
+        {
+          "description": "See [`BatchState::Submitted`].",
+          "type": "string",
+          "enum": [
+            "Submitted"
+          ]
+        },
+        {
+          "description": "See [`BatchState::Received`].",
+          "type": "string",
+          "enum": [
+            "Received"
+          ]
+        }
+      ]
+    },
+    "Bytes<HexPrefixed>": {
+      "description": "A string representation of bytes, encoded via HexPrefixed",
+      "type": "string"
+    },
+    "FixedBytes<HexPrefixed, 32>": {
+      "description": "A string representation of fixed bytes of length 32, encoded via HexPrefixed",
+      "type": "string"
+    },
+    "Staker": {
+      "oneOf": [
+        {
+          "description": "The staking was initiated on this chain.",
+          "type": "object",
+          "required": [
+            "Local"
+          ],
+          "properties": {
+            "Local": {
+              "type": "object",
+              "required": [
+                "address"
+              ],
+              "properties": {
+                "address": {
+                  "$ref": "#/definitions/Addr"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "The staking was initiated from a different chain.\n\nThis tuple of `(source address, destination channel id, path)` is required to uniquely identify cross-chain liquid staking operations.",
+          "type": "object",
+          "required": [
+            "Remote"
+          ],
+          "properties": {
+            "Remote": {
+              "type": "object",
+              "required": [
+                "address",
+                "channel_id",
+                "path"
+              ],
+              "properties": {
+                "address": {
+                  "description": "The address of the staker on the *counterparty* chain.",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/Bytes<HexPrefixed>"
+                    }
+                  ]
+                },
+                "channel_id": {
+                  "description": "The id of the channel on *this* chain.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 1.0
+                },
+                "path": {
+                  "description": "The path of the packet. This will typically be `0`, but if the packet was a forward packet, then this will contain the path to the source chain.",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/U256"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "U256": {
+      "description": "256-bit unsigned integer, represented as a decimal string",
+      "type": "string",
+      "pattern": "\\d+"
+    },
+    "Uint64": {
+      "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
+      "type": "string"
+    },
+    "UnstakeRequestKey": {
+      "type": "object",
+      "required": [
+        "batch_id",
+        "staker_hash"
+      ],
+      "properties": {
+        "batch_id": {
+          "$ref": "#/definitions/BatchId"
+        },
+        "staker_hash": {
+          "description": "The staker hash for the [`Staker`] of the associated [`UnstakeRequest`].\n\nThis is `sha256(bincode(staker))` (see [`Staker::hash`]).",
+          "allOf": [
+            {
+              "$ref": "#/definitions/FixedBytes<HexPrefixed, 32>"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

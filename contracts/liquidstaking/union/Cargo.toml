@@ -6,13 +6,9 @@ version = "0.0.0"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-# use library feature to disable all instantiate/execute/query exports
-library = []
-
 [dependencies]
 bincode              = { workspace = true, features = ["derive"] }
-cosmwasm-schema      = { workspace = true }
+cosmwasm-schema      = { workspace = true, optional = true }
 cosmwasm-std         = { workspace = true, features = ["cosmwasm_2_0"] }
 cw-utils             = { workspace = true }
 cw2                  = { workspace = true }
@@ -22,7 +18,7 @@ ibc-union-spec       = { workspace = true, features = ["serde", "bincode"] }
 itertools            = "0.14.0"
 on-zkgm-call-proxy   = { workspace = true, features = ["library"] }
 prost                = { version = "0.12.3", default-features = false, features = ["prost-derive"] }
-schemars             = { workspace = true }
+schemars             = { workspace = true, optional = true }
 semver               = { workspace = true }
 serde                = { workspace = true }
 serde-json-wasm      = "1.0"
@@ -34,3 +30,12 @@ unionlabs-primitives = { workspace = true, features = ["bincode"] }
 
 [dev-dependencies]
 cw-multi-test = "0.17.0"
+
+[features]
+default = []
+library = []
+schemars  = ["dep:schemars", "dep:cosmwasm-schema", "on-zkgm-call-proxy/schemars"]
+
+[[bin]]
+name              = "schema"
+required-features = ["schemars"]

@@ -76,12 +76,12 @@ pub fn instantiate(
     deps.storage
         .write_item::<Monitors>(&monitors.into_iter().map(Into::into).collect());
 
-    // save configs
+    // save configs and state
     deps.storage
         .write_item::<ProtocolFeeConfigStore>(&protocol_fee_config);
     deps.storage.write_item::<ConfigStore>(&Config {
         native_token_denom: native_token_denom.clone(),
-        minimum_liquid_stake_amount: minimum_liquid_stake_amount.into(),
+        minimum_liquid_stake_amount,
         batch_period_seconds,
     });
     deps.storage
@@ -102,7 +102,10 @@ pub fn instantiate(
         Event::new("init")
             .add_attribute("admin", admin)
             .add_attribute("native_token_denom", native_token_denom)
-            .add_attribute("minimum_liquid_stake_amount", minimum_liquid_stake_amount)
+            .add_attribute(
+                "minimum_liquid_stake_amount",
+                minimum_liquid_stake_amount.to_string(),
+            )
             .add_attribute(
                 "protocol_fee_rate",
                 protocol_fee_config.fee_rate.to_string(),
@@ -245,7 +248,7 @@ pub fn execute(
 pub fn query(deps: Deps, _: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
-        QueryMsg::State {} => to_json_binary(&query_state(deps)?),
+        QueryMsg::AccountingState {} => to_json_binary(&query_state(deps)?),
         QueryMsg::Batch { batch_id } => to_json_binary(&query_batch(deps, batch_id)?),
         QueryMsg::Batches {
             start_after,

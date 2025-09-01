@@ -26,7 +26,12 @@ pub const MAX_UNBONDING_PERIOD: u64 = 3_628_800;
     bincode::Encode,
     bincode::Decode,
 )]
-pub struct BatchId(#[serde(with = "::serde_utils::string")] NonZeroU64);
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct BatchId(
+    #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint64"))]
+    NonZeroU64,
+);
 
 impl fmt::Display for BatchId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -75,20 +80,23 @@ impl BatchId {
                     raw.len(),
                 ))
             })
-            .and_then(BatchId::try_from_be_bytes)
+            .and_then(BatchId::from_be_bytes)
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Batch {
     /// Total amount of the LST to be burned in this batch
     #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
     pub total_lst_to_burn: u128,
 
     /// The length of the unstake requests list.
     ///
     /// Multiple unbond requests in a batch are aggregated into one unstake request per user.
     #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint64"))]
     pub unstake_requests_count: u64,
 
     pub state: BatchState,
@@ -105,6 +113,7 @@ impl Batch {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum BatchState {
     /// Initial state of a batch. Only one batch is pending at a time (see [`crate::state::PENDING_BATCH_ID`].
     Pending {
@@ -113,6 +122,8 @@ pub enum BatchState {
         /// This will be `creation_time + batch_period`.
         ///
         /// Note that this is a *minimum* timestamp - empty batches will not be submitted.
+        #[serde(with = "::serde_utils::string")]
+        #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint64"))]
         submit_time: u64,
     },
     /// The batch has been submitted, and all unbonding requests have been processed. The unbonded tokens have not yet been sent back to this contract for withdrawing by the unbonded stakers.
@@ -122,13 +133,19 @@ pub enum BatchState {
         /// Estimated time when the batch will be received.
         ///
         /// This will be `submission_time + unbonding_period`.
+        #[serde(with = "::serde_utils::string")]
+        #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint64"))]
         receive_time: u64,
         /// The amount of native tokens that should be received after unstaking.
+        #[serde(with = "::serde_utils::string")]
+        #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
         expected_native_unstaked: u128,
     },
     /// The unbonding period has elapsed and the unbonded tokens have been sent back to this contract. The unbonded stakers from this batch are now able to claim their unbonded tokens.
     Received {
         /// The amount of native tokens received after unbonding.
+        #[serde(with = "::serde_utils::string")]
+        #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
         received_native_unstaked: u128,
     },
 }
@@ -144,6 +161,7 @@ impl BatchState {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum BatchStatus {
     /// See [`BatchState::Pending`].
     Pending,
@@ -154,19 +172,12 @@ pub enum BatchStatus {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct BatchExpectedAmount {
     pub batch_id: BatchId,
     #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
     pub expected_native_amount: u128,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
-pub struct LiquidUnbondRequest {
-    /// The user's address
-    pub user: Bytes,
-    /// The user's share in the batch
-    pub shares: u128,
-    pub redeemed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
@@ -186,25 +197,35 @@ pub struct Config {
 /// Config related to the fees collected by the contract to
 /// operate the liquid staking protocol.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ProtocolFeeConfig {
     #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
     pub fee_rate: u128, // not using a fraction, fee percentage=x/100000
 
     /// Address where the collected fees are sent.
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Addr"))]
     pub fee_recipient: String,
 }
 
 /// State of various balances this contract keeps track of.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AccountingState {
     /// The total amount of native tokens that have been bonded.
+    #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
     pub total_bonded_native_tokens: u128,
     /// The total issuance of the LST.
     ///
     /// Note that this is *not* the same as the total supply of the LST contract, but rather the total *cross-chain* supply of the LST. For example, when the LST is bridged, it will be burned on the source chain and minted on the destination chain.
+    #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
     pub total_issued_lst: u128,
 
     // REVIEW: Unused? If this is only used for off-chain actions/ accounting then this is probably better off in a separate storage
+    #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
     pub total_reward_amount: u128,
 }
 
@@ -220,9 +241,13 @@ pub struct AccountingState {
     bincode::Encode,
     bincode::Decode,
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum Staker {
     /// The staking was initiated on this chain.
-    Local { address: String },
+    Local {
+        #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Addr"))]
+        address: String,
+    },
     /// The staking was initiated from a different chain.
     ///
     /// This tuple of `(source address, destination channel id, path)` is required to uniquely identify cross-chain liquid staking operations.
@@ -263,6 +288,7 @@ pub struct PendingOwner {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct UnstakeRequestKey {
     pub batch_id: BatchId,
     /// The staker hash for the [`Staker`] of the associated [`UnstakeRequest`].
@@ -272,9 +298,12 @@ pub struct UnstakeRequestKey {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct UnstakeRequest {
     pub batch_id: BatchId,
     pub staker: Staker,
+    #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
     pub amount: u128,
     // TODO:
     //
