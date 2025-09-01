@@ -1,9 +1,9 @@
 use cosmwasm_std::{
-    Addr, BankMsg, Coin, Deps, DepsMut, Env, Event, MessageInfo, Response, Uint128, attr, ensure,
-    wasm_execute,
+    attr, ensure, wasm_execute, Addr, BankMsg, Coin, Deps, DepsMut, Env, Event, MessageInfo,
+    Response, Uint128,
 };
-use cw_utils::must_pay;
 use cw20::Cw20ExecuteMsg;
+use cw_utils::must_pay;
 use depolama::StorageExt;
 
 use crate::{
@@ -134,6 +134,7 @@ pub fn bond(
 
     let lst_address = deps.storage.read_item::<LstAddress>()?;
 
+    // TODO: Emit staker hash
     let response = Response::new()
         .add_message(transfer_funds_to_cw_account_msig_message)
         // send the minted lst tokens to recipient
@@ -268,29 +269,26 @@ pub fn unbond(
     let response = Response::new()
         .add_message(lst_transfer_from_msg)
         .add_event(
-            Event::new("unbond")
-                .add_attribute("staker_hash", staker_hash.to_string())
-                .add_attribute("batch", pending_batch_id.to_string())
-                .add_attribute("amount", amount.to_string())
-                .add_attribute("is_new_request", is_new_request.to_string()),
+            match staker {
+                Staker::Local { address } => Event::new("local_unbond")
+                    .add_attribute("staker_address", address)
+                    .add_attribute("staker_hash", staker_hash.to_string()),
+                Staker::Remote {
+                    address,
+                    channel_id,
+                    path,
+                } => Event::new("remote_unbond")
+                    .add_attribute("staker_address", address.to_string())
+                    .add_attribute("staker_channel_id", channel_id.to_string())
+                    .add_attribute("staker_path", path.to_string())
+                    .add_attribute("staker_hash", staker_hash.to_string()),
+            }
+            .add_attribute("batch", pending_batch_id.to_string())
+            .add_attribute("amount", amount.to_string())
+            .add_attribute("is_new_request", is_new_request.to_string()),
         );
 
-    Ok(match staker {
-        Staker::Local { address } => response.add_attributes([
-            attr("staker_type", "local"),
-            attr("staker_address", address),
-        ]),
-        Staker::Remote {
-            address,
-            channel_id,
-            path,
-        } => response.add_attributes([
-            attr("staker_type", "remote"),
-            attr("staker_address", address.to_string()),
-            attr("staker_channel_id", channel_id.to_string()),
-            attr("staker_path", path.to_string()),
-        ]),
-    })
+    Ok(response)
 }
 
 /// Submit batch and transition pending batch to submitted.
@@ -460,10 +458,12 @@ pub fn withdraw(
     Ok(Response::new()
         .add_event(
             Event::new("withdraw")
-                .add_attribute("batch", batch_id.to_string())
+                .add_attribute("staker_hash", staker.hash().to_string())
+                .add_attribute("batch_id", batch_id.to_string())
+                .add_attribute("withdraw_to_address", &withdraw_to_address)
                 .add_attribute("amount", amount.to_string()),
         )
-        // send the native token (U) back to the staker
+        // send the native token (U) back to the desired address
         .add_message(BankMsg::Send {
             to_address: withdraw_to_address.to_string(),
             amount: vec![Coin {

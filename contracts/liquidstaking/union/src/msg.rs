@@ -146,7 +146,7 @@ pub enum RemoteExecuteMsg {
 
     /// Initiates the unbonding process for a user.
     Unbond {
-        /// The amount to unstake.
+        /// The amount to unbond.
         amount: Uint128,
     },
 
