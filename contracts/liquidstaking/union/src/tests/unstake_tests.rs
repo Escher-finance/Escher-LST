@@ -1,7 +1,7 @@
 use cosmwasm_std::{
-    Addr, Coin, CosmosMsg, Event, StdError, Timestamp, WasmMsg, attr,
+    attr,
     testing::{message_info, mock_env},
-    to_json_binary,
+    to_json_binary, Addr, Coin, CosmosMsg, Event, StdError, Timestamp, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
 use depolama::StorageExt;
@@ -11,7 +11,7 @@ use crate::{
     contract::execute,
     msg::ExecuteMsg,
     state::{AccountingStateStore, Batches, UnstakeRequests},
-    tests::test_helper::{LIQUID_STAKE_TOKEN_ADDRESS, UNION1, UNION2, init},
+    tests::test_helper::{init, LIQUID_STAKE_TOKEN_ADDRESS, UNION1, UNION2},
     types::{BatchId, BatchState, Staker, UnstakeRequest, UnstakeRequestKey},
 };
 
@@ -19,8 +19,7 @@ use crate::{
 fn unbond_works() {
     let mut deps = init();
 
-    let _ = deps
-        .storage
+    deps.storage
         .upsert_item::<AccountingStateStore, StdError>(|s| {
             let mut s = s.unwrap();
             s.total_bonded_native_tokens = 1_100;
@@ -92,7 +91,7 @@ fn unbond_works() {
 
     assert_eq!(
         res.events[0],
-        Event::new("unbond")
+        Event::new("local_unbond")
             .add_attribute("staker_hash", staker.hash().to_string())
             .add_attribute("batch", "1")
             .add_attribute("amount", union1_amount_1)
@@ -119,7 +118,7 @@ fn unbond_works() {
     // is_new_request is now false
     assert_eq!(
         res.events[0],
-        Event::new("unbond")
+        Event::new("local_unbond")
             .add_attribute("staker_hash", staker.hash().to_string())
             .add_attribute("batch", "1")
             .add_attribute("amount", union1_amount_2)
@@ -156,7 +155,7 @@ fn unbond_works() {
     let union2_amount_1 = 4528u128.into();
 
     // a new unstake request
-    let _ = execute(
+    execute(
         deps.as_mut(),
         mock_env(),
         message_info(&Addr::unchecked(UNION2), &[]),
@@ -203,8 +202,7 @@ fn unbond_works() {
 fn receive_unstaked_tokens_works() {
     let mut deps = init();
 
-    let _ = deps
-        .storage
+    deps.storage
         .upsert_item::<AccountingStateStore, StdError>(|s| {
             let mut s = s.unwrap();
             s.total_bonded_native_tokens = 5_000;
@@ -215,7 +213,7 @@ fn receive_unstaked_tokens_works() {
 
     // UNION1 unbonds 1532 tokens
     let union1_unbond_amount = 1532u128.into();
-    let _ = execute(
+    execute(
         deps.as_mut(),
         mock_env(),
         message_info(&Addr::unchecked(UNION1), &[]),
@@ -228,7 +226,7 @@ fn receive_unstaked_tokens_works() {
 
     // UNION2 unbonds 1200 tokens
     let union2_unbond_amount = 1200u128.into();
-    let _ = execute(
+    execute(
         deps.as_mut(),
         mock_env(),
         message_info(&Addr::unchecked(UNION2), &[]),
@@ -241,7 +239,7 @@ fn receive_unstaked_tokens_works() {
 
     // UNION3 unbonds 500 tokens
     let union3_unbond_amount = 500u128.into();
-    let _ = execute(
+    execute(
         deps.as_mut(),
         mock_env(),
         message_info(&Addr::unchecked(UNION3), &[]),
@@ -264,7 +262,7 @@ fn receive_unstaked_tokens_works() {
     };
 
     // batch is submitted so that we can receive the unstaked tokens
-    let _ = execute(
+    execute(
         deps.as_mut(),
         env.clone(),
         message_info(&Addr::unchecked(UNION1), &[]),
