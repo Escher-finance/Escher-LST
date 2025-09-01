@@ -15,14 +15,21 @@ use crate::{
         UnstakeRequestsByStakerHash,
     },
     types::{
-        AccountingState, Batch, BatchId, BatchState, PendingOwner, Staker, UnstakeRequest,
-        UnstakeRequestKey,
+        AccountingState, Batch, BatchExpectedAmount, BatchId, BatchState, Config, PendingOwner,
+        ProtocolFeeConfig, Staker, UnstakeRequest, UnstakeRequestKey,
     },
 };
 
 const FEE_RATE_DENOMINATOR: u64 = 100_000;
 /// 7 days
 const OWNERSHIP_CLAIM_DELAY_PERIOD: u64 = 60 * 60 * 24 * 7;
+
+pub fn ensure_stopped(deps: Deps) -> Result<(), ContractError> {
+    if deps.storage.read_item::<Stopped>()? {
+        return Err(ContractError::NotStopped);
+    }
+    Ok(())
+}
 
 pub fn ensure_not_stopped(deps: Deps) -> Result<(), ContractError> {
     if deps.storage.read_item::<Stopped>()? {
@@ -196,7 +203,7 @@ pub fn unbond(
 
     // if the staker is local, then we need to ensure that the address allowed to unbond for the staker
     if let Staker::Local { address } = &staker {
-        ensure_sender(&info, &address)?;
+        ensure_sender(&info, address)?;
     };
 
     let pending_batch_id = deps.storage.read_item::<PendingBatchId>()?;
@@ -262,7 +269,6 @@ pub fn unbond(
         .add_message(lst_transfer_from_msg)
         .add_event(
             Event::new("unbond")
-                .add_attribute("action", "unbond")
                 .add_attribute("staker_hash", staker_hash.to_string())
                 .add_attribute("batch", pending_batch_id.to_string())
                 .add_attribute("amount", amount.to_string())
@@ -396,12 +402,10 @@ pub fn submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response> {
         )?)
         .add_event(
             Event::new("submit_batch")
-                // REVIEW: Remove this "action" attribute?
-                .add_attribute("action", "submit_batch")
                 .add_attribute("batch_id", pending_batch_id.to_string())
                 .add_attribute("batch_total", batch.total_lst_to_burn.to_string())
                 .add_attribute("expected_unstaked", unbond_amount.to_string())
-                .add_attribute("unbonding_period", unbonding_period.to_string()),
+                .add_attribute("current_unbonding_period", unbonding_period.to_string()),
         ))
 }
 
@@ -418,7 +422,7 @@ pub fn withdraw(
 
     // if the staker is local, then we need to ensure that the address allowed to withdraw for the staker
     if let Staker::Local { address } = &staker {
-        ensure_sender(&info, &address)?;
+        ensure_sender(&info, address)?;
     };
 
     let Some(batch) = deps.storage.maybe_read::<Batches>(&batch_id)? else {
@@ -454,6 +458,11 @@ pub fn withdraw(
         .delete::<UnstakeRequestsByStakerHash>(&unstake_request_key);
 
     Ok(Response::new()
+        .add_event(
+            Event::new("withdraw")
+                .add_attribute("batch", batch_id.to_string())
+                .add_attribute("amount", amount.to_string()),
+        )
         // send the native token (U) back to the staker
         .add_message(BankMsg::Send {
             to_address: withdraw_to_address.to_string(),
@@ -461,10 +470,7 @@ pub fn withdraw(
                 denom: config.native_token_denom.clone(),
                 amount: amount.into(),
             }],
-        })
-        .add_attribute("action", "execute_withdraw")
-        .add_attribute("batch", batch_id.to_string())
-        .add_attribute("amount", amount.to_string()))
+        }))
 }
 
 // Transfer ownership to another account; callable by the owner
@@ -489,10 +495,11 @@ pub fn transfer_ownership(
             Ok(pending_owner)
         })?;
 
-    Ok(Response::new()
-        .add_attribute("action", "transfer_ownership")
-        .add_attribute("new_owner", new_owner)
-        .add_attribute("previous_owner", info.sender))
+    Ok(Response::new().add_event(
+        Event::new("transfer_ownership")
+            .add_attribute("new_owner", new_owner)
+            .add_attribute("previous_owner", info.sender),
+    ))
 }
 
 // Revoke transfer ownership, callable by the owner
@@ -533,62 +540,58 @@ pub fn accept_ownership(deps: DepsMut, env: Env, info: MessageInfo) -> ContractR
 // TODO: Implement once basic functionality is completed
 // // Update the config; callable by the owner
 // #[allow(clippy::too_many_arguments)]
-// pub fn update_config(
-//     deps: DepsMut,
-//     _env: Env,
-//     info: MessageInfo,
-//     protocol_fee_config: Option<UnsafeProtocolFeeConfig>,
-//     monitors: Option<Vec<String>>,
-//     batch_period: Option<u64>,
-// ) -> ContractResult<Response> {
-//     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+pub fn update_config(
+    deps: DepsMut,
+    info: MessageInfo,
+    protocol_fee_config: Option<ProtocolFeeConfig>,
+    monitors: Option<Vec<Addr>>,
+    batch_period_seconds: Option<u64>,
+) -> ContractResult<Response> {
+    ensure_admin(deps.as_ref(), &info)?;
 
-//     let mut config = CONFIG.load(deps.storage)?;
+    let mut event = Event::new("update_config");
 
-//     if let Some(native_chain_config) = &native_chain_config {
-//         config = native_chain_config.validate()?;
-//     }
+    if let Some(protocol_fee_config) = protocol_fee_config {
+        deps.storage
+            .write_item::<ProtocolFeeConfigStore>(&protocol_fee_config);
 
-//     if let Some(protocol_chain_config) = protocol_chain_config {
-//         config = protocol_chain_config.validate(&config.token_denom)?;
-//     }
+        event = event
+            .add_attribute(
+                "protocol_fee_rate",
+                protocol_fee_config.fee_rate.to_string(),
+            )
+            .add_attribute(
+                "protocol_fee_recpient",
+                protocol_fee_config.fee_recipient.to_string(),
+            );
+    }
 
-//     // The native chain config contains the native token denom,
-//     // which influences protocol_chain_config.ibc_token_denom.
-//     // Ensure that if the native token denom has changed,
-//     // the configured IBC denom remains valid after updating protocol_chain_config.
-//     if native_chain_config.is_some() {
-//         validate_ibc_denom(
-//             &config.native_token_denom,
-//             &config.ibc_channel_id,
-//             &config.token_denom,
-//         )?;
-//     }
+    if let Some(monitors) = monitors {
+        // collect to Vec<String> as that's the type used in the store (and .join() can be called on it as well)
+        let monitors = monitors.into_iter().map(Into::into).collect();
+        deps.storage.write_item::<Monitors>(&monitors);
+        event = event.add_attribute("monitors", format!("[{}]", monitors.join(",")));
+    }
 
-//     if let Some(protocol_fee_config) = protocol_fee_config {
-//         config.protocol_fee_config = protocol_fee_config.validate(&config)?
-//     }
+    if let Some(batch_period_seconds) = batch_period_seconds {
+        let unbonding_period =
+            query_and_validate_unbonding_period(deps.as_ref(), batch_period_seconds)?;
 
-//     if let Some(monitors) = monitors {
-//         config.monitors = validate_addresses(&monitors, &config.account_address_prefix)?;
-//     }
+        deps.storage
+            .upsert_item::<ConfigStore, ContractError>(|config| {
+                Ok(Config {
+                    batch_period_seconds,
+                    ..config.unwrap()
+                })
+            })?;
 
-//     if let Some(batch_period) = batch_period {
-//         // Ensure the batch period is lower then unbonding period.
-//         if batch_period > config.unbonding_period {
-//             return Err(ContractError::ValueTooBig {
-//                 field_name: "batch_period".to_string(),
-//                 value: Uint128::from(config.unbonding_period),
-//                 max: Uint128::from(batch_period),
-//             });
-//         }
-//         config.batch_period = batch_period;
-//     }
+        event = event
+            .add_attribute("batch_period_seconds", batch_period_seconds.to_string())
+            .add_attribute("current_unbonding_period", unbonding_period.to_string());
+    }
 
-//     CONFIG.save(deps.storage, &config)?;
-
-//     Ok(Response::new().add_attribute("action", "update_config"))
-// }
+    Ok(Response::new().add_event(event))
+}
 
 /// Receive rewards (denominated in the native token) to this contract.
 ///
@@ -633,7 +636,7 @@ pub fn receive_rewards(deps: DepsMut, info: MessageInfo) -> ContractResult<Respo
             accounting_state.total_reward_amount += received_rewards;
 
             Ok(accounting_state)
-        });
+        })?;
 
     Ok(Response::new()
         .add_event(
@@ -719,20 +722,24 @@ pub fn receive_unstaked_tokens(
             Ok(batch)
         })?;
 
-    Ok(Response::new()
-        .add_attribute("action", "receive_unstaked_tokens")
-        .add_attribute("batch", batch_id.to_string())
-        .add_attribute("amount", amount.to_string()))
+    Ok(Response::new().add_event(
+        Event::new("receive_unstaked_tokens")
+            .add_attribute("batch", batch_id.to_string())
+            .add_attribute("amount", amount.to_string()),
+    ))
 }
 
 pub fn circuit_breaker(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
     // must either be admin or a monitor to halt the contract
     if deps.storage.read_item::<Admin>()? == info.sender
-        || deps.storage.maybe_read::<Monitors>(&info.sender)?.is_some()
+        || deps
+            .storage
+            .read_item::<Monitors>()?
+            .contains(&info.sender.to_string())
     {
         deps.storage.write_item::<Stopped>(&true);
 
-        Ok(Response::new().add_attribute("action", "circuit_breaker"))
+        Ok(Response::new().add_event(Event::new("circuit_breaker")))
     } else {
         Err(ContractError::Unauthorized {
             sender: info.sender,
@@ -746,10 +753,7 @@ pub fn resume_contract(
     new_accounting_state: AccountingState,
 ) -> ContractResult<Response> {
     ensure_admin(deps.as_ref(), &info)?;
-
-    if !deps.storage.read_item::<Stopped>()? {
-        return Err(ContractError::NotStopped);
-    };
+    ensure_stopped(deps.as_ref())?;
 
     deps.storage.write_item::<Stopped>(&false);
 
@@ -773,36 +777,51 @@ pub fn resume_contract(
     ))
 }
 
-// pub fn slash_batches(
-//     deps: DepsMut,
-//     info: MessageInfo,
-//     expected_amounts: Vec<BatchExpectedAmount>,
-// ) -> ContractResult<Response> {
-//     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
+pub fn slash_batches(
+    deps: DepsMut,
+    info: MessageInfo,
+    expected_amounts: Vec<BatchExpectedAmount>,
+) -> ContractResult<Response> {
+    ensure_admin(deps.as_ref(), &info)?;
 
-//     // Ensure the contract is stopped before slashing the batches
-//     if !CONFIG.load(deps.storage)?.stopped {
-//         return Err(ContractError::NotStopped);
-//     }
+    // ensure the contract is stopped before slashing the batches
+    ensure_stopped(deps.as_ref())?;
 
-//     for BatchExpectedAmount { batch_id, amount } in expected_amounts.iter() {
-//         let mut batch = BATCHES.load(deps.storage, *batch_id)?;
-//         let BatchState::Submitted {
-//             ref mut expected_native_unstaked,
-//             ..
-//         } = batch.state
-//         else {
-//             return Err(ContractError::BatchNotYetSubmitted {
-//                 batch_id: *batch_id,
-//             });
-//         };
+    for BatchExpectedAmount {
+        batch_id,
+        expected_native_amount,
+    } in &expected_amounts
+    {
+        deps.storage
+            .upsert::<Batches, ContractError>(batch_id, |batch| {
+                let mut batch = batch.ok_or_else(|| ContractError::BatchNotFound {
+                    batch_id: *batch_id,
+                })?;
 
-//         *expected_native_unstaked = *amount;
+                let BatchState::Submitted {
+                    ref mut expected_native_unstaked,
+                    ..
+                } = batch.state
+                else {
+                    return Err(ContractError::BatchNotYetSubmitted {
+                        batch_id: *batch_id,
+                    });
+                };
 
-//         deps.storage.write::<Batches>(*batch_id, &batch)?;
-//     }
+                *expected_native_unstaked = *expected_native_amount;
 
-//     Ok(Response::new()
-//         .add_attribute("action", "slash_batches")
-//         .add_attribute("updated_batches", serde_json::to_string(&expected_amounts)?))
-// }
+                Ok(batch)
+            })?;
+    }
+
+    Ok(Response::new().add_events(expected_amounts.into_iter().map(
+        |BatchExpectedAmount {
+             batch_id,
+             expected_native_amount: amount,
+         }| {
+            Event::new("slash_batch")
+                .add_attribute("batch_id", batch_id.to_string())
+                .add_attribute("amount", amount.to_string())
+        },
+    )))
+}

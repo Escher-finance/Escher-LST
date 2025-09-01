@@ -3,7 +3,7 @@ use cw2::VersionError;
 use cw_utils::PaymentError;
 use thiserror::Error;
 
-use crate::types::{BatchId, BatchState, Staker, MAX_FEE_RATE};
+use crate::types::{BatchId, Staker, MAX_FEE_RATE};
 
 pub type ContractResult<T> = core::result::Result<T, ContractError>;
 
@@ -11,9 +11,6 @@ pub type ContractResult<T> = core::result::Result<T, ContractError>;
 pub enum ContractError {
     #[error(transparent)]
     Std(#[from] StdError),
-
-    #[error(transparent)]
-    SerdeJson(#[from] serde_json::Error),
 
     #[error(transparent)]
     Payment(#[from] PaymentError),
@@ -131,4 +128,7 @@ pub enum ContractError {
         unbond_amount: u128,
         total_bonded_native_tokens: u128,
     },
+
+    #[error("batch {batch_id} not yet submitted")]
+    BatchNotYetSubmitted { batch_id: BatchId },
 }

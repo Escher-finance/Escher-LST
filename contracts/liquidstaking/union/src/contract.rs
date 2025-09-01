@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    entry_point, from_json, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult,
+    entry_point, from_json, to_json_binary, Binary, Deps, DepsMut, Env, Event, MessageInfo,
+    Response, StdError, StdResult,
 };
 use cw2::set_contract_version;
 use depolama::StorageExt;
@@ -13,7 +13,8 @@ use crate::{
     error::ContractError,
     execute::{
         accept_ownership, bond, circuit_breaker, receive_rewards, receive_unstaked_tokens,
-        resume_contract, submit_batch, transfer_ownership, unbond, withdraw,
+        resume_contract, slash_batches, submit_batch, transfer_ownership, unbond, update_config,
+        withdraw,
     },
     helpers::query_and_validate_unbonding_period,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, RemoteExecuteMsg},
@@ -58,7 +59,8 @@ pub fn instantiate(
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    query_and_validate_unbonding_period(deps.as_ref(), batch_period_seconds)?;
+    let unbonding_period =
+        query_and_validate_unbonding_period(deps.as_ref(), batch_period_seconds)?;
 
     if protocol_fee_config.fee_rate > MAX_FEE_RATE {
         return Err(ContractError::InvalidProtocolFeeRate);
@@ -71,15 +73,14 @@ pub fn instantiate(
     deps.storage.write_item::<Zkgm>(&ucs03_zkgm_address);
     deps.storage
         .write_item::<OnZkgmCallProxy>(&on_zkgm_call_proxy_address);
-    for monitor in monitors {
-        deps.storage.write::<Monitors>(&monitor, &());
-    }
+    deps.storage
+        .write_item::<Monitors>(&monitors.into_iter().map(Into::into).collect());
 
     // save configs
     deps.storage
         .write_item::<ProtocolFeeConfigStore>(&protocol_fee_config);
     deps.storage.write_item::<ConfigStore>(&Config {
-        native_token_denom,
+        native_token_denom: native_token_denom.clone(),
         minimum_liquid_stake_amount: minimum_liquid_stake_amount.into(),
         batch_period_seconds,
     });
@@ -97,9 +98,22 @@ pub fn instantiate(
     );
     deps.storage.write_item::<PendingBatchId>(&BatchId::ONE);
 
-    Ok(Response::new()
-        .add_attribute("action", "instantiate")
-        .add_attribute("owner", admin))
+    Ok(Response::new().add_event(
+        Event::new("init")
+            .add_attribute("admin", admin)
+            .add_attribute("native_token_denom", native_token_denom)
+            .add_attribute("minimum_liquid_stake_amount", minimum_liquid_stake_amount)
+            .add_attribute(
+                "protocol_fee_rate",
+                protocol_fee_config.fee_rate.to_string(),
+            )
+            .add_attribute("protocol_fee_recipient", protocol_fee_config.fee_recipient)
+            .add_attribute("current_unbonding_period", unbonding_period.to_string())
+            .add_attribute("staker_address", staker_address)
+            .add_attribute("lst_address", lst_address)
+            .add_attribute("ucs03_zkgm_address", ucs03_zkgm_address)
+            .add_attribute("on_zkgm_call_proxy_address", on_zkgm_call_proxy_address),
+    ))
 }
 
 ///////////////
@@ -149,6 +163,11 @@ pub fn execute(
             // revoke_ownership_transfer(deps, env, info)
             todo!()
         }
+        ExecuteMsg::UpdateConfig {
+            protocol_fee_config,
+            monitors,
+            batch_period,
+        } => update_config(deps, info, protocol_fee_config, monitors, batch_period),
         ExecuteMsg::ReceiveRewards {} => receive_rewards(deps, info),
         ExecuteMsg::ReceiveUnstakedTokens { batch_id } => {
             receive_unstaked_tokens(deps, env, info, batch_id)
@@ -167,10 +186,7 @@ pub fn execute(
                 total_reward_amount: total_reward_amount.u128(),
             },
         ),
-        ExecuteMsg::SlashBatches { new_amounts } => {
-            // slash_batches(deps, info, new_amounts);
-            todo!()
-        }
+        ExecuteMsg::SlashBatches { new_amounts } => slash_batches(deps, info, new_amounts),
         ExecuteMsg::OnProxyOnZkgmCall(OnProxyOnZkgmCall { on_zkgm_msg, msg }) => {
             if deps.storage.read_item::<OnZkgmCallProxy>()? != info.sender {
                 return Err(ContractError::Unauthorized {
@@ -178,7 +194,7 @@ pub fn execute(
                 });
             }
 
-            // this is Call.message as sent from the source chain
+            // this is `Call.message` as sent from the source chain
             match from_json::<RemoteExecuteMsg>(msg)? {
                 RemoteExecuteMsg::Bond {
                     mint_to,
@@ -196,7 +212,7 @@ pub fn execute(
                     info,
                     amount.u128(),
                     Staker::Remote {
-                        // REVIEW: WHat address to use here?
+                        // REVIEW: What address to use here?
                         address: on_zkgm_msg.sender,
                         channel_id: on_zkgm_msg.destination_channel_id,
                         path: U256::from_be_bytes(on_zkgm_msg.path.to_be_bytes()),

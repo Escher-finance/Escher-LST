@@ -1,16 +1,12 @@
 use std::collections::BTreeMap;
 
-use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Uint128};
-use ibc_union_spec::ChannelId;
 use on_zkgm_call_proxy::OnProxyOnZkgmCall;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use unionlabs_primitives::{Bytes, H256};
+use unionlabs_primitives::H256;
 
 use crate::types::{
-    Batch, BatchExpectedAmount, BatchId, BatchStatus, ProtocolFeeConfig, Staker, UnstakeRequest,
-    UnstakeRequestKey,
+    Batch, BatchExpectedAmount, BatchId, BatchStatus, ProtocolFeeConfig, Staker, UnstakeRequestKey,
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -89,18 +85,17 @@ pub enum ExecuteMsg {
     /// Revokes ownership transfer; callable by the current owner.
     RevokeOwnershipTransfer {},
 
-    // TODO: Implement once basic functionality is complete
-    // /// Updates contract configuration; callable by the owner.
-    // UpdateConfig {
-    //     /// Updated protocol fee configuration.
-    //     protocol_fee_config: Option<ProtocolFeeConfig>,
+    /// Updates contract configuration; callable by the owner.
+    UpdateConfig {
+        /// Updated protocol fee configuration.
+        protocol_fee_config: Option<ProtocolFeeConfig>,
 
-    //     /// Updated list of circuit breaker monitors.
-    //     monitors: Option<Vec<String>>,
+        /// Updated list of circuit breaker monitors.
+        monitors: Option<Vec<Addr>>,
 
-    //     /// Updated unbonding batch execution frequency (in seconds).
-    //     batch_period: Option<u64>,
-    // },
+        /// Updated unbonding batch execution frequency (in seconds).
+        batch_period: Option<u64>,
+    },
     /// Receives rewards from the native chain.
     ReceiveRewards {},
 

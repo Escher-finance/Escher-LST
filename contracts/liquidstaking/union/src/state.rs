@@ -1,10 +1,7 @@
 use cosmwasm_std::{Addr, StdError, StdResult};
-use depolama::{
-    value::{ValueCodecViaEncoding, ValueUnitEncoding},
-    KeyCodec, Prefix, Store, ValueCodec,
-};
+use depolama::{value::ValueCodecViaEncoding, KeyCodec, Prefix, Store, ValueCodec};
 use unionlabs_encoding::Bincode;
-use unionlabs_primitives::{ByteArrayExt, Bytes, H256};
+use unionlabs_primitives::{ByteArrayExt, Bytes};
 
 use crate::types::{
     AccountingState, Batch, BatchId, Config, PendingOwner, ProtocolFeeConfig, UnstakeRequest,
@@ -63,24 +60,12 @@ pub enum Monitors {}
 
 impl Store for Monitors {
     const PREFIX: Prefix = Prefix::new(b"monitors");
-    type Key = Addr;
-    type Value = ();
-}
-
-impl KeyCodec<Addr> for Monitors {
-    fn encode_key(key: &Addr) -> Bytes {
-        key.as_bytes().into()
-    }
-
-    fn decode_key(raw: &Bytes) -> StdResult<Addr> {
-        String::from_utf8(raw.to_vec())
-            .map(Addr::unchecked)
-            .map_err(|e| StdError::generic_err(format!("invalid key: {e}")))
-    }
+    type Key = ();
+    type Value = Vec<String>;
 }
 
 impl ValueCodecViaEncoding for Monitors {
-    type Encoding = ValueUnitEncoding;
+    type Encoding = Bincode;
 }
 
 /// The address of the [`UCS03-ZKGM`] contract on this chain.

@@ -1,4 +1,4 @@
-use cosmwasm_std::{Deps, Order, StdResult};
+use cosmwasm_std::{Addr, Deps, Order, StdResult};
 use depolama::StorageExt;
 use itertools::Itertools;
 use unionlabs_primitives::H256;
@@ -27,9 +27,10 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         lst_address: deps.storage.read_item::<LstAddress>()?,
         monitors: deps
             .storage
-            .iter_range::<Monitors>(Order::Ascending, ..)
-            .map_ok(|(monitor, ())| monitor)
-            .collect::<Result<_, _>>()?,
+            .read_item::<Monitors>()?
+            .into_iter()
+            .map(Addr::unchecked)
+            .collect(),
         batch_period_seconds,
         stopped: deps.storage.read_item::<Stopped>()?,
     })
@@ -77,7 +78,7 @@ pub fn query_batches(
 pub fn query_batches_by_ids(deps: Deps, batch_ids: &[BatchId]) -> StdResult<BatchesResponse> {
     Ok(BatchesResponse {
         batches: batch_ids
-            .into_iter()
+            .iter()
             .map(|batch_id| {
                 deps.storage
                     .read::<Batches>(batch_id)

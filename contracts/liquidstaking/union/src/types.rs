@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::BTreeMap, num::NonZeroU64};
+use std::num::NonZeroU64;
 
 use cosmwasm_std::{StdError, StdResult};
 use ibc_union_spec::ChannelId;
@@ -82,14 +82,13 @@ impl BatchId {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
 pub struct Batch {
     /// Total amount of the LST to be burned in this batch
+    #[serde(with = "::serde_utils::string")]
     pub total_lst_to_burn: u128,
-
-    // TODO: This should be a separate mapping storage
-    pub liquid_unbond_requests: BTreeMap<Staker, LiquidUnbondRequest>,
 
     /// The length of the unstake requests list.
     ///
     /// Multiple unbond requests in a batch are aggregated into one unstake request per user.
+    #[serde(with = "::serde_utils::string")]
     pub unstake_requests_count: u64,
 
     pub state: BatchState,
@@ -98,9 +97,8 @@ pub struct Batch {
 impl Batch {
     pub fn new_pending(submit_time: u64) -> Self {
         Self {
-            total_lst_to_burn: 0_u128.into(),
+            total_lst_to_burn: 0,
             state: BatchState::Pending { submit_time },
-            liquid_unbond_requests: Default::default(),
             unstake_requests_count: 0,
         }
     }
@@ -155,10 +153,11 @@ pub enum BatchStatus {
     Received,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct BatchExpectedAmount {
-    pub batch_id: u64,
-    pub amount: u128,
+    pub batch_id: BatchId,
+    #[serde(with = "::serde_utils::string")]
+    pub expected_native_amount: u128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
@@ -170,7 +169,7 @@ pub struct LiquidUnbondRequest {
     pub redeemed: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[derive(Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
 pub struct Config {
     /// The denom of the native token to liquid stake against.
     ///
@@ -188,7 +187,7 @@ pub struct Config {
 /// operate the liquid staking protocol.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, bincode::Encode, bincode::Decode)]
 pub struct ProtocolFeeConfig {
-    // NOTE: Previously called `dao_treasury_fee`
+    #[serde(with = "::serde_utils::string")]
     pub fee_rate: u128, // not using a fraction, fee percentage=x/100000
 
     /// Address where the collected fees are sent.
