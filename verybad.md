@@ -28,6 +28,6 @@ data:
   status: pending
   total_liquid_stake: "4660596803"
   unbond_records_count: 4
-  ```
+```
 
 note that 4660596803 - 4660566803 = 30000, which is the amount we sent in the packet
