@@ -18,6 +18,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         native_token_denom,
         minimum_liquid_stake_amount,
         batch_period_seconds,
+        unbonding_period_seconds: unbonding_period,
     } = deps.storage.read_item::<ConfigStore>()?;
 
     Ok(ConfigResponse {
@@ -32,6 +33,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
             .map(Addr::unchecked)
             .collect(),
         batch_period_seconds,
+        unbonding_period,
         stopped: deps.storage.read_item::<Stopped>()?,
     })
 }

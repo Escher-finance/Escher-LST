@@ -192,6 +192,9 @@ pub struct Config {
 
     /// Time in seconds between each batch.
     pub batch_period_seconds: u64,
+
+    /// Unbonding period of the host chain in seconds.
+    pub unbonding_period_seconds: u64,
 }
 
 /// Config related to the fees collected by the contract to

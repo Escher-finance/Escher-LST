@@ -16,7 +16,6 @@ use crate::{
         resume_contract, slash_batches, submit_batch, transfer_ownership, unbond, update_config,
         withdraw,
     },
-    helpers::query_and_validate_unbonding_period,
     msg::{ExecuteMsg, InstantiateMsg, QueryMsg, RemoteExecuteMsg},
     query::{
         query_all_unstake_requests, query_batch, query_batches, query_batches_by_ids, query_config,
@@ -55,12 +54,10 @@ pub fn instantiate(
         admin,
         ucs03_zkgm_address,
         on_zkgm_call_proxy_address,
+        unbonding_period_seconds,
     } = msg;
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    let unbonding_period =
-        query_and_validate_unbonding_period(deps.as_ref(), batch_period_seconds)?;
 
     if protocol_fee_config.fee_rate > MAX_FEE_RATE {
         return Err(ContractError::InvalidProtocolFeeRate);
@@ -83,6 +80,7 @@ pub fn instantiate(
         native_token_denom: native_token_denom.clone(),
         minimum_liquid_stake_amount,
         batch_period_seconds,
+        unbonding_period_seconds,
     });
     deps.storage
         .write_item::<AccountingStateStore>(&AccountingState {
@@ -113,7 +111,10 @@ pub fn instantiate(
                 protocol_fee_config.fee_rate.to_string(),
             )
             .add_attribute("protocol_fee_recipient", protocol_fee_config.fee_recipient)
-            .add_attribute("current_unbonding_period", unbonding_period.to_string())
+            .add_attribute(
+                "current_unbonding_period",
+                unbonding_period_seconds.to_string(),
+            )
             .add_attribute("staker_address", staker_address)
             .add_attribute("lst_address", lst_address)
             .add_attribute("ucs03_zkgm_address", ucs03_zkgm_address)

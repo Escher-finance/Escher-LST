@@ -365,8 +365,9 @@ pub fn submit_batch(deps: DepsMut, env: Env) -> ContractResult<Response> {
             ..accounting_state
         });
 
-    let unbonding_period =
-        query_and_validate_unbonding_period(deps.as_ref(), config.batch_period_seconds)?;
+    // let unbonding_period =
+    //     query_and_validate_unbonding_period(deps.as_ref(), config.batch_period_seconds)?;
+    let unbonding_period = config.unbonding_period_seconds;
 
     // save previously pending batch as submitted
     deps.storage.write::<Batches>(

@@ -41,11 +41,16 @@ pub struct InstantiateMsg {
     pub ucs03_zkgm_address: Addr,
 
     pub on_zkgm_call_proxy_address: Addr,
+
+    #[serde(with = "::serde_utils::string")]
+    #[cfg_attr(feature = "schemars", schemars(with = "cosmwasm_std::Uint128"))]
+    pub unbonding_period_seconds: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[allow(clippy::large_enum_variant)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// Initiates the bonding process for a user.
     Bond {
@@ -134,6 +139,7 @@ pub enum ExecuteMsg {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum RemoteExecuteMsg {
     /// Initiates the bonding process for a user.
     Bond {
@@ -241,6 +247,7 @@ pub struct ConfigResponse {
     pub monitors: Vec<Addr>,
     pub lst_address: Addr,
     pub batch_period_seconds: u64,
+    pub unbonding_period: u64,
     pub stopped: bool,
 }
 
