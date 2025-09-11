@@ -15,8 +15,8 @@ pub enum ContractError {
     #[error("semver parse error: {0}")]
     SemverError(#[from] semver::Error),
 
-    #[error("unauthorized")]
-    Unauthorized {},
+    #[error("unauthorized: {sender}")]
+    Unauthorized { sender: cosmwasm_std::Addr },
 
     // Add any other custom errors you like here.
     // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.

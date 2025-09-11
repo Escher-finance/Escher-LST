@@ -23,6 +23,7 @@ embed-commit         = { workspace = true }
 enumorph             = { workspace = true }
 hex-literal          = { workspace = true }
 ibc                  = { workspace = true, features = ["borsh", "serde"] }
+on-zkgm-call-proxy   = { workspace = true }
 prost                = { workspace = true, features = ["derive"] }
 schemars             = { workspace = true, optional = true }
 semver               = { workspace = true }

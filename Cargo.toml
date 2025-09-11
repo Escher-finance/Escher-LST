@@ -46,6 +46,7 @@ thiserror        = { version = "1.0.58" }
 
 # unionlabs
 embed-commit         = { git = "https://github.com/unionlabs/union", default-features = false }
+on-zkgm-call-proxy   = { git = "https://github.com/unionlabs/union", default-features = false }
 unionlabs-primitives = { git = "https://github.com/unionlabs/union", default-features = false }
 
 # [dev-dependencies]

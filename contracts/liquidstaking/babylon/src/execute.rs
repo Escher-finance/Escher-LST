@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
-    DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
+    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo,
+    Response, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
 };
 use cw20::Cw20ReceiveMsg;
 use unionlabs_primitives::Bytes;
@@ -22,14 +22,14 @@ use crate::{
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, CONFIG,
-        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE,
-        STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
+        CONFIG, Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
+        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{batches, BatchStatus},
+        batch::{BatchStatus, batches},
         calc::{
             calculate_exchange_rate, calculate_fee_from_reward, check_slippage,
             get_last_epoch_block, get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
@@ -51,6 +51,7 @@ pub fn bond(
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     salt: Option<String>,
+    staker: String,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
@@ -95,7 +96,7 @@ pub fn bond(
         deps.storage,
         deps.querier,
         sender.to_string(),
-        sender.to_string(),
+        staker.clone(),
         delegator.clone(),
         payment.amount,
         env.block.time.nanos(),
@@ -115,7 +116,7 @@ pub fn bond(
     // create bond event here
     let bond_event = BondEvent(
         sender.to_string(),
-        sender.to_string(),
+        staker.clone(),
         payment.amount,
         bond_data.delegated_amount,
         bond_data.mint_amount,
@@ -143,7 +144,7 @@ pub fn bond(
         .add_attributes(vec![
             attr("action", "bond"),
             attr("from", sender.clone()),
-            attr("staker", sender.clone()),
+            attr("staker", staker),
             attr("recipient", recipient.unwrap_or(sender.into())),
             attr("channel_id", recipient_channel_id.unwrap_or(0).to_string()),
             attr("bond_amount", payment.amount.to_string()),
@@ -330,7 +331,9 @@ pub fn receive(
     let params = PARAMETERS.load(deps.storage)?;
     // make sure the sender is the cw20 contract because only cw20 contract can call this function
     if info.sender != params.cw20_address {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::Unauthorized {
+            sender: info.sender,
+        });
     }
 
     let state = STATE.load(deps.storage)?;
@@ -499,7 +502,9 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
 
     // make sure sender is the rewards contract
     if params.reward_address != info.sender {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::Unauthorized {
+            sender: info.sender,
+        });
     }
 
     let delegator = env.contract.address.clone();
@@ -981,7 +986,9 @@ pub fn on_zkgm(
     // only ucs03 relayer contract can call this callback function
     let params = PARAMETERS.load(deps.storage)?;
     if info.sender.to_string() != params.ucs03_relay_contract {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::Unauthorized {
+            sender: info.sender,
+        });
     }
 
     // return pause for temporary on version 0.1.194
@@ -1152,7 +1159,9 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     let config = CONFIG.load(deps.storage)?;
     // only liquid staking contract able to call this function
     if info.sender != config.lst_contract_address {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::Unauthorized {
+            sender: info.sender,
+        });
     }
 
     // first need to get this contract balance
@@ -1388,4 +1397,42 @@ pub fn remove_ibc_channel(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     crate::state::IBC_CHANNELS.remove(deps.storage, ibc_channel_id);
     Ok(Response::new())
+}
+
+/// Process unbond
+pub fn unbond(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _amount: Uint128,
+    _recipient: Option<String>,
+    _recipient_channel_id: Option<u32>,
+) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
+    let state = STATE.load(deps.storage)?;
+    if state.exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
+    //let params = PARAMETERS.load(deps.storage)?;
+
+    // let unstake_request_event = utils::delegation::unstake_request_in_batch(
+    //     env.clone(),
+    //     deps.storage,
+    //     sender.to_string(),
+    //     the_staker.clone(),
+    //     amount,
+    //     None,
+    //     recipient,
+    //     recipient_channel_id,
+    //     recipient_ibc_channel_id,
+    // )?;
+
+    let res: Response = Response::new();
+
+    Ok(res)
 }

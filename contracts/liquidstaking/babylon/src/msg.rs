@@ -5,6 +5,7 @@ use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint64, Uint128, Uint256};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use cw2::ContractVersion;
 use cw20::Cw20ReceiveMsg;
+use on_zkgm_call_proxy::OnProxyOnZkgmCall;
 use serde::{Deserialize, Serialize};
 use unionlabs_primitives::{Bytes, H256};
 
@@ -61,6 +62,8 @@ pub struct InstantiateMsg {
     pub transfer_fee: Uint128,
     // zkgm token_minter address as cw20 allowance spender
     pub zkgm_token_minter: String,
+    // zkgm proxy contract for handling remote zkgm call
+    pub zkgm_proxy_contract: Addr,
 }
 
 #[cw_serde]
@@ -189,6 +192,7 @@ pub enum ExecuteMsg {
     RemoveIbcChannel {
         ibc_channel_id: String,
     },
+    OnProxyOnZkgmCall(OnProxyOnZkgmCall),
 }
 
 #[cw_serde]
@@ -407,4 +411,20 @@ pub struct IBCChannel {
 #[cw_serde]
 pub struct IbcChannelId {
     pub channel_id: String,
+}
+
+#[cw_serde]
+pub enum RemoteExecuteMsg {
+    Bond {
+        slippage: Option<Decimal>,
+        expected: Uint128,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+        salt: Option<String>,
+    },
+    Unbond {
+        amount: Uint128,
+        recipient: Option<String>,
+        recipient_channel_id: Option<u32>,
+    },
 }

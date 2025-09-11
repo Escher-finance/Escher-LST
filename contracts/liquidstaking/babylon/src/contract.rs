@@ -1,22 +1,23 @@
 use cosmwasm_std::{
-    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, StdError, Uint128,
-    entry_point,
+    entry_point, from_json, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo,
+    Response, StdError, Uint128,
 };
 use cw2::set_contract_version;
+use on_zkgm_call_proxy::OnProxyOnZkgmCall;
 
 use crate::{
     error::ContractError,
     execute,
     instantiate::create_reward,
-    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
+    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, RemoteExecuteMsg},
     state::{
-        CONFIG, Config, OldParameters, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN,
-        REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, State, Status,
-        SupplyQueue, VALIDATORS_REGISTRY, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE,
-        WithdrawReward, unbond_record,
+        unbond_record, Config, OldParameters, Parameters, ParametersV0_1_194, State, Status,
+        SupplyQueue, ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID,
+        QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE,
+        VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
     },
     utils::{
-        batch::{Batch, batches},
+        batch::{batches, Batch},
         validation::{validate_quote_tokens, validate_validators},
     },
 };
@@ -95,6 +96,7 @@ pub fn instantiate(
         transfer_fee: msg.transfer_fee,
         transfer_handler: msg.transfer_handler,
         zkgm_token_minter: msg.zkgm_token_minter,
+        zkgm_proxy_contract: msg.zkgm_proxy_contract,
     };
     PARAMETERS.save(deps.storage, &params)?;
 
@@ -176,12 +178,13 @@ pub fn execute(
         } => execute::bond(
             deps,
             env,
-            info,
+            info.clone(),
             slippage,
             expected,
             recipient,
             recipient_channel_id,
             salt,
+            info.sender.to_string(), // local bond will set sender as staker
         ),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
@@ -277,6 +280,40 @@ pub fn execute(
         ExecuteMsg::RemoveIbcChannel { ibc_channel_id } => {
             execute::remove_ibc_channel(deps, info, ibc_channel_id)
         }
+        ExecuteMsg::OnProxyOnZkgmCall(OnProxyOnZkgmCall { on_zkgm_msg, msg }) => {
+            let params = PARAMETERS.load(deps.storage)?;
+            // only zkgm proxy contract is allowed to call this OnProxyOnZkgmCall
+            if params.zkgm_proxy_contract != info.sender {
+                return Err(ContractError::Unauthorized {
+                    sender: info.sender.clone(),
+                });
+            }
+
+            match from_json::<RemoteExecuteMsg>(msg)? {
+                RemoteExecuteMsg::Bond {
+                    slippage,
+                    expected,
+                    recipient,
+                    recipient_channel_id,
+                    salt,
+                } => execute::bond(
+                    deps,
+                    env,
+                    info,
+                    slippage,
+                    expected,
+                    recipient,
+                    recipient_channel_id,
+                    salt,
+                    on_zkgm_msg.sender.to_string(),
+                ),
+                RemoteExecuteMsg::Unbond {
+                    amount,
+                    recipient,
+                    recipient_channel_id,
+                } => execute::unbond(deps, env, info, amount, recipient, recipient_channel_id),
+            }
+        }
     }
 }
 
@@ -308,7 +345,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
                 None => env.contract.address.to_string(),
             };
 
-            let new_params = Parameters {
+            let new_params = ParametersV0_1_194 {
                 underlying_coin_denom: old_param.underlying_coin_denom,
                 liquidstaking_denom: old_param.liquidstaking_denom,
                 ucs03_relay_contract: old_param.ucs03_relay_contract,
