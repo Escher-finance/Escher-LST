@@ -55,8 +55,8 @@ const checkParams = async (lstContract: string) => {
 const runTransfer = async (receiver: string) => {
     console.log("Setting up contracts for network:", targetNetwork);
     let lst = "union17auke0f2l9uejk6wfkwvhlap3fxdqcdl8jkcmg6cmc53cnqrhekq7928m0";
-    let channel_id = 19;
-    let amount = "2000000";
+    let channel_id = 20;
+    let amount = "7000000000000000000";
     let hash = await transfer(targetNetwork, lst, amount, channel_id, receiver);
     console.log("Transfer hash:", hash);
 }
@@ -71,5 +71,7 @@ const runMigrate = async () => {
 
 // runUpload();
 // instantiate();
-runTransfer("0x1285a2214319Eff512C5035933ac44E573738772");
+runTransfer("0x4aAa51a0814D91F7D2B3Ab60829A921eC9Eb8e17");
 // runMigrate();
+
+// address: union1vnglhewf3w66cquy6hr7urjv3589srheampz42

@@ -29,7 +29,7 @@ export const initializeClient = async (network: SupportedNetworks): Promise<[Sig
     let rpc = Networks[network].rpc;
     if (!client) {
         client = await SigningCosmWasmClient.connectWithSigner(rpc, signer, {
-            gasPrice: GasPrice.fromString("1au"),
+            gasPrice: GasPrice.fromString("10000000000au"),
         });
     }
     return [client, userAddress];

@@ -143,7 +143,7 @@ export const transfer = async (targetNetwork: SupportedNetworks, contract: strin
 
     try {
         const msg = {
-            transfer_and_call: {
+            transfer: {
                 contract,
                 amount,
                 channel_id: hub_channel_id,
