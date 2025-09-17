@@ -24,8 +24,6 @@ export default function Transfer() {
     } = useGlobalContext();
 
 
-
-
     const transfer = async (ucs03Address: string, channelId: number, amount: string, baseToken: string, receiver: string, quoteToken: string) => {
         if (!userAddress) {
             return;

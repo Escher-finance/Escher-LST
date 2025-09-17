@@ -262,10 +262,10 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     }
   },
   "union-testnet": {
-    chainId: "union-testnet-9",
+    chainId: "union-testnet-10",
     chainName: "uniontestnet",
-    rest: "https://rest.testnet-9.union.build",
-    rpc: "https://rpc.testnet-9.union.build",
+    rest: "https://rest.rpc-node.union-testnet-10.union.build",
+    rpc: "https://rpc.rpc-node.union-testnet-10.union.build",
     stakeCurrency: currency["union-testnet"],
     bip44: {
       coinType: 118
@@ -281,22 +281,22 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     currencies: [currency["union-testnet"]],
     feeCurrencies: [currency["union-testnet"]],
     contracts: {
-      lst: "union1mdsv9vd9f0gjte83vauwjqsahxg4gte2mdkcxxex68p97h8a4txqq0k5ct",
-      cw20: "union1uf2jmjgaxwdxl5ttnwcef829lm2hgcxcxczyn93leuuhs4jrtm8sgse85m",
+      lst: "union1d2r4ecsuap4pujrlf3nz09vz8eha8y0z25knq0lfxz4yzn83v6kq0jxsmk",
+      cw20: "union1eueueueu9var4yhdruyzkjcsh74xzeug6ckyy60hs0vcqnzql2hq0lxc2f",
       reward: "union14nt98pl3edsgd4lu56m3yndervtp9z3qvyp0wmqkx6tmmse5ufnsrct8pc",
     },
-    gasPrice: "0.0025muno",
+    gasPrice: "10000000000au",
     escher: {
-      lst: "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g",
-      ucs03: "osmo1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292qs2uecc",
+      lst: "union1d2r4ecsuap4pujrlf3nz09vz8eha8y0z25knq0lfxz4yzn83v6kq0jxsmk",
+      ucs03: "union1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292qpe64fh",
       babyDenom: "ibc/EC3A4ACBA1CFBEE698472D3563B70985AEA5A7144C319B61B3EBDFB57B5E1535",
       ebabyDenom: "factory/osmo12r3yc76u9lxe33yemstatnw8602culdjzrtr8lmnpycmd3z7d4jsxx60kc/FwNhFaW3zLxoLUgXCdWjqBzcvGNPaB7B2XZqm2xgrB93",
-      tokenMinter: "osmo12r3yc76u9lxe33yemstatnw8602culdjzrtr8lmnpycmd3z7d4jsxx60kc",
+      tokenMinter: "union1t5awl707x54k6yyx7qfkuqp890dss2pqgwxh07cu44x5lrlvt4rs8hqmk0",
       channel: {
-        "holesky": {
+        "babylon": {
           sourceIbcChannelId: "channel-101635",
-          sourceChannelId: 1,
-          destinationChannelId: 4,
+          sourceChannelId: 21,
+          destinationChannelId: 8,
           destinationIbcChannelId: "channel-3"
         }
       }
