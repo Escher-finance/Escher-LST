@@ -1,232 +1,176 @@
-import { err, ok, ResultAsync, type Result } from "neverthrow"
-import { fromHex, Hex, isHex } from "viem";
-import { graphql } from "gql.tada";
-import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 
-const GRAQPHQL_URL = "https://staging.graphql.union.build/v1/graphql";
+import { TokenOrderV2Abi, TokenOrderV2, Call, CallAbi, Batch, Schema as Ucs03Schema } from "@unionlabs/sdk/Ucs03";
+import { Address, encodeAbiParameters, Hex, toHex } from "viem";
+import { ChainRegistry } from "@unionlabs/sdk/ChainRegistry";
+import { UniversalChainId } from "@unionlabs/sdk/schema/chain";
+import { TokenOrder, Ucs03, Ucs05, Utils } from "@unionlabs/sdk";
+import { Effect, pipe, Schema } from "effect";
+import { getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/utils";
+import { ChannelId } from "@unionlabs/sdk/schema/channel";
 
+const U_FROM_UNION_SOLVER_METADATA_TESTNET = "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000014ba5ed44733953d79717f6269357c77718c8ba5ed0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
-export function getTimestamp() {
-    const current = Date.now();
-    let timestamp = current + 900000;
-    timestamp = timestamp * 10000000;
-    return timestamp
-}
-
-const cosmosChainId: string[] = [
-    "elgafar-1",
-    "osmo-test-5",
-    "union-testnet-9",
-    "stride-internal-1",
-    "bbn-test-5",
-    "union-testnet-8"
-];
+const TOKEN_ORDER_KIND_SOLVE = 3;
+const TOKEN_ORDER_V2_VERSION = 2;
+export const OP_CODE_CALL = 1;
+const OP_CODE_TOKEN_ORDER_V2 = 3;
+export const INSTR_VERSION_ZERO = 0;
 
 
-export type CosmosChainId = `${(typeof cosmosChainId)[number]}`
+export const tokenOrderV2 = (
+    sender: string,
+    receiver: string,
+    baseToken: string,
+    baseAmount: bigint,
+    quoteToken: `0x${string}`,
+    quoteAmount: bigint,
+) => {
 
-export const cosmosRpcs: Record<CosmosChainId, string> = {
-    "elgafar-1": "https://rpc.elgafar-1.stargaze.chain.kitchen",
-    "osmo-test-5": "https://rpc.osmo-test-5.osmosis.chain.kitchen",
-    "union-testnet-9": "https://rpc.union-testnet-9.union.chain.kitchen",
-    "union-testnet-8": "https://rpc.union-testnet-8.union.chain.kitchen",
-    "stride-internal-1": "https://rpc.stride-internal-1.stride.chain.kitchen",
-    "bbn-test-5": "https://rpc.bbn-test-5.babylon.chain.kitchen"
-}
+    let senderHex = sender.startsWith("0x") ? sender as Hex : toHex(sender);
+    let receiverHex = receiver.startsWith("0x") ? receiver as Hex : toHex(receiver);
+    let baseTokenHex = baseToken.startsWith("0x") ? baseToken as Hex : toHex(baseToken);
 
-export const getRecommendedChannels = async () => {
-    const query = `query MyQuery {
-                           v1_ibc_union_channel_recommendations(
-                                where: 
-                                {
-                                source_chain_id: {_eq: "union-testnet-9"}
-                                version: {_eq: "ucs03-zkgm-0"}
-                                }
-                            ) {
-                                destination_chain_id
-                                destination_channel_id
-                                destination_port_id
-                                destination_connection_id
-                                source_chain_id
-                                source_channel_id
-                                source_connection_id
-                                source_port_id
-                            }
-                        }
-                `;
-
-
-    const response = await fetch(GRAQPHQL_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-            query,
-        })
+    let tokenOrderV2: TokenOrderV2 = TokenOrderV2.make({
+        opcode: OP_CODE_TOKEN_ORDER_V2,
+        version: TOKEN_ORDER_V2_VERSION,
+        operand: [
+            senderHex,
+            receiverHex,
+            baseTokenHex,
+            baseAmount,
+            quoteToken,
+            quoteAmount,
+            TOKEN_ORDER_KIND_SOLVE,
+            U_FROM_UNION_SOLVER_METADATA_TESTNET]
     });
 
-    if (!response.ok) {
-        throw new Error(`Response status: ${response.status}`);
-    }
-    const res = await response.json();
-    console.log(JSON.stringify(res));
-
-    return res.data.v1_ibc_union_channel_recommendations;
+    return tokenOrderV2;
 }
 
-export type Channel = {
-    source_chain_id: string
-    source_port_id: string
-    source_channel_id: number
-    source_connection_id: number
-    destination_chain_id: string
-    destination_port_id: string
-    destination_channel_id: number
-    destination_connection_id: number
+export const encodeTokenOrderV2 = (instruction: TokenOrderV2) => {
+    return encodeAbiParameters(TokenOrderV2Abi(), instruction.operand);
 }
 
-export const getChannelInfo = (
-    source_chain_id: string,
-    destination_chain_id: string,
-    channels: Awaited<ReturnType<typeof getRecommendedChannels>>
-): Channel | null => {
-    let rawChannel = channels.find(
-        (chan: any) =>
-            chan.source_chain_id === source_chain_id && chan.destination_chain_id === destination_chain_id
-    )
-    if (
-        // Validate that all required fields are included by the garphql api.
-        !rawChannel ||
-        rawChannel.source_connection_id === null ||
-        rawChannel.source_channel_id === null ||
-        !rawChannel.source_port_id ||
-        rawChannel.destination_connection_id === null ||
-        rawChannel.destination_channel_id === null ||
-        !rawChannel.destination_port_id
-    ) {
-        return null
-    }
 
-    let source_port_id = String(rawChannel.source_port_id)
-    if (source_port_id.length < 4) return null
-    source_port_id = source_port_id.slice(2)
 
-    let destination_port_id = String(rawChannel.destination_port_id)
-    if (destination_port_id.length < 4) return null
-    destination_port_id = destination_port_id.slice(2)
+export const callInstruction = (
+    sender: string,
+    contractAddress: string,
+    payload: `0x${string}`,
+) => {
 
-    return {
-        source_chain_id,
-        source_connection_id: rawChannel.source_connection_id,
-        source_channel_id: rawChannel.source_channel_id,
-        source_port_id,
-        destination_chain_id,
-        destination_connection_id: rawChannel.destination_connection_id,
-        destination_channel_id: rawChannel.destination_channel_id,
-        destination_port_id
-    }
+    let senderHex = sender.startsWith("0x") ? sender as Hex : toHex(sender);
+    let contractAddressHex = contractAddress.startsWith("0x") ? contractAddress as Hex : toHex(contractAddress);
+
+    let call: Call = Call.make({
+        opcode: OP_CODE_CALL,
+        version: INSTR_VERSION_ZERO,
+        operand: [
+            senderHex,
+            false,
+            contractAddressHex,
+            payload
+        ]
+    });
+
+    return call;
 }
 
-const tokenWrappingQuery = graphql(/*  GraphQL */ `
-    query QueryTokenWrapping(
-      $source_chain_id: String!
-      $base_token: String!
-      $destination_channel_id: Int!
-    ) {
-      v1_ibc_union_tokens(where: {_and: {chain: {chain_id: {_eq: $source_chain_id}}, denom: {_eq: $base_token}, wrapping: {_and: {index: {_eq: 0}, destination_channel_id: {_eq: $destination_channel_id}}}}}) {
-        denom
-        wrapping {
-          destination_channel_id
-          unwrapped_chain {
-            chain_id
-          }
-          unwrapped_address_hex
-        }
-      }
-    }
-    
-    `)
+
+export const encodeCall = (call: Call) => {
+    return encodeAbiParameters(CallAbi(), call.operand);
+}
 
 
 
-export const getQuoteToken = async (
-    source_chain_id: string,
-    base_token: Hex,
-    channel: Channel
-): Promise<
-    Result<
-        { quote_token: string; type: "UNWRAPPED" | "NEW_WRAPPED" } | { type: "NO_QUOTE_AVAILABLE" },
-        Error
-    >
-> => {
-    // check if the denom is wrapped
-    const { request } = await import("graphql-request");
-    let wrapping: any = await ResultAsync.fromPromise(
-        request(GRAQPHQL_URL, tokenWrappingQuery, {
-            base_token,
-            destination_channel_id: channel.source_channel_id, // not a mistake! because we're unwrapping
-            source_chain_id
-        }),
-        error => {
-            console.error("@unionlabs/client-[getQuoteToken]", error)
-            return new Error("failed to get quote token from graphql", { cause: error })
-        }
-    )
 
-    if (wrapping.isErr()) {
-        return err(wrapping.error)
-    }
+export const getInstructionBatch = (
+    instructions: [Ucs03Schema, ...Ucs03Schema[]]
+) => {
 
-    let wrappingTokens = wrapping.value.v1_ibc_union_tokens
+    const batch = Batch.make({
+        operand: instructions
+    })
 
-    // if it is, quote token is the unwrapped verison of the wrapped token.
-    if (wrappingTokens.length > 0) {
-        let quote_token = wrappingTokens.at(0)?.wrapping.at(0)?.unwrapped_address_hex
-        if (quote_token) {
-            return ok({ type: "UNWRAPPED", quote_token })
-        }
-    }
+    return batch;
+}
 
-    // if it is unknown, calculate the quotetoken
-    // cosmos quote token prediction
-    if (cosmosChainId.includes(channel.destination_chain_id)) {
-        let rpc = cosmosRpcs[channel.destination_chain_id as CosmosChainId] // as is valid bc of the check in the if statement.
+interface GetSendbackCallMsgParams {
+    sender: Address
+    receiver: string
+    minAmount: bigint
+    baseToken: string
+    quoteToken: string
+    metadata: `0x${string}`
+    channel_id: ChannelId
+    ucs03: `${string}1${string}`
+}
 
-        let publicClient = await ResultAsync.fromPromise(CosmWasmClient.connect(rpc), error => {
-            return new Error(`failed to create public cosmwasm client with rpc ${rpc}`, { cause: error })
+const JsonFromBase64 = Schema.compose(
+    Schema.StringFromBase64,
+    Schema.parseJson(),
+)
+
+export const getSendbackCallMsg = (params: GetSendbackCallMsgParams) =>
+    Effect.gen(function* () {
+
+        const UCS03_ZKGM = Ucs05.CosmosDisplay.make({
+            address: params.ucs03,
+        });
+        const SENDER = Ucs05.EvmDisplay.make({
+            address: params.sender,
         })
+        const MIN_MINT_AMOUNT = params.minAmount;
+        const ETHEREUM_CHAIN_ID = UniversalChainId.make("ethereum.17000");
+        const UNION_CHAIN_ID = UniversalChainId.make("union.union-testnet-10");
 
-        if (publicClient.isErr()) {
-            return err(publicClient.error)
-        }
+        const ethereumChain = yield* ChainRegistry.byUniversalId(ETHEREUM_CHAIN_ID);
+        const unionChain = yield* ChainRegistry.byUniversalId(UNION_CHAIN_ID);
 
-        let client = publicClient.value
+        const salt = yield* Utils.generateSalt("cosmos");
 
-        let predictedQuoteToken = await ResultAsync.fromPromise(
-            client.queryContractSmart(fromHex(`0x${channel.destination_port_id}`, "string"), {
-                predict_wrapped_token: {
-                    path: "0",
-                    channel: channel.destination_channel_id,
-                    token: base_token
-                }
+        const sendCall = yield* pipe(
+            TokenOrder.make({
+                source: unionChain,
+                destination: ethereumChain,
+                sender: Ucs05.CosmosDisplay.make({
+                    address: params.receiver as '`${string}1${string}`',
+                }),
+                receiver: SENDER,
+                baseToken: params.baseToken,
+                baseAmount: MIN_MINT_AMOUNT,
+                quoteToken: params.quoteToken,
+                quoteAmount: MIN_MINT_AMOUNT,
+                kind: "solve",
+                metadata: params.metadata,
+                version: 2,
             }),
-            error => {
-                return new Error("failed to query predict wrapped denom", { cause: error })
-            }
-        ).andThen(res =>
-            res?.wrapped_token && isHex(res?.wrapped_token) && res?.wrapped_token.length > 2
-                ? ok(res.wrapped_token)
-                : err(new Error(`no wrapped token in response: ${JSON.stringify(res)}`))
+            Effect.flatMap(TokenOrder.encodeV2),
+            Effect.flatMap(Schema.encode(Ucs03.Ucs03WithInstructionFromHex)),
+            Effect.map((instruction) => ({
+                send: {
+                    channel_id: params.channel_id,
+                    timeout_height: BigInt(0).toString(),
+                    timeout_timestamp: getTimeoutInNanoseconds24HoursFromNow().toString(),
+                    salt,
+                    instruction,
+                },
+            } as const)),
+            Effect.flatMap(Schema.encode(JsonFromBase64)),
+            Effect.map((msg) => ({
+                wasm: {
+                    execute: {
+                        contract_addr: UCS03_ZKGM.address,
+                        msg,
+                        funds: [],
+                    },
+                },
+            })),
         )
+        return sendCall
+    }).pipe(
+        Effect.provide(ChainRegistry.Default),
+    );
 
-        if (predictedQuoteToken.isErr()) {
-            return err(predictedQuoteToken.error)
-        }
 
-        return ok({ type: "NEW_WRAPPED", quote_token: predictedQuoteToken.value })
-    }
 
-    return err(new Error("unknown chain in token prediction"))
-}

@@ -3,8 +3,8 @@ import { useState } from "react";
 
 import { Button, Input, Form, SelectItem, Select } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
-import { getSalt } from "@/app/lib/salt";
-import { getTimestamp, getRecommendedChannels, getChannelInfo, getQuoteToken } from "@/app/lib/ucs03";
+import { getSalt, getTimestamp } from "@/app/lib/utils";
+import { getRecommendedChannels, getChannelInfo, getQuoteToken } from "@/app/lib/ucs03_helpers";
 import { toHex } from "viem";
 import { fromHex } from "viem";
 

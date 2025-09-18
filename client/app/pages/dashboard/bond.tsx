@@ -9,7 +9,8 @@ import {
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
 import { useState } from "react";
-import { getSalt, toHex } from "@/app/lib/salt";
+import { getSalt } from "@/app/lib/utils";
+import { toHex } from "viem";
 
 interface KeyProps {
   stateKey: number;
@@ -43,7 +44,7 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const amount = formEntries.amount.toString();
-    const recipient = formEntries.recipient.toString();
+    let recipient = formEntries.recipient.toString();
     const recipient_channel_id = formEntries.recipient_channel_id.toString();
 
     const expected = Math.floor(Number(amount) / liquidity.exchange_rate);
@@ -51,16 +52,12 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
     const recipient_hex = toHex(encoder.encode(recipient));
 
 
-    // recipient: recipient == "" ? null : recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
-    // recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
-
     const msg = {
       bond: {
         salt: getSalt(),
         expected: expected.toString(),
-        recipient: recipient == "" ? null : recipient.indexOf("bbn") != -1 ? recipient : recipient_hex,
+        recipient: recipient == "" ? null : recipient.indexOf("0x") == -1 ? recipient_hex : recipient,
         recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
-
       },
     };
 

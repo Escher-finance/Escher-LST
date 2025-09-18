@@ -10,10 +10,8 @@ import { useState } from "react";
 import Liquidity from "./liquidity";
 import { useGlobalContext } from "@/app/core/context";
 import IbcBond from "./ibc_bond";
-import ZkgmUnbond from "./zkgm_unbond";
-import TransferEbabyFromOsmosis from "./transfer_ebaby_from_osmosis";
-import TransferEbabyToOsmosis from "./transfer_ebaby_to_osmosis";
-import DualTransferToOsmosis from "./dual_transfer_to_osmosis";
+import TransferU from "./transfer_u";
+//import ZkgmUnbond from "./zkgm_unbond";
 
 export default function Dashboard() {
   const { network } = useGlobalContext();
@@ -32,7 +30,7 @@ export default function Dashboard() {
           <h1 className="p-3 text-2xl">Escher Liquid Staking</h1>
           <Chip><Link onPress={refresh}>Refresh</Link></Chip>
         </div>
-        {network?.chainId.indexOf("osmo") == -1 &&
+        {network?.chainId.indexOf("babylon") != -1 &&
           <div className="flex flex-col">
 
             <div className="grid grid-cols-2 gap-4">
@@ -54,14 +52,6 @@ export default function Dashboard() {
                 <Unbond stateKey={stateKey} setStateKey={setStateKey} />
               </Tab>
 
-              <Tab key="ebaby_transfer_to_osmosis" title="Transfer eBaby to Osmosis" >
-                <TransferEbabyToOsmosis />
-              </Tab>
-
-              <Tab key="dual_transfer_to_osmosis" title="Transfer Baby & eBaby to Osmosis" >
-                <DualTransferToOsmosis />
-              </Tab>
-
             </Tabs>
 
           </div>
@@ -72,11 +62,17 @@ export default function Dashboard() {
             <Tab key="ibc_bond" title="IbcBond" >
               <IbcBond stateKey={stateKey} setStateKey={setStateKey} />
             </Tab>
-            <Tab key="zkgm_unbond" title="ZKGM Unbond" >
+            {/* <Tab key="zkgm_unbond" title="ZKGM Unbond" >
               <ZkgmUnbond stateKey={stateKey} setStateKey={setStateKey} />
-            </Tab>
-            <Tab key="transfer_to_babylon" title="Transfer Ebaby To Babylon" >
-              <TransferEbabyFromOsmosis />
+            </Tab> */}
+
+          </Tabs>
+        }
+
+        {network?.chainId.indexOf("union") != -1 &&
+          <Tabs className="mt-10 p-3">
+            <Tab key="ibc_bond" title="IbcBond" >
+              <TransferU stateKey={stateKey} setStateKey={setStateKey} />
             </Tab>
 
           </Tabs>
