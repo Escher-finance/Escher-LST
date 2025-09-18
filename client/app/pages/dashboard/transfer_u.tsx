@@ -8,14 +8,13 @@ import {
     Input,
     Select,
     SelectItem
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
-import { encodeAbiParameters, Hex, toHex } from "viem";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/utils";
-import { encodeTokenOrderV2, tokenOrderV2 } from "@/app/lib/ucs03";
-import { InstructionAbi } from "@unionlabs/sdk/Ucs03";
+import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2 } from "@/app/lib/ucs03";
+import { Instruction } from "@unionlabs/sdk/Ucs03";
 import { getSalt } from "@/app/lib/utils";
 import { useState } from "react";
 
@@ -32,26 +31,26 @@ export const chains = [
 ];
 
 
-const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
-    let allowanceMsg = {
-        increase_allowance: {
-            spender,
-            amount,
-        }
-    }
-    console.log(JSON.stringify(allowanceMsg));
-    const executeAllowanceMsg = {
-        typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
-        value: MsgExecuteContract.fromPartial({
-            sender,
-            contract,
-            msg: toUtf8(JSON.stringify(allowanceMsg)),
-            funds: []
-        }),
-    };
+// const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
+//     let allowanceMsg = {
+//         increase_allowance: {
+//             spender,
+//             amount,
+//         }
+//     }
+//     console.log(JSON.stringify(allowanceMsg));
+//     const executeAllowanceMsg = {
+//         typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+//         value: MsgExecuteContract.fromPartial({
+//             sender,
+//             contract,
+//             msg: toUtf8(JSON.stringify(allowanceMsg)),
+//             funds: []
+//         }),
+//     };
 
-    return executeAllowanceMsg;
-}
+//     return executeAllowanceMsg;
+// }
 
 interface KeyProps {
     stateKey: number;
@@ -62,10 +61,9 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
     const { userAddress, client, network } = useGlobalContext();
     const [isLoading, setIsLoading] = useState(false);
 
-    const base_denom = network?.escher?.ebabyDenom;
     const ucs03_contract = network?.escher?.ucs03;
-    const receiver = "0x15Ee7c367F4232241028c36E720803100757c6e9"
-    const zkgm_token_minter = network?.escher?.tokenMinter;
+    const receiver = "0x15Ee7c367F4232241028c36E720803100757c6e9";
+    //const zkgm_token_minter = network?.escher?.tokenMinter;
 
 
     const handleSubmit = async (e: any) => {
@@ -76,8 +74,10 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
         const formData = new FormData(form);
         const formEntries = Object.fromEntries(formData.entries());
         const amount = BigInt(formEntries.amount.toString());
-        const recipient = formEntries.receiver.toString();
+        const recipient = formEntries.recipient.toString();
         const destination_chain = formEntries.destination_chain.toString();
+
+        console.log(JSON.stringify(formEntries));
 
         const channel_id = network?.escher?.channel[destination_chain]?.sourceChannelId;
 
@@ -85,9 +85,8 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
             alert("Please connect your wallet");
             return;
         }
-        const executeAllowanceMsg = getExecuteAllowanceMsg(formEntries.denom.toString(), userAddress, zkgm_token_minter, amount.toString());
 
-        let testnet = network?.chainName?.toLowerCase().includes("testnet");
+        //let testnet = network?.chainName?.toLowerCase().includes("testnet");
 
         const quoteToken = network?.escher?.channel[destination_chain].nativeQuoteToken;
         if (!quoteToken || !network?.escher?.nativeBaseToken) {
@@ -97,27 +96,32 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
         let tokenOrder =
             tokenOrderV2(userAddress.toLowerCase(), recipient, network?.escher?.nativeBaseToken, amount, quoteToken as '0x${string}', amount);
 
-        const timeout_timestamp = getTimeoutInNanoseconds24HoursFromNow().toString();
+        console.log("opcode:", tokenOrder.opcode);
+        console.log("version:", tokenOrder.version);
 
+        const timeout_timestamp = getTimeoutInNanoseconds24HoursFromNow().toString();
+        const instruction = Instruction.make({
+            opcode: 3,
+            version: 2,
+            operand: encodeTokenOrderV2(tokenOrder),
+        });
+
+        console.log(instruction);
         let msg = {
             send: {
                 channel_id,
                 timeout_height: "0",
                 timeout_timestamp,
                 salt: getSalt(),
-                instruction: encodeAbiParameters(InstructionAbi(), [
-                    tokenOrder.opcode,
-                    tokenOrder.version,
-                    encodeTokenOrderV2(tokenOrder)
-                ])
+                instruction: encodeInstruction(instruction),
             },
         }
 
         console.log("msg", JSON.stringify(msg));
 
         let funds = [{
-            denom: "ubbn",
-            amount: testnet ? "10000" : "100"
+            denom: network?.stakeCurrency.coinMinimalDenom,
+            amount: amount.toString()
         }]
 
         const executeTransferMsg = {
@@ -133,7 +137,7 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
 
         console.log(JSON.stringify(msg));
         try {
-            const res = await client?.signAndBroadcast(userAddress, [executeAllowanceMsg, executeTransferMsg], "auto", "transfer ebaby from babylon to osmosis");
+            const res = await client?.signAndBroadcast(userAddress, [executeTransferMsg], "auto", "transfer u");
             alert(res?.transactionHash);
             let newKey = stateKey + 1;
             setStateKey(newKey);
@@ -157,17 +161,11 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
                         />
                         <Input
                             isRequired
-                            name="denom"
-                            label="Denom"
-                            defaultValue={base_denom}
-                        />
-                        <Input
-                            isRequired
                             name="recipient"
                             label="Recipient"
                             defaultValue={receiver}
                         />
-                        <Select className="max-w-xs" label="Select destination chain" variant="flat">
+                        <Select className="max-w-xs" label="Select destination chain" variant="flat" name="destination_chain">
                             {chains.map((chain) => (
                                 <SelectItem key={chain.key}>{chain.label}</SelectItem>
                             ))}
