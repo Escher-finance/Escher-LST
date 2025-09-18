@@ -1,7 +1,7 @@
 "use client";
 
 
-import { Card, CardBody, CardHeader, Divider } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, Divider } from "@heroui/react";
 import { useState, useEffect } from "react";
 import { useGlobalContext } from "@/app/core/context";
 import { IndexedTx } from "@cosmjs/stargate";

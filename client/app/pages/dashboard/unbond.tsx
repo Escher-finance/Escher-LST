@@ -6,7 +6,7 @@ import {
   CardFooter,
   Button,
   Input,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import { getExecuteContractMessage } from "@/utils/msg";
 import { useState } from "react";

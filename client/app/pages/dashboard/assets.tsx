@@ -1,7 +1,7 @@
 "use client";
 
 
-import { Button, Card, CardBody, CardHeader, Chip, Divider, Tooltip } from "@nextui-org/react";
+import { Button, Card, CardBody, CardHeader, Chip, Divider, Tooltip } from "@heroui/react";
 import { useState, useEffect } from "react";
 import { useGlobalContext } from "@/app/core/context";
 

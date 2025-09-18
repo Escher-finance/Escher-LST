@@ -7,7 +7,7 @@ import {
   DropdownMenu,
   DropdownItem,
   Button,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { BaseNetworks, ChainConfig } from "@/config/networks.config";
 import { useGlobalContext } from "@/app/core/context";
 import { LocalStorage } from "@/app/lib/localstorage";

@@ -4,7 +4,7 @@ import {
   CardBody,
   Button,
   Input,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import { http } from "viem"
 import { holesky } from "viem/chains";
