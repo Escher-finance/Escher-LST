@@ -36,7 +36,7 @@ contract BasedeU is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    function allowMarketMakers() external pure override returns (bool) {
+    function allowMarketMakers() external pure returns (bool) {
         return false;
     }
 
