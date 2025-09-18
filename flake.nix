@@ -99,10 +99,12 @@
           };
 
           packages = {
-            liquidstaking-babylon = crane.buildWasmContract "contracts/liquidstaking/babylon" { };
-            # liquidstaking-union = crane.buildWasmContract "contracts/liquidstaking/union" { };
-            reward = crane.buildWasmContract "contracts/reward" { };
-            cw20-base = crane.buildWasmContract "contracts/cw20-base" { };
+            liquidstaking-babylon =
+              crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/liquidstaking/babylon"
+                { };
+            # liquidstaking-union = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/liquidstaking/union" { };
+            reward = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/reward" { };
+            cw20-base = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/cw20-base" { };
           };
 
           checks = {

@@ -4,7 +4,11 @@
         "module": "commonjs",
         "outDir": "dist",
         "strict": true,
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "baseUrl": ".",
+        "paths": {
+            "@Babylon-LST/*": ["../cosmwasm/Babylon-LST/*"]
+        }
     },
     "include": [
         "src/**/*.ts"
