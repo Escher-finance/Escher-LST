@@ -1,5 +1,5 @@
 
-import { TokenOrderV2Abi, TokenOrderV2, Call, CallAbi, Batch, Schema as Ucs03Schema } from "@unionlabs/sdk/Ucs03";
+import { TokenOrderV2Abi, TokenOrderV2, Call, CallAbi, Batch, Schema as Ucs03Schema, InstructionAbi, Instruction } from "@unionlabs/sdk/Ucs03";
 import { Address, encodeAbiParameters, Hex, toHex } from "viem";
 import { ChainRegistry } from "@unionlabs/sdk/ChainRegistry";
 import { UniversalChainId } from "@unionlabs/sdk/schema/chain";
@@ -51,6 +51,12 @@ export const encodeTokenOrderV2 = (instruction: TokenOrderV2) => {
     return encodeAbiParameters(TokenOrderV2Abi(), instruction.operand);
 }
 
+
+export const encodeInstruction = (instruction: Instruction) => {
+    return encodeAbiParameters(
+        InstructionAbi(),
+        [instruction.version, instruction.opcode, instruction.operand] as const);
+}
 
 
 export const callInstruction = (
