@@ -5,7 +5,7 @@ import { useState } from "react";
 import {
     Button,
     Textarea,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import { MsgTransfer } from "cosmjs-types/ibc/applications/transfer/v1/tx";
 

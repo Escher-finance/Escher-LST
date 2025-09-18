@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardBody } from "@nextui-org/react";
+import { Card, CardBody } from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import Dashboard from "./pages/dashboard/page";
 

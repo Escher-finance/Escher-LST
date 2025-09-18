@@ -4,7 +4,7 @@ import "@/styles/globals.css";
 import { fontSans } from "@/config/fonts";
 import { Providers } from "./providers";
 import { Navbar } from "@/components/navbar";
-import { Link } from "@nextui-org/link";
+import { Link } from "@heroui/link";
 import clsx from "clsx";
 import { GlobalContextProvider } from "@/app/core/context/GlobalContext";
 

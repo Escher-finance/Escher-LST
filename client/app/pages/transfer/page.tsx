@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-import { Button, Input, Form, SelectItem, Select } from "@nextui-org/react";
+import { Button, Input, Form, SelectItem, Select } from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import { getSalt, getTimestamp } from "@/app/lib/utils";
 import { getRecommendedChannels, getChannelInfo, getQuoteToken } from "@/app/lib/ucs03_helpers";

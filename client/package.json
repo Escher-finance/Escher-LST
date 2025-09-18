@@ -13,11 +13,13 @@
     "@cosmjs/cosmwasm-stargate": "^0.33.1",
     "@cosmjs/proto-signing": "^0.33.1",
     "@cosmjs/stargate": "^0.33.1",
-    "@nextui-org/link": "^2.2.5",
-    "@nextui-org/navbar": "^2.2.5",
-    "@nextui-org/react": "^2.6.8",
-    "@nextui-org/select": "^2.4.9",
-    "@nextui-org/theme": "^2.1.10",
+    "@effect/experimental": "^0.54.6",
+    "@effect/platform": "^0.90.10",
+    "@heroui/link": "2.2.22",
+    "@heroui/navbar": "2.2.24",
+    "@heroui/react": "2.8.4",
+    "@heroui/select": "2.4.27",
+    "@heroui/theme": "2.4.22",
     "@react-aria/visually-hidden": "^3.8.3",
     "@types/node": "20.5.7",
     "@types/react": "^18.2.30",
@@ -56,5 +58,6 @@
     "effect": "^3.17.13",
     "tailwind-variants": "0.1.20",
     "tailwindcss": "3.4.16"
-  }
+  },
+  "packageManager": "yarn@4.9.4"
 }

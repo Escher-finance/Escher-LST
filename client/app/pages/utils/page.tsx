@@ -4,7 +4,7 @@ import { useState } from "react";
 import InstantiateCW20 from "./instantiate_cw20";
 import ContractUpload from "./upload";
 import InstantiateLiquidStaking from "./instantiate_lst";
-import { Accordion, Button, AccordionItem } from "@nextui-org/react";
+import { Accordion, Button, AccordionItem } from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import SetParams from "./set_params";
 import SetMinter from "./set_minter";

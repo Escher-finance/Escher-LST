@@ -7,7 +7,7 @@ import {
     Button,
     Input,
     user,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 
 export default function InstantiateDebugger() {

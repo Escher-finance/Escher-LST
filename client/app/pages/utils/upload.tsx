@@ -4,7 +4,7 @@ import {
   Card,
   CardBody,
   Button,
-} from "@nextui-org/react";
+} from "@heroui/react";
 
 import { useGlobalContext } from "@/app/core/context";
 

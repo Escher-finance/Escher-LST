@@ -3,7 +3,7 @@
 import Bond from "./bond";
 import Unbond from "./unbond";
 import Assets from "./assets";
-import { Tabs, Tab, Chip, Link } from "@nextui-org/react";
+import { Tabs, Tab, Chip, Link } from "@heroui/react";
 import RewardAsset from "./reward_asset";
 import RevenueAssets from "./revenue_assets";
 import { useState } from "react";

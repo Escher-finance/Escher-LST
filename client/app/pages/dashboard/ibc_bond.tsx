@@ -6,7 +6,7 @@ import {
     CardFooter,
     Button,
     Input,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import { createSendIBCMsg, getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/ibc";
 import { toHex } from "viem";
