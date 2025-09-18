@@ -11,6 +11,7 @@ import Liquidity from "./liquidity";
 import { useGlobalContext } from "@/app/core/context";
 import IbcBond from "./ibc_bond";
 import TransferU from "./transfer_u";
+import TransfereU from "./transfer_eu";
 //import ZkgmUnbond from "./zkgm_unbond";
 
 export default function Dashboard() {
@@ -71,8 +72,11 @@ export default function Dashboard() {
 
         {network?.chainId.indexOf("union") != -1 &&
           <Tabs className="mt-10 p-3">
-            <Tab key="ibc_bond" title="IbcBond" >
+            <Tab key="transfer_u" title="Transfer U" >
               <TransferU stateKey={stateKey} setStateKey={setStateKey} />
+            </Tab>
+            <Tab key="transfer_eu" title="Transfer eU" >
+              <TransfereU stateKey={stateKey} setStateKey={setStateKey} />
             </Tab>
 
           </Tabs>

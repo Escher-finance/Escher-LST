@@ -24,17 +24,41 @@ export const chains = [
     { key: "holesky", label: "Holesky" },
 ];
 
+
+const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
+    let allowanceMsg = {
+        increase_allowance: {
+            spender,
+            amount,
+        }
+    }
+    console.log(JSON.stringify(allowanceMsg));
+    const executeAllowanceMsg = {
+        typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+        value: MsgExecuteContract.fromPartial({
+            sender,
+            contract,
+            msg: toUtf8(JSON.stringify(allowanceMsg)),
+            funds: []
+        }),
+    };
+
+    return executeAllowanceMsg;
+}
+
 interface KeyProps {
     stateKey: number;
     setStateKey: (key: number) => void;
 }
 
-export default function TransferU({ stateKey, setStateKey }: KeyProps) {
+export default function TransfereU({ stateKey, setStateKey }: KeyProps) {
     const { userAddress, client, network } = useGlobalContext();
     const [isLoading, setIsLoading] = useState(false);
 
     const ucs03_contract = network?.escher?.ucs03;
     const receiver = "0x15Ee7c367F4232241028c36E720803100757c6e9";
+    const zkgm_token_minter = network?.escher?.tokenMinter;
+
 
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
@@ -56,17 +80,17 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
             return;
         }
 
+        const eUContract = network?.contracts.cw20;
+        let allowanceMsg = getExecuteAllowanceMsg(eUContract, userAddress, zkgm_token_minter, amount.toString());
 
-        const quoteToken = network?.escher?.channel[destination_chain].nativeQuoteToken;
-        if (!quoteToken || !network?.escher?.nativeBaseToken) {
+        const quoteToken = network?.escher?.channel[destination_chain].stakedQuoteToken;
+        if (!quoteToken || !network?.escher?.stakedBaseToken) {
             alert("no quote token or no native base token");
             return;
         }
-        let tokenOrder =
-            tokenOrderV2(userAddress.toLowerCase(), recipient, network?.escher?.nativeBaseToken, amount, quoteToken as '0x${string}', amount);
 
-        console.log("opcode:", tokenOrder.opcode);
-        console.log("version:", tokenOrder.version);
+        let tokenOrder =
+            tokenOrderV2(userAddress.toLowerCase(), recipient, network?.escher?.stakedBaseToken, amount, quoteToken as '0x${string}', amount);
 
         const timeout_timestamp = getTimeoutInNanoseconds24HoursFromNow().toString();
         const instruction = Instruction.make({
@@ -86,8 +110,6 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
             },
         }
 
-        console.log("msg", JSON.stringify(msg));
-
         let funds = [{
             denom: network?.stakeCurrency.coinMinimalDenom,
             amount: amount.toString()
@@ -104,9 +126,8 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
         };
 
 
-        console.log(JSON.stringify(msg));
         try {
-            const res = await client?.signAndBroadcast(userAddress, [executeTransferMsg], "auto", "transfer u");
+            const res = await client?.signAndBroadcast(userAddress, [allowanceMsg, executeTransferMsg], "auto", "transfer u");
             alert(res?.transactionHash);
             let newKey = stateKey + 1;
             setStateKey(newKey);
