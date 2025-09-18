@@ -6,16 +6,18 @@ import {
     CardFooter,
     Button,
     Input,
+    Select,
+    SelectItem
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
 import { encodeAbiParameters, Hex, toHex } from "viem";
-import { instructionAbi } from "@unionlabs/sdk/evm/abi";
-import { getSalt, transferForwardInstruction, TransferFwdIntent, transferInstruction, TransferIntent } from "../utils/ucs03";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
-import { getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/ibc";
-import { Instruction } from "@unionlabs/sdk/ucs03";
-import { BaseNetworks } from "@/config/networks.config";
+import { getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/utils";
+import { encodeTokenOrderV2, tokenOrderV2 } from "@/app/lib/ucs03";
+import { InstructionAbi } from "@unionlabs/sdk/Ucs03";
+import { getSalt } from "@/app/lib/utils";
+import { useState } from "react";
 
 
 // Get quote token of baby in osmosis 
@@ -23,8 +25,14 @@ import { BaseNetworks } from "@/config/networks.config";
 // data:
 // wrapped_token: 0x666163746f72792f6f736d6f3133756c63367071686d3630716e78353873733773336366743863716679636578713375793364643276306c3871736e6b766b34736a3232736e362f46374266536e58746d6652613343475541473841507055576b42794476686445706e464874694b59394542
 
-const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
 
+export const chains = [
+    { key: "sepolia", label: "Sepolia" },
+    { key: "holesky", label: "Holesky" },
+];
+
+
+const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
     let allowanceMsg = {
         increase_allowance: {
             spender,
@@ -45,52 +53,49 @@ const getExecuteAllowanceMsg = (contract: string, sender: string, spender: strin
     return executeAllowanceMsg;
 }
 
+interface KeyProps {
+    stateKey: number;
+    setStateKey: (key: number) => void;
+}
 
-export default function TransferEbabyToOsmosis() {
+export default function TransferU({ stateKey, setStateKey }: KeyProps) {
     const { userAddress, client, network } = useGlobalContext();
+    const [isLoading, setIsLoading] = useState(false);
 
     const base_denom = network?.escher?.ebabyDenom;
     const ucs03_contract = network?.escher?.ucs03;
-    const channel_id = network?.escher?.channel["osmosis"]?.sourceChannelId;
-    const receiver = "osmo1vnglhewf3w66cquy6hr7urjv3589srhelhn6df"
+    const receiver = "0x15Ee7c367F4232241028c36E720803100757c6e9"
     const zkgm_token_minter = network?.escher?.tokenMinter;
 
 
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
+        setIsLoading(true);
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
         const formEntries = Object.fromEntries(formData.entries());
         const amount = BigInt(formEntries.amount.toString());
+        const recipient = formEntries.receiver.toString();
+        const destination_chain = formEntries.destination_chain.toString();
+
+        const channel_id = network?.escher?.channel[destination_chain]?.sourceChannelId;
 
         if (userAddress === undefined || userAddress === null) {
             alert("Please connect your wallet");
             return;
         }
-
+        const executeAllowanceMsg = getExecuteAllowanceMsg(formEntries.denom.toString(), userAddress, zkgm_token_minter, amount.toString());
 
         let testnet = network?.chainName?.toLowerCase().includes("testnet");
 
-        const cosmosIntent: TransferFwdIntent = {
-            sender: userAddress,
-            receiver: formEntries.receiver.toString(),
-            baseToken: formEntries.denom.toString(),
-            baseAmount: BigInt(amount),
-            baseTokenSymbol: "eBABY",
-            baseTokenName: "ebbn",
-            quoteToken: testnet ? toHex(BaseNetworks["osmosis-testnet"].escher.ebabyDenom) : toHex(BaseNetworks["osmosis-mainnet"].escher.ebabyDenom),
-            quoteAmount: BigInt(amount),
-            baseTokenPath: BigInt(0),
-            baseTokenDecimals: 6,
-            quoteTokenPath: BigInt(1),
-        } as const
-
-        console.log("cosmosIntent", JSON.stringify(cosmosIntent));
-
-        const batch_instruction = transferForwardInstruction(cosmosIntent);
-
-        console.log("batch_instruction", JSON.stringify(batch_instruction));
+        const quoteToken = network?.escher?.channel[destination_chain].nativeQuoteToken;
+        if (!quoteToken || !network?.escher?.nativeBaseToken) {
+            alert("no quote token or no native base token");
+            return;
+        }
+        let tokenOrder =
+            tokenOrderV2(userAddress.toLowerCase(), recipient, network?.escher?.nativeBaseToken, amount, quoteToken as '0x${string}', amount);
 
         const timeout_timestamp = getTimeoutInNanoseconds24HoursFromNow().toString();
 
@@ -100,10 +105,10 @@ export default function TransferEbabyToOsmosis() {
                 timeout_height: "0",
                 timeout_timestamp,
                 salt: getSalt(),
-                instruction: encodeAbiParameters(instructionAbi, [
-                    0,
-                    2,
-                    Instruction.encodeAbi(batch_instruction)
+                instruction: encodeAbiParameters(InstructionAbi(), [
+                    tokenOrder.opcode,
+                    tokenOrder.version,
+                    encodeTokenOrderV2(tokenOrder)
                 ])
             },
         }
@@ -115,7 +120,7 @@ export default function TransferEbabyToOsmosis() {
             amount: testnet ? "10000" : "100"
         }]
 
-        const executeBondMsg = {
+        const executeTransferMsg = {
             typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
             value: MsgExecuteContract.fromPartial({
                 sender: userAddress,
@@ -125,16 +130,17 @@ export default function TransferEbabyToOsmosis() {
             }),
         };
 
-        const executeAllowanceMsg = getExecuteAllowanceMsg(formEntries.denom.toString(), userAddress, zkgm_token_minter, amount.toString());
-
 
         console.log(JSON.stringify(msg));
         try {
-            const res = await client?.signAndBroadcast(userAddress, [executeAllowanceMsg, executeBondMsg], "auto", "transfer ebaby from babylon to osmosis");
+            const res = await client?.signAndBroadcast(userAddress, [executeAllowanceMsg, executeTransferMsg], "auto", "transfer ebaby from babylon to osmosis");
             alert(res?.transactionHash);
-
+            let newKey = stateKey + 1;
+            setStateKey(newKey);
+            setIsLoading(false);
         } catch (err) {
             console.log(err);
+            setIsLoading(false);
         }
     };
 
@@ -157,17 +163,22 @@ export default function TransferEbabyToOsmosis() {
                         />
                         <Input
                             isRequired
-                            name="receiver"
-                            label="Receiver (osmosis address)"
+                            name="recipient"
+                            label="Recipient"
                             defaultValue={receiver}
                         />
+                        <Select className="max-w-xs" label="Select destination chain" variant="flat">
+                            {chains.map((chain) => (
+                                <SelectItem key={chain.key}>{chain.label}</SelectItem>
+                            ))}
+                        </Select>
                     </CardBody>
                     <CardFooter>
-                        <Button type="submit">Submit</Button>
+                        <Button type="submit" isLoading={isLoading}>Submit</Button>
                     </CardFooter>
                 </Card>
             </form>
-        </div>
+        </div >
     );
 }
 

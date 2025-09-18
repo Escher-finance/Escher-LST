@@ -15,6 +15,8 @@ export type Channel = {
   destinationChannelId: number;
   sourceIbcChannelId: string;
   destinationIbcChannelId: string;
+  nativeQuoteToken?: string | undefined;
+  stakedQuoteToken?: string | undefined;
 }
 
 export type EscherConfig = {
@@ -23,6 +25,8 @@ export type EscherConfig = {
   tokenMinter: string;
   babyDenom: string;
   ebabyDenom: string;
+  nativeBaseToken?: string;
+  stakedBaseToken?: string;
   channel: Record<string, Channel>;
 };
 
@@ -87,11 +91,11 @@ const currency: Record<SupportedNetworks, Currency> = {
     liquidStakingDenomDisplay: "eBABY",
   },
   "union-testnet": {
-    coinDenom: "UNO",
-    coinMinimalDenom: "muno",
-    coinDecimals: 6,
-    liquidStakingDenom: "ebbn",
-    liquidStakingDenomDisplay: "eBABY",
+    coinDenom: "U",
+    coinMinimalDenom: "au",
+    coinDecimals: 18,
+    liquidStakingDenom: "eu",
+    liquidStakingDenomDisplay: "eU",
   }
 };
 
@@ -292,12 +296,30 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
       babyDenom: "ibc/EC3A4ACBA1CFBEE698472D3563B70985AEA5A7144C319B61B3EBDFB57B5E1535",
       ebabyDenom: "factory/osmo12r3yc76u9lxe33yemstatnw8602culdjzrtr8lmnpycmd3z7d4jsxx60kc/FwNhFaW3zLxoLUgXCdWjqBzcvGNPaB7B2XZqm2xgrB93",
       tokenMinter: "union1t5awl707x54k6yyx7qfkuqp890dss2pqgwxh07cu44x5lrlvt4rs8hqmk0",
+      nativeBaseToken: "0x6175",
+      stakedBaseToken: "0x756e696f6e31657565756575657539766172347968647275797a6b6a6373683734787a65756736636b797936306873307663716e7a716c326871306c78633266",
       channel: {
         "babylon": {
           sourceIbcChannelId: "channel-101635",
           sourceChannelId: 21,
           destinationChannelId: 8,
           destinationIbcChannelId: "channel-3"
+        },
+        "sepolia": {
+          sourceIbcChannelId: "channel-0",
+          sourceChannelId: 1,
+          destinationChannelId: 1,
+          destinationIbcChannelId: "channel-0",
+          nativeQuoteToken: "0xba5ed44733953d79717f6269357c77718c8ba5ed",
+          stakedQuoteToken: "0xe5cf13c84c0fea3236c101bd7d743d30366e5cf1"
+        },
+        "holesky": {
+          sourceIbcChannelId: "channel-0",
+          sourceChannelId: 20,
+          destinationChannelId: 6,
+          destinationIbcChannelId: "channel-0",
+          nativeQuoteToken: "0xba5ed44733953d79717f6269357c77718c8ba5ed",
+          stakedQuoteToken: "0xe5cf13c84c0fea3236c101bd7d743d30366e5cf1"
         }
       }
     }

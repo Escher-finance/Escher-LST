@@ -10,7 +10,7 @@ import {
 import { useGlobalContext } from "@/app/core/context";
 import { getExecuteContractMessage } from "@/utils/msg";
 import { useState } from "react";
-import { toHex } from "@/app/lib/salt";
+import { toHex } from "viem";
 const { toBase64 } = require("@cosmjs/encoding");
 
 interface KeyProps {

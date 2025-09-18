@@ -36,6 +36,8 @@ export const createSendIBCMsg = ({
     };
 };
 
+
+
 export function getTimeoutInNanoseconds24HoursFromNow(): bigint {
     const millisecondsNow = Date.now() // current time in ms
     const millisecondsIn24Hours = 24 * 60 * 60 * 1000 * 3 // 24 hours in ms * 3

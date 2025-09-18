@@ -9,7 +9,7 @@ import {
 } from "@nextui-org/react";
 import { useGlobalContext } from "@/app/core/context";
 import { useState } from "react";
-import { getSalt } from "@/app/lib/salt";
+import { getSalt } from "@/app/lib/utils";
 
 
 export default function ZkgmBond() {

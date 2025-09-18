@@ -1,5 +1,5 @@
 diff --git a/node_modules/@cosmjs/amino/build/pubkeys.js b/node_modules/@cosmjs/amino/build/pubkeys.js
-index e9844ef..86101f8 100644
+index e9844ef8c6439c1665e723ce076790e752b8442a..b130b770bf593d35ecb4473e66001ccc4ad49779 100644
 --- a/node_modules/@cosmjs/amino/build/pubkeys.js
 +++ b/node_modules/@cosmjs/amino/build/pubkeys.js
 @@ -9,6 +9,10 @@ function isSecp256k1Pubkey(pubkey) {

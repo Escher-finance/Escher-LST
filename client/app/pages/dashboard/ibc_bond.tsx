@@ -10,7 +10,7 @@ import {
 import { useGlobalContext } from "@/app/core/context";
 import { createSendIBCMsg, getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/ibc";
 import { toHex } from "viem";
-import { getSalt } from "../utils/ucs03";
+import { getSalt } from "@/app/lib/utils";
 import { BaseNetworks } from "@/config/networks.config";
 import { useState } from "react";
 
