@@ -7,7 +7,7 @@ libs           = ["lib"]
 optimizer      = true
 optimizer_runs = 100
 out            = "out"
-src            = "src"
+src            = "solidity"
 via_ir         = true
 
 [rpc_endpoints]
