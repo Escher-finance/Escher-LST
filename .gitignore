@@ -33,3 +33,7 @@ docs/
 lib/
 # Sol json
 soljson-*.js
+
+# Temp clones
+.tmp-evm-ibc-apps/
+.tmp-evm-lst-hub/
