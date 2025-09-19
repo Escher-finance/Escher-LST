@@ -26,6 +26,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@Babylon-LST/*": [
+        "../cosmwasm/Babylon-LST/*"
       ]
     }
   },
