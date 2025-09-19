@@ -8,17 +8,17 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+version = "0.1.0"
+
 [workspace.lints.clippy]
 disallowed_types        = "deny"
-module_inception        = "allow" # it's useful sometimes
-module_name_repetitions = "allow" # dumb lint
+module_inception        = "allow"
+module_name_repetitions = "allow"
+pedantic                = "warn"
 
 [workspace.lints.rustdoc]
 broken-intra-doc-links = "deny"
-
-[profile.release]
-lto       = "thin"
-opt-level = 3
 
 [workspace.dependencies]
 alloy            = { version = "0.15.3", default-features = false }
@@ -48,3 +48,14 @@ unionlabs-primitives = { git = "https://github.com/unionlabs/union", default-fea
 # [dev-dependencies]
 cw-multi-test   = { version = "2.2.0", features = ["staking"] }
 serde-json-wasm = { version = "1.0.1" }
+
+[profile.release]
+codegen-units    = 1
+debug            = false
+debug-assertions = false
+incremental      = false
+lto              = "thin"
+opt-level        = 3
+overflow-checks  = true
+panic            = 'abort'
+rpath            = false
