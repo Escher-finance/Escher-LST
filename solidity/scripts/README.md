@@ -16,7 +16,7 @@ How to run:
 
 ```shell
 forge script solidity/scripts/ZkgmTransfer.s.sol \
---sig 'run(address,uint256,uint32,string memory,string memory)' \
+--sig 'run(address token, uint256 amount, uint32 channelId, string memory quoteToken, string memory receiver)' \
 0xeeEEeeE98622c19Ea39Ea8827ae22Bbfc732671c 100 1 0xeeEEeeE98622c19Ea39Ea8827ae22Bbfc732671c 0x1285a2214319Eff512C5035933ac44E573738772 \
 --rpc-url holesky --account escher-dev --sender "$(cast w a --account escher-dev)" --broadcast
 ```
