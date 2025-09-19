@@ -1,20 +1,17 @@
 [workspace]
-resolver = "2"
-# NOTE: All paths must be listed out (i.e. no globs) since ifd is still broken in nix (still can't import the output of `cargo metadata` :( ). See crane.nix for where this is used.
+default-members = []
 members = [
   "cosmwasm/babylon-lst/contracts/reward",
   "cosmwasm/babylon-lst/contracts/liquidstaking/babylon",
   "cosmwasm/babylon-lst/contracts/cw20-base",
   "cosmwasm/babylon-lst/evm-ica",
 ]
+resolver = "2"
 
 [workspace.lints.clippy]
 disallowed_types        = "deny"
 module_inception        = "allow" # it's useful sometimes
 module_name_repetitions = "allow" # dumb lint
-
-# [workspace.lints.rust]
-# unused_crate_dependencies = "warn"
 
 [workspace.lints.rustdoc]
 broken-intra-doc-links = "deny"
