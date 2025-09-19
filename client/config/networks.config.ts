@@ -128,16 +128,34 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     gasPrice: "0.0025ubbn",
     escher: {
       lst: "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss",
-      ucs03: "osmo1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292qs2uecc",
+      ucs03: "bbn1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292q77945h",
       babyDenom: "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9",
-      ebabyDenom: "factory/osmo13ulc6pqhm60qnx58ss7s3cft8cqfycexq3uy3dd2v0l8qsnkvk4sj22sn6/5dDrk51st6AKJwxbyFwe8wydD417XHRDAAx9JSJN7c9a",
+      ebabyDenom: "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9",
       tokenMinter: "bbn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf",
+      nativeBaseToken: "0x7562626e",
+      stakedBaseToken: "0x62626e31636e7833347038327a6e677130757561656e64736e65307834733567736d376770776b326573387a6b38727a38746e6a39333871717971386639",
       channel: {
         "osmosis": {
           sourceChannelId: 5,
           destinationChannelId: 3,
           sourceIbcChannelId: "channel-10366",
           destinationIbcChannelId: "channel-1"
+        },
+        "sepolia": {
+          sourceIbcChannelId: "channel-0",
+          sourceChannelId: 1,
+          destinationChannelId: 7,
+          destinationIbcChannelId: "channel-0",
+          nativeQuoteToken: "0xbd030914ab8d7ab1bd626f09e47c7cc2881550a3",
+          stakedQuoteToken: "0x36d88c22895Fe24F3bF6623D7320ca138a363dc1"
+        },
+        "holesky": {
+          sourceIbcChannelId: "channel-0",
+          sourceChannelId: 2,
+          destinationChannelId: 3,
+          destinationIbcChannelId: "channel-0",
+          nativeQuoteToken: "0xbd030914ab8d7ab1bd626f09e47c7cc2881550a3",
+          stakedQuoteToken: "0x36d88c22895Fe24F3bF6623D7320ca138a363dc1"
         }
       }
     }
@@ -163,7 +181,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     feeCurrencies: [currency["babylon-mainnet"]],
     contracts: {
       lst: "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g",
-      cw20: "bbn1s7jzz7cyuqmy5xpr07yepka5ngktexsferu2cr4xeww897ftj77sv30f5s",
+      cw20: "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9",
       reward: "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g",
     },
     gasPrice: "0.0025ubbn",
@@ -171,7 +189,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
       lst: "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g",
       ucs03: "bbn1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292q77945h",
       babyDenom: "ubbn",
-      ebabyDenom: "bbn1s7jzz7cyuqmy5xpr07yepka5ngktexsferu2cr4xeww897ftj77sv30f5s",
+      ebabyDenom: "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9",
       tokenMinter: "bbn1c723xf74f0r9g4uyn0cv2t7pkgcq7x0gaw5h773j78rk35w0j0usslxen6",
       channel: {
         "osmosis": {

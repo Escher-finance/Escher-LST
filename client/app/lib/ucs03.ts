@@ -11,6 +11,7 @@ import { ChannelId } from "@unionlabs/sdk/schema/channel";
 export const U_FROM_UNION_SOLVER_METADATA_TESTNET = "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000014ba5ed44733953d79717f6269357c77718c8ba5ed0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 export const EU_FROM_UNION_SOLVER_METADATA_TESTNET = "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000014e5cf13c84c0fea3236c101bd7d743d30366e5cf10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
+const TOKEN_ORDER_KIND_ESCROW = 1;
 const TOKEN_ORDER_KIND_SOLVE = 3;
 const TOKEN_ORDER_V2_VERSION = 2;
 export const OP_CODE_CALL = 1;
@@ -18,7 +19,7 @@ const OP_CODE_TOKEN_ORDER_V2 = 3;
 export const INSTR_VERSION_ZERO = 0;
 
 
-export const tokenOrderV2 = (
+export const tokenOrderV2WithSolverMetadata = (
     sender: string,
     receiver: string,
     baseToken: string,
@@ -48,6 +49,37 @@ export const tokenOrderV2 = (
 
     return tokenOrderV2;
 }
+
+
+export const tokenOrderV2Escrow = (
+    sender: string,
+    receiver: string,
+    baseToken: string,
+    amount: bigint,
+    quoteToken: `0x${string}`,
+) => {
+
+    let senderHex = sender.startsWith("0x") ? sender as Hex : toHex(sender);
+    let receiverHex = receiver.startsWith("0x") ? receiver as Hex : toHex(receiver);
+    let baseTokenHex = baseToken.startsWith("0x") ? baseToken as Hex : toHex(baseToken);
+
+    let tokenOrderV2: TokenOrderV2 = TokenOrderV2.make({
+        opcode: OP_CODE_TOKEN_ORDER_V2,
+        version: TOKEN_ORDER_V2_VERSION,
+        operand: [
+            senderHex,
+            receiverHex,
+            baseTokenHex,
+            amount,
+            quoteToken,
+            amount,
+            TOKEN_ORDER_KIND_ESCROW,
+            toHex("")]
+    });
+
+    return tokenOrderV2;
+}
+
 
 export const encodeTokenOrderV2 = (instruction: TokenOrderV2) => {
     return encodeAbiParameters(TokenOrderV2Abi(), instruction.operand);
