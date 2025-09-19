@@ -1,0 +1,16 @@
+[profile.default]
+ast            = true
+build_info     = true
+extra_output   = ["storageLayout"]
+ffi            = true
+libs           = ["lib"]
+optimizer      = true
+optimizer_runs = 100
+out            = "out"
+src            = "solidity"
+via_ir         = true
+
+[rpc_endpoints]
+holesky = "https://ethereum-holesky-rpc.publicnode.com"
+mainnet = "https://ethereum-rpc.publicnode.com"
+sepolia = "https://ethereum-sepolia-rpc.publicnode.com"

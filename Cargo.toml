@@ -1,28 +1,25 @@
 [workspace]
-resolver = "2"
-# NOTE: All paths must be listed out (i.e. no globs) since ifd is still broken in nix (still can't import the output of `cargo metadata` :( ). See crane.nix for where this is used.
+default-members = []
 members = [
-  "cosmwasm/Babylon-LST/contracts/reward",
-  "cosmwasm/Babylon-LST/contracts/liquidstaking/babylon",
-  # "cosmwasm/Babylon-LST/contracts/liquidstaking/union",
-  "cosmwasm/Babylon-LST/contracts/cw20-base",
-  "cosmwasm/Babylon-LST/evm-ica",
+  "cosmwasm/babylon-lst/contracts/reward",
+  "cosmwasm/babylon-lst/contracts/liquidstaking/babylon",
+  "cosmwasm/babylon-lst/contracts/cw20-base",
+  "cosmwasm/babylon-lst/evm-ica",
+  "scripts/rust/create2-miner",
 ]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
 
 [workspace.lints.clippy]
 disallowed_types        = "deny"
-module_inception        = "allow" # it's useful sometimes
-module_name_repetitions = "allow" # dumb lint
-
-# [workspace.lints.rust]
-# unused_crate_dependencies = "warn"
+module_inception        = "allow"
+module_name_repetitions = "allow"
+pedantic                = "warn"
 
 [workspace.lints.rustdoc]
 broken-intra-doc-links = "deny"
-
-[profile.release]
-lto       = "thin"
-opt-level = 3
 
 [workspace.dependencies]
 alloy            = { version = "0.15.3", default-features = false }
@@ -36,14 +33,19 @@ cw-utils         = { version = "2.0.0" }
 cw2              = { version = "2.0.0" }
 cw20             = { version = "2.0.0" }
 enumorph         = { version = "0.1.2" }
+hex              = { version = "0.4.3" }
 hex-literal      = { version = "1.0.0" }
 ibc              = { version = "0.57.0", default-features = false }
+num_cpus         = { version = "1.17.0" }
 prost            = { version = "0.13", features = ["derive"] }
+rand             = { version = "0.9.2" }
+rayon            = { version = "1.11.0" }
 schemars         = { version = "0.8.16" }
 semver           = { version = "1.0" }
 serde            = { version = "1.0.197", default-features = false, features = ["derive"] }
 serde_bytes      = { version = "0.11.15" }
 thiserror        = { version = "1.0.58" }
+tiny-keccak      = { version = "2.0.2", features = ["keccak"] }
 
 # unionlabs
 embed-commit         = { git = "https://github.com/unionlabs/union", default-features = false }
@@ -52,3 +54,14 @@ unionlabs-primitives = { git = "https://github.com/unionlabs/union", default-fea
 # [dev-dependencies]
 cw-multi-test   = { version = "2.2.0", features = ["staking"] }
 serde-json-wasm = { version = "1.0.1" }
+
+[profile.release]
+codegen-units    = 1
+debug            = false
+debug-assertions = false
+incremental      = false
+lto              = "thin"
+opt-level        = 3
+overflow-checks  = true
+panic            = 'abort'
+rpath            = false
