@@ -7,10 +7,10 @@ export function getSalt() {
     return salt
 }
 
-export function getTimeoutInNanoseconds24HoursFromNow(): bigint {
+export function getTimeoutInNanoseconds7DaysFromNow(): bigint {
     const millisecondsNow = Date.now() // current time in ms
-    const millisecondsIn24Hours = 24 * 60 * 60 * 1000 * 3 // 24 hours in ms * 3
-    const totalMilliseconds = millisecondsNow + millisecondsIn24Hours
+    const millisecondsIn7Days = 7 * 24 * 60 * 60 * 1000 * 3 // 24 hours in ms * 3
+    const totalMilliseconds = millisecondsNow + millisecondsIn7Days;
     return BigInt(totalMilliseconds) * BigInt(1_000_000) // convert ms to ns
 }
 
