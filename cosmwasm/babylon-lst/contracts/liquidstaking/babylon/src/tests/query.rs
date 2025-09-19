@@ -1,9 +1,9 @@
-use cosmwasm_std::{Uint128, testing::mock_dependencies};
+use cosmwasm_std::{testing::mock_dependencies, Uint128};
 
 use crate::{
-    ContractError,
     query::*,
-    state::{UnbondRecord, unbond_record},
+    state::{unbond_record, UnbondRecord},
+    ContractError,
 };
 
 #[test]
@@ -58,11 +58,9 @@ fn test_query_unbond_record() {
     )
     .unwrap();
     assert_eq!(unbond_recs.len(), 6);
-    assert!(
-        unbond_recs
-            .iter()
-            .all(|r| r.staker == staker && r.id >= 10 && r.id <= 15)
-    );
+    assert!(unbond_recs
+        .iter()
+        .all(|r| r.staker == staker && r.id >= 10 && r.id <= 15));
     // Query by staker_released
     let unbond_recs = query_unbond_record(
         &deps.storage,

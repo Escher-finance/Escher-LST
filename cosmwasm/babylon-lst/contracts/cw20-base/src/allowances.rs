@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    Storage, Uint128, attr,
+    attr, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
@@ -257,8 +257,9 @@ pub fn query_allowance(deps: Deps, owner: String, spender: String) -> StdResult<
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::{
-        CosmosMsg, SubMsg, Timestamp, WasmMsg, coins,
+        coins,
         testing::{message_info, mock_dependencies_with_balance, mock_env},
+        CosmosMsg, SubMsg, Timestamp, WasmMsg,
     };
     use cw20::{Cw20Coin, TokenInfoResponse};
 

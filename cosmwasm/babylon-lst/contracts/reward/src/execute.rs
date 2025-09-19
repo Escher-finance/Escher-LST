@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128,
-    attr,
+    attr, Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
+    Uint128,
 };
 
 use crate::{
