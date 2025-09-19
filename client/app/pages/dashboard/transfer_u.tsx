@@ -13,7 +13,7 @@ import { useGlobalContext } from "@/app/core/context";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
-import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2, U_FROM_UNION_SOLVER_METADATA_TESTNET } from "@/app/lib/ucs03";
+import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2WithSolverMetadata, U_FROM_UNION_SOLVER_METADATA_TESTNET } from "@/app/lib/ucs03";
 import { Instruction } from "@unionlabs/sdk/Ucs03";
 import { getSalt } from "@/app/lib/utils";
 import { useState } from "react";
@@ -58,7 +58,7 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
             return;
         }
         let tokenOrder =
-            tokenOrderV2(userAddress.toLowerCase(), recipient, network?.escher?.nativeBaseToken, amount, quoteToken as '0x${string}', amount, U_FROM_UNION_SOLVER_METADATA_TESTNET);
+            tokenOrderV2WithSolverMetadata(userAddress.toLowerCase(), recipient, network?.escher?.nativeBaseToken, amount, quoteToken as '0x${string}', amount, U_FROM_UNION_SOLVER_METADATA_TESTNET);
 
         let msg = {
             send: {

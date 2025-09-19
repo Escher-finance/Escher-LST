@@ -14,6 +14,7 @@ import TransferU from "./transfer_u";
 import TransfereU from "./transfer_eu";
 import UnionBond from "./union_bond";
 import UnionInfo from "./union_info";
+import TransferFromBabylon from "./transfer_from_babylon";
 //import ZkgmUnbond from "./zkgm_unbond";
 
 export default function Dashboard() {
@@ -33,7 +34,7 @@ export default function Dashboard() {
           <h1 className="p-3 text-2xl">Escher Liquid Staking</h1>
           <Chip><Link onPress={refresh}>Refresh</Link></Chip>
         </div>
-        {network?.chainId.indexOf("babylon") != -1 &&
+        {network?.chainId.indexOf("bbn") != -1 &&
           <div className="flex flex-col">
 
             <div className="grid grid-cols-2 gap-4">
@@ -53,6 +54,10 @@ export default function Dashboard() {
 
               <Tab key="unbond" title="Unbond" >
                 <Unbond stateKey={stateKey} setStateKey={setStateKey} />
+              </Tab>
+
+              <Tab key="transfer" title="Transfer Baby or eBaby" >
+                <TransferFromBabylon stateKey={stateKey} setStateKey={setStateKey} />
               </Tab>
 
             </Tabs>

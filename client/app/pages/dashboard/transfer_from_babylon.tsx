@@ -13,16 +13,25 @@ import { useGlobalContext } from "@/app/core/context";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
-import { encodeInstruction, encodeTokenOrderV2, EU_FROM_UNION_SOLVER_METADATA_TESTNET, tokenOrderV2WithSolverMetadata } from "@/app/lib/ucs03";
+import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2Escrow } from "@/app/lib/ucs03";
 import { Instruction } from "@unionlabs/sdk/Ucs03";
 import { getSalt } from "@/app/lib/utils";
 import { useState } from "react";
 
+(BigInt.prototype as any).toJSON = function () {
+    return this.toString();
+};
 
 export const chains = [
     { key: "sepolia", label: "Sepolia" },
     { key: "holesky", label: "Holesky" },
 ];
+
+export const denoms = [
+    { key: "ubbn", label: "Baby" },
+    { key: "ebbn", label: "eBaby" },
+];
+
 
 
 const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
@@ -51,13 +60,12 @@ interface KeyProps {
     setStateKey: (key: number) => void;
 }
 
-export default function TransfereU({ stateKey, setStateKey }: KeyProps) {
+export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps) {
     const { userAddress, client, network } = useGlobalContext();
     const [isLoading, setIsLoading] = useState(false);
 
     const ucs03_contract = network?.escher?.ucs03;
     const receiver = "0x15Ee7c367F4232241028c36E720803100757c6e9";
-    const zkgm_token_minter = network?.escher?.tokenMinter;
 
 
     const handleSubmit = async (e: any) => {
@@ -70,26 +78,27 @@ export default function TransfereU({ stateKey, setStateKey }: KeyProps) {
         const amount = BigInt(formEntries.amount.toString());
         const recipient = formEntries.recipient.toString();
         const destination_chain = formEntries.destination_chain.toString();
+        const denom = formEntries.denom.toString();
 
         if (userAddress === undefined || userAddress === null) {
             alert("Please connect your wallet");
             return;
         }
 
-        const eUContract = network?.contracts.cw20;
-        let allowanceMsg = getExecuteAllowanceMsg(eUContract, userAddress, zkgm_token_minter, amount.toString());
 
-        const quoteToken = network?.escher?.channel[destination_chain].stakedQuoteToken;
-        if (!quoteToken || !network?.escher?.stakedBaseToken) {
-            alert("no quote token or no native base token");
+        let baseToken = denom == "ubbn" ? network?.escher?.nativeBaseToken : network?.escher?.stakedBaseToken;
+        let quoteToken = denom == "ubbn" ? network?.escher?.channel[destination_chain].nativeQuoteToken : network?.escher?.channel[destination_chain].stakedQuoteToken;
+
+
+        if (!baseToken) {
+            alert("No base token");
             return;
         }
 
         let tokenOrder =
-            tokenOrderV2WithSolverMetadata(userAddress.toLowerCase(), recipient, network?.escher?.stakedBaseToken, amount, quoteToken as '0x${string}', amount, EU_FROM_UNION_SOLVER_METADATA_TESTNET);
+            tokenOrderV2Escrow(userAddress.toLowerCase(), recipient, baseToken, amount, quoteToken as '0x${string}');
 
-
-        let msg = {
+        let cosmos_msg = {
             send: {
                 channel_id: network?.escher?.channel[destination_chain]?.sourceChannelId,
                 timeout_height: "0",
@@ -103,22 +112,35 @@ export default function TransfereU({ stateKey, setStateKey }: KeyProps) {
             },
         }
 
+
         const executeTransferMsg = {
             typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
             value: MsgExecuteContract.fromPartial({
                 sender: userAddress,
                 contract: ucs03_contract,
-                msg: toUtf8(JSON.stringify(msg)),
-                funds: [{
-                    denom: network?.stakeCurrency.coinMinimalDenom,
-                    amount: amount.toString()
-                }]
+                msg: toUtf8(JSON.stringify(cosmos_msg)),
+                funds: []
             }),
         };
 
 
+        let msgs = [];
+
+        console.log("cosmos_msg", cosmos_msg);
+
+        if (denom == "ubbn") {
+            msgs = [executeTransferMsg];
+        } else {
+            const zkgm_token_minter = network?.escher?.tokenMinter;
+            const cw20Contract = network?.contracts.cw20;
+            let allowanceMsg = getExecuteAllowanceMsg(cw20Contract, userAddress, zkgm_token_minter, amount.toString());
+            msgs = [allowanceMsg, executeTransferMsg];
+        }
+
+        console.log(userAddress);
+
         try {
-            const res = await client?.signAndBroadcast(userAddress, [allowanceMsg, executeTransferMsg], "auto", "transfer u");
+            const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "transfer u");
             alert(res?.transactionHash);
             let newKey = stateKey + 1;
             setStateKey(newKey);
@@ -151,6 +173,12 @@ export default function TransfereU({ stateKey, setStateKey }: KeyProps) {
                                 <SelectItem key={chain.key}>{chain.label}</SelectItem>
                             ))}
                         </Select>
+                        <Select className="max-w-xs" label="Select denom" variant="flat" name="denom">
+                            {denoms.map((denom) => (
+                                <SelectItem key={denom.key}>{denom.label}</SelectItem>
+                            ))}
+                        </Select>
+
                     </CardBody>
                     <CardFooter>
                         <Button type="submit" isLoading={isLoading}>Submit</Button>
