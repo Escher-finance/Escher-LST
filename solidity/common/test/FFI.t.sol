@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import "./FFI.sol";
+import "../ffi/FFI.sol";
 
 contract FFITest is Test {
     function setUp() public {}
