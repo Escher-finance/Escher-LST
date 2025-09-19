@@ -12,8 +12,8 @@ import {
 import { useGlobalContext } from "@/app/core/context";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
-import { getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/utils";
-import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2 } from "@/app/lib/ucs03";
+import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
+import { encodeInstruction, encodeTokenOrderV2, EU_FROM_UNION_SOLVER_METADATA_TESTNET, tokenOrderV2 } from "@/app/lib/ucs03";
 import { Instruction } from "@unionlabs/sdk/Ucs03";
 import { getSalt } from "@/app/lib/utils";
 import { useState } from "react";
@@ -90,9 +90,9 @@ export default function TransfereU({ stateKey, setStateKey }: KeyProps) {
         }
 
         let tokenOrder =
-            tokenOrderV2(userAddress.toLowerCase(), recipient, network?.escher?.stakedBaseToken, amount, quoteToken as '0x${string}', amount);
+            tokenOrderV2(userAddress.toLowerCase(), recipient, network?.escher?.stakedBaseToken, amount, quoteToken as '0x${string}', amount, EU_FROM_UNION_SOLVER_METADATA_TESTNET);
 
-        const timeout_timestamp = getTimeoutInNanoseconds24HoursFromNow().toString();
+        const timeout_timestamp = getTimeoutInNanoseconds7DaysFromNow().toString();
         const instruction = Instruction.make({
             opcode: 3,
             version: 2,

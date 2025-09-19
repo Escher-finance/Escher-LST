@@ -5,10 +5,11 @@ import { ChainRegistry } from "@unionlabs/sdk/ChainRegistry";
 import { UniversalChainId } from "@unionlabs/sdk/schema/chain";
 import { TokenOrder, Ucs03, Ucs05, Utils } from "@unionlabs/sdk";
 import { Effect, pipe, Schema } from "effect";
-import { getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/utils";
+import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
 import { ChannelId } from "@unionlabs/sdk/schema/channel";
 
-const U_FROM_UNION_SOLVER_METADATA_TESTNET = "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000014ba5ed44733953d79717f6269357c77718c8ba5ed0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+export const U_FROM_UNION_SOLVER_METADATA_TESTNET = "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000014ba5ed44733953d79717f6269357c77718c8ba5ed0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+export const EU_FROM_UNION_SOLVER_METADATA_TESTNET = "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000014e5cf13c84c0fea3236c101bd7d743d30366e5cf10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
 const TOKEN_ORDER_KIND_SOLVE = 3;
 const TOKEN_ORDER_V2_VERSION = 2;
@@ -24,6 +25,7 @@ export const tokenOrderV2 = (
     baseAmount: bigint,
     quoteToken: `0x${string}`,
     quoteAmount: bigint,
+    metadata: `0x${string}`,
 ) => {
 
     let senderHex = sender.startsWith("0x") ? sender as Hex : toHex(sender);
@@ -41,7 +43,7 @@ export const tokenOrderV2 = (
             quoteToken,
             quoteAmount,
             TOKEN_ORDER_KIND_SOLVE,
-            U_FROM_UNION_SOLVER_METADATA_TESTNET]
+            metadata]
     });
 
     return tokenOrderV2;
@@ -157,7 +159,7 @@ export const getSendbackCallMsg = (params: GetSendbackCallMsgParams) =>
                 send: {
                     channel_id: params.channel_id,
                     timeout_height: BigInt(0).toString(),
-                    timeout_timestamp: getTimeoutInNanoseconds24HoursFromNow().toString(),
+                    timeout_timestamp: getTimeoutInNanoseconds7DaysFromNow().toString(),
                     salt,
                     instruction,
                 },
