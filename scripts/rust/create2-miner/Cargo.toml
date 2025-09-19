@@ -1,0 +1,14 @@
+[package]
+edition = "2024"
+name    = "create2-miner"
+version = "0.1.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+hex         = { workspace = true }
+num_cpus    = { workspace = true }
+rand        = { workspace = true }
+rayon       = { workspace = true }
+tiny-keccak = { workspace = true }
