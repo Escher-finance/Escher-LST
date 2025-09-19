@@ -47,15 +47,10 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
         const recipient = formEntries.recipient.toString();
         const destination_chain = formEntries.destination_chain.toString();
 
-        console.log(JSON.stringify(formEntries));
-
-        const channel_id = network?.escher?.channel[destination_chain]?.sourceChannelId;
-
         if (userAddress === undefined || userAddress === null) {
             alert("Please connect your wallet");
             return;
         }
-
 
         const quoteToken = network?.escher?.channel[destination_chain].nativeQuoteToken;
         if (!quoteToken || !network?.escher?.nativeBaseToken) {
@@ -65,33 +60,19 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
         let tokenOrder =
             tokenOrderV2(userAddress.toLowerCase(), recipient, network?.escher?.nativeBaseToken, amount, quoteToken as '0x${string}', amount, U_FROM_UNION_SOLVER_METADATA_TESTNET);
 
-        console.log("opcode:", tokenOrder.opcode);
-        console.log("version:", tokenOrder.version);
-
-        const timeout_timestamp = getTimeoutInNanoseconds7DaysFromNow().toString();
-        const instruction = Instruction.make({
-            opcode: 3,
-            version: 2,
-            operand: encodeTokenOrderV2(tokenOrder),
-        });
-
-        console.log(instruction);
         let msg = {
             send: {
-                channel_id,
+                channel_id: network?.escher?.channel[destination_chain]?.sourceChannelId,
                 timeout_height: "0",
-                timeout_timestamp,
+                timeout_timestamp: getTimeoutInNanoseconds7DaysFromNow().toString(),
                 salt: getSalt(),
-                instruction: encodeInstruction(instruction),
+                instruction: encodeInstruction(Instruction.make({
+                    opcode: 3,
+                    version: 2,
+                    operand: encodeTokenOrderV2(tokenOrder),
+                })),
             },
         }
-
-        console.log("msg", JSON.stringify(msg));
-
-        let funds = [{
-            denom: network?.stakeCurrency.coinMinimalDenom,
-            amount: amount.toString()
-        }]
 
         const executeTransferMsg = {
             typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
@@ -99,12 +80,13 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
                 sender: userAddress,
                 contract: ucs03_contract,
                 msg: toUtf8(JSON.stringify(msg)),
-                funds
+                funds: [{
+                    denom: network?.stakeCurrency.coinMinimalDenom,
+                    amount: amount.toString()
+                }]
             }),
         };
 
-
-        console.log(JSON.stringify(msg));
         try {
             const res = await client?.signAndBroadcast(userAddress, [executeTransferMsg], "auto", "transfer u");
             alert(res?.transactionHash);
