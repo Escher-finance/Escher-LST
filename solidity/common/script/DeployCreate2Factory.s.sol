@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Create2Factory} from "../src/Create2Factory.sol";
+import {Create2Factory} from "../Create2Factory.sol";
 
 contract DeployCreate2FactoryScript is Script {
     Create2Factory public factory;

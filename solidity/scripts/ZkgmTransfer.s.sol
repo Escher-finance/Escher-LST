@@ -2,8 +2,8 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import "../src/core/Zkgm.sol";
-import {eU} from "../src/eU.sol";
+import "@common/zkgm-core/Zkgm.sol";
+import {eU} from "../union-evm-lst/src/eU.sol";
 import "union/apps/ucs/03-zkgm/IZkgmable.sol";
 import "union/apps/ucs/03-zkgm/IZkgm.sol";
 

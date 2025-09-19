@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {Lst} from "../src/Lst.sol";
 import {eU} from "../src/eU.sol";
 import {BaseToken} from "../src/U.sol";
-import {HubBatch, HubRecord} from "../src/core/Types.sol";
+import {HubBatch, HubRecord} from "@common/zkgm-core/Types.sol";
 
 contract RunStake is Script {
     Lst public lst;

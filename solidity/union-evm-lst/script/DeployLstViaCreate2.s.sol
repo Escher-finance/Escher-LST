@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Script, console} from "forge-std/Script.sol";
 import {Lst, InitializePayload} from "../src/Lst.sol";
 import {LSTProxy} from "../src/LSTProxy.sol";
-import {Create2Factory} from "../src/Create2Factory.sol";
+import {Create2Factory} from "@common/Create2Factory.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 

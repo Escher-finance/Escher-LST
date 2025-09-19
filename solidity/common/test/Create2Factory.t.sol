@@ -2,9 +2,9 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import {Create2Factory} from "../src/Create2Factory.sol";
-import {LSTProxy} from "../src/LSTProxy.sol";
-import {Lst, InitializePayload} from "../src/Lst.sol";
+import {Create2Factory} from "../Create2Factory.sol";
+import {LSTProxy} from "../../union-evm-lst/src/LSTProxy.sol";
+import {Lst, InitializePayload} from "../../union-evm-lst/src/Lst.sol";
 
 contract LSTProxyFactoryTest is Test {
     Create2Factory factory;

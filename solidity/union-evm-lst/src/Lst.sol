@@ -16,11 +16,11 @@ import {
     HUB_BATCH_UNBONDING_RELEASED_HASH,
     STAKE_HASH,
     UNSTAKE_HASH
-} from "./core/Types.sol";
+} from "@common/zkgm-core/Types.sol";
 import "./U.sol";
 import "./eU.sol";
-import "./core/Event.sol";
-import "./core/Zkgm.sol";
+import "@common/zkgm-core/Event.sol";
+import "@common/zkgm-core/Zkgm.sol";
 
 import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";

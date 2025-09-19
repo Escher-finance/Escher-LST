@@ -6,7 +6,7 @@ import {Lst, InitializePayload} from "../src/Lst.sol";
 import {LSTProxy} from "../src/LSTProxy.sol";
 import {eU} from "../src/eU.sol";
 import {BaseToken} from "../src/U.sol";
-import {HubBatch, BatchStatus, Config} from "../src/core/Types.sol";
+import {HubBatch, BatchStatus, Config} from "@common/zkgm-core/Types.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 

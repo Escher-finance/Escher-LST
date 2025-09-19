@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
 import {eU} from "../src/eU.sol";
-import {Create2Factory} from "../src/Create2Factory.sol";
+import {Create2Factory} from "@common/Create2Factory.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployeUScript is Script {
