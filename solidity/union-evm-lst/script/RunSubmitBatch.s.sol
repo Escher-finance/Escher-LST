@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Script, console} from "forge-std/Script.sol";
 import {Lst} from "../src/Lst.sol";
 import {BaseToken} from "../src/U.sol";
-import {HubBatch, HubRecord} from "../src/core/Types.sol";
+import {HubBatch, HubRecord} from "@common/zkgm-core/Types.sol";
 
 contract RunSubmitBatch is Script {
     Lst public lst;

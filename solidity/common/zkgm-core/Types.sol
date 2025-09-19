@@ -2,7 +2,6 @@
 pragma solidity ^0.8.27;
 
 import "union/apps/ucs/03-zkgm/IZkgm.sol";
-import "../eU.sol";
 
 uint8 constant BASE_TOKEN_DECIMALS = 18;
 
