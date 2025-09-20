@@ -33,7 +33,6 @@ export const denoms = [
 ];
 
 
-
 const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
     let allowanceMsg = {
         increase_allowance: {
