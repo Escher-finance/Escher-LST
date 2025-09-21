@@ -154,7 +154,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
           sourceChannelId: 2,
           destinationChannelId: 3,
           destinationIbcChannelId: "channel-0",
-          nativeQuoteToken: "0xbd030914ab8d7ab1bd626f09e47c7cc2881550a3",
+          nativeQuoteToken: "0x77b99a27a5fed3bc8fb3e2f1063181f82ec48637",
           stakedQuoteToken: "0xe5551306179361CFD169435C4F27445E81BA630a"
         }
       }
