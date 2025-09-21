@@ -13,7 +13,7 @@ import { useGlobalContext } from "@/app/core/context";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
-import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2Escrow, tokenOrderV2Initialize } from "@/app/lib/ucs03";
+import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2Escrow } from "@/app/lib/ucs03";
 import { Instruction } from "@unionlabs/sdk/Ucs03";
 import { getSalt } from "@/app/lib/utils";
 import { useState } from "react";
@@ -88,15 +88,14 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
 
         let baseToken = denom === "ubbn" ? network?.escher?.nativeBaseToken : network?.escher?.stakedBaseToken;
         let quoteToken = denom === "ubbn" ? network?.escher?.channel[destination_chain].nativeQuoteToken : network?.escher?.channel[destination_chain].stakedQuoteToken;
-
+        let funds = denom === "ubbn" ? [{ amount: amount.toString(), denom }] : [];
 
         if (!baseToken) {
             alert("No base token");
             return;
         }
 
-        let tokenOrder = denom === "ubbn" ? tokenOrderV2Escrow(userAddress.toLowerCase(), recipient, baseToken, amount, quoteToken as '0x${string}') :
-            tokenOrderV2Initialize(userAddress.toLowerCase(), recipient, baseToken, amount, quoteToken as '0x${string}');
+        let tokenOrder = tokenOrderV2Escrow(userAddress.toLowerCase(), recipient, baseToken, amount, quoteToken as '0x${string}');
 
         let cosmos_msg = {
             send: {
@@ -110,7 +109,7 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
                     operand: encodeTokenOrderV2(tokenOrder),
                 })),
             },
-        }
+        };
 
 
         const executeTransferMsg = {
@@ -119,14 +118,12 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
                 sender: userAddress,
                 contract: ucs03_contract,
                 msg: toUtf8(JSON.stringify(cosmos_msg)),
-                funds: []
+                funds
             }),
         };
 
 
         let msgs = [];
-
-        console.log("cosmos_msg", cosmos_msg);
 
         if (denom == "ubbn") {
             msgs = [executeTransferMsg];
@@ -136,8 +133,6 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
             let allowanceMsg = getExecuteAllowanceMsg(cw20Contract, userAddress, zkgm_token_minter, amount.toString());
             msgs = [allowanceMsg, executeTransferMsg];
         }
-
-        console.log(userAddress);
 
         try {
             const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "transfer from babylon");
@@ -178,6 +173,9 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
                                 <SelectItem key={denom.key}>{denom.label}</SelectItem>
                             ))}
                         </Select>
+                        <div className="text-sm italic p-1">
+                            Note: To send to sepolia, after send the packet need to run curl to relay
+                        </div>
 
                     </CardBody>
                     <CardFooter>

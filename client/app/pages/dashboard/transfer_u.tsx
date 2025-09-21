@@ -121,6 +121,9 @@ export default function TransferU({ stateKey, setStateKey }: KeyProps) {
                                 <SelectItem key={chain.key}>{chain.label}</SelectItem>
                             ))}
                         </Select>
+                        <div className="text-sm italic p-1">
+                            Note: To send to sepolia, after send the packet need to run curl to relay
+                        </div>
                     </CardBody>
                     <CardFooter>
                         <Button type="submit" isLoading={isLoading}>Submit</Button>

@@ -109,16 +109,13 @@ export default function TransfereU({ stateKey, setStateKey }: KeyProps) {
                 sender: userAddress,
                 contract: ucs03_contract,
                 msg: toUtf8(JSON.stringify(msg)),
-                funds: [{
-                    denom: network?.stakeCurrency.coinMinimalDenom,
-                    amount: amount.toString()
-                }]
+                funds: []
             }),
         };
 
 
         try {
-            const res = await client?.signAndBroadcast(userAddress, [allowanceMsg, executeTransferMsg], "auto", "transfer u");
+            const res = await client?.signAndBroadcast(userAddress, [allowanceMsg, executeTransferMsg], "auto", "transfer eu");
             alert(res?.transactionHash);
             let newKey = stateKey + 1;
             setStateKey(newKey);
@@ -151,6 +148,9 @@ export default function TransfereU({ stateKey, setStateKey }: KeyProps) {
                                 <SelectItem key={chain.key}>{chain.label}</SelectItem>
                             ))}
                         </Select>
+                        <div>
+                            Note: To send to sepolia, after send the packet need to run curl to relay
+                        </div>
                     </CardBody>
                     <CardFooter>
                         <Button type="submit" isLoading={isLoading}>Submit</Button>
