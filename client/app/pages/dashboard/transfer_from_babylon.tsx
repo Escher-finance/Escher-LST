@@ -174,7 +174,7 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
                             ))}
                         </Select>
                         <div className="text-sm italic p-1">
-                            Note: To send to sepolia, after send the packet need to run curl to relay
+                            Note: To send to sepolia and holesky, after send the packet need to run curl to relay (see README at client folder for CURL example)
                         </div>
 
                     </CardBody>

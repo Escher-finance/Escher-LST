@@ -149,7 +149,7 @@ export default function TransfereU({ stateKey, setStateKey }: KeyProps) {
                             ))}
                         </Select>
                         <div>
-                            Note: To send to sepolia, after send the packet need to run curl to relay
+                            Note: To send to sepolia, after send the packet need to run curl to relay (see README at client folder for CURL example)
                         </div>
                     </CardBody>
                     <CardFooter>
