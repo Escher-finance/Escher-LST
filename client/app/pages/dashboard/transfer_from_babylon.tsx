@@ -13,7 +13,7 @@ import { useGlobalContext } from "@/app/core/context";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
-import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2Escrow } from "@/app/lib/ucs03";
+import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2Escrow, tokenOrderV2Initialize } from "@/app/lib/ucs03";
 import { Instruction } from "@unionlabs/sdk/Ucs03";
 import { getSalt } from "@/app/lib/utils";
 import { useState } from "react";
@@ -67,6 +67,7 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
     const receiver = "0x15Ee7c367F4232241028c36E720803100757c6e9";
 
 
+
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
         setIsLoading(true);
@@ -85,8 +86,8 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
         }
 
 
-        let baseToken = denom == "ubbn" ? network?.escher?.nativeBaseToken : network?.escher?.stakedBaseToken;
-        let quoteToken = denom == "ubbn" ? network?.escher?.channel[destination_chain].nativeQuoteToken : network?.escher?.channel[destination_chain].stakedQuoteToken;
+        let baseToken = denom === "ubbn" ? network?.escher?.nativeBaseToken : network?.escher?.stakedBaseToken;
+        let quoteToken = denom === "ubbn" ? network?.escher?.channel[destination_chain].nativeQuoteToken : network?.escher?.channel[destination_chain].stakedQuoteToken;
 
 
         if (!baseToken) {
@@ -94,8 +95,8 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
             return;
         }
 
-        let tokenOrder =
-            tokenOrderV2Escrow(userAddress.toLowerCase(), recipient, baseToken, amount, quoteToken as '0x${string}');
+        let tokenOrder = denom === "ubbn" ? tokenOrderV2Escrow(userAddress.toLowerCase(), recipient, baseToken, amount, quoteToken as '0x${string}') :
+            tokenOrderV2Initialize(userAddress.toLowerCase(), recipient, baseToken, amount, quoteToken as '0x${string}');
 
         let cosmos_msg = {
             send: {
@@ -139,7 +140,7 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
         console.log(userAddress);
 
         try {
-            const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "transfer u");
+            const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "transfer from babylon");
             alert(res?.transactionHash);
             let newKey = stateKey + 1;
             setStateKey(newKey);
