@@ -24,9 +24,7 @@ contract EulerVault is ERC4626, Ownable2Step {
         _updateEulerVault(_eulerVault);
     }
 
-    /**
-     * @dev See {IERC4626-totalAssets}.
-     */
+    /// @inheritdoc IERC4626
     function totalAssets() public view virtual override returns (uint256) {
         address thisAddr = address(this);
         uint256 total = IERC20(asset()).balanceOf(thisAddr);
@@ -37,9 +35,7 @@ contract EulerVault is ERC4626, Ownable2Step {
         return total;
     }
 
-    /**
-     * @dev See {IERC4626-deposit}.
-     */
+    /// @inheritdoc IERC4626
     function deposit(uint256 assets, address receiver) public virtual override returns (uint256) {
         uint256 maxAssets = maxDeposit(receiver);
         if (assets > maxAssets) {
@@ -53,9 +49,7 @@ contract EulerVault is ERC4626, Ownable2Step {
         return shares;
     }
 
-    /**
-     * @dev See {IERC4626-mint}.
-     */
+    /// @inheritdoc IERC4626
     function mint(uint256 shares, address receiver) public virtual override returns (uint256) {
         uint256 maxShares = maxMint(receiver);
         if (shares > maxShares) {
@@ -69,9 +63,7 @@ contract EulerVault is ERC4626, Ownable2Step {
         return assets;
     }
 
-    /**
-     * @dev See {IERC4626-withdraw}.
-     */
+    /// @inheritdoc IERC4626
     function withdraw(uint256 assets, address receiver, address owner) public virtual override returns (uint256) {
         uint256 maxAssets = maxWithdraw(owner);
         if (assets > maxAssets) {
@@ -79,15 +71,13 @@ contract EulerVault is ERC4626, Ownable2Step {
         }
 
         uint256 shares = previewWithdraw(assets);
-        _beforeWithdraw(assets);
+        _beforeWithdraw(assets, shares);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return shares;
     }
 
-    /**
-     * @dev See {IERC4626-redeem}.
-     */
+    /// @inheritdoc IERC4626
     function redeem(uint256 shares, address receiver, address owner) public virtual override returns (uint256) {
         uint256 maxShares = maxRedeem(owner);
         if (shares > maxShares) {
@@ -95,18 +85,21 @@ contract EulerVault is ERC4626, Ownable2Step {
         }
 
         uint256 assets = previewRedeem(shares);
-        _beforeWithdraw(assets);
+        _beforeWithdraw(assets, shares);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
     }
 
     function _afterDeposit(uint256 assets) internal {
-        // TODO
+        IERC20(asset()).approve(address(s_eulerVault), assets);
+        s_eulerVault.deposit(assets, address(this));
     }
 
-    function _beforeWithdraw(uint256 assets) internal {
-        // TODO
+    function _beforeWithdraw(uint256 assets, uint256 shares) internal {
+        address eulerVaultAddr = address(s_eulerVault);
+        IERC20(eulerVaultAddr).approve(eulerVaultAddr, shares);
+        s_eulerVault.withdraw(assets, address(this), address(this));
     }
 
     function _updateEulerVault(IEVault _eulerVault) private {
