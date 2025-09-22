@@ -24,6 +24,19 @@ contract EulerVault is ERC4626, Ownable2Step {
         _updateEulerVault(_eulerVault);
     }
 
+    /**
+     * @dev See {IERC4626-totalAssets}.
+     */
+    function totalAssets() public view virtual override returns (uint256) {
+        address thisAddr = address(this);
+        uint256 total = IERC20(asset()).balanceOf(thisAddr);
+        uint256 eulerShares = s_eulerVault.balanceOf(thisAddr);
+        if (eulerShares > 0) {
+            total += s_eulerVault.convertToAssets(eulerShares);
+        }
+        return total;
+    }
+
     function _updateEulerVault(IEVault _eulerVault) private {
         if (asset() != _eulerVault.asset()) {
             revert EscherVault_InvalidEulerVault();
