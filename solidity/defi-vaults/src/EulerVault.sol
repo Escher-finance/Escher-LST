@@ -11,6 +11,7 @@ contract EulerVault is ERC4626, Ownable2Step {
     IEVault public s_eulerVault;
 
     error EscherVault_InvalidEulerVault();
+    error EscherVault_OldEulerVaultStillActive();
 
     event EulerVaultUpdated(address indexed _newEulerVault);
 
@@ -29,7 +30,7 @@ contract EulerVault is ERC4626, Ownable2Step {
         address thisAddr = address(this);
         uint256 total = IERC20(asset()).balanceOf(thisAddr);
         uint256 eulerShares = s_eulerVault.balanceOf(thisAddr);
-        if (eulerShares > 0) {
+        if (eulerShares != 0) {
             total += s_eulerVault.convertToAssets(eulerShares);
         }
         return total;
@@ -89,6 +90,13 @@ contract EulerVault is ERC4626, Ownable2Step {
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
+    }
+
+    function updateEulerVault(IEVault _eulerVault) public onlyOwner {
+        if (s_eulerVault.balanceOf(address(this)) != 0) {
+            revert EscherVault_OldEulerVaultStillActive();
+        }
+        _updateEulerVault(_eulerVault);
     }
 
     function _afterDeposit(uint256 assets) internal {
