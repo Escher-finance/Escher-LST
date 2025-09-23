@@ -107,11 +107,22 @@ contract EulerVault is ERC4626, Ownable2Step {
         s_eulerVault.deposit(assets, address(this));
     }
 
+    /// @dev This makes sure to only withdraw from Euler if there aren't enough assets in the vault
     function _beforeWithdraw(uint256 assets) internal {
         address eulerVaultAddr = address(s_eulerVault);
-        uint256 shares = s_eulerVault.previewWithdraw(assets);
-        IERC20(eulerVaultAddr).safeIncreaseAllowance(eulerVaultAddr, shares);
-        s_eulerVault.withdraw(assets, address(this), address(this));
+        address thisAddr = address(this);
+        IERC20 eulerVaultToken = IERC20(eulerVaultAddr);
+
+        uint256 eulerShares = s_eulerVault.previewWithdraw(assets);
+        uint256 eulerSharesBalance = eulerVaultToken.balanceOf(thisAddr);
+        uint256 eulerSharesNeeded = 0;
+        if (eulerShares > eulerSharesBalance) {
+            eulerSharesNeeded = eulerShares - eulerSharesBalance;
+        }
+        if (eulerSharesNeeded != 0) {
+            eulerVaultToken.safeIncreaseAllowance(eulerVaultAddr, eulerSharesNeeded);
+            s_eulerVault.withdraw(s_eulerVault.convertToAssets(eulerSharesNeeded), thisAddr, thisAddr);
+        }
     }
 
     function _updateEulerVault(IEVault _eulerVault) private {
