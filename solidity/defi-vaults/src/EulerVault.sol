@@ -4,10 +4,13 @@ pragma solidity ^0.8.13;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IEVault} from "./interfaces/IEVault.sol";
 
 contract EulerVault is ERC4626, Ownable2Step {
+    using SafeERC20 for IERC20;
+
     IEVault public s_eulerVault;
 
     error EscherVault_InvalidEulerVault();
@@ -100,13 +103,13 @@ contract EulerVault is ERC4626, Ownable2Step {
     }
 
     function _afterDeposit(uint256 assets) internal {
-        IERC20(asset()).approve(address(s_eulerVault), assets);
+        IERC20(asset()).safeIncreaseAllowance(address(s_eulerVault), assets);
         s_eulerVault.deposit(assets, address(this));
     }
 
     function _beforeWithdraw(uint256 assets, uint256 shares) internal {
         address eulerVaultAddr = address(s_eulerVault);
-        IERC20(eulerVaultAddr).approve(eulerVaultAddr, shares);
+        IERC20(eulerVaultAddr).safeIncreaseAllowance(eulerVaultAddr, shares);
         s_eulerVault.withdraw(assets, address(this), address(this));
     }
 
