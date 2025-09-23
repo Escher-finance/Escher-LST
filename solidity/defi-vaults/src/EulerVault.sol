@@ -4,16 +4,30 @@ pragma solidity ^0.8.13;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IEVault} from "./interfaces/IEVault.sol";
+import {IEthereumVaultConnector} from "./interfaces/IEthereumVaultConnector.sol";
 
 contract EulerVault is ERC4626, Ownable2Step {
+    using SafeERC20 for IERC20;
+
     IEVault public s_eulerVault;
+    IEthereumVaultConnector public s_eulerEVC;
 
     error EscherVault_InvalidEulerVault();
     error EscherVault_OldEulerVaultStillActive();
+    error EscherVault_MissingEulerEVC();
 
     event EulerVaultUpdated(address indexed _newEulerVault);
+    event EulerEVCUpdated(address indexed _newEulerEVC);
+
+    modifier onlyWithEulerEVC() {
+        if (address(s_eulerEVC) == address(0)) {
+            revert EscherVault_MissingEulerEVC();
+        }
+        _;
+    }
 
     constructor(
         address _owner,
@@ -72,7 +86,7 @@ contract EulerVault is ERC4626, Ownable2Step {
         }
 
         uint256 shares = previewWithdraw(assets);
-        _beforeWithdraw(assets, shares);
+        _beforeWithdraw(assets);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return shares;
@@ -86,10 +100,14 @@ contract EulerVault is ERC4626, Ownable2Step {
         }
 
         uint256 assets = previewRedeem(shares);
-        _beforeWithdraw(assets, shares);
+        _beforeWithdraw(assets);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
+    }
+
+    function borrow(uint256 assets) public onlyOwner {
+        _borrow(assets);
     }
 
     function updateEulerVault(IEVault _eulerVault) public onlyOwner {
@@ -99,15 +117,38 @@ contract EulerVault is ERC4626, Ownable2Step {
         _updateEulerVault(_eulerVault);
     }
 
+    function updateEulerEVC(IEthereumVaultConnector _eulerEVC) public onlyOwner {
+        _updateEulerEVC(_eulerEVC);
+    }
+
+    function _borrow(uint256 assets) internal onlyWithEulerEVC {
+        address thisAddr = address(this);
+        s_eulerEVC.enableCollateral(thisAddr, thisAddr);
+        s_eulerEVC.enableController(thisAddr, address(s_eulerVault));
+        s_eulerVault.borrow(assets, thisAddr);
+    }
+
     function _afterDeposit(uint256 assets) internal {
-        IERC20(asset()).approve(address(s_eulerVault), assets);
+        IERC20(asset()).safeIncreaseAllowance(address(s_eulerVault), assets);
         s_eulerVault.deposit(assets, address(this));
     }
 
-    function _beforeWithdraw(uint256 assets, uint256 shares) internal {
+    /// @dev This makes sure to only withdraw from Euler if there aren't enough assets in the vault
+    function _beforeWithdraw(uint256 assets) internal {
         address eulerVaultAddr = address(s_eulerVault);
-        IERC20(eulerVaultAddr).approve(eulerVaultAddr, shares);
-        s_eulerVault.withdraw(assets, address(this), address(this));
+        address thisAddr = address(this);
+        IERC20 eulerVaultToken = IERC20(eulerVaultAddr);
+
+        uint256 eulerShares = s_eulerVault.previewWithdraw(assets);
+        uint256 eulerSharesBalance = eulerVaultToken.balanceOf(thisAddr);
+        uint256 eulerSharesNeeded = 0;
+        if (eulerShares > eulerSharesBalance) {
+            eulerSharesNeeded = eulerShares - eulerSharesBalance;
+        }
+        if (eulerSharesNeeded != 0) {
+            eulerVaultToken.safeIncreaseAllowance(eulerVaultAddr, eulerSharesNeeded);
+            s_eulerVault.withdraw(s_eulerVault.convertToAssets(eulerSharesNeeded), thisAddr, thisAddr);
+        }
     }
 
     function _updateEulerVault(IEVault _eulerVault) private {
@@ -116,5 +157,10 @@ contract EulerVault is ERC4626, Ownable2Step {
         }
         s_eulerVault = _eulerVault;
         emit EulerVaultUpdated(address(_eulerVault));
+    }
+
+    function _updateEulerEVC(IEthereumVaultConnector _eulerEVC) private {
+        s_eulerEVC = _eulerEVC;
+        emit EulerEVCUpdated(address(_eulerEVC));
     }
 }
