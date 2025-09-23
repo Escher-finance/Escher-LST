@@ -7,16 +7,27 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IEVault} from "./interfaces/IEVault.sol";
+import {IEthereumVaultConnector} from "./interfaces/IEthereumVaultConnector.sol";
 
 contract EulerVault is ERC4626, Ownable2Step {
     using SafeERC20 for IERC20;
 
     IEVault public s_eulerVault;
+    IEthereumVaultConnector public s_eulerEVC;
 
     error EscherVault_InvalidEulerVault();
     error EscherVault_OldEulerVaultStillActive();
+    error EscherVault_MissingEulerEVC();
 
     event EulerVaultUpdated(address indexed _newEulerVault);
+    event EulerEVCUpdated(address indexed _newEulerEVC);
+
+    modifier onlyWithEulerEVC() {
+        if (address(s_eulerEVC) == address(0)) {
+            revert EscherVault_MissingEulerEVC();
+        }
+        _;
+    }
 
     constructor(
         address _owner,
@@ -95,11 +106,26 @@ contract EulerVault is ERC4626, Ownable2Step {
         return assets;
     }
 
+    function borrow(uint256 assets) public onlyOwner {
+        _borrow(assets);
+    }
+
     function updateEulerVault(IEVault _eulerVault) public onlyOwner {
         if (s_eulerVault.balanceOf(address(this)) != 0) {
             revert EscherVault_OldEulerVaultStillActive();
         }
         _updateEulerVault(_eulerVault);
+    }
+
+    function updateEulerEVC(IEthereumVaultConnector _eulerEVC) public onlyOwner {
+        _updateEulerEVC(_eulerEVC);
+    }
+
+    function _borrow(uint256 assets) internal onlyWithEulerEVC {
+        address thisAddr = address(this);
+        s_eulerEVC.enableCollateral(thisAddr, thisAddr);
+        s_eulerEVC.enableController(thisAddr, address(s_eulerVault));
+        s_eulerVault.borrow(assets, thisAddr);
     }
 
     function _afterDeposit(uint256 assets) internal {
@@ -131,5 +157,10 @@ contract EulerVault is ERC4626, Ownable2Step {
         }
         s_eulerVault = _eulerVault;
         emit EulerVaultUpdated(address(_eulerVault));
+    }
+
+    function _updateEulerEVC(IEthereumVaultConnector _eulerEVC) private {
+        s_eulerEVC = _eulerEVC;
+        emit EulerEVCUpdated(address(_eulerEVC));
     }
 }
