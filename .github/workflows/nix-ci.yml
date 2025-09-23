@@ -15,10 +15,6 @@ jobs:
         uses: cachix/install-nix-action@v25
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - name: Cachix
-        uses: cachix/cachix-action@v14
-        with:
-          name: escher-lst-cache
       - name: Build CosmWasm contracts
         run: |
           nix develop --command bash -c 'cargo wasm -p reward -p liquidstaking-babylon -p cw20-base -p evm-ica'
