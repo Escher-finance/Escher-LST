@@ -69,7 +69,11 @@ fn nibbles_match(address: &[u8], hex_prefix: &str) -> bool {
     true
 }
 
-fn find_matching_salt(target: &str, deployer: &[u8; 20], init_code_hash: &[u8; 32]) -> [u8; 32] {
+fn find_matching_salt(
+    target: &str,
+    deployer: &[u8; 20],
+    init_code_hash: &[u8; 32],
+) -> Option<[u8; 32]> {
     let found = Arc::new(AtomicBool::new(false));
 
     let n = num_cpus::get();
@@ -82,7 +86,7 @@ fn find_matching_salt(target: &str, deployer: &[u8; 20], init_code_hash: &[u8; 3
             },
             |salt, _| {
                 while !found.load(Ordering::Relaxed) {
-                    let addr = create2_address(deployer, &salt, init_code_hash);
+                    let addr = create2_address(deployer, salt, init_code_hash);
                     if nibbles_match(&addr, target) {
                         println!("MATCH > {}", hex::encode(addr));
                         found.store(true, Ordering::Relaxed);
@@ -93,21 +97,21 @@ fn find_matching_salt(target: &str, deployer: &[u8; 20], init_code_hash: &[u8; 3
                 None
             },
         )
-        .find_any(|res| res.is_some())
+        .find_any(std::option::Option::is_some)
         .flatten()
-        .unwrap()
-        .clone()
 }
 
 fn main() {
     let target = args().nth(1).expect("missing target arg e.g. c0ffee");
 
-    let deployer = <[u8; 20]>::from_hex("226143977e08FEA768e5f11f37DCE22f9dF8be33").unwrap();
+    let deployer =
+        <[u8; 20]>::from_hex("226143977e08FEA768e5f11f37DCE22f9dF8be33").expect("invalid hex");
     let init_code_hash =
         <[u8; 32]>::from_hex("3a4f1278c55dc1fda49512cbc0b3ef978cf36dbf4017764cdb5a8d919687cd52")
-            .unwrap();
+            .expect("invalid hex");
     let start = Instant::now();
-    let salt = find_matching_salt(&target, &deployer, &init_code_hash);
+    let salt = find_matching_salt(&target, &deployer, &init_code_hash)
+        .expect("Could not find matching salt");
 
     println!("SALT 0x{}", hex::encode(salt));
     println!(

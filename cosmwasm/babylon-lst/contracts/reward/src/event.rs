@@ -3,6 +3,7 @@ use cosmwasm_std::{Addr, Decimal, Event, Timestamp, Uint128};
 pub const SPLIT_REWARD_EVENT: &str = "split_reward";
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn SplitRewardEvent(
     fee_rate: Decimal,
     split_amount: Uint128,
@@ -21,6 +22,7 @@ pub fn SplitRewardEvent(
 pub const UPDATE_CONFIG_EVENT: &str = "update_config";
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn UpdateConfigEvent(
     lst_contract_address: Addr,
     fee_receiver: Addr,

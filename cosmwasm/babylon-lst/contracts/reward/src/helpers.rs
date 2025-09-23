@@ -6,12 +6,13 @@ use crate::msg::ExecuteLstMsg;
 
 const DECIMAL_FRACTIONAL: Uint128 = Uint128::new(1_000_000_000_000_000_000u128);
 
-/// CwTemplateContract is a wrapper around Addr that provides a lot of helpers
+/// `CwTemplateContract` is a wrapper around Addr that provides a lot of helpers
 /// for working with this.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct LstTemplateContract(pub Addr);
 
 impl LstTemplateContract {
+    #[must_use]
     pub fn addr(&self) -> Addr {
         self.0.clone()
     }
@@ -27,6 +28,7 @@ impl LstTemplateContract {
     }
 }
 
+#[must_use]
 pub fn split_revenue(amount: Uint128, fee_rate: Decimal, denom: String) -> (Coin, Coin) {
     let decimal_fract = Decimal::new(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL);
     let fract = (fee_rate * decimal_fract).to_uint_floor();
