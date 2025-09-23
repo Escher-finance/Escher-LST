@@ -16,7 +16,7 @@ version = "0.1.0"
 disallowed_types        = "deny"
 module_inception        = "allow"
 module_name_repetitions = "allow"
-pedantic                = "warn"
+pedantic                = { level = "warn", priority = -1 }
 
 [workspace.lints.rustdoc]
 broken-intra-doc-links = "deny"
