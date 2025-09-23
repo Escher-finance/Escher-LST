@@ -75,7 +75,7 @@ contract EulerVault is ERC4626, Ownable2Step {
         }
 
         uint256 shares = previewWithdraw(assets);
-        _beforeWithdraw(assets, shares);
+        _beforeWithdraw(assets);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return shares;
@@ -89,7 +89,7 @@ contract EulerVault is ERC4626, Ownable2Step {
         }
 
         uint256 assets = previewRedeem(shares);
-        _beforeWithdraw(assets, shares);
+        _beforeWithdraw(assets);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
 
         return assets;
@@ -107,8 +107,9 @@ contract EulerVault is ERC4626, Ownable2Step {
         s_eulerVault.deposit(assets, address(this));
     }
 
-    function _beforeWithdraw(uint256 assets, uint256 shares) internal {
+    function _beforeWithdraw(uint256 assets) internal {
         address eulerVaultAddr = address(s_eulerVault);
+        uint256 shares = s_eulerVault.previewWithdraw(assets);
         IERC20(eulerVaultAddr).safeIncreaseAllowance(eulerVaultAddr, shares);
         s_eulerVault.withdraw(assets, address(this), address(this));
     }
