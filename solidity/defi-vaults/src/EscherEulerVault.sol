@@ -9,7 +9,7 @@ import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step
 import {IEVault} from "./interfaces/IEVault.sol";
 import {IEthereumVaultConnector} from "./interfaces/IEthereumVaultConnector.sol";
 
-contract EulerVault is ERC4626, Ownable2Step {
+contract EscherEulerVault is ERC4626, Ownable2Step {
     using SafeERC20 for IERC20;
 
     IEVault public s_eulerVault;
