@@ -107,8 +107,8 @@ contract EscherEulerVault is ERC4626, Ownable2Step {
         return assets;
     }
 
-    function borrow(uint256 assets) public onlyOwner {
-        _borrow(assets);
+    function borrow(uint256 assets) public onlyOwner onlyWithEulerEVC {
+        s_eulerVault.borrow(assets, address(this));
     }
 
     function disableController(IEVault _eulerVault) public onlyOwner {
@@ -145,10 +145,6 @@ contract EscherEulerVault is ERC4626, Ownable2Step {
 
     function updateEulerEVC(IEthereumVaultConnector _eulerEVC) public onlyOwner {
         _updateEulerEVC(_eulerEVC);
-    }
-
-    function _borrow(uint256 assets) internal onlyWithEulerEVC {
-        s_eulerVault.borrow(assets, address(this));
     }
 
     function _afterDeposit(uint256 assets) internal {

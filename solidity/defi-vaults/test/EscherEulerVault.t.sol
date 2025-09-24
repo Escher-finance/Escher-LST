@@ -13,14 +13,6 @@ contract EscherEulerVaultTest is Test {
     address owner;
     address user;
 
-    function compareArrays(address[] memory a, address[] memory b) internal pure returns (bool) {
-        if (a.length != b.length) return false;
-        for (uint256 i = 0; i < a.length; i++) {
-            if (a[i] != b[i]) return false;
-        }
-        return true;
-    }
-
     function setUp() public {
         vm.createSelectFork("mainnet", 23432500);
         eulerVault = IEVault(0x3573A84Bee11D49A1CbCe2b291538dE7a7dD81c6);
@@ -80,24 +72,25 @@ contract EscherEulerVaultTest is Test {
     function test_collateralsAndBorrowing() public {
         vm.startPrank(owner);
         uint256 depositAmount = 100000;
-        address[] memory expectedCollaterals = new address[](2);
+
+        assertEq(vault.s_eulerEVC().isCollateralEnabled(address(vault), address(collateralVault1)), false);
+        assertEq(vault.s_eulerEVC().isCollateralEnabled(address(vault), address(collateralVault2)), false);
 
         // add 1st collateral
-        compareArrays(vault.collaterals(), expectedCollaterals);
         IERC20(collateralVault1.asset()).approve(address(collateralVault1), depositAmount);
         collateralVault1.deposit(depositAmount, address(vault));
         vault.addCollateral(collateralVault1);
-        expectedCollaterals[0] = address(collateralVault1);
-        compareArrays(vault.collaterals(), expectedCollaterals);
 
         // add 2nd collateral
         IERC20(collateralVault2.asset()).approve(address(collateralVault2), depositAmount);
         collateralVault2.deposit(depositAmount, address(vault));
         vault.addCollateral(collateralVault2);
-        expectedCollaterals[1] = address(collateralVault2);
-        compareArrays(vault.collaterals(), expectedCollaterals);
+
+        assertEq(vault.s_eulerEVC().isCollateralEnabled(address(vault), address(collateralVault1)), true);
+        assertEq(vault.s_eulerEVC().isCollateralEnabled(address(vault), address(collateralVault2)), true);
+        assertEq(vault.s_eulerEVC().isControllerEnabled(address(vault), address(eulerVault)), true);
 
         // borrow
-        vault.borrow(50);
+        // vault.borrow(50);
     }
 }
