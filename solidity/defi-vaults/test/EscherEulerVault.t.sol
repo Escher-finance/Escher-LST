@@ -90,7 +90,10 @@ contract EscherEulerVaultTest is Test {
         assertEq(vault.s_eulerEVC().isCollateralEnabled(address(vault), address(collateralVault2)), true);
         assertEq(vault.s_eulerEVC().isControllerEnabled(address(vault), address(eulerVault)), true);
 
+        (uint256 collateralValue,) = eulerVault.accountLiquidity(address(vault), false);
+        assertGt(collateralValue, 0);
+
         // borrow
-        // vault.borrow(50);
+        vault.borrow(50);
     }
 }
