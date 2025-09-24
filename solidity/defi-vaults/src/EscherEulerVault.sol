@@ -139,15 +139,15 @@ contract EscherEulerVault is ERC4626, Ownable2Step {
         address thisAddr = address(this);
         IERC20 eulerVaultToken = IERC20(eulerVaultAddr);
 
-        uint256 eulerShares = s_eulerVault.previewWithdraw(assets);
-        uint256 eulerSharesBalance = eulerVaultToken.balanceOf(thisAddr);
-        uint256 eulerSharesNeeded = 0;
-        if (eulerShares > eulerSharesBalance) {
-            eulerSharesNeeded = eulerShares - eulerSharesBalance;
+        uint256 assetsBalance = IERC20(s_eulerVault.asset()).balanceOf(thisAddr);
+        uint256 assetsNeeded = 0;
+        if (assets > assetsBalance) {
+            assetsNeeded = assets - assetsBalance;
         }
-        if (eulerSharesNeeded != 0) {
-            eulerVaultToken.safeIncreaseAllowance(eulerVaultAddr, eulerSharesNeeded);
-            s_eulerVault.withdraw(s_eulerVault.convertToAssets(eulerSharesNeeded), thisAddr, thisAddr);
+        if (assetsNeeded != 0) {
+            uint256 eulerShares = s_eulerVault.convertToShares(assetsNeeded);
+            eulerVaultToken.safeIncreaseAllowance(eulerVaultAddr, eulerShares);
+            s_eulerVault.withdraw(assetsNeeded, thisAddr, thisAddr);
         }
     }
 
