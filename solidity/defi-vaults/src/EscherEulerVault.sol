@@ -9,7 +9,7 @@ import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step
 import {IEVault} from "./interfaces/IEVault.sol";
 import {IEthereumVaultConnector} from "./interfaces/IEthereumVaultConnector.sol";
 
-contract EulerVault is ERC4626, Ownable2Step {
+contract EscherEulerVault is ERC4626, Ownable2Step {
     using SafeERC20 for IERC20;
 
     IEVault public s_eulerVault;
@@ -18,6 +18,7 @@ contract EulerVault is ERC4626, Ownable2Step {
     error EscherVault_InvalidEulerVault();
     error EscherVault_OldEulerVaultStillActive();
     error EscherVault_MissingEulerEVC();
+    error EscherVault_CollateralAlreadyEnabled();
 
     event EulerVaultUpdated(address indexed _newEulerVault);
     event EulerEVCUpdated(address indexed _newEulerEVC);
@@ -106,8 +107,33 @@ contract EulerVault is ERC4626, Ownable2Step {
         return assets;
     }
 
-    function borrow(uint256 assets) public onlyOwner {
-        _borrow(assets);
+    function borrow(uint256 assets) public onlyOwner onlyWithEulerEVC {
+        s_eulerVault.borrow(assets, address(this));
+    }
+
+    function disableController(IEVault _eulerVault) public onlyOwner {
+        _eulerVault.disableController();
+    }
+
+    function controllers() public view returns (address[] memory) {
+        return s_eulerEVC.getControllers(address(this));
+    }
+
+    function collaterals() public view returns (address[] memory) {
+        return s_eulerEVC.getCollaterals(address(this));
+    }
+
+    function isCollateralEnabled(address _eulerVault) public view returns (bool) {
+        return s_eulerEVC.isCollateralEnabled(address(this), _eulerVault);
+    }
+
+    function addCollateral(IEVault _collateralVault) public onlyOwner onlyWithEulerEVC {
+        address thisAddr = address(this);
+        address collateralVaultAddr = address(_collateralVault);
+        if (isCollateralEnabled(collateralVaultAddr)) {
+            revert EscherVault_CollateralAlreadyEnabled();
+        }
+        s_eulerEVC.enableCollateral(thisAddr, collateralVaultAddr);
     }
 
     function updateEulerVault(IEVault _eulerVault) public onlyOwner {
@@ -121,13 +147,6 @@ contract EulerVault is ERC4626, Ownable2Step {
         _updateEulerEVC(_eulerEVC);
     }
 
-    function _borrow(uint256 assets) internal onlyWithEulerEVC {
-        address thisAddr = address(this);
-        s_eulerEVC.enableCollateral(thisAddr, thisAddr);
-        s_eulerEVC.enableController(thisAddr, address(s_eulerVault));
-        s_eulerVault.borrow(assets, thisAddr);
-    }
-
     function _afterDeposit(uint256 assets) internal {
         IERC20(asset()).safeIncreaseAllowance(address(s_eulerVault), assets);
         s_eulerVault.deposit(assets, address(this));
@@ -139,15 +158,15 @@ contract EulerVault is ERC4626, Ownable2Step {
         address thisAddr = address(this);
         IERC20 eulerVaultToken = IERC20(eulerVaultAddr);
 
-        uint256 eulerShares = s_eulerVault.previewWithdraw(assets);
-        uint256 eulerSharesBalance = eulerVaultToken.balanceOf(thisAddr);
-        uint256 eulerSharesNeeded = 0;
-        if (eulerShares > eulerSharesBalance) {
-            eulerSharesNeeded = eulerShares - eulerSharesBalance;
+        uint256 assetsBalance = IERC20(s_eulerVault.asset()).balanceOf(thisAddr);
+        uint256 assetsNeeded = 0;
+        if (assets > assetsBalance) {
+            assetsNeeded = assets - assetsBalance;
         }
-        if (eulerSharesNeeded != 0) {
-            eulerVaultToken.safeIncreaseAllowance(eulerVaultAddr, eulerSharesNeeded);
-            s_eulerVault.withdraw(s_eulerVault.convertToAssets(eulerSharesNeeded), thisAddr, thisAddr);
+        if (assetsNeeded != 0) {
+            uint256 eulerShares = s_eulerVault.convertToShares(assetsNeeded);
+            eulerVaultToken.safeIncreaseAllowance(eulerVaultAddr, eulerShares);
+            s_eulerVault.withdraw(assetsNeeded, thisAddr, thisAddr);
         }
     }
 
@@ -160,6 +179,9 @@ contract EulerVault is ERC4626, Ownable2Step {
     }
 
     function _updateEulerEVC(IEthereumVaultConnector _eulerEVC) private {
+        address thisAddr = address(this);
+        address eulerVaultAddr = address(s_eulerVault);
+        _eulerEVC.enableController(thisAddr, eulerVaultAddr);
         s_eulerEVC = _eulerEVC;
         emit EulerEVCUpdated(address(_eulerEVC));
     }
