@@ -18,6 +18,7 @@ contract EscherEulerVault is ERC4626, Ownable2Step {
     error EscherVault_InvalidEulerVault();
     error EscherVault_OldEulerVaultStillActive();
     error EscherVault_MissingEulerEVC();
+    error EscherVault_CollateralAlreadyEnabled();
 
     event EulerVaultUpdated(address indexed _newEulerVault);
     event EulerEVCUpdated(address indexed _newEulerEVC);
@@ -110,6 +111,31 @@ contract EscherEulerVault is ERC4626, Ownable2Step {
         _borrow(assets);
     }
 
+    function disableController(IEVault _eulerVault) public onlyOwner {
+        _eulerVault.disableController();
+    }
+
+    function controllers() public view returns (address[] memory) {
+        return s_eulerEVC.getControllers(address(this));
+    }
+
+    function collaterals() public view returns (address[] memory) {
+        return s_eulerEVC.getCollaterals(address(this));
+    }
+
+    function isCollateralEnabled(address _eulerVault) public view returns (bool) {
+        return s_eulerEVC.isCollateralEnabled(address(this), _eulerVault);
+    }
+
+    function addCollateral(IEVault _collateralVault) public onlyOwner onlyWithEulerEVC {
+        address thisAddr = address(this);
+        address collateralVaultAddr = address(_collateralVault);
+        if (isCollateralEnabled(collateralVaultAddr)) {
+            revert EscherVault_CollateralAlreadyEnabled();
+        }
+        s_eulerEVC.enableCollateral(thisAddr, collateralVaultAddr);
+    }
+
     function updateEulerVault(IEVault _eulerVault) public onlyOwner {
         if (s_eulerVault.balanceOf(address(this)) != 0) {
             revert EscherVault_OldEulerVaultStillActive();
@@ -159,7 +185,6 @@ contract EscherEulerVault is ERC4626, Ownable2Step {
     function _updateEulerEVC(IEthereumVaultConnector _eulerEVC) private {
         address thisAddr = address(this);
         address eulerVaultAddr = address(s_eulerVault);
-        _eulerEVC.enableCollateral(thisAddr, eulerVaultAddr);
         _eulerEVC.enableController(thisAddr, eulerVaultAddr);
         s_eulerEVC = _eulerEVC;
         emit EulerEVCUpdated(address(_eulerEVC));

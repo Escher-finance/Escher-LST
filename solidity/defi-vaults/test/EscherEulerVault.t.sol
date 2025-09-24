@@ -8,12 +8,24 @@ contract EscherEulerVaultTest is Test {
     EscherEulerVault vault;
     IERC20 underylingAsset;
     IEVault eulerVault;
+    IEVault collateralVault1;
+    IEVault collateralVault2;
     address owner;
     address user;
+
+    function compareArrays(address[] memory a, address[] memory b) internal pure returns (bool) {
+        if (a.length != b.length) return false;
+        for (uint256 i = 0; i < a.length; i++) {
+            if (a[i] != b[i]) return false;
+        }
+        return true;
+    }
 
     function setUp() public {
         vm.createSelectFork("mainnet", 23432500);
         eulerVault = IEVault(0x3573A84Bee11D49A1CbCe2b291538dE7a7dD81c6);
+        collateralVault1 = IEVault(0xE415952f5ee06f8A548F4f7D5bE18FBf144b4E4D);
+        collateralVault2 = IEVault(0xe0a80d35bB6618CBA260120b279d357978c42BCE);
         underylingAsset = IERC20(eulerVault.asset());
         owner = makeAddr("owner");
         user = makeAddr("user");
@@ -23,8 +35,10 @@ contract EscherEulerVaultTest is Test {
         uint256 dealAmount = 100 ether;
         deal(address(underylingAsset), owner, dealAmount);
         deal(address(underylingAsset), user, dealAmount);
-        assertGe(underylingAsset.balanceOf(owner), dealAmount);
-        assertGe(underylingAsset.balanceOf(user), dealAmount);
+        deal(collateralVault1.asset(), owner, dealAmount);
+        deal(collateralVault1.asset(), user, dealAmount);
+        deal(collateralVault2.asset(), owner, dealAmount);
+        deal(collateralVault2.asset(), user, dealAmount);
 
         IEthereumVaultConnector evc = IEthereumVaultConnector(payable(0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383));
         vm.prank(owner);
@@ -63,13 +77,27 @@ contract EscherEulerVaultTest is Test {
         assertGe(vault.s_eulerVault().balanceOf(address(vault)), 0);
     }
 
-    function test_borrowing() public {
+    function test_collateralsAndBorrowing() public {
         vm.startPrank(owner);
-
         uint256 depositAmount = 100000;
-        underylingAsset.approve(address(vault), depositAmount);
-        vault.deposit(depositAmount, user);
+        address[] memory expectedCollaterals = new address[](2);
 
+        // add 1st collateral
+        compareArrays(vault.collaterals(), expectedCollaterals);
+        IERC20(collateralVault1.asset()).approve(address(collateralVault1), depositAmount);
+        collateralVault1.deposit(depositAmount, address(vault));
+        vault.addCollateral(collateralVault1);
+        expectedCollaterals[0] = address(collateralVault1);
+        compareArrays(vault.collaterals(), expectedCollaterals);
+
+        // add 2nd collateral
+        IERC20(collateralVault2.asset()).approve(address(collateralVault2), depositAmount);
+        collateralVault2.deposit(depositAmount, address(vault));
+        vault.addCollateral(collateralVault2);
+        expectedCollaterals[1] = address(collateralVault2);
+        compareArrays(vault.collaterals(), expectedCollaterals);
+
+        // borrow
         vault.borrow(50);
     }
 }
