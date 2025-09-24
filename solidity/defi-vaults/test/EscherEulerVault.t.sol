@@ -7,12 +7,13 @@ import {EscherEulerVault, IEVault, IERC20, IEthereumVaultConnector} from "../src
 contract EscherEulerVaultTest is Test {
     EscherEulerVault vault;
     IERC20 underylingAsset;
+    IEVault eulerVault;
     address owner;
     address user;
 
     function setUp() public {
         vm.createSelectFork("mainnet", 23432500);
-        IEVault eulerVault = IEVault(0x3573A84Bee11D49A1CbCe2b291538dE7a7dD81c6);
+        eulerVault = IEVault(0x3573A84Bee11D49A1CbCe2b291538dE7a7dD81c6);
         underylingAsset = IERC20(eulerVault.asset());
         owner = makeAddr("owner");
         user = makeAddr("user");
@@ -48,7 +49,7 @@ contract EscherEulerVaultTest is Test {
         assertEq(vault.balanceOf(user), depositAmount);
         assertEq(vault.totalSupply(), depositAmount);
         assertApproxEqRel(vault.totalAssets(), depositAmount, 0.01 ether);
-        assertGe(vault.s_eulerVault().balanceOf(address(vault)), 0);
+        assertGe(eulerVault.balanceOf(address(vault)), 0);
 
         // redeem
 
@@ -65,7 +66,7 @@ contract EscherEulerVaultTest is Test {
     function test_borrowing() public {
         vm.startPrank(owner);
 
-        uint256 depositAmount = 500;
+        uint256 depositAmount = 100000;
         underylingAsset.approve(address(vault), depositAmount);
         vault.deposit(depositAmount, user);
 

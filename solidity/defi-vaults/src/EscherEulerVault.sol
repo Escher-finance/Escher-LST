@@ -122,10 +122,7 @@ contract EscherEulerVault is ERC4626, Ownable2Step {
     }
 
     function _borrow(uint256 assets) internal onlyWithEulerEVC {
-        address thisAddr = address(this);
-        s_eulerEVC.enableCollateral(thisAddr, thisAddr);
-        s_eulerEVC.enableController(thisAddr, address(s_eulerVault));
-        s_eulerVault.borrow(assets, thisAddr);
+        s_eulerVault.borrow(assets, address(this));
     }
 
     function _afterDeposit(uint256 assets) internal {
@@ -160,6 +157,10 @@ contract EscherEulerVault is ERC4626, Ownable2Step {
     }
 
     function _updateEulerEVC(IEthereumVaultConnector _eulerEVC) private {
+        address thisAddr = address(this);
+        address eulerVaultAddr = address(s_eulerVault);
+        _eulerEVC.enableCollateral(thisAddr, eulerVaultAddr);
+        _eulerEVC.enableController(thisAddr, eulerVaultAddr);
         s_eulerEVC = _eulerEVC;
         emit EulerEVCUpdated(address(_eulerEVC));
     }
