@@ -9,15 +9,13 @@ contract EscherEulerVaultTest is Test {
     IERC20 underylingAsset;
     IEVault eulerVault;
     IEVault collateralVault1;
-    IEVault collateralVault2;
     address owner;
     address user;
 
     function setUp() public {
         vm.createSelectFork("mainnet", 23432500);
         eulerVault = IEVault(0x3573A84Bee11D49A1CbCe2b291538dE7a7dD81c6);
-        collateralVault1 = IEVault(0xE415952f5ee06f8A548F4f7D5bE18FBf144b4E4D);
-        collateralVault2 = IEVault(0xe0a80d35bB6618CBA260120b279d357978c42BCE);
+        collateralVault1 = IEVault(0x797DD80692c3b2dAdabCe8e30C07fDE5307D48a9);
         underylingAsset = IERC20(eulerVault.asset());
         owner = makeAddr("owner");
         user = makeAddr("user");
@@ -29,8 +27,6 @@ contract EscherEulerVaultTest is Test {
         deal(address(underylingAsset), user, dealAmount);
         deal(collateralVault1.asset(), owner, dealAmount);
         deal(collateralVault1.asset(), user, dealAmount);
-        deal(collateralVault2.asset(), owner, dealAmount);
-        deal(collateralVault2.asset(), user, dealAmount);
 
         IEthereumVaultConnector evc = IEthereumVaultConnector(payable(0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383));
         vm.prank(owner);
@@ -70,30 +66,36 @@ contract EscherEulerVaultTest is Test {
     }
 
     function test_collateralsAndBorrowing() public {
-        vm.startPrank(owner);
-        uint256 depositAmount = 100000;
+        vm.startPrank(user);
+
+        // make a deposit just to make the vault have some tokens
+        uint256 depositAmount = 500;
+        underylingAsset.approve(address(vault), depositAmount);
+        vault.deposit(depositAmount, user);
+
+        uint256 collateralAmount = 15000;
+        uint256 borrowAmount = 10000;
 
         assertEq(vault.s_eulerEVC().isCollateralEnabled(address(vault), address(collateralVault1)), false);
-        assertEq(vault.s_eulerEVC().isCollateralEnabled(address(vault), address(collateralVault2)), false);
 
-        // add 1st collateral
-        IERC20(collateralVault1.asset()).approve(address(collateralVault1), depositAmount);
-        collateralVault1.deposit(depositAmount, address(vault));
+        // user deposits collateral
+        IERC20(collateralVault1.asset()).approve(address(collateralVault1), collateralAmount);
+        collateralVault1.deposit(collateralAmount, address(vault));
+
+        vm.startPrank(owner);
+
+        // owner adds collateral
         vault.addCollateral(collateralVault1);
 
-        // add 2nd collateral
-        IERC20(collateralVault2.asset()).approve(address(collateralVault2), depositAmount);
-        collateralVault2.deposit(depositAmount, address(vault));
-        vault.addCollateral(collateralVault2);
-
         assertEq(vault.s_eulerEVC().isCollateralEnabled(address(vault), address(collateralVault1)), true);
-        assertEq(vault.s_eulerEVC().isCollateralEnabled(address(vault), address(collateralVault2)), true);
         assertEq(vault.s_eulerEVC().isControllerEnabled(address(vault), address(eulerVault)), true);
 
         (uint256 collateralValue,) = eulerVault.accountLiquidity(address(vault), false);
         assertGt(collateralValue, 0);
 
         // borrow
-        vault.borrow(50);
+        assertApproxEqRel(vault.totalAssets(), depositAmount, 0.01 ether);
+        vault.borrow(borrowAmount);
+        assertApproxEqRel(vault.totalAssets(), depositAmount + borrowAmount, 0.01 ether);
     }
 }
