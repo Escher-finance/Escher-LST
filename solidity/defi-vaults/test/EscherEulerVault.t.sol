@@ -45,5 +45,16 @@ contract EscherEulerVaultTest is Test {
         assertEq(vault.totalSupply(), depositAmount);
         assertApproxEqRel(vault.totalAssets(), depositAmount, 0.01 ether);
         assertGe(vault.s_eulerVault().balanceOf(address(vault)), 0);
+
+        // redeem
+
+        uint256 redeemAmount = depositAmount / 2;
+        vault.approve(address(vault), redeemAmount);
+        vault.redeem(redeemAmount, user, user);
+        assertGe(vault.convertToShares(10000), 10000);
+        assertEq(vault.balanceOf(user), redeemAmount);
+        assertEq(vault.totalSupply(), depositAmount - redeemAmount);
+        assertApproxEqRel(vault.totalAssets(), depositAmount - redeemAmount, 0.01 ether);
+        assertGe(vault.s_eulerVault().balanceOf(address(vault)), 0);
     }
 }
