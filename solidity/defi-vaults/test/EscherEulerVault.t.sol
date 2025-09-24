@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import {EscherEulerVault, IEVault, IERC20} from "../src/EscherEulerVault.sol";
+import {EscherEulerVault, IEVault, IERC20, IEthereumVaultConnector} from "../src/EscherEulerVault.sol";
 
 contract EscherEulerVaultTest is Test {
     EscherEulerVault vault;
@@ -24,12 +24,16 @@ contract EscherEulerVaultTest is Test {
         deal(address(underylingAsset), user, dealAmount);
         assertGe(underylingAsset.balanceOf(owner), dealAmount);
         assertGe(underylingAsset.balanceOf(user), dealAmount);
+
+        IEthereumVaultConnector evc = IEthereumVaultConnector(payable(0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383));
+        vm.prank(owner);
+        vault.updateEulerEVC(evc);
     }
 
     function test_lending() public {
-        assertEq(vault.convertToShares(10000), 10000, "should have 1:1 ratio initially");
-
         vm.startPrank(user);
+
+        assertEq(vault.convertToShares(10000), 10000, "should have 1:1 ratio initially");
 
         assertEq(vault.totalSupply(), 0);
         assertEq(vault.totalAssets(), 0);
@@ -56,5 +60,15 @@ contract EscherEulerVaultTest is Test {
         assertEq(vault.totalSupply(), depositAmount - redeemAmount);
         assertApproxEqRel(vault.totalAssets(), depositAmount - redeemAmount, 0.01 ether);
         assertGe(vault.s_eulerVault().balanceOf(address(vault)), 0);
+    }
+
+    function test_borrowing() public {
+        vm.startPrank(owner);
+
+        uint256 depositAmount = 500;
+        underylingAsset.approve(address(vault), depositAmount);
+        vault.deposit(depositAmount, user);
+
+        vault.borrow(50);
     }
 }
