@@ -15,6 +15,7 @@ import TransfereU from "./transfer_eu";
 import UnionBond from "./union_bond";
 import UnionInfo from "./union_info";
 import TransferFromBabylon from "./transfer_from_babylon";
+import UnionUnbond from "./union_unbond";
 //import ZkgmUnbond from "./zkgm_unbond";
 
 export default function Dashboard() {
@@ -86,6 +87,9 @@ export default function Dashboard() {
             <Tabs className="mt-10 p-1">
               <Tab key="bond" title="Bond">
                 <UnionBond stateKey={stateKey} setStateKey={setStateKey} />
+              </Tab>
+              <Tab key="unbond" title="Unbond">
+                <UnionUnbond stateKey={stateKey} setStateKey={setStateKey} />
               </Tab>
               <Tab key="transfer_u" title="Transfer U" >
                 <TransferU stateKey={stateKey} setStateKey={setStateKey} />
