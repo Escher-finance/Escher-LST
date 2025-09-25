@@ -148,6 +148,7 @@ pub enum ExecuteMsg {
     UpdateValidators {
         validators: Vec<Validator>,
     },
+    /*
     OnZkgm {
         caller: Addr,
         path: Uint256,
@@ -158,6 +159,7 @@ pub enum ExecuteMsg {
         relayer: Addr,
         relayer_msg: Bytes,
     },
+    */
     /// Redelegate some amount that is called from reward contract as result of split reward call to reward contract
     Redelegate {},
     /// Call migrate to reward contract
