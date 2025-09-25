@@ -97,7 +97,7 @@ pub enum Cw20PayloadMsg {
 #[allow(clippy::large_enum_variant)]
 pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
-    /// Issue `amount` / exchange_rate for the user.
+    /// Issue `amount` / `exchange_rate` for the user.
     Bond {
         slippage: Option<Decimal>,
         expected: Uint128,
@@ -167,12 +167,6 @@ pub enum ExecuteMsg {
         code_id: u64,
     },
     SplitReward {},
-    SetConfig {
-        lst_contract_address: Option<Addr>,
-        fee_receiver: Option<Addr>,
-        fee_rate: Option<Decimal>,
-        coin_denom: Option<String>,
-    },
     SetStatus(Status),
     SetChain {
         chain: crate::state::Chain,

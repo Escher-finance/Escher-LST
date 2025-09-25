@@ -6,7 +6,6 @@ pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const STATUS: Item<Status> = Item::new("status");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
-pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
 
@@ -136,12 +135,20 @@ pub struct Parameters {
 
 pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
 
+/// # Result
+/// Will return new incremented token as u64
+/// # Errors
+/// Will return `cosmwasm_std::StdError`
 pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
     let val = num_tokens(storage)? + 1;
     TOKEN_COUNT.save(storage, &val)?;
     Ok(val)
 }
 
+/// # Result
+/// Will return current token as u64
+/// # Errors
+/// Will return `cosmwasm_std::StdError`
 pub fn num_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
     Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
 }
@@ -178,6 +185,7 @@ impl<'a> IndexList<OldUnbondRecord> for OldUnbondRecordIndexes<'a> {
     }
 }
 
+#[must_use]
 pub fn old_unbond_record<'a>() -> IndexedMap<u64, OldUnbondRecord, OldUnbondRecordIndexes<'a>> {
     let indexes = OldUnbondRecordIndexes {
         staker: MultiIndex::new(
@@ -240,6 +248,7 @@ impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     }
 }
 
+#[must_use]
 pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<'a>> {
     let indexes = UnbondRecordIndexes {
         staker: MultiIndex::new(
@@ -271,14 +280,6 @@ pub struct QuoteToken {
     pub channel_id: u32,
     pub quote_token: String,
     pub lst_quote_token: String,
-}
-
-#[cw_serde]
-pub struct Config {
-    pub lst_contract_address: Addr,
-    pub fee_receiver: Addr,
-    pub fee_rate: Decimal,
-    pub coin_denom: String,
 }
 
 /// the queued staking token mint amount

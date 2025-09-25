@@ -10,9 +10,9 @@ use crate::{
     instantiate::create_reward,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
     state::{
-        unbond_record, Config, OldParameters, Parameters, State, Status, SupplyQueue,
-        ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-        REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
+        unbond_record, OldParameters, Parameters, State, Status, SupplyQueue, ValidatorsRegistry,
+        WithdrawReward, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
         WITHDRAW_REWARD_QUEUE,
     },
     utils::{
@@ -25,7 +25,13 @@ use crate::{
 const CONTRACT_NAME: &str = "crates.io:liquidstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Instantiate new contract
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[allow(clippy::needless_pass_by_value)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -47,14 +53,6 @@ pub fn instantiate(
     };
 
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
-
-    let reward_config = Config {
-        lst_contract_address: env.clone().contract.address,
-        fee_receiver: msg.fee_receiver.clone(),
-        fee_rate: msg.fee_rate,
-        coin_denom: msg.underlying_coin_denom.clone(),
-    };
-    CONFIG.save(deps.storage, &reward_config)?;
 
     let mut reward_address = env.contract.address.clone();
     let msgs: Vec<CosmosMsg> = if msg.use_external_reward.unwrap_or(false) {
@@ -159,6 +157,11 @@ pub fn instantiate(
         .add_messages(msgs))
 }
 
+/// Execute contract
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -252,20 +255,6 @@ pub fn execute(
         } => execute::on_zkgm(deps, env, info, destination_channel_id, sender, message),*/
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::SplitReward {} => execute::split_reward(deps, env, info),
-        ExecuteMsg::SetConfig {
-            lst_contract_address,
-            fee_receiver,
-            fee_rate,
-            coin_denom,
-        } => execute::set_config(
-            deps,
-            env,
-            info,
-            lst_contract_address,
-            fee_receiver,
-            fee_rate,
-            coin_denom,
-        ),
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
         ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
         ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
@@ -281,6 +270,12 @@ pub fn execute(
     }
 }
 
+/// Migrate contract
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::needless_pass_by_value)]
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -348,7 +343,12 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
         .add_attribute("contract_name", CONTRACT_NAME))
 }
 
-/// Migrate the old unbond record to the new record with recipient and recipient_channel_id properties
+/// Migrate the old unbond record to the new record with recipient and `recipient_channel_id` properties
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::needless_pass_by_value)]
 pub fn migrate_unbond_record_v0_1_163(
     storage: &mut dyn cosmwasm_std::Storage,
 ) -> Result<(), ContractError> {
@@ -425,5 +425,5 @@ fn test_migrate_unbond_record_v0_1_163() {
     assert_eq!(new_data.height, 1008);
     assert_eq!(new_data.recipient, None);
 
-    println!("{:#?}", new_data);
+    println!("{new_data:#?}");
 }

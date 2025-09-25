@@ -8,17 +8,16 @@ use crate::{
     error::ContractError,
     event::{
         BatchReceivedEvent, BatchReleasedEvent, BondEvent, ProcessBatchUnbondingEvent,
-        ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent, UpdateConfigEvent,
-        UpdateValidatorsEvent,
+        ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent, UpdateValidatorsEvent,
     },
     helpers,
     msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, RewardMigrateMsg},
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, CONFIG,
-        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE,
-        STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
+        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, PARAMETERS,
+        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
+        SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
     },
     utils::{
         self,
@@ -986,56 +985,6 @@ pub fn update_quote_token(
     Ok(Response::default())
 }
 
-/// Set config
-/// # Result
-/// Will return result of `cosmwasm_std::Response`
-/// # Errors
-/// Will return contract error
-#[allow(clippy::needless_pass_by_value)]
-pub fn set_config(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    lst_contract_address: Option<Addr>,
-    fee_receiver: Option<Addr>,
-    fee_rate: Option<Decimal>,
-    coin_denom: Option<String>,
-) -> Result<Response, ContractError> {
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    let mut config = CONFIG.load(deps.storage)?;
-
-    if let Some(rate) = fee_rate {
-        if rate > Decimal::one() {
-            return Err(ContractError::InvalidFeeRate {});
-        }
-    }
-
-    config.lst_contract_address = lst_contract_address
-        .clone()
-        .unwrap_or(config.lst_contract_address);
-    config.fee_receiver = fee_receiver.clone().unwrap_or(config.fee_receiver);
-    config.fee_rate = fee_rate.unwrap_or(config.fee_rate);
-    config.coin_denom = coin_denom.clone().unwrap_or(config.coin_denom);
-    CONFIG.save(deps.storage, &config)?;
-
-    let event = UpdateConfigEvent(
-        config.lst_contract_address.clone(),
-        config.fee_receiver.clone(),
-        config.fee_rate,
-        config.coin_denom.clone(),
-    );
-
-    let attrs = Vec::from([
-        attr("action", "set_config"),
-        attr("lst_contract_address", config.lst_contract_address),
-        attr("fee_receiver", config.fee_receiver),
-        attr("fee_rate", config.fee_rate.to_string()),
-        attr("coin_denom", config.coin_denom),
-    ]);
-
-    Ok(Response::new().add_attributes(attrs).add_event(event))
-}
-
 /// Migrate reward contract
 /// # Result
 /// Will return result of `cosmwasm_std::Response`
@@ -1074,17 +1023,19 @@ pub fn migrate_reward(
 /// Will return contract error
 #[allow(clippy::needless_pass_by_value)]
 pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
+    let config = PARAMETERS.load(deps.storage)?;
+
+    let lst_contract_address = env.contract.address;
     // only liquid staking contract able to call this function
-    if info.sender != config.lst_contract_address {
+    if info.sender != lst_contract_address {
         return Err(ContractError::Unauthorized {});
     }
 
     // first need to get this contract balance
-    let contract_addr: Addr = env.contract.address;
-    let balance = deps
-        .querier
-        .query_balance(contract_addr, config.coin_denom.clone())?;
+    let balance = deps.querier.query_balance(
+        lst_contract_address.clone(),
+        config.underlying_coin_denom.clone(),
+    )?;
 
     let mut msgs: Vec<CosmosMsg> = vec![];
 
@@ -1108,8 +1059,11 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         attr("fee_receiver", config.fee_receiver.to_string()),
         attr("time", format!("{}", env.block.time.nanos())),
     ];
-    let (redelegate, fee) =
-        helpers::split_revenue(balance_to_split, config.fee_rate, config.coin_denom);
+    let (redelegate, fee) = helpers::split_revenue(
+        balance_to_split,
+        config.fee_rate,
+        config.underlying_coin_denom,
+    );
 
     // Send the fee to revenue receiver
     let bank_msg = CosmosMsg::Bank(BankMsg::Send {
@@ -1120,8 +1074,7 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     msgs.push(bank_msg);
 
     // Redelegate by call the LST Contract and attach the funds
-    let lst: helpers::LstTemplateContract =
-        helpers::LstTemplateContract(config.lst_contract_address);
+    let lst: helpers::LstTemplateContract = helpers::LstTemplateContract(lst_contract_address);
     let execute_msg = lst.call(ExecuteMsg::Redelegate {}, vec![redelegate.clone()])?;
     msgs.push(execute_msg);
 
