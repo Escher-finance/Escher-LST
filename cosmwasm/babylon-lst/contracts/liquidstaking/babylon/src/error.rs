@@ -146,4 +146,10 @@ pub enum ContractError {
 
     #[error("recipient ibc channel id not found for unbond record with id: {id}")]
     UnbondRecordIbcChannelNotFound { id: u64 },
+
+    #[error("Batch next action time is not set")]
+    BatchNextActionTimeNotSet,
+
+    #[error("Batch expected native unstaked is not set")]
+    BatchExpectedNativeUnstakedNotSet,
 }
