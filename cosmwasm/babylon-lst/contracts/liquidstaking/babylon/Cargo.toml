@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name    = "liquidstaking-babylon"
-version = "0.1.194"
+version = "0.1.195"
 
 [lints]
 workspace = true
