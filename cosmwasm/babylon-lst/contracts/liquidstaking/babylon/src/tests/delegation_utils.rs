@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments, clippy::too_many_lines)]
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
@@ -38,7 +39,7 @@ fn test_get_validator_delegation_map_base_on_weight() {
             weight: 20,
         },
     ];
-    let total_delegated_amount = Uint128::new(250000);
+    let total_delegated_amount = Uint128::new(250_000);
     let map =
         get_validator_delegation_map_base_on_weight(validators.clone(), total_delegated_amount);
     assert_eq!(map.len(), 2);
@@ -260,9 +261,7 @@ fn test_get_delegate_to_validator_msgs() {
                     validator_address,
                     amount,
                 } = msg.unwrap();
-                if delegator_address != delegator {
-                    panic!("bad delegator");
-                }
+                assert!(delegator_address == delegator, "bad delegator");
                 return (
                     validator_address,
                     Uint128::from_str(&amount.unwrap().amount).unwrap(),
@@ -342,14 +341,14 @@ fn test_get_validator_delegation_map_base_on_weight_should_delegate_remaining_am
             weight: 1000,
         },
     ]);
-    let total_delegated_amount = Uint128::from(500000_u128);
+    let total_delegated_amount = Uint128::from(500_000_u128);
 
     assert_eq!(
         get_validator_delegation_map_base_on_weight(validators, total_delegated_amount)
             .values()
             .sum::<Uint128>(),
         total_delegated_amount
-    )
+    );
 }
 
 #[test]
@@ -672,13 +671,10 @@ fn test_get_undelegate_msgs() {
     let validator_c = "c".to_string();
     let other_validator = "other".to_string();
     let validator_delegation_ratio = HashMap::from([
-        (validator_a.to_string(), Decimal::from_str("0.4").unwrap()),
-        (validator_b.to_string(), Decimal::from_str("0.3").unwrap()),
-        (validator_c.to_string(), Decimal::from_str("0.2").unwrap()),
-        (
-            other_validator.to_string(),
-            Decimal::from_str("0.0").unwrap(),
-        ),
+        (validator_a.clone(), Decimal::from_str("0.4").unwrap()),
+        (validator_b.clone(), Decimal::from_str("0.3").unwrap()),
+        (validator_c.clone(), Decimal::from_str("0.2").unwrap()),
+        (other_validator.clone(), Decimal::from_str("0.0").unwrap()),
     ]);
     let (total_undelegate_amount, msgs, mut atts) = get_undelegate_msgs(
         delegator.clone(),
@@ -703,12 +699,8 @@ fn test_get_undelegate_msgs() {
                 amount,
             } = msg.unwrap();
             let amount = amount.unwrap();
-            if delegator_address != delegator {
-                panic!("bad delegator");
-            }
-            if amount.denom != coin_denom {
-                panic!("wrong denom");
-            }
+            assert!(delegator_address == delegator, "bad delegator");
+            assert!(amount.denom == coin_denom, "wrong denom");
             (
                 validator_address,
                 Uint128::from_str(&amount.amount).unwrap(),
@@ -748,7 +740,7 @@ fn test_get_undelegate_msgs() {
 fn test_unstake_request_in_batch() {
     let mut deps = mock_dependencies();
     let mut env = mock_env();
-    env.block.height = 500000;
+    env.block.height = 500_000;
     let sender = "sender".to_string();
     let staker = "staker".to_string();
     let unstake_amount = Uint128::new(10000);
@@ -894,7 +886,7 @@ fn test_process_bond() {
     let delegator = api.addr_make("delegator");
     let amount = Uint128::new(10000);
     let bond_time = 36000;
-    let block_height = 10000000;
+    let block_height = 10_000_000;
     let salt = "0x0000000000000000000000000000000000000000000000000000000000000001".to_string();
     let params = mock_parameters();
     let validator_addr_a = "a".to_string();
@@ -1015,7 +1007,7 @@ fn test_process_bond() {
         get_delegate_to_validator_msgs(
             delegator.to_string(),
             amount,
-            params.underlying_coin_denom.to_string(),
+            params.underlying_coin_denom,
             validators
         )
     );
@@ -1024,7 +1016,7 @@ fn test_process_bond() {
 #[test]
 fn test_submit_pending_batch() {
     let mut deps = mock_dependencies();
-    let time = Timestamp::from_seconds(1000000);
+    let time = Timestamp::from_seconds(1_000_000);
     let block_height = 10000;
     let sender = deps.api.addr_make("sender");
     let delegator = deps.api.addr_make("delegator");
@@ -1254,7 +1246,7 @@ fn validator_restaking_adjustment() {
     let staking_msg = get_redelegate_msg(20000, denom.clone(), "B".to_string(), "D".to_string());
     assert_eq!(msgs.get(2).unwrap(), &staking_msg);
 
-    println!("msgs: {:#?}", msgs);
+    println!("msgs: {msgs:#?}");
 }
 
 #[test]
@@ -1291,7 +1283,7 @@ fn validator_restaking_adjustment_2() {
     let staking_msg = get_redelegate_msg(30000, denom.clone(), "B".to_string(), "D".to_string());
     assert_eq!(msgs.get(2).unwrap(), &staking_msg);
 
-    println!("msgs: {:#?}", msgs);
+    println!("msgs: {msgs:#?}");
 }
 
 #[test]
@@ -1328,7 +1320,7 @@ fn validator_restaking_adjustment_3() {
     let staking_msg = get_redelegate_msg(5000, denom.clone(), "C".to_string(), "D".to_string());
     assert_eq!(msgs.get(2).unwrap(), &staking_msg);
 
-    println!("\nmsgs: {:#?}", msgs);
+    println!("\nmsgs: {msgs:#?}");
 }
 
 #[test]
@@ -1369,7 +1361,7 @@ fn validator_restaking_adjustment_4() {
     let staking_msg = get_redelegate_msg(18000, denom.clone(), "B".to_string(), "E".to_string());
     assert_eq!(msgs.get(3).unwrap(), &staking_msg);
 
-    println!("\nmsgs: {:#?}", msgs);
+    println!("\nmsgs: {msgs:#?}");
 }
 
 #[test]
@@ -1441,10 +1433,7 @@ fn validators_restaking_adjustment_5() {
     let correct_validator_delegation_map =
         get_validator_delegation_map_base_on_weight(validators, total_delegated_amount);
 
-    println!(
-        "correct_validator_delegation_map : {:#?}",
-        correct_validator_delegation_map
-    );
+    println!("correct_validator_delegation_map : {correct_validator_delegation_map:#?}");
 
     let (surplus_validators, deficient_validators) =
         get_surplus_deficit_validators(validator_delegation_map, correct_validator_delegation_map);
@@ -1457,7 +1446,7 @@ fn validators_restaking_adjustment_5() {
         deficient_validators,
         denom.clone(),
     );
-    println!("\nmsgs: {:#?}", msgs);
+    println!("\nmsgs: {msgs:#?}");
 
     let staking_msg = get_redelegate_msg(
         700u128,
@@ -1528,13 +1517,13 @@ fn validators_restaking_adjustment_6() {
     let everstake = "bbnvaloper1l5c6cf6rps3vq65hmk73hqv2epj6wrn2vlkawa".to_string();
 
     let validator_delegation_map = HashMap::from([
-        (cosmos_spaces.clone(), Uint128::new(2565228)),
-        (node_01.clone(), Uint128::new(2147588)),
-        (lavender_5.clone(), Uint128::new(1825450)),
-        (block_hunters.clone(), Uint128::new(1825450)),
-        (figment.clone(), Uint128::new(1288553)),
-        (fiona.clone(), Uint128::new(859035)),
-        (crypto_crew.clone(), Uint128::new(214758)),
+        (cosmos_spaces.clone(), Uint128::new(2_565_228)),
+        (node_01.clone(), Uint128::new(2_147_588)),
+        (lavender_5.clone(), Uint128::new(1_825_450)),
+        (block_hunters.clone(), Uint128::new(1_825_450)),
+        (figment.clone(), Uint128::new(1_288_553)),
+        (fiona.clone(), Uint128::new(859_035)),
+        (crypto_crew.clone(), Uint128::new(214_758)),
         (everstake.clone(), Uint128::new(11341)),
     ]);
 
@@ -1578,10 +1567,7 @@ fn validators_restaking_adjustment_6() {
     let correct_validator_delegation_map =
         get_validator_delegation_map_base_on_weight(validators, total_delegated_amount);
 
-    println!(
-        "correct_validator_delegation_map : {:#?}",
-        correct_validator_delegation_map
-    );
+    println!("correct_validator_delegation_map : {correct_validator_delegation_map:#?}");
 
     let (surplus_validators, deficient_validators) =
         get_surplus_deficit_validators(validator_delegation_map, correct_validator_delegation_map);
@@ -1595,33 +1581,37 @@ fn validators_restaking_adjustment_6() {
         deficient_validators,
         denom.clone(),
     );
-    println!("\nmsgs: {:#?}", msgs);
+    println!("\nmsgs: {msgs:#?}");
 
     let staking_msg = get_redelegate_msg(65u128, denom.clone(), figment, fiona.clone());
     assert_eq!(msgs.first().unwrap(), &staking_msg);
 
-    let staking_msg = get_redelegate_msg(107466u128, denom.clone(), lavender_5, fiona.clone());
+    let staking_msg = get_redelegate_msg(107_466_u128, denom.clone(), lavender_5, fiona.clone());
     assert_eq!(msgs.get(1).unwrap(), &staking_msg);
 
     let staking_msg = get_redelegate_msg(
-        321922u128,
+        321_922_u128,
         denom.clone(),
         cosmos_spaces.clone(),
         fiona.clone(),
     );
     assert_eq!(msgs.get(2).unwrap(), &staking_msg);
 
-    let staking_msg =
-        get_redelegate_msg(954815u128, denom.clone(), cosmos_spaces, everstake.clone());
+    let staking_msg = get_redelegate_msg(
+        954_815_u128,
+        denom.clone(),
+        cosmos_spaces,
+        everstake.clone(),
+    );
     assert_eq!(msgs.get(3).unwrap(), &staking_msg);
 
     let staking_msg = get_redelegate_msg(10u128, denom.clone(), crypto_crew, everstake.clone());
     assert_eq!(msgs.get(4).unwrap(), &staking_msg);
 
-    let staking_msg = get_redelegate_msg(214856u128, denom.clone(), node_01, everstake.clone());
+    let staking_msg = get_redelegate_msg(214_856_u128, denom.clone(), node_01, everstake.clone());
     assert_eq!(msgs.get(5).unwrap(), &staking_msg);
 
-    let staking_msg = get_redelegate_msg(107466u128, denom.clone(), block_hunters, everstake);
+    let staking_msg = get_redelegate_msg(107_466_u128, denom.clone(), block_hunters, everstake);
     assert_eq!(msgs.get(6).unwrap(), &staking_msg);
 }
 
@@ -1769,15 +1759,12 @@ fn validators_restaking_adjustment_7() {
         "validator_delegation_map: {:#?}",
         validator_delegation_map.clone()
     );
-    println!("total_delegated_amount: {:#?}", total_delegated_amount);
+    println!("total_delegated_amount: {total_delegated_amount:#?}");
 
     let correct_validator_delegation_map =
         get_validator_delegation_map_base_on_weight(validators.clone(), total_delegated_amount);
 
-    println!(
-        "correct_validator_delegation_map: {:#?}",
-        correct_validator_delegation_map
-    );
+    println!("correct_validator_delegation_map: {correct_validator_delegation_map:#?}");
 
     let (surplus_validators, deficient_validators) = get_surplus_deficit_validators(
         validator_delegation_map.clone(),
@@ -1793,7 +1780,7 @@ fn validators_restaking_adjustment_7() {
 
     let mut new_delegation_map: HashMap<String, Uint128> = validator_delegation_map.clone();
 
-    for msg in msgs.iter() {
+    for msg in &msgs {
         if let CosmosMsg::Staking(StakingMsg::Redelegate {
             amount,
             src_validator,
@@ -1822,7 +1809,7 @@ fn validators_restaking_adjustment_7() {
     assert_eq!(
         new_delegation_map.clone(),
         correct_validator_delegation_map.clone()
-    )
+    );
 }
 
 #[test]
@@ -1881,14 +1868,14 @@ fn validators_restaking_adjustment_8() {
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             figment.clone(),
-            Coin::new(Uint128::new(258586), denom.clone()),
+            Coin::new(Uint128::new(258_586), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             blockhunters.clone(),
-            Coin::new(Uint128::new(315935), denom.clone()),
+            Coin::new(Uint128::new(315_935), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
@@ -1902,21 +1889,21 @@ fn validators_restaking_adjustment_8() {
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             everstake.clone(),
-            Coin::new(Uint128::new(215445), denom.clone()),
+            Coin::new(Uint128::new(215_445), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             node01.clone(),
-            Coin::new(Uint128::new(445739), denom.clone()),
+            Coin::new(Uint128::new(445_739), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
         cosmwasm_std::FullDelegation::create(
             delegator_addr.clone(),
             cryptocrew.clone(),
-            Coin::new(Uint128::new(143630), denom.clone()),
+            Coin::new(Uint128::new(143_630), denom.clone()),
             Coin::default(),
             Vec::default(),
         ),
@@ -1997,15 +1984,12 @@ fn validators_restaking_adjustment_8() {
         "validator_delegation_map: {:#?}",
         validator_delegation_map.clone()
     );
-    println!("total_delegated_amount: {:#?}", total_delegated_amount);
+    println!("total_delegated_amount: {total_delegated_amount:#?}");
 
     let correct_validator_delegation_map =
         get_validator_delegation_map_base_on_weight(validators.clone(), total_delegated_amount);
 
-    println!(
-        "correct_validator_delegation_map: {:#?}",
-        correct_validator_delegation_map
-    );
+    println!("correct_validator_delegation_map: {correct_validator_delegation_map:#?}");
 
     let (surplus_validators, deficient_validators) = get_surplus_deficit_validators(
         validator_delegation_map.clone(),
@@ -2018,11 +2002,11 @@ fn validators_restaking_adjustment_8() {
         deficient_validators,
         denom.clone(),
     );
-    println!("msgs: {:#?}", msgs);
+    println!("msgs: {msgs:#?}");
 
     let mut new_delegation_map: HashMap<String, Uint128> = validator_delegation_map.clone();
 
-    for msg in msgs.iter() {
+    for msg in &msgs {
         if let CosmosMsg::Staking(StakingMsg::Redelegate {
             amount,
             src_validator,
@@ -2047,7 +2031,7 @@ fn validators_restaking_adjustment_8() {
         }
     }
 
-    println!("new_delegation_map: {:#?}", new_delegation_map);
+    println!("new_delegation_map: {new_delegation_map:#?}");
 
     assert_eq!(
         new_delegation_map.clone(),
