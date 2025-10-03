@@ -8,14 +8,16 @@ use crate::{execute::*, state::QuoteToken, utils, ContractError};
 fn test_calculate_native_token() {
     let staking_token = Uint128::from(10000u32);
     //60926366
-    let exchange_rate =
-        Decimal::from_ratio(Uint128::from(5350444044771u128), Uint128::from(30000u128));
+    let exchange_rate = Decimal::from_ratio(
+        Uint128::from(5_350_444_044_771_u128),
+        Uint128::from(30000u128),
+    );
 
-    println!("exchange_rate: {}", exchange_rate);
+    println!("exchange_rate: {exchange_rate}");
 
     let undelegate_amount: Uint128 =
         utils::calc::calculate_native_token_from_staking_token(staking_token, exchange_rate);
-    println!("undelegate_amount: {}", undelegate_amount);
+    println!("undelegate_amount: {undelegate_amount}");
 }
 
 #[test]
@@ -25,11 +27,11 @@ fn exchange_rate_calculation() {
     let a = Uint128::new(10);
     let b = Uint128::new(50);
     let exchange_rate = Decimal::from_ratio(a, b);
-    println!("{:?} / {:?}", total_bond, exchange_rate);
+    println!("{total_bond:?} / {exchange_rate:?}");
 
     let token = utils::calc::calculate_staking_token_from_rate(total_bond, exchange_rate);
 
-    println!("token: {:?}", token);
+    println!("token: {token:?}");
     assert_eq!(token, Uint128::new(500));
 
     // - Rewards for 4 days: 1000 Union * 0.0274% * 4 = 1.096 Union
@@ -39,15 +41,15 @@ fn exchange_rate_calculation() {
     // - New exchange rate: 1001.096 / 1000 = 1.001096 Union per LUnion
     // - Bob receives: 500 / 1.001096 = 499.45 LUnion
 
-    let a = Uint128::new(1001096);
-    let b = Uint128::new(1000000);
+    let a = Uint128::new(1_001_096);
+    let b = Uint128::new(1_000_000);
     let new_exchange_rate = Decimal::from_ratio(a, b);
 
-    let bond_amount = Uint128::new(500000000);
+    let bond_amount = Uint128::new(500_000_000);
     let mint_amount =
         utils::calc::calculate_staking_token_from_rate(bond_amount, new_exchange_rate);
-    assert_eq!(mint_amount, Uint128::new(499452599));
-    println!("mint_amount: {:?}", mint_amount);
+    assert_eq!(mint_amount, Uint128::new(499_452_599));
+    println!("mint_amount: {mint_amount:?}");
 }
 
 #[test]

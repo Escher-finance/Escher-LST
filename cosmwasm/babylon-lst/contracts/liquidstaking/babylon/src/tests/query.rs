@@ -39,12 +39,12 @@ fn test_query_unbond_record() {
     // Query by batch_id
     let unbond_recs =
         query_unbond_record(&deps.storage, None, None, None, Some(2), None, None).unwrap();
-    assert_eq!(unbond_recs.len(), total as usize / 2);
+    assert_eq!(unbond_recs.len(), (total / 2) as usize);
     assert!(unbond_recs.iter().all(|r| r.batch_id == 2));
     // Query by released
     let unbond_recs =
         query_unbond_record(&deps.storage, None, Some(false), None, None, None, None).unwrap();
-    assert_eq!(unbond_recs.len(), total as usize / 2);
+    assert_eq!(unbond_recs.len(), (total / 2) as usize);
     assert!(unbond_recs.iter().all(|r| !r.released));
     // Query by staker
     let unbond_recs = query_unbond_record(
@@ -72,7 +72,7 @@ fn test_query_unbond_record() {
         None,
     )
     .unwrap();
-    assert_eq!(unbond_recs.len(), (total as usize / 2) - 1);
+    assert_eq!(unbond_recs.len(), (total / 2) as usize - 1);
     assert!(unbond_recs.iter().all(|r| r.staker == staker && r.released));
 }
 
@@ -91,12 +91,12 @@ fn test_query_chains() {
     let mut deps = cosmwasm_std::testing::mock_dependencies();
 
     for i in 1..10 {
-        let chain_id = format!("chain-{}", i);
+        let chain_id = format!("chain-{i}");
         let data = crate::state::Chain {
             chain_id: chain_id.clone(),
-            name: format!("chain{}", i),
+            name: format!("chain{i}"),
             ucs03_channel_id: i,
-            prefix: format!("b{}", i),
+            prefix: format!("b{i}"),
         };
         crate::state::CHAINS
             .save(&mut deps.storage, i, &data)
@@ -112,5 +112,5 @@ fn test_query_chains() {
     assert_eq!(chain_1.ucs03_channel_id, 1);
 
     let chain_9: &crate::state::Chain = chains.get(8).unwrap();
-    assert_eq!(chain_9.name, "chain9")
+    assert_eq!(chain_9.name, "chain9");
 }
