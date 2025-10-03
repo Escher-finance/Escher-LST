@@ -28,7 +28,9 @@ use crate::{
         },
         delegation::{get_actual_total_delegated, get_actual_total_reward, submit_pending_batch},
         transfer::{self, get_send_bank_msg, ibc_transfer_msg},
-        validation::{validate_recipient, validate_validators},
+        validation::{
+            validate_recipient, validate_remote_sender, validate_required_coin, validate_validators,
+        },
     },
 };
 
@@ -61,26 +63,19 @@ pub fn bond(
         salt.clone(),
     )?;
 
-    // coin must have be sent along with transaction and it should be in underlying coin denom
-    if info.funds.len() > 1usize {
-        return Err(ContractError::InvalidAsset {});
-    }
-
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom.clone();
     let sender = info.sender;
     let delegator = env.contract.address;
 
-    let payment = Coin {
-        amount: info
-            .funds
-            .iter()
-            .find(|x| x.denom == coin_denom && x.amount > Uint128::zero())
-            .ok_or_else(|| ContractError::NoAsset {})?
-            .amount,
-        denom: coin_denom.clone(),
-    };
+    let payment = validate_required_coin(
+        &info.funds,
+        &Coin {
+            amount: params.min_bond,
+            denom: coin_denom.clone(),
+        },
+    )?;
 
     let slippage_rate = match slippage {
         Some(rate) => rate,
@@ -147,6 +142,84 @@ pub fn bond(
             attr("minted", bond_data.mint_amount),
             attr("exchange_rate", bond_data.exchange_rate.to_string()),
         ]);
+
+    Ok(res)
+}
+
+/// Process remote bond call to contract, this will not send to any other chain address as send staked token back is attached on zkgm Calls
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+pub fn remote_bond(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    min_mint_amount: Uint128,
+    mint_to_address: Addr,
+) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.bond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
+    let params = PARAMETERS.load(deps.storage)?;
+
+    let coin = validate_required_coin(
+        &info.funds,
+        &Coin {
+            amount: params.min_bond,
+            denom: params.underlying_coin_denom.clone(),
+        },
+    )?;
+
+    // assume sender is cw-account contract address if contract creator is the ucs03 contract
+    validate_remote_sender(deps.querier, &info.sender, params)?;
+
+    // handle delegation to validators
+    let (mut msgs, bond_data) = utils::delegation::delegate(
+        deps.storage,
+        deps.querier,
+        env.clone(),
+        coin.amount,
+        min_mint_amount,
+    )?;
+
+    // mint staked token to mint_to_address
+    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: bond_data.cw20_address,
+        msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint {
+            recipient: mint_to_address.to_string(),
+            amount: bond_data.mint_amount,
+        })?,
+        funds: vec![],
+    }));
+
+    // create bond event here
+    let bond_event = BondEvent(
+        info.sender.to_string(),
+        info.sender.to_string(),
+        bond_data.bond_amount,
+        bond_data.delegated_amount,
+        bond_data.mint_amount,
+        bond_data.total_bond_amount,
+        bond_data.total_supply,
+        bond_data.exchange_rate,
+        String::new(),
+        env.block.time,
+        bond_data.denom.clone(),
+        None,
+        None,
+        bond_data.reward_balance,
+        bond_data.unclaimed_reward,
+        None,
+    );
+
+    let res: Response = Response::new()
+        .add_messages(msgs)
+        .add_event(bond_event)
+        .add_attributes(vec![attr("action", "remote_bond")]);
 
     Ok(res)
 }
@@ -855,77 +928,6 @@ pub fn process_batch_withdrawal(
 
     Ok(res)
 }
-
-/*
-/// Zkgm callback function to process bond and unbond from another chain
-pub fn on_zkgm(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    channel_id: ChannelId,
-    sender: Bytes,
-    message: Bytes,
-) -> Result<Response, ContractError> {
-    let msg_bytes = message.as_ref();
-    let payload: ZkgmMessage = from_json(msg_bytes)?;
-    let msg = format!(
-        "on zgkm time:{} info sender :{}, channel_id:{}, source sender:{} payload:{:?}",
-        env.block.time, info.sender, channel_id, sender, payload
-    );
-    deps.api.debug(&msg);
-
-    // only ucs03 relayer contract can call this callback function
-    let params = PARAMETERS.load(deps.storage)?;
-    if info.sender.to_string() != params.ucs03_relay_contract {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    // return pause for temporary on version 0.1.194
-    Err(ContractError::FunctionalityUnderMaintenance {})
-
-    /*
-    comment for temporary as code is unreachable
-    match payload {
-        ZkgmMessage::Bond {
-            amount,
-            salt,
-            slippage,
-            expected,
-            recipient,
-            recipient_channel_id,
-        } => zkgm_bond(
-            deps,
-            env,
-            info,
-            channel_id,
-            format!("{}", sender),
-            amount,
-            salt,
-            slippage,
-            expected,
-            recipient,
-            recipient_channel_id,
-        ),
-        ZkgmMessage::Unbond {
-            amount,
-            recipient,
-            recipient_channel_id,
-            recipient_ibc_channel_id,
-        } => zkgm_unbond(
-            deps,
-            env,
-            info,
-            channel_id,
-            format!("{}", sender),
-            amount,
-            recipient,
-            recipient_channel_id,
-            recipient_ibc_channel_id,
-        ),
-    }
-     */
-}
-*/
 
 /// Update the ownership of the contract.
 /// # Result
