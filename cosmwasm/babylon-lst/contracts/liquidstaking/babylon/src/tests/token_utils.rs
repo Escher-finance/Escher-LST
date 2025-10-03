@@ -52,7 +52,7 @@ fn test_burn_token() {
     else {
         panic!("bad cosmos msg");
     };
-    assert_eq!(contract_addr, cw20_address.to_string());
+    assert_eq!(contract_addr, cw20_address.clone());
     assert!(funds.is_empty());
 
     let cw20_msg: cw20::Cw20ExecuteMsg = from_json(msg).unwrap();

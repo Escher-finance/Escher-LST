@@ -91,8 +91,8 @@ fn test_is_on_chain_recipient() {
         None,
     );
 
-    println!("recipient_addr: {}", recipient_addr);
-    println!("is_same_chain_recipient: {}", is_same_chain_recipient);
+    println!("recipient_addr: {recipient_addr}");
+    println!("is_same_chain_recipient: {is_same_chain_recipient}");
     assert!(is_same_chain_recipient);
 
     let recipient = Some("0xbb74285235846c9d98280ac92ab8007382e51234".to_string());
