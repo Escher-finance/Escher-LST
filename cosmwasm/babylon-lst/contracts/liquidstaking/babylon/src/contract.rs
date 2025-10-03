@@ -242,17 +242,6 @@ pub fn execute(
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
-        /*
-        ExecuteMsg::OnZkgm {
-            caller: _caller,
-            path: _path,
-            source_channel_id: _source_channel_id,
-            destination_channel_id,
-            sender,
-            message,
-            relayer: _relayer,
-            relayer_msg: _relayer_msg,
-        } => execute::on_zkgm(deps, env, info, destination_channel_id, sender, message),*/
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::SplitReward {} => execute::split_reward(deps, env, info),
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
@@ -267,6 +256,10 @@ pub fn execute(
         ExecuteMsg::RemoveIbcChannel { ibc_channel_id } => {
             execute::remove_ibc_channel(deps, info, ibc_channel_id)
         }
+        ExecuteMsg::RemoteBond {
+            min_mint_amount,
+            mint_to_address,
+        } => execute::remote_bond(deps, env, info, min_mint_amount, mint_to_address),
     }
 }
 

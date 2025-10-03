@@ -148,18 +148,6 @@ pub enum ExecuteMsg {
     UpdateValidators {
         validators: Vec<Validator>,
     },
-    /*
-    OnZkgm {
-        caller: Addr,
-        path: Uint256,
-        source_channel_id: ChannelId,
-        destination_channel_id: ChannelId,
-        sender: Bytes,
-        message: Bytes,
-        relayer: Addr,
-        relayer_msg: Bytes,
-    },
-    */
     /// Redelegate some amount that is called from reward contract as result of split reward call to reward contract
     Redelegate {},
     /// Call migrate to reward contract
@@ -184,6 +172,10 @@ pub enum ExecuteMsg {
     },
     RemoveIbcChannel {
         ibc_channel_id: String,
+    },
+    RemoteBond {
+        min_mint_amount: Uint128,
+        mint_to_address: Addr,
     },
 }
 
@@ -353,6 +345,20 @@ pub struct BondData {
 }
 
 #[cw_serde]
+pub struct RemoteBondData {
+    pub denom: String,
+    pub bond_amount: Uint128,
+    pub mint_amount: Uint128,
+    pub delegated_amount: Uint128,
+    pub total_bond_amount: Uint128,
+    pub exchange_rate: Decimal,
+    pub total_supply: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
+    pub cw20_address: String,
+}
+
+#[cw_serde]
 pub struct UnbondData {
     pub undelegate_amount: Uint128,
     pub delegated_amount: Uint128,
@@ -403,4 +409,13 @@ pub struct IBCChannel {
 #[cw_serde]
 pub struct IbcChannelId {
     pub channel_id: String,
+}
+
+#[cw_serde]
+pub struct LiquidityState {
+    pub assets: Uint128, // delegated + erward
+    pub delegated: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
+    pub exchange_rate: Decimal,
 }

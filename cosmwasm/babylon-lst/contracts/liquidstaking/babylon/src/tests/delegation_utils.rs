@@ -7,19 +7,20 @@ use cosmwasm_std::{
     Addr, AnyMsg, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
     StakingMsg, Timestamp, Uint128,
 };
-use cw_multi_test::App;
+use cw_multi_test::{App, IntoAddr};
 use prost::Message;
 
 use crate::{
     event::{SUBMIT_BATCH_EVENT, UNBOND_EVENT, UNSTAKE_REQUEST_EVENT},
+    execute::remote_bond,
     msg::{BondData, DelegationDiff, ValidatorDelegation},
     proto,
     state::{
         unbond_record, BurnQueue, MintQueue, State, SupplyQueue, UnbondRecord, Validator,
         ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE,
-        STATE, SUPPLY_QUEUE, TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
+        STATE, STATUS, SUPPLY_QUEUE, TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
     },
-    tests::mock_parameters,
+    tests::{mock_parameters, setup_validators_delegation, NATIVE_DENOM},
     utils::{
         batch::{batches, Batch, BatchStatus},
         calc::{self, normalize_supply_queue, normalize_total_supply},
@@ -889,6 +890,7 @@ fn test_process_bond() {
     let block_height = 10_000_000;
     let salt = "0x0000000000000000000000000000000000000000000000000000000000000001".to_string();
     let params = mock_parameters();
+
     let validator_addr_a = "a".to_string();
     let validator_addr_b = "b".to_string();
     let channel_id = Some(10);
@@ -1011,6 +1013,184 @@ fn test_process_bond() {
             validators
         )
     );
+}
+
+#[test]
+fn test_delegate() {
+    let mut deps = mock_dependencies();
+    let env: cosmwasm_std::Env = mock_env();
+    let delegator = env.contract.address.clone();
+    let amount = Uint128::new(10000);
+    let params = mock_parameters();
+
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+
+    let validator_addr_a = "a".to_string();
+    let validator_addr_b = "b".to_string();
+    let validators: Vec<Validator> = Vec::from([
+        Validator {
+            weight: 50,
+            address: validator_addr_a.clone(),
+        },
+        Validator {
+            weight: 50,
+            address: validator_addr_b.clone(),
+        },
+    ]);
+
+    let total_delegation = Uint128::new(7_466_305_228);
+    deps = setup_validators_delegation(
+        deps,
+        &delegator,
+        validators.as_slice(),
+        NATIVE_DENOM.to_string(),
+        total_delegation,
+    );
+
+    crate::state::VALIDATORS_REGISTRY
+        .save(
+            deps.as_mut().storage,
+            &ValidatorsRegistry {
+                validators: validators.clone(),
+            },
+        )
+        .unwrap();
+
+    let exchange_rate = Decimal::from_str("1.9787253322").unwrap();
+    let state = State {
+        exchange_rate,
+        total_bond_amount: total_delegation,
+        total_delegated_amount: total_delegation,
+        total_supply: Uint128::new(3_773_290_364),
+        bond_counter: 5,
+        last_bond_time: 50000,
+    };
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+
+    println!("state: {state:?}");
+
+    WITHDRAW_REWARD_QUEUE
+        .save(deps.as_mut().storage, &vec![])
+        .unwrap();
+
+    REWARD_BALANCE
+        .save(deps.as_mut().storage, &Uint128::zero())
+        .unwrap();
+
+    let supply_queue: SupplyQueue = SupplyQueue {
+        mint: Vec::from([
+            MintQueue {
+                amount: Uint128::new(100),
+                block: 1,
+            },
+            MintQueue {
+                amount: Uint128::new(200),
+                block: 2,
+            },
+        ]),
+        burn: Vec::from([
+            BurnQueue {
+                amount: Uint128::new(50),
+                block: 2,
+            },
+            BurnQueue {
+                amount: Uint128::new(70),
+                block: 3,
+            },
+        ]),
+        epoch_period: 10,
+    };
+    SUPPLY_QUEUE
+        .save(deps.as_mut().storage, &supply_queue)
+        .unwrap();
+
+    let min_mint_amount = (Decimal::from_ratio(amount, Uint128::one()) / exchange_rate)
+        .to_uint_floor()
+        .strict_sub(Uint128::new(50u128));
+
+    println!("min_mint_amount: {min_mint_amount}");
+
+    let querier: QuerierWrapper<Empty> = QuerierWrapper::new(&deps.querier);
+
+    let (msgs, new_bond_data) =
+        delegate(&mut deps.storage, querier, env, amount, min_mint_amount).unwrap();
+
+    let updated_state = STATE.load(deps.as_mut().storage).unwrap();
+
+    println!("new_bond_data: {new_bond_data:?}");
+    println!("updated_state: {updated_state:?}");
+
+    assert_eq!(updated_state.bond_counter, state.bond_counter + 1);
+    assert_eq!(
+        updated_state.total_supply,
+        state.total_supply + new_bond_data.mint_amount
+    );
+    assert_eq!(
+        updated_state.total_bond_amount,
+        state.total_bond_amount + new_bond_data.bond_amount
+    );
+    assert_eq!(
+        updated_state.total_supply,
+        state.total_supply + new_bond_data.mint_amount
+    );
+    assert_eq!(
+        updated_state.total_delegated_amount,
+        state.total_delegated_amount + amount,
+    );
+
+    assert_eq!(
+        msgs,
+        get_delegate_to_validator_msgs(
+            delegator.to_string(),
+            amount,
+            params.underlying_coin_denom,
+            validators
+        )
+    );
+}
+
+#[test]
+fn test_remote_bond_from_invalid_address() {
+    let app = App::default();
+    let api = app.api();
+    let mut deps = mock_dependencies();
+    let env: cosmwasm_std::Env = mock_env();
+
+    let sender = "sender".into_addr();
+
+    let sender_addr = api.addr_make(sender.as_str());
+    let params = mock_parameters();
+
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+
+    STATUS
+        .save(
+            deps.as_mut().storage,
+            &crate::state::Status {
+                bond_is_paused: false,
+                unbond_is_paused: false,
+            },
+        )
+        .unwrap();
+
+    let min_mint_amount = Uint128::new(100u128);
+
+    let info = cosmwasm_std::testing::message_info(
+        &sender_addr,
+        &cosmwasm_std::coins(10000, NATIVE_DENOM),
+    );
+
+    let user: Addr = Addr::unchecked("user");
+
+    let res = remote_bond(
+        deps.as_mut(),
+        env.clone(),
+        info,
+        min_mint_amount,
+        user.clone(),
+    );
+
+    assert!(res.is_err());
 }
 
 #[test]

@@ -60,6 +60,26 @@ pub fn check_slippage(
     Ok(())
 }
 
+pub fn check_slippage_with_min_mint_amount(
+    min_mint_amount: Uint128,
+    amount_base_on_rate: Uint128,
+    slippage: Decimal,
+) -> Result<(), ContractError> {
+    let slippage_amount =
+        (Decimal::from_ratio(amount_base_on_rate, Uint128::one()) * slippage).to_uint_floor();
+
+    let max_amount: Uint128 = min_mint_amount + slippage_amount;
+    if amount_base_on_rate < min_mint_amount || amount_base_on_rate > max_amount {
+        return Err(ContractError::SlippageError {
+            output_amount: amount_base_on_rate,
+            min_amount: min_mint_amount,
+            max_amount,
+        });
+    }
+
+    Ok(())
+}
+
 pub fn get_last_epoch_block(block: u64, epoch_period: u32) -> u64 {
     let remainder: u64 = block % epoch_period as u64;
     block - remainder
@@ -181,7 +201,6 @@ pub fn calculate_exchange_rate(
     let mut exchange_rate: Decimal = Decimal::one();
     if total_bond_amount != Uint128::zero() {
         let normalize_total_supply = normalize_total_supply(total_supply, &queue.mint, &queue.burn);
-
         exchange_rate = Decimal::from_ratio(total_bond_amount, normalize_total_supply);
     }
     exchange_rate

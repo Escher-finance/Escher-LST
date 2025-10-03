@@ -15,14 +15,22 @@ use super::{
 use crate::{
     event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
     execute::StakerUndelegation,
-    msg::{BondData, DelegationDiff, InjectData, MintTokensPayload, ValidatorDelegation},
+    msg::{
+        BondData, DelegationDiff, InjectData, LiquidityState, MintTokensPayload, RemoteBondData,
+        ValidatorDelegation,
+    },
     proto,
     state::{
         increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
         UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, WITHDRAW_REWARD_QUEUE,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, VALIDATORS_REGISTRY,
+        WITHDRAW_REWARD_QUEUE,
     },
-    utils::{batch::batches, calc, delegation, token},
+    utils::{
+        batch::batches,
+        calc::{self, check_slippage_with_min_mint_amount},
+        delegation, token,
+    },
     ContractError,
 };
 
@@ -530,6 +538,139 @@ pub fn process_bond(
             total_supply: state.total_supply,
             reward_balance,
             unclaimed_reward,
+        },
+    ))
+}
+
+pub fn query_liquidity(
+    storage: &mut dyn Storage,
+    querier: QuerierWrapper,
+    delegator: String,
+    coin_denom: String,
+    validators_list: Vec<String>,
+    block_height: u64,
+    fee_rate: Decimal,
+    supply_queue: &mut SupplyQueue,
+) -> Result<LiquidityState, ContractError> {
+    let mut state = STATE.load(storage)?;
+
+    let delegated_amount = get_actual_total_delegated(
+        querier,
+        delegator.clone(),
+        coin_denom.clone(),
+        validators_list.clone(),
+    )?;
+
+    state.total_delegated_amount = delegated_amount;
+    let unclaimed_reward =
+        get_unclaimed_reward(querier, delegator, coin_denom.clone(), validators_list)?;
+
+    let reward_balance =
+        calc::normalize_reward_balance(storage, block_height, unclaimed_reward).unwrap();
+
+    let reward = reward_balance + unclaimed_reward;
+
+    let fee: Uint128 = calculate_fee_from_reward(reward, fee_rate);
+    let assets = delegated_amount + reward - fee;
+
+    calc::normalize_supply_queue(supply_queue, block_height);
+    let exchange_rate = if assets == Uint128::zero() {
+        Decimal::one()
+    } else {
+        calc::calculate_exchange_rate(assets, state.total_supply, supply_queue)
+    };
+
+    if exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
+    Ok(LiquidityState {
+        assets,
+        delegated: delegated_amount,
+        reward_balance,
+        unclaimed_reward,
+        exchange_rate,
+    })
+}
+
+/// Process delegate call to mint liquid staking token, delegate/stake base on the bond amount and exchange rate
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+pub fn delegate(
+    storage: &mut dyn Storage,
+    querier: QuerierWrapper,
+    env: Env,
+    amount: Uint128,
+    min_mint_amount: Uint128,
+) -> Result<(Vec<CosmosMsg>, RemoteBondData), ContractError> {
+    let params = PARAMETERS.load(storage)?;
+
+    let validators_reg = VALIDATORS_REGISTRY.load(storage)?;
+
+    let msgs = delegation::get_delegate_to_validator_msgs(
+        env.contract.address.to_string(),
+        amount,
+        params.underlying_coin_denom.clone(),
+        validators_reg.validators.clone(),
+    );
+
+    let validators_list: Vec<String> = validators_reg
+        .validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect();
+
+    let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
+
+    let liquidity = query_liquidity(
+        storage,
+        querier,
+        env.contract.address.to_string(),
+        params.underlying_coin_denom.clone(),
+        validators_list,
+        env.block.height,
+        params.fee_rate,
+        &mut supply_queue,
+    )?;
+
+    let mint_amount = calc::calculate_staking_token_from_rate(amount, liquidity.exchange_rate);
+
+    check_slippage_with_min_mint_amount(min_mint_amount, mint_amount, Decimal::percent(1))?;
+
+    supply_queue.mint.push(MintQueue {
+        block: env.block.height,
+        amount: mint_amount,
+    });
+    SUPPLY_QUEUE.save(storage, &supply_queue)?;
+
+    // logic to mint token and update the supply and total_bond_amount
+    let mut state = STATE.load(storage)?;
+    // after update exchange rate we update the state
+    state.bond_counter += 1;
+    state.total_bond_amount = liquidity.assets + amount;
+    state.total_supply += mint_amount;
+    state.total_delegated_amount = liquidity.delegated + amount;
+    state.last_bond_time = env.block.time.nanos();
+    state.exchange_rate = liquidity.exchange_rate;
+
+    STATE.save(storage, &state)?;
+
+    Ok((
+        msgs,
+        RemoteBondData {
+            denom: params.underlying_coin_denom.clone(),
+            bond_amount: amount,
+            mint_amount,
+            delegated_amount: state.total_delegated_amount,
+            total_bond_amount: state.total_bond_amount,
+            exchange_rate: liquidity.exchange_rate,
+            total_supply: state.total_supply,
+            reward_balance: liquidity.reward_balance,
+            unclaimed_reward: liquidity.unclaimed_reward,
+            cw20_address: params.cw20_address.to_string(),
         },
     ))
 }
