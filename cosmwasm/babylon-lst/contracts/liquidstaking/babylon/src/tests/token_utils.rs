@@ -13,7 +13,7 @@ fn test_get_staked_token_submsg() {
         mint_amount,
         String::default(),
         payload_bin.clone(),
-        cw20_address.clone(),
+        &cw20_address,
     );
     assert_eq!(submsg.reply_on, ReplyOn::Always);
     assert_eq!(submsg.payload, payload_bin);

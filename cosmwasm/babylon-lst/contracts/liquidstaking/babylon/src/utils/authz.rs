@@ -60,7 +60,7 @@ pub fn get_authz_increase_allowance_msg(
     cw20_contract: String,
     spender: String,
     amount: Uint128,
-    funds: Vec<Coin>,
+    funds: &[Coin],
 ) -> Result<CosmosMsg, ContractError> {
     let allowance_msg = cw20::Cw20ExecuteMsg::IncreaseAllowance {
         spender,
@@ -70,7 +70,7 @@ pub fn get_authz_increase_allowance_msg(
 
     let allow_bin = to_json_binary(&allowance_msg).unwrap();
 
-    cosmos_msg_for_contract_execution(granter, grantee, cw20_contract, &allow_bin, &funds)
+    cosmos_msg_for_contract_execution(granter, grantee, cw20_contract, &allow_bin, funds)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -86,7 +86,7 @@ pub fn get_authz_ucs03_transfer(
     base_amount: Uint128,
     quote_token: Bytes,
     quote_amount: Uint128,
-    funds: Vec<Coin>,
+    funds: &[Coin],
     salt: H256,
 ) -> Result<CosmosMsg, ContractError> {
     let ucs03_transfer_msg_bin = ucs03_transfer(
@@ -107,6 +107,6 @@ pub fn get_authz_ucs03_transfer(
         grantee,
         ucs03_contract_addr,
         &ucs03_transfer_msg_bin,
-        &funds,
+        funds,
     )
 }

@@ -551,7 +551,7 @@ pub fn process_bond(
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,
-            params.cw20_address,
+            &params.cw20_address,
         );
         sub_msgs.push(sub_msg);
     }
@@ -1007,7 +1007,7 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
         total_amount,
         quote_token,
         undelegate_amount,
-        funds,
+        &funds,
         H256::from_str(salt)?,
     )?;
 

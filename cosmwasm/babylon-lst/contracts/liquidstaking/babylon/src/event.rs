@@ -24,10 +24,7 @@ pub fn BondEvent(
     unclaimed_reward: Uint128,
     ibc_channel_id: Option<String>,
 ) -> Event {
-    let recipient = match recipient {
-        Some(recipient) => recipient,
-        None => String::new(),
-    };
+    let recipient = recipient.unwrap_or_default();
 
     let recipient_channel_id: String = match recipient_channel_id {
         Some(channel_id) => channel_id.to_string(),
@@ -35,7 +32,7 @@ pub fn BondEvent(
     };
 
     let ibc_channel_id: String = match ibc_channel_id {
-        Some(channel_id) => channel_id.to_string(),
+        Some(channel_id) => channel_id.clone(),
         None => String::new(),
     };
 
@@ -256,10 +253,7 @@ pub fn UnstakeRequestEvent(
         None => String::new(),
     };
 
-    let recipient = match recipient {
-        Some(recipient) => recipient,
-        None => String::new(),
-    };
+    let recipient = recipient.unwrap_or_default();
 
     let recipient_channel_id: String = match recipient_channel_id {
         Some(channel_id) => channel_id.to_string(),
@@ -320,7 +314,7 @@ pub const BATCH_RELEASED_EVENT: &str = "batch_released";
 #[allow(non_snake_case)]
 pub fn BatchReleasedEvent(batch_id: u64, time: Timestamp) -> Event {
     Event::new(BATCH_RELEASED_EVENT.to_string())
-        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("batch_id", format!("{batch_id}"))
         .add_attribute("time", format!("{}", time.nanos()))
 }
 
@@ -328,6 +322,7 @@ pub const INJECT_EVENT: &str = "inject";
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn InjectEvent(
     amount: Uint128,
     reward_balance: Uint128,
@@ -355,6 +350,7 @@ pub const IBC_CALLBACK_EVENT: &str = "ibc_callback";
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn IbcCallbackEvent(
     sender: String,
     ibc_channel_id: String,
