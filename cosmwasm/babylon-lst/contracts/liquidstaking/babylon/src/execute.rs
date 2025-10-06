@@ -624,7 +624,7 @@ pub fn update_ownership(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     if action == cw_ownable::Action::RenounceOwnership {
         return Err(ContractError::OwnershipCannotBeRenounced);
-    };
+    }
 
     cw_ownable::update_ownership(deps, &env.block, &info.sender, action)?;
 
@@ -696,7 +696,7 @@ pub fn set_parameters(
 
     if let Some(batch_period) = batch_period {
         params.batch_period = batch_period;
-    };
+    }
 
     // update epoch period in SUPPLY QUEUE
     if let Some(epoch_period) = epoch_period {

@@ -5,6 +5,7 @@ pub const BOND_EVENT: &str = "bond";
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn BondEvent(
     sender: String,
     staker: String,
@@ -25,7 +26,7 @@ pub fn BondEvent(
 ) -> Event {
     let recipient = match recipient {
         Some(recipient) => recipient,
-        None => "".to_string(),
+        None => String::new(),
     };
 
     let recipient_channel_id: String = match recipient_channel_id {
@@ -35,7 +36,7 @@ pub fn BondEvent(
 
     let ibc_channel_id: String = match ibc_channel_id {
         Some(channel_id) => channel_id.to_string(),
-        None => "".to_string(),
+        None => String::new(),
     };
 
     Event::new(BOND_EVENT.to_string())
@@ -60,6 +61,7 @@ pub fn BondEvent(
 pub const UNBOND_EVENT: &str = "unbond";
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn UnbondEvent(
     batch_id: u64,
     validator: String,
@@ -67,13 +69,14 @@ pub fn UnbondEvent(
     time: Timestamp,
 ) -> Event {
     Event::new(UNBOND_EVENT.to_string())
-        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("batch_id", format!("{batch_id}"))
         .add_attribute("validator", validator)
         .add_attribute("output_amount", undelegate_amount)
         .add_attribute("time", format!("{}", time.nanos()))
 }
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn UnbondEventsFromAtts(atts: Vec<Attribute>, batch_id: u64, time: Timestamp) -> Vec<Event> {
     let mut events = vec![];
     for att in atts {
@@ -91,6 +94,7 @@ pub const SUBMIT_BATCH_EVENT: &str = "submit_batch";
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn SubmitBatchEvent(
     batch_id: u64,
     sender: String,
@@ -106,7 +110,7 @@ pub fn SubmitBatchEvent(
     unclaimed_reward: Uint128,
 ) -> Event {
     Event::new(SUBMIT_BATCH_EVENT.to_string())
-        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("batch_id", format!("{batch_id}"))
         .add_attribute("sender", sender)
         .add_attribute("unstake_amount", unstake_amount)
         .add_attribute("output_amount", undelegate_amount)
@@ -123,6 +127,7 @@ pub fn SubmitBatchEvent(
 pub const UPDATE_VALIDATORS_EVENT: &str = "update_validators";
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn UpdateValidatorsEvent(
     sender: String,
     prev_validators: Vec<Validator>,
@@ -131,12 +136,12 @@ pub fn UpdateValidatorsEvent(
     let mut attrs: Vec<Attribute> = vec![];
     attrs.push(attr("sender", sender));
 
-    for val in prev_validators.into_iter() {
+    for val in prev_validators {
         attrs.push(attr("prev_validator_addr", val.address));
         attrs.push(attr("prev_validator_weight", val.weight.to_string()));
     }
 
-    for val in new_validators.into_iter() {
+    for val in new_validators {
         attrs.push(attr("new_validator_addr", val.address));
         attrs.push(attr("new_validator_weight", val.weight.to_string()));
     }
@@ -147,6 +152,7 @@ pub fn UpdateValidatorsEvent(
 pub const PROCESS_REWARDS_EVENT: &str = "process_rewards";
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn ProcessRewardsEvent(total_amount: Uint128, balance_reward: Uint128) -> Event {
     Event::new(PROCESS_REWARDS_EVENT.to_string())
         .add_attribute("withdraw_reward_amount", total_amount.to_string())
@@ -157,6 +163,7 @@ pub const PROCESS_UNBONDING_EVENT: &str = "process_unbonding";
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn ProcessUnbondingEvent(
     batch_id: u64,
     channel_id: Option<u32>,
@@ -170,7 +177,7 @@ pub fn ProcessUnbondingEvent(
 ) -> Event {
     let recipient = match recipient {
         Some(recipient) => recipient,
-        None => staker.to_string(),
+        None => staker.clone(),
     };
 
     let recipient_channel_id: String = match recipient_channel_id {
@@ -180,7 +187,7 @@ pub fn ProcessUnbondingEvent(
 
     let recipient_ibc_channel_id: String = match recipient_ibc_channel_id {
         Some(channel_id) => channel_id.to_string(),
-        None => "".to_string(),
+        None => String::new(),
     };
 
     Event::new(PROCESS_UNBONDING_EVENT.to_string())
@@ -188,7 +195,7 @@ pub fn ProcessUnbondingEvent(
         .add_attribute("amount", amount.to_string())
         .add_attribute("denom", denom)
         .add_attribute("time", format!("{}", time.nanos()))
-        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("batch_id", format!("{batch_id}"))
         .add_attribute("channel_id", channel_id.unwrap_or(0).to_string())
         .add_attribute("recipient", recipient)
         .add_attribute("recipient_channel_id", recipient_channel_id)
@@ -198,6 +205,7 @@ pub fn ProcessUnbondingEvent(
 pub const PROCESS_BATCH_UNBONDING_EVENT: &str = "process_batch_unbonding";
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn ProcessBatchUnbondingEvent(
     batch_id: u64,
     time: Timestamp,
@@ -211,14 +219,14 @@ pub fn ProcessBatchUnbondingEvent(
         .add_attribute("released_amount", released_amount.to_string())
         .add_attribute("denom", denom)
         .add_attribute("time", format!("{}", time.nanos()))
-        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("batch_id", format!("{batch_id}"))
         .add_attribute(
             "record_ids",
             format!(
                 "[{}]",
                 record_ids
                     .iter()
-                    .map(|id| id.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(","),
             ),
@@ -229,6 +237,7 @@ pub const UNSTAKE_REQUEST_EVENT: &str = "unstake_request";
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 pub fn UnstakeRequestEvent(
     sender: String,
     staker: String,
@@ -244,12 +253,12 @@ pub fn UnstakeRequestEvent(
 ) -> Event {
     let channel_id: String = match channel_id {
         Some(channel_id) => channel_id.to_string(),
-        None => "".to_string(),
+        None => String::new(),
     };
 
     let recipient = match recipient {
         Some(recipient) => recipient,
-        None => "".to_string(),
+        None => String::new(),
     };
 
     let recipient_channel_id: String = match recipient_channel_id {
@@ -259,7 +268,7 @@ pub fn UnstakeRequestEvent(
 
     let recipient_ibc_channel_id: String = match recipient_ibc_channel_id {
         Some(channel_id) => channel_id.to_string(),
-        None => "".to_string(),
+        None => String::new(),
     };
 
     Event::new(UNSTAKE_REQUEST_EVENT.to_string())
@@ -268,8 +277,8 @@ pub fn UnstakeRequestEvent(
         .add_attribute("channel_id", channel_id)
         .add_attribute("unbond_amount", amount)
         .add_attribute("time", format!("{}", time.nanos()))
-        .add_attribute("batch_id", format!("{}", batch_id))
-        .add_attribute("record_id", format!("{}", record_id))
+        .add_attribute("batch_id", format!("{batch_id}"))
+        .add_attribute("record_id", format!("{record_id}"))
         .add_attribute("recipient", recipient)
         .add_attribute("recipient_channel_id", recipient_channel_id)
         .add_attribute("reward_balance", reward_balance)
@@ -279,9 +288,10 @@ pub fn UnstakeRequestEvent(
 pub const BATCH_RECEIVED_EVENT: &str = "batch_received";
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn BatchReceivedEvent(batch_id: u64, received_amount: String, time: Timestamp) -> Event {
     Event::new(BATCH_RECEIVED_EVENT.to_string())
-        .add_attribute("batch_id", format!("{}", batch_id))
+        .add_attribute("batch_id", format!("{batch_id}"))
         .add_attribute("received_amount", received_amount)
         .add_attribute("time", format!("{}", time.nanos()))
 }
@@ -289,6 +299,7 @@ pub fn BatchReceivedEvent(batch_id: u64, received_amount: String, time: Timestam
 pub const SPLIT_REWARD_EVENT: &str = "split_reward";
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn SplitRewardEvent(
     fee_rate: Decimal,
     split_amount: Uint128,
