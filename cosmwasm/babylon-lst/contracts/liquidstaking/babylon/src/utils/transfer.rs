@@ -3,13 +3,14 @@ use cosmwasm_std::{
 };
 
 use crate::{
+    ContractError,
     execute::StakerUndelegation,
     utils::delegation::{
-        get_unbonding_ucs03_transfer_cosmos_msg, DEFAULT_TIMEOUT_TIMESTAMP_OFFSET,
+        DEFAULT_TIMEOUT_TIMESTAMP_OFFSET, get_unbonding_ucs03_transfer_cosmos_msg,
     },
-    ContractError,
 };
 
+#[must_use]
 pub fn get_send_bank_msg(
     staker: &str,
     recipient: Option<String>,
@@ -74,6 +75,7 @@ pub fn send_back_token_via_ucs03(
     Ok((bank_msg, ucs3_send_msg))
 }
 
+#[must_use]
 pub fn ibc_transfer_msg(
     channel_id: String,
     to_address: String,

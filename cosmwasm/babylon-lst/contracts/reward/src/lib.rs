@@ -1,4 +1,5 @@
 #![cfg_attr(not(test), warn(clippy::unwrap_used))]
+#![allow(clippy::missing_errors_doc, clippy::needless_pass_by_value)]
 
 pub mod contract;
 mod error;

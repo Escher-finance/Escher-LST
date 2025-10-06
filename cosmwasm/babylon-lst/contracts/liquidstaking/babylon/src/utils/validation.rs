@@ -3,10 +3,12 @@ use std::collections::HashSet;
 use cosmwasm_std::{Addr, Coin, QuerierWrapper, Uint128};
 
 use crate::{
-    state::{Parameters, QuoteToken, Validator},
     ContractError,
+    state::{Parameters, QuoteToken, Validator},
 };
 
+/// Errors:
+/// - Returns `InvalidValidators` when duplicate addresses or zero weights are found.
 pub fn validate_validators(validators: &[Validator]) -> Result<(), ContractError> {
     let unique_validators_len = validators
         .iter()
@@ -28,6 +30,8 @@ pub fn validate_validators(validators: &[Validator]) -> Result<(), ContractError
     Ok(())
 }
 
+/// Errors:
+/// - Returns `InvalidQuoteTokens` when duplicate channel ids are found.
 pub fn validate_quote_tokens(quote_tokens: &[QuoteToken]) -> Result<(), ContractError> {
     let unique_quote_tokens_len = quote_tokens
         .iter()
@@ -43,6 +47,8 @@ pub fn validate_quote_tokens(quote_tokens: &[QuoteToken]) -> Result<(), Contract
     Ok(())
 }
 
+/// Errors:
+/// - Returns address/channel validation errors or missing salt errors.
 pub fn validate_recipient(
     deps: &cosmwasm_std::DepsMut,
     recipient: Option<String>,
@@ -93,13 +99,14 @@ pub fn validate_recipient(
             return Err(ContractError::InvalidAddress {
                 kind: "recipient".into(),
                 address: recipient.unwrap(),
-                reason: format!("address prefix must starts with {}", prefix),
+                reason: format!("address prefix must starts with {prefix}"),
             });
         }
     }
     Ok(on_chain_recipient)
 }
 
+#[must_use]
 pub fn is_on_chain_recipient(
     deps: &cosmwasm_std::Deps,
     recipient: Option<String>,
@@ -117,6 +124,8 @@ pub fn is_on_chain_recipient(
     on_chain_recipient
 }
 
+/// Errors:
+/// - Returns `InvalidAddress` when sender is not the expected cw-account contract.
 pub fn validate_remote_sender(
     querier: QuerierWrapper,
     sender: &Addr,

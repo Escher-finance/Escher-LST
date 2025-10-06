@@ -1,20 +1,23 @@
+#![allow(clippy::similar_names)]
 use cosmos_sdk_proto::{
+    Any,
     cosmos::{authz::v1beta1::MsgExec, base::v1beta1::Coin as ProtoCoin},
     cosmwasm::wasm::v1::MsgExecuteContract,
     traits::Message,
-    Any,
 };
-use cosmwasm_std::{to_json_binary, AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128};
+use cosmwasm_std::{AnyMsg, Binary, Coin, CosmosMsg, Timestamp, Uint128, to_json_binary};
 use unionlabs_primitives::{Bytes, H256};
 
 use crate::{error::ContractError, zkgm::protocol::ucs03_transfer};
 
+/// Errors:
+/// - Returns EncodeAnyMsgError if Any message encoding fails.
 pub fn cosmos_msg_for_contract_execution(
     granter: String,
     grantee: String,
     target_contract_address: String,
-    msg: Binary,
-    funds: Vec<Coin>,
+    msg: &Binary,
+    funds: &[Coin],
 ) -> Result<CosmosMsg, ContractError> {
     let proto_funds: Vec<ProtoCoin> = funds
         .iter()
@@ -34,7 +37,7 @@ pub fn cosmos_msg_for_contract_execution(
 
     if execute_any.is_err() {
         return Err(ContractError::EncodeAnyMsgError {});
-    };
+    }
 
     let execute_msg = MsgExec {
         grantee,
@@ -49,6 +52,8 @@ pub fn cosmos_msg_for_contract_execution(
     Ok(execute_stargate)
 }
 
+/// Errors:
+/// - Bubbles up errors from contract execution message construction.
 pub fn get_authz_increase_allowance_msg(
     granter: String,
     grantee: String,
@@ -65,7 +70,7 @@ pub fn get_authz_increase_allowance_msg(
 
     let allow_bin = to_json_binary(&allowance_msg).unwrap();
 
-    cosmos_msg_for_contract_execution(granter, grantee, cw20_contract, allow_bin, funds)
+    cosmos_msg_for_contract_execution(granter, grantee, cw20_contract, &allow_bin, &funds)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -101,7 +106,7 @@ pub fn get_authz_ucs03_transfer(
         granter,
         grantee,
         ucs03_contract_addr,
-        ucs03_transfer_msg_bin,
-        funds,
+        &ucs03_transfer_msg_bin,
+        &funds,
     )
 }

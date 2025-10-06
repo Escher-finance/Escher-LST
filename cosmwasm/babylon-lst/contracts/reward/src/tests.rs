@@ -11,6 +11,6 @@ fn test_split_revenue() {
 
     //check Decimal(100000000000000000)
     println!("fee_rate: {fee_rate:?}");
-    let (restake, fee) = split_revenue(reward_amount, fee_rate, "stake".into());
+    let (restake, fee) = split_revenue(reward_amount, fee_rate, "stake");
     println!("split_revenue: {reward_amount}, restake: {restake}, fee: {fee}");
 }

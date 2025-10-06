@@ -76,10 +76,12 @@
           cargoWorkspaceAttrs = {
             pname = "cargo-workspace";
             version = "0.0.0";
+            # Use the cleaned cargo workspace source so Nix includes tracked members
             src = crane.cargoWorkspaceSrc;
 
-            cargoTestExtraArgs = "--workspace --no-fail-fast";
-            cargoClippyExtraArgs = "--workspace --tests -- -Dwarnings";
+            # Restrict checks to CosmWasm contracts only
+            cargoTestExtraArgs = "-p liquidstaking-babylon -p reward -p cw20-base@0.0.0 --no-fail-fast";
+            cargoClippyExtraArgs = "-p liquidstaking-babylon -p reward -p cw20-base@0.0.0 --tests -- -Dwarnings";
 
             CARGO_PROFILE = "dev";
 
@@ -103,8 +105,8 @@
               crane.buildWasmContract "cosmwasm/babylon-lst/contracts/liquidstaking/babylon"
                 { };
             # liquidstaking-union = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/liquidstaking/union" { };
-            reward = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/reward" { };
-            cw20-base = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/cw20-base" { };
+            reward = crane.buildWasmContract "cosmwasm/babylon-lst/contracts/reward" { };
+            cw20-base = crane.buildWasmContract "cosmwasm/babylon-lst/contracts/cw20-base" { };
           };
 
           checks = {

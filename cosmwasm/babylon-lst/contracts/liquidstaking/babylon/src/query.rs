@@ -1,26 +1,26 @@
 use std::marker::PhantomData;
 
 use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, Decimal, Deps, Env, FullDelegation, Order, Storage,
-    Uint128,
+    Binary, Decimal, Deps, Env, FullDelegation, Order, Storage, Uint128, entry_point,
+    to_json_binary,
 };
-use cw2::ContractVersion;
 use cw_ownable::get_ownership;
+use cw2::ContractVersion;
 
 use crate::{
+    ContractError,
     msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
     state::{
-        unbond_record, Parameters, QuoteToken, State, Status, SupplyQueue, UnbondRecord,
-        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, STATE,
-        STATUS, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, VALIDATORS_REGISTRY,
-        WITHDRAW_REWARD_QUEUE,
+        PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
+        SUPPLY_QUEUE, State, Status, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL, UnbondRecord,
+        VALIDATORS_REGISTRY, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue,
+        unbond_record,
     },
     utils::{
-        batch::{batches, Batch, BatchStatus},
+        batch::{Batch, BatchStatus, batches},
         calc::{self, calculate_fee_from_reward, calculate_query_bounds},
         delegation::{get_actual_total_delegated, get_unclaimed_reward},
     },
-    ContractError,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -34,7 +34,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
             denom,
             validators,
         } => to_json_binary(&query_staking_liquidity(
-            deps, env, delegator, denom, validators,
+            deps, &env, delegator, denom, validators,
         )?),
         QueryMsg::RewardBalance {} => to_json_binary(&(query_reward_balance(deps.storage)?)),
         QueryMsg::UnbondRecord {
@@ -60,7 +60,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         } => to_json_binary(&query_batch(deps.storage, id, status, min, max)?),
         QueryMsg::SupplyQueue {} => to_json_binary(&query_supply_queue(deps.storage)?),
         QueryMsg::Status {} => to_json_binary(&query_status(deps.storage)?),
-        QueryMsg::Delegations {} => to_json_binary(&query_delegations(deps, env)?),
+        QueryMsg::Delegations {} => to_json_binary(&query_delegations(deps, &env)?),
         QueryMsg::Chains {} => to_json_binary(&query_chains(deps.storage)?),
         QueryMsg::RewardQueue {} => to_json_binary(&query_reward_queue(deps.storage)?),
         QueryMsg::IbcChannels {} => to_json_binary(&query_ibc_channels(deps.storage)?),
@@ -113,7 +113,7 @@ pub fn query_supply_queue(storage: &dyn Storage) -> Result<SupplyQueue, Contract
 
 pub fn query_staking_liquidity(
     deps: Deps,
-    env: Env,
+    env: &Env,
     delegator: Option<String>,
     coin_denom: Option<String>,
     validators_list: Option<Vec<String>>,
@@ -137,7 +137,7 @@ pub fn query_staking_liquidity(
     let validators = validators_list.clone().unwrap_or(validators_addr);
 
     let delegated_amount =
-        get_actual_total_delegated(deps.querier, the_delegator.to_string(), &denom, &validators)?;
+        get_actual_total_delegated(deps.querier, the_delegator.clone(), &denom, &validators)?;
 
     let unclaimed_reward = get_unclaimed_reward(deps.querier, the_delegator, &denom, &validators)?;
     let reward_balance: Uint128 = REWARD_BALANCE.load(deps.storage)?;
@@ -176,6 +176,8 @@ pub fn query_staking_liquidity(
     })
 }
 
+/// Errors:
+/// - Returns StdError on storage reads or invalid query parameters.
 pub fn query_unbond_record(
     storage: &dyn Storage,
     staker: Option<String>,
@@ -185,8 +187,8 @@ pub fn query_unbond_record(
     min: Option<u64>,
     max: Option<u64>,
 ) -> Result<Vec<UnbondRecord>, ContractError> {
-    if id.is_some() {
-        let unbonded_list = vec![unbond_record().load(storage, id.unwrap())?];
+    if let Some(id) = id {
+        let unbonded_list = vec![unbond_record().load(storage, id)?];
         return Ok(unbonded_list);
     }
 
@@ -217,7 +219,7 @@ pub fn query_unbond_record(
             (Some(staker), Some(released)) => unbond_record()
                 .idx
                 .staker_released
-                .prefix(format!("{}-{}", staker, released))
+                .prefix(format!("{staker}-{released}"))
                 .range(storage, min_bound, max_bound, Order::Ascending),
             (None, None) => return Err(ContractError::InvalidUnbondRecordQuery {}),
         }
@@ -228,6 +230,8 @@ pub fn query_unbond_record(
         .collect())
 }
 
+/// Errors:
+/// - Returns StdError on storage reads.
 pub fn query_unreleased_unbond_record_from_batch(
     storage: &dyn Storage,
     batch_id: u64,
@@ -261,6 +265,8 @@ pub fn query_unreleased_unbond_record_from_batch(
 
 // query batch by id or status
 // min bound and max bound only used when status filter is released
+/// Errors:
+/// - Returns StdError on storage reads or invalid parameters.
 pub fn query_batch(
     storage: &dyn Storage,
     id: Option<u64>,
@@ -268,8 +274,8 @@ pub fn query_batch(
     min: Option<u64>,
     max: Option<u64>,
 ) -> Result<Vec<Batch>, ContractError> {
-    if id.is_some() {
-        let batch = batches().load(storage, id.unwrap())?;
+    if let Some(id) = id {
+        let batch = batches().load(storage, id)?;
 
         return Ok(vec![batch]);
     }
@@ -280,9 +286,7 @@ pub fn query_batch(
     };
 
     let (min_bound, max_bound) = match batch_status {
-        BatchStatus::Pending => (None, None),
-        BatchStatus::Submitted => (None, None),
-        BatchStatus::Received => (None, None),
+        BatchStatus::Pending | BatchStatus::Submitted | BatchStatus::Received => (None, None),
         BatchStatus::Released => {
             let (min_id, max_id) = calculate_query_bounds(min, max);
             let min_bound = Some(cw_storage_plus::Bound::Inclusive((min_id, PhantomData)));
@@ -308,11 +312,13 @@ pub fn query_batch(
     Ok(batch_list)
 }
 
-pub fn query_delegations(deps: Deps, env: Env) -> Result<Vec<FullDelegation>, ContractError> {
+/// Errors:
+/// - Returns StdError on storage reads or queries.
+pub fn query_delegations(deps: Deps, env: &Env) -> Result<Vec<FullDelegation>, ContractError> {
     let validators_registry = VALIDATORS_REGISTRY.load(deps.storage)?;
     let delegator = env.contract.address.clone();
     let mut delegations = vec![];
-    for validator in validators_registry.validators.iter() {
+    for validator in &validators_registry.validators {
         let validator_bond = deps
             .querier
             .query_delegation(delegator.clone(), validator.address.clone())?;
@@ -324,6 +330,8 @@ pub fn query_delegations(deps: Deps, env: Env) -> Result<Vec<FullDelegation>, Co
     Ok(delegations)
 }
 
+/// Errors:
+/// - Returns StdError on storage reads.
 pub fn query_chains(storage: &dyn Storage) -> Result<Vec<crate::state::Chain>, ContractError> {
     let chains: Vec<crate::state::Chain> = crate::state::CHAINS
         .range(storage, None, None, cosmwasm_std::Order::Ascending)
@@ -332,6 +340,8 @@ pub fn query_chains(storage: &dyn Storage) -> Result<Vec<crate::state::Chain>, C
     Ok(chains)
 }
 
+/// Errors:
+/// - Returns StdError on storage reads.
 pub fn query_reward_queue(
     storage: &dyn Storage,
 ) -> Result<Vec<WithdrawRewardQueue>, ContractError> {
@@ -339,6 +349,8 @@ pub fn query_reward_queue(
     Ok(queue)
 }
 
+/// Errors:
+/// - Returns StdError on storage reads.
 pub fn query_ibc_channels(storage: &dyn Storage) -> Result<Vec<IBCChannel>, ContractError> {
     let channels: Vec<IBCChannel> = crate::state::IBC_CHANNELS
         .range(storage, None, None, cosmwasm_std::Order::Ascending)
@@ -352,6 +364,8 @@ pub fn query_ibc_channels(storage: &dyn Storage) -> Result<Vec<IBCChannel>, Cont
     Ok(channels)
 }
 
+/// Errors:
+/// - Returns UnbondRecordIbcChannelNotFound if no channel for given id.
 pub fn query_recipient_ibc_channel(
     storage: &dyn Storage,
     id: u64,

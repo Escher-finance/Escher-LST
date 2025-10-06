@@ -1,4 +1,4 @@
-use cosmwasm_std::{to_json_binary, Addr, Coin, CosmosMsg, Decimal, StdResult, Uint128, WasmMsg};
+use cosmwasm_std::{Addr, Coin, CosmosMsg, Decimal, StdResult, Uint128, WasmMsg, to_json_binary};
 
 use crate::msg::ExecuteMsg;
 
