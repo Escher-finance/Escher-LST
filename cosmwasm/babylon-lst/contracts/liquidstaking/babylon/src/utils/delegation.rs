@@ -1,8 +1,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    to_json_binary, Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    Event, QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128,
+    Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, Event,
+    QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128, to_json_binary,
 };
 use prost::Message;
 use unionlabs_primitives::{Bytes, H256};
@@ -13,6 +13,7 @@ use super::{
     calc::{calculate_exchange_rate, calculate_fee_from_reward},
 };
 use crate::{
+    ContractError,
     event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
     execute::StakerUndelegation,
     msg::{
@@ -21,17 +22,16 @@ use crate::{
     },
     proto,
     state::{
-        increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
-        UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, VALIDATORS_REGISTRY,
-        WITHDRAW_REWARD_QUEUE,
+        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL,
+        UnbondRecord, VALIDATORS_REGISTRY, Validator, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE,
+        increment_tokens, unbond_record,
     },
     utils::{
         batch::batches,
         calc::{self, check_slippage_with_min_mint_amount},
         delegation, token,
     },
-    ContractError,
 };
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 900;
@@ -980,25 +980,19 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
 
     let quote_token_string = quote_token.quote_token.clone();
 
-    let recipient_address = match Bytes::from_str(recipient.as_str()) {
-        Ok(rec) => rec,
-        Err(_) => {
-            return Err(ContractError::InvalidAddress {
-                kind: "recipient".into(),
-                address: recipient,
-                reason: "address must be in hex and starts with 0x".to_string(),
-            });
-        }
+    let Ok(recipient_address) = Bytes::from_str(recipient.as_str()) else {
+        return Err(ContractError::InvalidAddress {
+            kind: "recipient".into(),
+            address: recipient,
+            reason: "address must be in hex and starts with 0x".to_string(),
+        });
     };
-    let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
-        Ok(token) => token,
-        Err(_) => {
-            return Err(ContractError::InvalidAddress {
-                kind: "quote_token".into(),
-                address: quote_token_string,
-                reason: "address must be in hex and starts with 0x".to_string(),
-            });
-        }
+    let Ok(quote_token) = Bytes::from_str(quote_token_string.as_str()) else {
+        return Err(ContractError::InvalidAddress {
+            kind: "quote_token".into(),
+            address: quote_token_string,
+            reason: "address must be in hex and starts with 0x".to_string(),
+        });
     };
 
     let authz_ucs03_msg = get_authz_ucs03_transfer(
@@ -1020,14 +1014,16 @@ pub fn get_unbonding_ucs03_transfer_cosmos_msg(
     Ok(authz_ucs03_msg)
 }
 
+/// Errors:
+/// - Returns serialization errors when querying rewards or reading storage.
 pub fn get_actual_total_reward(
     storage: &dyn Storage,
     querier: QuerierWrapper,
     delegator: String,
-    denom: String,
-    validators: Vec<String>,
+    denom: &str,
+    validators: &[String],
 ) -> StdResult<Uint128> {
-    let unclaimed_reward = get_unclaimed_reward(querier, delegator, &denom, &validators)?;
+    let unclaimed_reward = get_unclaimed_reward(querier, delegator, denom, validators)?;
     let reward_balance = REWARD_BALANCE.load(storage)?;
     Ok(unclaimed_reward + reward_balance)
 }
@@ -1264,10 +1260,10 @@ pub fn inject(
 
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
     calc::normalize_supply_queue(&mut supply_queue, block_height);
-    let exchange_rate = if total_bond_amount != Uint128::zero() {
-        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
-    } else {
+    let exchange_rate = if total_bond_amount == Uint128::zero() {
         Decimal::one()
+    } else {
+        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
     };
 
     if exchange_rate < Decimal::one() {
@@ -1276,10 +1272,10 @@ pub fn inject(
 
     let prev_exchange_rate = exchange_rate;
     let new_bond_amount = total_bond_amount + amount;
-    let new_exchange_rate = if total_bond_amount != Uint128::zero() {
-        calc::calculate_exchange_rate(new_bond_amount, state.total_supply, &supply_queue)
-    } else {
+    let new_exchange_rate = if total_bond_amount == Uint128::zero() {
         Decimal::one()
+    } else {
+        calc::calculate_exchange_rate(new_bond_amount, state.total_supply, &supply_queue)
     };
 
     state.total_bond_amount = new_bond_amount;

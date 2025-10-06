@@ -1,4 +1,4 @@
-use cosmwasm_std::{to_json_binary, Addr, Coin, CosmosMsg, Decimal, StdResult, Uint128, WasmMsg};
+use cosmwasm_std::{Addr, Coin, CosmosMsg, Decimal, StdResult, Uint128, WasmMsg, to_json_binary};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +17,8 @@ impl LstTemplateContract {
         self.0.clone()
     }
 
+    /// Errors:
+    /// - Returns an error if the message cannot be serialized to JSON.
     pub fn call<T: Into<ExecuteLstMsg>>(&self, msg: T, funds: Vec<Coin>) -> StdResult<CosmosMsg> {
         let msg = to_json_binary(&msg.into())?;
         Ok(WasmMsg::Execute {
@@ -29,7 +31,7 @@ impl LstTemplateContract {
 }
 
 #[must_use]
-pub fn split_revenue(amount: Uint128, fee_rate: Decimal, denom: String) -> (Coin, Coin) {
+pub fn split_revenue(amount: Uint128, fee_rate: Decimal, denom: &str) -> (Coin, Coin) {
     let decimal_fract = Decimal::new(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL);
     let fract = (fee_rate * decimal_fract).to_uint_floor();
     let fee_amount = Decimal::from_ratio(fract * amount, DECIMAL_FRACTIONAL).to_uint_floor();
@@ -38,11 +40,11 @@ pub fn split_revenue(amount: Uint128, fee_rate: Decimal, denom: String) -> (Coin
     (
         Coin {
             amount: redelegate_amount,
-            denom: denom.clone(),
+            denom: denom.to_string(),
         },
         Coin {
             amount: fee_amount,
-            denom: denom.clone(),
+            denom: denom.to_string(),
         },
     )
 }

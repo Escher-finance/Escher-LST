@@ -1,13 +1,13 @@
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Storage};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::{entry_point, to_json_binary};
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Storage};
 use cw2::set_contract_version;
 
 use crate::{
     error::ContractError,
     execute,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{Config, CONFIG},
+    state::{CONFIG, Config},
 };
 
 // version info for migration info
@@ -15,6 +15,8 @@ const CONTRACT_NAME: &str = "crates.io:rewards";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+/// Errors:
+/// - Returns `std::io` errors from storage when persisting contract data fails.
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -40,6 +42,8 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+/// Errors:
+/// - Bubbles up errors from the underlying execute handlers (e.g. owner checks, invalid params).
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -67,6 +71,8 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+/// Errors:
+/// - Returns serialization errors when encoding the query response to JSON.
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_json_binary(&query_get_config(deps.storage)?),
@@ -74,12 +80,17 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
+/// Errors:
+/// - Returns `std::io` errors if reading from storage fails.
 pub fn query_get_config(storage: &dyn Storage) -> StdResult<Config> {
     let params = CONFIG.load(storage)?;
     Ok(params)
 }
 
 #[entry_point]
+/// Errors:
+/// - Returns `InvalidContractName` if the stored contract name differs.
+/// - Returns `InvalidMigrationVersion` if attempting to migrate to an older or equal version.
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     let ver = cw2::get_contract_version(deps.storage)?;
     // ensure we are migrating from a compatible contract

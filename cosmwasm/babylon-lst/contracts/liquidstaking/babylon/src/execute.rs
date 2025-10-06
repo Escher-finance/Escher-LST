@@ -1,9 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, wasm_execute, Addr, Attribute, BankMsg, Coin, CosmosMsg,
-    Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, StdError, SubMsg, Uint128,
-    WasmMsg,
+    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo,
+    Response, StdError, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary, wasm_execute,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use unionlabs_primitives::Bytes;
@@ -19,14 +18,14 @@ use crate::{
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, PARAMETERS,
-        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
-        SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
+        Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
+        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{batches, BatchStatus},
+        batch::{BatchStatus, batches},
         calc::{
             calculate_exchange_rate, calculate_fee_from_reward, check_slippage,
             get_last_epoch_block, get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
@@ -490,8 +489,8 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
         deps.storage,
         deps.querier,
         delegator.to_string(),
-        coin_denom.clone(),
-        validators_list,
+        &coin_denom,
+        &validators_list,
     )?;
 
     let fee = calculate_fee_from_reward(total_reward, params.fee_rate);
@@ -1406,7 +1405,7 @@ pub fn transfer(
         Err(e) => {
             return Err(ContractError::Std(StdError::generic_err(format!(
                 "failed to parse salt: {salt}, reason: {e}"
-            ))))
+            ))));
         }
     };
 

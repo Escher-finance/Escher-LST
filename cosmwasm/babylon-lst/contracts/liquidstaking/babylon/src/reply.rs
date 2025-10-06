@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, StdError, SubMsg, Uint128, WasmMsg,
+    Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StdError, SubMsg, Uint128,
+    WasmMsg, attr, entry_point, from_json, to_json_binary,
 };
 use unionlabs_primitives::Bytes;
 
@@ -10,8 +10,8 @@ use crate::{
     error::ContractError,
     msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload},
     state::{
-        Parameters, WithdrawReward, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE,
-        SPLIT_REWARD_QUEUE, SUPPLY_QUEUE, WITHDRAW_REWARD_QUEUE,
+        PARAMETERS, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, SUPPLY_QUEUE,
+        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
     },
     utils::calc::get_next_epoch,
 };
@@ -20,6 +20,8 @@ pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
 
 #[entry_point]
+/// Errors:
+/// - Propagates errors from submessage replies and handlers.
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
     if !msg.result.is_ok() {
         let err = msg.result.unwrap_err();
@@ -29,14 +31,14 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     }
 
     match msg.id {
-        MINT_CW20_TOKENS_REPLY_ID => on_mint_cw20_tokens(deps, env, msg),
+        MINT_CW20_TOKENS_REPLY_ID => on_mint_cw20_tokens(deps, &env, msg),
         PROCESS_WITHDRAW_REWARD_REPLY_ID => on_process_rewards(deps, env, msg),
-        SPLIT_REWARD_REPLY_ID => on_split_reward(deps, env, msg),
+        SPLIT_REWARD_REPLY_ID => on_split_reward(deps, &env, msg),
         _ => Ok(Response::new()),
     }
 }
 
-fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
+fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response, ContractError> {
     let params: Parameters = PARAMETERS.load(deps.storage)?;
     let payload: MintTokensPayload = from_json(msg.payload)?;
 
@@ -54,7 +56,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         && (payload.channel_id.is_some() || payload.recipient_channel_id.is_some())
     {
         cw20::Cw20QueryMsg::Balance {
-            address: params.transfer_handler.to_string(),
+            address: params.transfer_handler.clone(),
         }
     } else {
         cw20::Cw20QueryMsg::Balance {
@@ -186,8 +188,8 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let res: Response = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "mint_cw20")
-        .add_attribute("sender", payload.sender.to_string())
-        .add_attribute("staker", payload.staker.to_string())
+        .add_attribute("sender", payload.sender.clone())
+        .add_attribute("staker", payload.staker.clone())
         .add_attribute("recipient", format!("{:?}", payload.recipient))
         .add_attribute("channel_id", payload.channel_id.unwrap_or(0).to_string())
         .add_attribute("amount", amount.to_string())
@@ -252,7 +254,7 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
 }
 
 /// Handle split reward call to reward contract reply
-fn on_split_reward(deps: DepsMut, env: Env, _msg: Reply) -> Result<Response, ContractError> {
+fn on_split_reward(deps: DepsMut, env: &Env, _msg: Reply) -> Result<Response, ContractError> {
     // reset reward balance after split reward call success
     REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
     let supply = SUPPLY_QUEUE.load(deps.storage)?;
@@ -262,7 +264,7 @@ fn on_split_reward(deps: DepsMut, env: Env, _msg: Reply) -> Result<Response, Con
     let epoch_diff = next_epoch - block_height;
 
     // Only add one withdraw reward queue entry if epoch diff > 3 to trigger normalize reward
-    if epoch_diff > 0 && epoch_diff != supply.epoch_period as u64 {
+    if epoch_diff > 0 && epoch_diff != u64::from(supply.epoch_period) {
         let reward_queue = WithdrawRewardQueue {
             amount: Uint128::zero(),
             block: block_height,
@@ -279,9 +281,11 @@ fn on_split_reward(deps: DepsMut, env: Env, _msg: Reply) -> Result<Response, Con
 }
 
 /// Send or transfer token on same chain
-pub fn send(_deps: DepsMut, amount: Coin, receiver: String) -> Result<Response, ContractError> {
+/// Errors:
+/// - Returns StdError on message serialization failure.
+pub fn send(_deps: DepsMut, amount: Coin, receiver: &str) -> Result<Response, ContractError> {
     let bank_msg: BankMsg = BankMsg::Send {
-        to_address: receiver.clone(),
+        to_address: receiver.to_string(),
         amount: vec![amount.clone()],
     };
 
@@ -297,6 +301,8 @@ pub fn send(_deps: DepsMut, amount: Coin, receiver: String) -> Result<Response, 
 }
 
 /// Send or transfer cw20 token on same chain
+/// Errors:
+/// - Returns StdError if CW20 message serialization fails.
 pub fn send_cw20(
     _deps: DepsMut,
     amount: Uint128,

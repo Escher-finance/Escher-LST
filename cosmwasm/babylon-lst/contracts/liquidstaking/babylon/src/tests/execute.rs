@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use cosmwasm_std::{Decimal, Uint128};
 
-use crate::{execute::*, state::QuoteToken, utils, ContractError};
+use crate::{ContractError, execute::*, state::QuoteToken, utils};
 
 #[test]
 fn test_calculate_native_token() {

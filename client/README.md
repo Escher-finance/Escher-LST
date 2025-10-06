@@ -22,13 +22,11 @@
 
 6. Put the address to config
 
-
 ## How to run
 
 > yarn install
 
 > yarn run dev
-
 
 ### CURL RELAYER
 
@@ -45,4 +43,3 @@ To send to sepolia need to run curl relayer
 ### UNION TO SEPOLIA
 
 > curl -X POST "95.217.11.125:7177/enqueue"   -H "Content-Type: application/json"   -d '{"@type":"call","@value":{"@type":"plugin","@value":{"plugin":"voyager-plugin-packet-index","message":{"@type":"make_packet_event","@value":{"chain_id":"union-testnet-10","channel_id":1,"packet_hash":"replacethis"}}}}}'
-
