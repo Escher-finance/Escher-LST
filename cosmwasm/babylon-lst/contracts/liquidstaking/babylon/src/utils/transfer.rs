@@ -61,15 +61,15 @@ pub fn send_back_token_via_ucs03(
     //after send bank msg to transfer handler, then call ucs03 on behalf of transfer handler to send token back
     let ucs3_send_msg = get_unbonding_ucs03_transfer_cosmos_msg(
         storage,
-        lst_contract.clone(),
+        &lst_contract,
         receiver,
         target_channel_id,
         time,
-        ucs03_relay_contract.clone(),
+        &ucs03_relay_contract,
         undelegation.unstake_return_native_amount.unwrap(),
         transfer_fee,
-        denom,
-        salt,
+        &denom,
+        &salt,
     )?;
     Ok((bank_msg, ucs3_send_msg))
 }

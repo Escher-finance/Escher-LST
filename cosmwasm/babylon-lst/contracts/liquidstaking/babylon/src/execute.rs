@@ -1,8 +1,12 @@
+use std::str::FromStr;
+
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut,
-    DistributionMsg, Env, MessageInfo, Response, SubMsg, Uint128, WasmMsg,
+    attr, from_json, to_json_binary, wasm_execute, Addr, Attribute, BankMsg, Coin, CosmosMsg,
+    Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, StdError, SubMsg, Uint128,
+    WasmMsg,
 };
-use cw20::Cw20ReceiveMsg;
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
+use unionlabs_primitives::Bytes;
 
 use crate::{
     error::ContractError,
@@ -19,6 +23,7 @@ use crate::{
         PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
         SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
     },
+    types::ChannelId,
     utils::{
         self,
         batch::{batches, BatchStatus},
@@ -32,6 +37,7 @@ use crate::{
             validate_recipient, validate_remote_sender, validate_required_coin, validate_validators,
         },
     },
+    zkgm::protocol::ucs03_transfer_v2,
 };
 
 /// process bond call to contract
@@ -302,7 +308,7 @@ pub fn receive(
     }
 
     let unstake_request_event = utils::delegation::unstake_request_in_batch(
-        env.clone(),
+        &env.clone(),
         deps.storage,
         sender.clone(),
         the_staker.clone(),
@@ -359,7 +365,7 @@ pub fn submit_batch(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         delegator.clone(),
         &mut pending_batch,
         params,
-        validators_reg.clone(),
+        &validators_reg.clone(),
     )?;
 
     let res: Response = Response::new().add_messages(msgs).add_events(events);
@@ -475,8 +481,8 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     let delegated_amount = get_actual_total_delegated(
         deps.querier,
         delegator.to_string(),
-        coin_denom.clone(),
-        validators_list.clone(),
+        &coin_denom,
+        &validators_list,
     )?;
 
     state.total_delegated_amount = delegated_amount;
@@ -1202,8 +1208,8 @@ pub fn normalize_reward(deps: DepsMut, env: Env) -> Result<Response, ContractErr
     let unclaimed_reward = utils::delegation::get_unclaimed_reward(
         deps.querier,
         delegator.to_string(),
-        params.underlying_coin_denom.clone(),
-        validators_list,
+        &params.underlying_coin_denom,
+        &validators_list,
     )?;
     let reward_balance = REWARD_BALANCE.load(deps.storage)?;
 
@@ -1307,4 +1313,124 @@ pub fn remove_ibc_channel(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     crate::state::IBC_CHANNELS.remove(deps.storage, ibc_channel_id);
     Ok(Response::new())
+}
+
+/// Process unbond request from user to unstake some amount of liquid staking token
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::needless_pass_by_value)]
+pub fn unbond(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
+    let status = STATUS.load(deps.storage)?;
+    if status.unbond_is_paused {
+        return Err(ContractError::FunctionalityUnderMaintenance {});
+    }
+
+    let state = STATE.load(deps.storage)?;
+    if state.exchange_rate < Decimal::one() {
+        return Err(ContractError::InvalidExchangeRate {});
+    }
+
+    let unstake_request_event = utils::delegation::unstake_request_in_batch(
+        &env.clone(),
+        deps.storage,
+        info.sender.to_string(),
+        info.sender.to_string(),
+        amount,
+        None,
+        None,
+        None,
+        None,
+    )?;
+
+    let response = Response::new()
+        .add_message(wasm_execute(
+            PARAMETERS.load(deps.storage)?.cw20_address.to_string(),
+            &Cw20ExecuteMsg::TransferFrom {
+                owner: info.sender.to_string(),
+                recipient: env.contract.address.to_string(),
+                amount,
+            },
+            vec![],
+        )?)
+        .add_event(unstake_request_event);
+
+    Ok(response)
+}
+
+/// Transfer liquid staking token to other chain via ucs03
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::needless_pass_by_value)]
+pub fn transfer(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    amount: Uint128,
+    to: String,
+    channel_id: u32,
+    salt: String,
+) -> Result<Response, ContractError> {
+    let params = PARAMETERS.load(deps.storage)?;
+
+    let coin = info
+        .funds
+        .iter()
+        .find(|x| x.denom == params.underlying_coin_denom && x.amount > Uint128::zero())
+        .cloned()
+        .ok_or_else(|| ContractError::NoAsset {})?;
+
+    if coin.amount < amount {
+        return Err(ContractError::NotEnoughFund {});
+    }
+
+    let Ok(recipient_address) = Bytes::from_str(to.as_str()) else {
+        return Err(ContractError::InvalidAddress {
+            kind: "recipient".into(),
+            address: to,
+            reason: "address must be in hex and starts with 0x".to_string(),
+        });
+    };
+
+    let salt: unionlabs_primitives::H256 = match unionlabs_primitives::H256::from_str(salt.as_str())
+    {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(ContractError::Std(StdError::generic_err(format!(
+                "failed to parse salt: {salt}, reason: {e}"
+            ))))
+        }
+    };
+
+    let Some(channel_id) = ChannelId::from_raw(channel_id) else {
+        return Err(ContractError::InvalidChannelId {});
+    };
+
+    let msg = ucs03_transfer_v2(
+        deps,
+        env,
+        info.sender.as_ref(),
+        recipient_address,
+        amount,
+        channel_id,
+        salt,
+    )?;
+
+    let response = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "transfer_lst")
+        .add_attribute("from", info.sender.to_string())
+        .add_attribute("to", to.clone())
+        .add_attribute("amount", amount.to_string())
+        .add_attribute("channel_id", channel_id.to_string());
+
+    Ok(response)
 }

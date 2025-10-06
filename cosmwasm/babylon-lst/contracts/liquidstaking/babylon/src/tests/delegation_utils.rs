@@ -411,8 +411,8 @@ fn test_get_actual_total_delegated() {
     let total_delegated = get_actual_total_delegated(
         querier_wrapper,
         delegator_addr.to_string(),
-        denom.clone(),
-        Vec::from([validator_addr_a, validator_addr_b]),
+        &denom,
+        &Vec::from([validator_addr_a, validator_addr_b]),
     )
     .unwrap();
     assert_eq!(total_delegated, Uint128::new(3000));
@@ -457,8 +457,8 @@ fn test_get_unclaimed_reward() {
     let unclaimed_rewards = get_unclaimed_reward(
         querier_wrapper,
         delegator_addr.to_string(),
-        denom.clone(),
-        Vec::from([validator_addr_a.clone(), validator_addr_b.clone()]),
+        &denom,
+        &Vec::from([validator_addr_a.clone(), validator_addr_b.clone()]),
     )
     .unwrap();
 
@@ -536,7 +536,7 @@ fn test_get_validator_delegation_map_with_total_bond() {
     let (validator_delegation_map, total_delegated_amount) =
         get_validator_delegation_map_with_total_bond(
             deps.as_ref(),
-            delegator_addr.to_string(),
+            &delegator_addr.to_string(),
             validators,
         )
         .unwrap();
@@ -630,7 +630,7 @@ fn test_adjust_validators_delegation() {
     let (validator_delegation_map, total_delegated_amount) =
         get_validator_delegation_map_with_total_bond(
             deps.as_ref(),
-            delegator_addr.to_string(),
+            &delegator_addr.to_string(),
             prev_validators.clone(),
         )
         .unwrap();
@@ -786,7 +786,7 @@ fn test_unstake_request_in_batch() {
         .unwrap();
 
     let unstake_request_event = unstake_request_in_batch(
-        env.clone(),
+        &env.clone(),
         deps.as_mut().storage,
         sender.clone(),
         staker.clone(),
@@ -1331,7 +1331,7 @@ fn test_submit_pending_batch() {
         delegator.clone(),
         &mut pending_batch,
         params.clone(),
-        validators_reg.clone(),
+        &validators_reg.clone(),
     )
     .unwrap();
 
@@ -1930,7 +1930,7 @@ fn validators_restaking_adjustment_7() {
     let (validator_delegation_map, total_delegated_amount) =
         get_validator_delegation_map_with_total_bond(
             deps.as_ref(),
-            delegator_addr.to_string(),
+            &delegator_addr.to_string(),
             prev_validators.clone(),
         )
         .unwrap();
@@ -2155,7 +2155,7 @@ fn validators_restaking_adjustment_8() {
     let (validator_delegation_map, total_delegated_amount) =
         get_validator_delegation_map_with_total_bond(
             deps.as_ref(),
-            delegator_addr.to_string(),
+            &delegator_addr.to_string(),
             prev_validators.clone(),
         )
         .unwrap();

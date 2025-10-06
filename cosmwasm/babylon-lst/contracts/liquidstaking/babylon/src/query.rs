@@ -136,15 +136,11 @@ pub fn query_staking_liquidity(
 
     let validators = validators_list.clone().unwrap_or(validators_addr);
 
-    let delegated_amount = get_actual_total_delegated(
-        deps.querier,
-        the_delegator.to_string(),
-        denom.clone(),
-        validators.clone(),
-    )?;
+    let delegated_amount =
+        get_actual_total_delegated(deps.querier, the_delegator.to_string(), &denom, &validators)?;
 
-    let unclaimed_reward = get_unclaimed_reward(deps.querier, the_delegator, denom, validators)?;
-    let reward_balance = REWARD_BALANCE.load(deps.storage)?;
+    let unclaimed_reward = get_unclaimed_reward(deps.querier, the_delegator, &denom, &validators)?;
+    let reward_balance: Uint128 = REWARD_BALANCE.load(deps.storage)?;
     let total_reward = unclaimed_reward + reward_balance;
 
     let fee = calculate_fee_from_reward(total_reward, params.fee_rate);

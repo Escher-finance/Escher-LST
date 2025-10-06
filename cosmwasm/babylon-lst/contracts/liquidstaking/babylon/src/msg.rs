@@ -105,6 +105,9 @@ pub enum ExecuteMsg {
         recipient_channel_id: Option<u32>,
         salt: Option<String>,
     },
+    Unbond {
+        amount: Uint128,
+    },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
     /// Submit pending batch
