@@ -158,4 +158,7 @@ pub enum ContractError {
 
     #[error("no salt")]
     NoSalt,
+
+    #[error("invalid salt")]
+    InvalidSalt(#[from] unionlabs_primitives::encoding::HexPrefixedFromStrError),
 }
