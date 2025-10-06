@@ -8,7 +8,7 @@ pub fn get_staked_token_submsg(
     mint_amount: Uint128,
     _liquidstaking_denom: String,
     payload_bin: Binary,
-    cw20_address: Addr,
+    cw20_address: &Addr,
 ) -> SubMsg {
     let mint = cw20::Cw20ExecuteMsg::Mint {
         recipient,

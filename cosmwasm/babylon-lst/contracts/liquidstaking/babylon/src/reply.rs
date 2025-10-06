@@ -108,7 +108,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
             params.cw20_address.to_string(),
             params.zkgm_token_minter,
             amount,
-            vec![],
+            &[],
         )?;
 
         msgs.push(allowance_msg);
@@ -169,7 +169,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
             amount,
             quote_token,
             amount,
-            funds.clone(),
+            &funds,
             salt,
         )?;
 

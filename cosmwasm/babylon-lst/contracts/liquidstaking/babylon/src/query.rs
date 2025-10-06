@@ -24,6 +24,7 @@ use crate::{
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[allow(clippy::needless_pass_by_value)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     Ok(match msg {
         QueryMsg::State {} => to_json_binary(&query_state(deps.storage)?),
@@ -125,7 +126,7 @@ pub fn query_staking_liquidity(
 
     let denom = coin_denom
         .clone()
-        .unwrap_or_else(|| params.underlying_coin_denom.to_string());
+        .unwrap_or_else(|| params.underlying_coin_denom.clone());
 
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let validators_addr: Vec<String> = validators_reg

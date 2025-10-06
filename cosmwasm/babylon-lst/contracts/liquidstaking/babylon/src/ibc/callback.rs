@@ -106,8 +106,7 @@ pub fn ibc_destination_callback(
 
     if amount < required_amount {
         let ibc_callback_error_message = format!(
-            "insufficient amount, not enough transfer fee, required: {}, received: {}",
-            required_amount, amount
+            "insufficient amount, not enough transfer fee, required: {required_amount}, received: {amount}"
         );
 
         return failure_handler(
@@ -201,7 +200,7 @@ pub fn ibc_destination_callback(
 
     // create bond event here
     let bond_event = crate::event::BondEvent(
-        packet_data.sender.to_string(),
+        packet_data.sender.clone(),
         packet_data.sender.clone(),
         payload.amount,
         bond_data.delegated_amount,
@@ -220,7 +219,7 @@ pub fn ibc_destination_callback(
     );
 
     let ibc_callback_event = IbcCallbackEvent(
-        packet_data.sender.to_string(),
+        packet_data.sender.clone(),
         channel_id.clone(),
         amount,
         payload.amount,
@@ -253,7 +252,7 @@ fn failure_handler(
         channel_id.clone(),
         packet_data.sender.clone(),
         transfer_amount,
-        denom,
+        &denom,
         env.block.time,
     );
 
@@ -264,7 +263,7 @@ fn failure_handler(
 
     let payload_recipient = match payload {
         Some(ref p) => p.recipient.clone(),
-        None => "".to_string(),
+        None => String::new(),
     };
 
     let recipient_channel_id = match payload {
@@ -274,7 +273,7 @@ fn failure_handler(
 
     let salt = match payload {
         Some(ref p) => p.salt.clone(),
-        None => "".to_string(),
+        None => String::new(),
     };
 
     let transfer_fee = match payload {
@@ -283,7 +282,7 @@ fn failure_handler(
     };
 
     let ibc_callback_event = IbcCallbackEvent(
-        packet_data.sender.to_string(),
+        packet_data.sender.clone(),
         channel_id.clone(),
         transfer_amount,
         amount,

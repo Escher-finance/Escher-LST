@@ -852,8 +852,8 @@ pub fn process_batch_withdrawal(
         if is_on_chain_recipient {
             let msg = get_send_bank_msg(
                 staker,
-                undelegation.recipient.clone(),
-                denom.clone(),
+                undelegation.recipient.clone().as_ref(),
+                &denom,
                 unstake_return_native_amount,
             );
             send_msgs.push(msg);
@@ -864,15 +864,15 @@ pub fn process_batch_withdrawal(
                 // send native token back via ucs03
                 let (bank_msg, ucs03_msg) = transfer::send_back_token_via_ucs03(
                     deps.storage,
-                    lst_contract.clone(),
+                    &lst_contract,
                     staker,
-                    denom.clone(),
-                    params.transfer_handler.clone(),
+                    &denom,
+                    &params.transfer_handler,
                     params.transfer_fee,
-                    ucs03_relay_contract.clone(),
+                    &ucs03_relay_contract,
                     undelegation,
                     time,
-                    salt,
+                    &salt,
                 )?;
 
                 send_msgs.push(bank_msg);
@@ -883,7 +883,7 @@ pub fn process_batch_withdrawal(
                         recipient_ibc_channel_id.clone(),
                         recipient.clone(),
                         unstake_return_native_amount,
-                        denom.clone(),
+                        &denom,
                         time,
                     );
                     send_msgs.push(msg);
