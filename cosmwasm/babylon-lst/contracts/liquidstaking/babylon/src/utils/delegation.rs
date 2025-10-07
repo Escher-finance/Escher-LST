@@ -1,8 +1,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, Event,
-    QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128, to_json_binary,
+    to_json_binary, Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    Event, QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128,
 };
 use prost::Message;
 use unionlabs_primitives::{Bytes, H256};
@@ -13,7 +13,6 @@ use super::{
     calc::{calculate_exchange_rate, calculate_fee_from_reward},
 };
 use crate::{
-    ContractError,
     event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
     execute::StakerUndelegation,
     msg::{
@@ -22,16 +21,17 @@ use crate::{
     },
     proto,
     state::{
-        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN,
-        REWARD_BALANCE, STATE, SUPPLY_QUEUE, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL,
-        UnbondRecord, VALIDATORS_REGISTRY, Validator, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE,
-        increment_tokens, unbond_record,
+        increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
+        UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, VALIDATORS_REGISTRY,
+        WITHDRAW_REWARD_QUEUE,
     },
     utils::{
         batch::batches,
         calc::{self, check_slippage_with_min_mint_amount},
         delegation, token,
     },
+    ContractError,
 };
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 900;
@@ -102,10 +102,11 @@ pub fn calculate_delegated_amount(amount: Uint128, ratio: Decimal) -> Uint128 {
 }
 
 #[must_use]
+#[allow(clippy::implicit_hasher)]
 pub fn get_undelegate_msgs(
-    delegator: String,
+    delegator: &str,
     undelegate_amount: Uint128,
-    coin_denom: String,
+    coin_denom: &str,
     validator_delegation_ratio: HashMap<String, Decimal>,
 ) -> (Uint128, Vec<CosmosMsg>, Vec<Attribute>) {
     let mut msgs: Vec<CosmosMsg> = vec![];
@@ -124,10 +125,10 @@ pub fn get_undelegate_msgs(
         }
 
         let undelegate_staking_msg = get_babylon_undelegate_cosmos_msg(
-            delegator.clone(),
+            delegator.to_string(),
             validator.clone(),
             undelegate_amount_for_validator.to_string(),
-            coin_denom.clone(),
+            coin_denom.to_string(),
         );
         msgs.push(undelegate_staking_msg);
 
@@ -212,45 +213,46 @@ pub fn get_validator_delegation_map_base_on_weight(
 }
 
 #[must_use]
+#[allow(clippy::needless_pass_by_value, clippy::implicit_hasher)]
 pub fn get_surplus_deficit_validators(
     validator_delegation_map: HashMap<String, Uint128>,
     correct_validator_delegation_map: HashMap<String, Uint128>,
 ) -> (Vec<ValidatorDelegation>, Vec<ValidatorDelegation>) {
     let mut surplus_validators: Vec<ValidatorDelegation> = vec![];
     let mut deficient_validators: Vec<ValidatorDelegation> = vec![];
-    for (key, previous_amount) in validator_delegation_map.clone().iter_mut() {
+    for (key, previous_amount) in &mut validator_delegation_map.clone() {
         // check if old validator key exists on new validators map
         if !correct_validator_delegation_map.contains_key(key) {
             // because old validator not exists on new one that means the previous validator
             // need to be restaked fully so it is surplus
             surplus_validators.push(ValidatorDelegation {
-                address: key.to_string(),
+                address: key.clone(),
                 delegation_diff: DelegationDiff::Surplus,
                 diff_amount: *previous_amount,
-            })
-        };
+            });
+        }
     }
 
-    for (new_validator_key, correct_amount) in correct_validator_delegation_map.clone().iter_mut() {
+    for (new_validator_key, correct_amount) in &mut correct_validator_delegation_map.clone() {
         // check if previous validator exists
         match validator_delegation_map.get(new_validator_key) {
             Some(previous_amount) => {
                 if *previous_amount > *correct_amount {
                     surplus_validators.push(ValidatorDelegation {
-                        address: new_validator_key.to_string(),
+                        address: new_validator_key.clone(),
                         delegation_diff: DelegationDiff::Surplus,
                         diff_amount: *previous_amount - *correct_amount,
-                    })
+                    });
                 } else {
                     deficient_validators.push(ValidatorDelegation {
-                        address: new_validator_key.to_string(),
+                        address: new_validator_key.clone(),
                         delegation_diff: DelegationDiff::Deficit,
                         diff_amount: *correct_amount - *previous_amount,
-                    })
+                    });
                 }
             }
             None => deficient_validators.push(ValidatorDelegation {
-                address: new_validator_key.to_string(),
+                address: new_validator_key.clone(),
                 delegation_diff: DelegationDiff::Deficit,
                 diff_amount: *correct_amount,
             }),
@@ -262,10 +264,10 @@ pub fn get_surplus_deficit_validators(
 
 #[must_use]
 pub fn get_restaking_msgs(
-    delegator: String,
+    delegator: &str,
     mut surplus_validators: Vec<ValidatorDelegation>,
     mut deficient_validators: Vec<ValidatorDelegation>,
-    denom: String,
+    denom: &str,
 ) -> Vec<CosmosMsg> {
     let mut msgs = Vec::new();
 
@@ -273,7 +275,7 @@ pub fn get_restaking_msgs(
     surplus_validators.sort_by_key(|v| v.address.clone());
     deficient_validators.sort_by_key(|v| v.address.clone());
 
-    for surplus_validator in surplus_validators.iter_mut() {
+    for surplus_validator in &mut surplus_validators {
         while surplus_validator.diff_amount > Uint128::zero() {
             if let Some(deficient_validator) = deficient_validators
                 .iter_mut()
@@ -296,17 +298,17 @@ pub fn get_restaking_msgs(
                         src_validator: surplus_validator.address.clone(),
                         dst_validator: deficient_validator.address.clone(),
                         amount: Coin {
-                            denom: denom.clone(),
+                            denom: denom.to_string(),
                             amount: redelegate_amount,
                         },
                     }));
                 } else {
                     msgs.push(get_babylon_redelegate_cosmos_msg(
-                        delegator.clone(),
-                        surplus_validator.address.to_string(),
+                        delegator.to_string(),
+                        surplus_validator.address.clone(),
                         deficient_validator.address.clone(),
                         redelegate_amount.to_string(),
-                        denom.clone(),
+                        denom,
                     ));
                 }
 
@@ -323,8 +325,9 @@ pub fn get_restaking_msgs(
     msgs
 }
 
+#[must_use]
 pub fn get_delegate_to_validator_msgs(
-    delegator: String,
+    delegator: &str,
     delegate_amount: Uint128,
     coin_denom: String,
     validators: Vec<Validator>,
@@ -353,7 +356,7 @@ pub fn get_delegate_to_validator_msgs(
         total_delegated += delegate_amount;
 
         let delegate_msg = get_babylon_delegate_cosmos_msg(
-            delegator.clone(),
+            delegator.to_string(),
             validator.address.clone(),
             delegate_amount.to_string(),
             coin_denom.clone(),
@@ -362,7 +365,7 @@ pub fn get_delegate_to_validator_msgs(
         msgs.push(delegate_msg);
 
         if first_validator.is_empty() {
-            first_validator = validator.address.clone();
+            first_validator.clone_from(&validator.address);
         }
     }
 
@@ -371,7 +374,7 @@ pub fn get_delegate_to_validator_msgs(
     let remaining_amount = delegate_amount - total_delegated;
     if !remaining_amount.is_zero() {
         let delegate_msg = get_babylon_delegate_cosmos_msg(
-            delegator.clone(),
+            delegator.to_string(),
             first_validator.clone(),
             remaining_amount.to_string(),
             coin_denom,
@@ -387,6 +390,7 @@ pub fn get_delegate_to_validator_msgs(
 /// Will return `StdResult` of total unclaimed erward amount in Uint128
 /// # Errors
 /// Will return `StdError`
+#[allow(clippy::needless_pass_by_value)]
 pub fn adjust_validators_delegation(
     deps: DepsMut,
     delegator: Addr,
@@ -399,7 +403,7 @@ pub fn adjust_validators_delegation(
     let (validator_delegation_map, total_delegated_amount) =
         get_validator_delegation_map_with_total_bond(
             deps.as_ref(),
-            &delegator.to_string(),
+            delegator.as_ref(),
             prev_validators,
         )?;
 
@@ -410,10 +414,10 @@ pub fn adjust_validators_delegation(
         get_surplus_deficit_validators(validator_delegation_map, correct_validator_delegation_map);
 
     let msgs: Vec<CosmosMsg> = get_restaking_msgs(
-        delegator.to_string(),
+        delegator.as_ref(),
         surplus_validators,
         deficient_validators,
-        denom,
+        &denom,
     );
 
     Ok(msgs)
@@ -424,7 +428,11 @@ pub fn adjust_validators_delegation(
 /// Will return `StdResult` of Vector of `CosmosMsg`, Vector of `SubMsg` and `BondData`
 /// # Errors
 /// Will return `ContractError`
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    clippy::needless_pass_by_value
+)]
 pub fn process_bond(
     storage: &mut dyn Storage,
     querier: QuerierWrapper,
@@ -449,7 +457,7 @@ pub fn process_bond(
 
     let coin_denom = params.underlying_coin_denom.clone();
     let msgs = delegation::get_delegate_to_validator_msgs(
-        delegator.to_string(),
+        delegator.as_ref(),
         amount,
         coin_denom.clone(),
         validators_reg.validators.clone(),
@@ -571,6 +579,7 @@ pub fn process_bond(
     ))
 }
 
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 pub fn query_liquidity(
     storage: &mut dyn Storage,
     querier: QuerierWrapper,
@@ -635,7 +644,7 @@ pub fn delegate(
     let validators_reg = VALIDATORS_REGISTRY.load(storage)?;
 
     let msgs = delegation::get_delegate_to_validator_msgs(
-        env.contract.address.to_string(),
+        env.contract.address.as_ref(),
         amount,
         params.underlying_coin_denom.clone(),
         validators_reg.validators.clone(),
@@ -708,7 +717,11 @@ pub fn delegate(
 /// Will return result of `cosmwasm_std::Response` of `CosmosMsg` Vector and Event Vector
 /// # Errors
 /// Will return contract error
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    clippy::needless_pass_by_value
+)]
 pub fn submit_pending_batch(
     deps: DepsMut,
     block_height: u64,
@@ -800,9 +813,9 @@ pub fn submit_pending_batch(
     }
 
     let (total_undelegate_amount, undelegate_msgs, atts) = get_undelegate_msgs(
-        delegator.to_string(),
+        delegator.as_ref(),
         undelegate_amount,
-        coin_denom.clone(),
+        &coin_denom,
         validators_delegation_ratio,
     );
     msgs.extend(undelegate_msgs.clone());
@@ -1077,19 +1090,20 @@ pub fn get_babylon_undelegate_cosmos_msg(
     })
 }
 
+#[must_use]
 pub fn get_babylon_redelegate_cosmos_msg(
     delegator_address: String,
     validator_src_address: String,
     validator_dst_address: String,
     amount: String,
-    denom: String,
+    denom: &str,
 ) -> CosmosMsg {
     let redelegate_msg = proto::cosmos::staking::v1beta1::MsgBeginRedelegate {
         delegator_address,
         validator_src_address,
         validator_dst_address,
         amount: Some(proto::cosmos::base::v1beta1::Coin {
-            denom: denom.clone(),
+            denom: denom.to_string(),
             amount,
         }),
     };
@@ -1135,7 +1149,7 @@ pub fn get_staker_undelegation(
         let entry = staker_undelegation
             .entry((
                 record.staker.clone(),
-                record.recipient.clone().unwrap_or("".to_string()),
+                record.recipient.clone().unwrap_or(String::new()),
             ))
             .and_modify(|e| e.unstake_amount += record.amount)
             .or_insert(StakerUndelegation {
@@ -1180,15 +1194,12 @@ pub fn get_staker_undelegation(
         Uint128::new(unbonding_records.len() as u128),
     );
     for (i, record) in unbonding_records.iter_mut().enumerate() {
-        let recipient = match record.recipient.clone() {
-            Some(recipient) => recipient,
-            None => "".to_string(),
+        let recipient = record.recipient.clone().unwrap_or_default();
+        let Some(staker_undelegation) =
+            staker_undelegation.get_mut(&(record.staker.clone(), recipient))
+        else {
+            continue;
         };
-        let staker_undelegation =
-            match staker_undelegation.get_mut(&(record.staker.clone(), recipient)) {
-                Some(x) => x,
-                None => continue,
-            };
         let dust = dust_distribution[i];
         staker_undelegation.unstake_return_native_amount = staker_undelegation
             .unstake_return_native_amount
@@ -1208,9 +1219,9 @@ pub fn get_staker_undelegation(
 pub fn inject(
     storage: &mut dyn Storage,
     querier: QuerierWrapper,
-    delegator: Addr,
+    delegator: &Addr,
     amount: Uint128,
-    params: Parameters,
+    params: &Parameters,
     block_height: u64,
 ) -> Result<(Vec<CosmosMsg>, InjectData), ContractError> {
     if amount < params.min_bond {
@@ -1219,11 +1230,11 @@ pub fn inject(
 
     let validators_reg = crate::state::VALIDATORS_REGISTRY.load(storage)?;
 
-    let coin_denom = params.underlying_coin_denom.to_string();
+    let coin_denom = params.underlying_coin_denom.clone();
     let msgs = delegation::get_delegate_to_validator_msgs(
-        delegator.to_string(),
+        delegator.as_ref(),
         amount,
-        coin_denom.to_string(),
+        coin_denom.clone(),
         validators_reg.validators.clone(),
     );
 
