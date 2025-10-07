@@ -2,21 +2,21 @@ use std::str::FromStr;
 
 use alloy::sol_types::SolValue;
 use cosmwasm_std::{
-    wasm_execute, Addr, BankMsg, Coin, CosmosMsg, IbcMsg, IbcTimeout, StdError, Storage, Timestamp,
-    Uint128, Uint64,
+    Addr, BankMsg, Coin, CosmosMsg, IbcMsg, IbcTimeout, StdError, Storage, Timestamp, Uint64,
+    Uint128, wasm_execute,
 };
 use ucs03_zkgm::com::{
-    Instruction, TokenOrderV2, INSTR_VERSION_2, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_ESCROW,
+    INSTR_VERSION_2, Instruction, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_ESCROW, TokenOrderV2,
 };
 
 use crate::{
+    ContractError,
     execute::StakerUndelegation,
     msg::{Ucs03ExecuteMsg, ZkgmTransfer},
     types::ChannelId,
     utils::delegation::{
-        get_unbonding_ucs03_transfer_cosmos_msg, DEFAULT_TIMEOUT_TIMESTAMP_OFFSET,
+        DEFAULT_TIMEOUT_TIMESTAMP_OFFSET, get_unbonding_ucs03_transfer_cosmos_msg,
     },
-    ContractError,
 };
 
 #[must_use]
@@ -111,7 +111,7 @@ pub fn ibc_transfer_msg(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn send_native_token_via_ucs03(
+pub fn transfer_escrow_v2(
     ucs03_relay_contract: &str,
     payload: &ZkgmTransfer,
     base_token: &str,
@@ -158,7 +158,7 @@ pub fn send_native_token_via_ucs03(
         return Err(ContractError::InvalidChannelId {});
     };
 
-    let transfer_msg: Ucs03ExecuteMsg = Ucs03ExecuteMsg::Send {
+    let send_msg: Ucs03ExecuteMsg = Ucs03ExecuteMsg::Send {
         channel_id,
         timeout_height: Uint64::from(0u64),
         timeout_timestamp,
@@ -170,7 +170,7 @@ pub fn send_native_token_via_ucs03(
         denom: base_token.to_string(),
         amount: payload.amount,
     }];
-    let msg = wasm_execute(ucs03_relay_contract, &transfer_msg, funds)?;
+    let msg = wasm_execute(ucs03_relay_contract, &send_msg, funds)?;
 
     Ok(msg.into())
 }
