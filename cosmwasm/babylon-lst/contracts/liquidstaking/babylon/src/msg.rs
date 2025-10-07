@@ -105,9 +105,6 @@ pub enum ExecuteMsg {
         recipient_channel_id: Option<u32>,
         salt: Option<String>,
     },
-    Unbond {
-        amount: Uint128,
-    },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
     /// Submit pending batch
@@ -179,6 +176,9 @@ pub enum ExecuteMsg {
     RemoteBond {
         min_mint_amount: Uint128,
         mint_to_address: Addr,
+    },
+    RemoteUnbond {
+        amount: Uint128,
     },
 }
 
@@ -421,4 +421,13 @@ pub struct LiquidityState {
     pub reward_balance: Uint128,
     pub unclaimed_reward: Uint128,
     pub exchange_rate: Decimal,
+}
+
+#[derive(Debug)]
+pub struct ZkgmTransfer {
+    pub sender: String,
+    pub amount: Uint128,
+    pub recipient: String,
+    pub recipient_channel_id: u32,
+    pub salt: String,
 }

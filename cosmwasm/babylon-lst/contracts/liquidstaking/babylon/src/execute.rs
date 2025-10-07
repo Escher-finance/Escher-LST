@@ -1,8 +1,9 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo,
-    Response, StdError, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary, wasm_execute,
+    attr, from_json, to_json_binary, wasm_execute, Addr, Attribute, BankMsg, Coin, CosmosMsg,
+    Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, StdError, SubMsg, Uint128,
+    WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use unionlabs_primitives::Bytes;
@@ -14,18 +15,21 @@ use crate::{
         ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent, UpdateValidatorsEvent,
     },
     helpers,
-    msg::{BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, RewardMigrateMsg},
+    msg::{
+        BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, RewardMigrateMsg,
+        ZkgmTransfer,
+    },
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
-        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
-        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, PARAMETERS,
+        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
+        SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{BatchStatus, batches},
+        batch::{batches, BatchStatus},
         calc::{
             calculate_exchange_rate, calculate_fee_from_reward, check_slippage,
             get_last_epoch_block, get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
@@ -829,6 +833,8 @@ pub fn process_batch_withdrawal(
 
     let mut send_msgs: Vec<CosmosMsg> = vec![];
 
+    let mut quote_token_map: HashMap<u32, QuoteToken> = HashMap::new();
+
     for (i, ((staker, _), undelegation)) in staker_undelegation.iter().enumerate() {
         // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
         // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
@@ -860,23 +866,41 @@ pub fn process_batch_withdrawal(
         } else {
             // if recipient channel id is set, it means that the receiver/recipient is on other chain
             // but if channel_id is set but recipient also recipient_channel_id is none, it will send to staker
-            if undelegation.recipient_channel_id.is_some() {
-                // send native token back via ucs03
-                let (bank_msg, ucs03_msg) = transfer::send_back_token_via_ucs03(
-                    deps.storage,
-                    &lst_contract,
-                    staker,
-                    &denom,
-                    &params.transfer_handler,
-                    params.transfer_fee,
-                    &ucs03_relay_contract,
-                    undelegation,
-                    time,
-                    &salt,
-                )?;
+            if let Some(recipient_channel_id) = undelegation.recipient_channel_id {
+                // get quote token for the channel id
+                let quote_token = if let Some(qt) = quote_token_map.get(&recipient_channel_id) {
+                    qt.clone()
+                } else {
+                    let qt = QUOTE_TOKEN.load(deps.storage, recipient_channel_id)?;
+                    quote_token_map.insert(recipient_channel_id, qt.clone());
+                    qt
+                };
 
-                send_msgs.push(bank_msg);
-                send_msgs.push(ucs03_msg);
+                let Some(recipient) = undelegation.recipient.as_ref() else {
+                    return Err(ContractError::InvalidAddress {
+                        kind: "recipient".to_string(),
+                        address: "blank".to_string(),
+                        reason: "recipient is required when recipient_channel_id is set"
+                            .to_string(),
+                    });
+                };
+
+                // send native token back via ucs03
+                transfer::send_native_token_via_ucs03(
+                    &ucs03_relay_contract,
+                    &ZkgmTransfer {
+                        sender: lst_contract.to_string(),
+                        amount: unstake_return_native_amount,
+                        recipient: recipient.clone(),
+                        recipient_channel_id: undelegation
+                            .recipient_channel_id
+                            .unwrap_or(undelegation.channel_id.unwrap_or(0)),
+                        salt,
+                    },
+                    &denom,
+                    &quote_token.quote_token,
+                    time,
+                )?;
             } else if let Some(recipient_ibc_channel_id) = &undelegation.recipient_ibc_channel_id {
                 if let Some(recipient) = &undelegation.recipient {
                     let msg = ibc_transfer_msg(
@@ -912,7 +936,7 @@ pub fn process_batch_withdrawal(
             total_released_amount,
             total_received_amount,
             denom.clone(),
-            unbond_record_ids,
+            &unbond_record_ids,
         );
 
         events.push(ev);
@@ -1069,7 +1093,7 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
     let (redelegate, fee) = helpers::split_revenue(
         balance_to_split,
         config.fee_rate,
-        config.underlying_coin_denom,
+        &config.underlying_coin_denom,
     );
 
     // Send the fee to revenue receiver
