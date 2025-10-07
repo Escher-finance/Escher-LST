@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, WasmMsg, instantiate2_address, to_json_binary,
+    instantiate2_address, to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, WasmMsg,
 };
 
 use crate::{error::ContractError, msg::InstantiateRewardMsg};
@@ -47,7 +47,7 @@ pub fn instantiate2(
     Ok((instantiate_msg, contract_addr))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 pub fn create_reward(
     deps: &DepsMut,
     env: &Env,
@@ -58,7 +58,7 @@ pub fn create_reward(
     fee_rate: Decimal,
     coin_denom: String,
 ) -> Result<(CosmosMsg, Addr), ContractError> {
-    let reward_label: String = format!("reward-instance-{}", salt);
+    let reward_label: String = format!("reward-instance-{salt}");
     let instantiate_msg = InstantiateRewardMsg {
         lst_contract: lst_contract.clone(),
         fee_receiver: revenue_receiver,
