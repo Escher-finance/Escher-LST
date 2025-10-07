@@ -1,26 +1,26 @@
 use std::marker::PhantomData;
 
 use cosmwasm_std::{
-    Binary, Decimal, Deps, Env, FullDelegation, Order, Storage, Uint128, entry_point,
-    to_json_binary,
+    entry_point, to_json_binary, Binary, Decimal, Deps, Env, FullDelegation, Order, Storage,
+    Uint128,
 };
-use cw_ownable::get_ownership;
 use cw2::ContractVersion;
+use cw_ownable::get_ownership;
 
 use crate::{
-    ContractError,
     msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
     state::{
-        PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
-        SUPPLY_QUEUE, State, Status, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL, UnbondRecord,
-        VALIDATORS_REGISTRY, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue,
-        unbond_record,
+        unbond_record, Parameters, QuoteToken, State, Status, SupplyQueue, UnbondRecord,
+        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, STATE,
+        STATUS, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, VALIDATORS_REGISTRY,
+        WITHDRAW_REWARD_QUEUE,
     },
     utils::{
-        batch::{Batch, BatchStatus, batches},
+        batch::{batches, Batch, BatchStatus},
         calc::{self, calculate_fee_from_reward, calculate_query_bounds},
         delegation::{get_actual_total_delegated, get_unclaimed_reward},
     },
+    ContractError,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -112,6 +112,7 @@ pub fn query_supply_queue(storage: &dyn Storage) -> Result<SupplyQueue, Contract
     Ok(supply_queue)
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn query_staking_liquidity(
     deps: Deps,
     env: &Env,

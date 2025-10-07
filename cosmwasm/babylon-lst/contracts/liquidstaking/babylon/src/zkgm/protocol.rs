@@ -2,20 +2,20 @@ use std::str::FromStr;
 
 use alloy::{primitives::U256, sol_types::SolValue};
 use cosmwasm_std::{
-    Binary, Coin, CosmosMsg, Timestamp, Uint64, Uint128, to_json_binary, wasm_execute,
+    to_json_binary, wasm_execute, Binary, Coin, CosmosMsg, Timestamp, Uint128, Uint64,
 };
 use ucs03_zkgm::com::{
-    Batch, INSTR_VERSION_0, INSTR_VERSION_1, INSTR_VERSION_2, Instruction, OP_BATCH,
-    OP_TOKEN_ORDER, TOKEN_ORDER_KIND_ESCROW, TokenOrderV2,
+    Batch, Instruction, TokenOrderV2, INSTR_VERSION_0, INSTR_VERSION_1, INSTR_VERSION_2, OP_BATCH,
+    OP_TOKEN_ORDER, TOKEN_ORDER_KIND_ESCROW,
 };
 use unionlabs_primitives::{Bytes, H256};
 
 use crate::{
-    ContractError,
     msg::Ucs03ExecuteMsg,
     state::{PARAMETERS, QUOTE_TOKEN},
     types::ChannelId,
     zkgm::com::FungibleAssetOrder,
+    ContractError,
 };
 
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
