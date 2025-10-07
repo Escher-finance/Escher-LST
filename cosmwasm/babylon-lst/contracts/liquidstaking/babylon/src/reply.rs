@@ -1,19 +1,16 @@
-use std::str::FromStr;
-
 use cosmwasm_std::{
-    Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, StdError, SubMsg, Uint128,
-    WasmMsg, attr, entry_point, from_json, to_json_binary,
+    Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, SubMsg, Uint128, WasmMsg,
+    attr, entry_point, from_json, to_json_binary,
 };
-use unionlabs_primitives::Bytes;
 
 use crate::{
     error::ContractError,
-    msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload},
+    msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload, ZkgmTransfer},
     state::{
         PARAMETERS, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, SUPPLY_QUEUE,
         WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
     },
-    utils::calc::get_next_epoch,
+    utils::{calc::get_next_epoch, transfer},
 };
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
@@ -26,7 +23,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     if !msg.result.is_ok() {
         let err = msg.result.unwrap_err();
         return Err(ContractError::ReplyError {
-            message: err.to_string(),
+            message: err.clone(),
         });
     }
 
@@ -38,6 +35,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response, ContractError> {
     let params: Parameters = PARAMETERS.load(deps.storage)?;
     let payload: MintTokensPayload = from_json(msg.payload)?;
@@ -45,9 +43,9 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
     // if recipient channel id is none, need to make sure recipient address is valid address on the chain where the contract is running
     let is_on_chain_recipient = crate::utils::validation::is_on_chain_recipient(
         &deps.as_ref(),
-        payload.recipient.clone(),
+        &payload.recipient.clone(),
         payload.recipient_channel_id,
-        None,
+        &None,
     );
 
     // check to query balance of transfer handler or this contract
@@ -123,57 +121,23 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
         }
 
         let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
-        quote_token_string = quote_token.lst_quote_token.clone();
+        quote_token_string.clone_from(&quote_token.lst_quote_token);
 
-        let recipient_address = match Bytes::from_str(recipient.as_str()) {
-            Ok(rec) => rec,
-            Err(_) => {
-                return Err(ContractError::InvalidAddress {
-                    kind: "recipient".into(),
-                    address: recipient,
-                    reason: "address must be in hex and starts with 0x".to_string(),
-                });
-            }
-        };
-        let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
-            Ok(token) => token,
-            Err(_) => {
-                return Err(ContractError::InvalidAddress {
-                    kind: "quote_token".into(),
-                    address: quote_token_string,
-                    reason: "address must be in hex and starts with 0x".to_string(),
-                });
-            }
-        };
-
-        let salt: unionlabs_primitives::H256 =
-            match unionlabs_primitives::H256::from_str(payload.salt.as_str()) {
-                Ok(s) => s,
-                Err(e) => {
-                    return Err(ContractError::Std(StdError::generic_err(format!(
-                        "failed to parse salt: {}, reason: {}",
-                        payload.salt, e
-                    ))));
-                }
-            };
-
-        let authz_ucs03_msg = crate::utils::authz::get_authz_ucs03_transfer(
-            params.cw20_address.to_string(),
-            params.transfer_handler,
-            env.contract.address.to_string(),
+        let send_msg = transfer::transfer_escrow_v2(
+            &params.ucs03_relay_contract.clone(),
+            &ZkgmTransfer {
+                sender: env.contract.address.to_string(),
+                amount,
+                recipient,
+                recipient_channel_id: channel_id,
+                salt: payload.salt,
+            },
+            params.cw20_address.as_ref(),
+            &quote_token_string,
             env.block.time,
-            params.ucs03_relay_contract.clone(),
-            channel_id,
-            recipient_address,
-            params.cw20_address.to_string(),
-            amount,
-            quote_token,
-            amount,
-            &funds,
-            salt,
         )?;
 
-        msgs.push(authz_ucs03_msg);
+        msgs.push(send_msg);
     } else {
         let receiver = match payload.recipient.clone() {
             Some(receiver) => receiver,
@@ -204,6 +168,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
 }
 
 /// Call split reward to reward contract after withdraw reward
+#[allow(clippy::needless_pass_by_value)]
 fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let payload: BondRewardsPayload = from_json(msg.payload)?;
@@ -254,6 +219,7 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
 }
 
 /// Handle split reward call to reward contract reply
+#[allow(clippy::needless_pass_by_value)]
 fn on_split_reward(deps: DepsMut, env: &Env, _msg: Reply) -> Result<Response, ContractError> {
     // reset reward balance after split reward call success
     REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;

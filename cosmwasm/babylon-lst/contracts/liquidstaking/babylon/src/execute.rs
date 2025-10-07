@@ -16,8 +16,8 @@ use crate::{
     },
     helpers,
     msg::{
-        BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, RewardMigrateMsg,
-        ZkgmTransfer,
+        BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, Recipient,
+        RewardMigrateMsg, ZkgmTransfer,
     },
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
@@ -37,7 +37,8 @@ use crate::{
         delegation::{get_actual_total_delegated, get_actual_total_reward, submit_pending_batch},
         transfer::{self, get_send_bank_msg, ibc_transfer_msg},
         validation::{
-            validate_recipient, validate_remote_sender, validate_required_coin, validate_validators,
+            split_and_validate_recipient, validate_recipient, validate_remote_sender,
+            validate_required_coin, validate_validators,
         },
     },
     zkgm::protocol::ucs03_transfer_v2,
@@ -64,13 +65,8 @@ pub fn bond(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
-    let on_chain_recipient = validate_recipient(
-        &deps,
-        recipient.clone(),
-        recipient_channel_id,
-        None,
-        salt.clone(),
-    )?;
+    let on_chain_recipient =
+        validate_recipient(&deps, recipient.clone(), recipient_channel_id, None, &salt)?;
 
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -184,7 +180,7 @@ pub fn remote_bond(
     )?;
 
     // assume sender is cw-account contract address if contract creator is the ucs03 contract
-    validate_remote_sender(deps.querier, &info.sender, params)?;
+    validate_remote_sender(deps.querier, &info.sender, &params)?;
 
     // handle delegation to validators
     let (mut msgs, bond_data) = utils::delegation::delegate(
@@ -293,7 +289,7 @@ pub fn receive(
         recipient.clone(),
         recipient_channel_id,
         recipient_ibc_channel_id.clone(),
-        Some(String::new()),
+        &Some(String::new()),
     )?; // salt is not required in unbond request
 
     let unbond_amount = cw20_msg.amount;
@@ -466,7 +462,7 @@ pub fn redelegate(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     };
 
     let msgs = utils::delegation::get_delegate_to_validator_msgs(
-        delegator.to_string(),
+        delegator.as_ref(),
         payment.amount,
         params.underlying_coin_denom.clone(),
         validators_reg.validators.clone(),
@@ -840,9 +836,9 @@ pub fn process_batch_withdrawal(
         // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
         let is_on_chain_recipient = utils::validation::is_on_chain_recipient(
             &deps.as_ref(),
-            undelegation.recipient.clone(),
+            &undelegation.recipient.clone(),
             undelegation.recipient_channel_id,
-            undelegation.recipient_ibc_channel_id.clone(),
+            &undelegation.recipient_ibc_channel_id.clone(),
         );
 
         let salt = if let Some(salt) = salt.get(i) {
@@ -886,21 +882,20 @@ pub fn process_batch_withdrawal(
                 };
 
                 // send native token back via ucs03
-                transfer::send_native_token_via_ucs03(
+                let msg = transfer::transfer_escrow_v2(
                     &ucs03_relay_contract,
                     &ZkgmTransfer {
                         sender: lst_contract.to_string(),
                         amount: unstake_return_native_amount,
                         recipient: recipient.clone(),
-                        recipient_channel_id: undelegation
-                            .recipient_channel_id
-                            .unwrap_or(undelegation.channel_id.unwrap_or(0)),
+                        recipient_channel_id,
                         salt,
                     },
                     &denom,
                     &quote_token.quote_token,
                     time,
                 )?;
+                send_msgs.push(msg);
             } else if let Some(recipient_ibc_channel_id) = &undelegation.recipient_ibc_channel_id {
                 if let Some(recipient) = &undelegation.recipient {
                     let msg = ibc_transfer_msg(
@@ -1280,9 +1275,9 @@ pub fn inject(
     let (msgs, inject_data) = utils::delegation::inject(
         deps.storage,
         deps.querier,
-        contract_addr,
+        &contract_addr,
         amount,
-        params,
+        &params,
         env.block.height,
     )?;
 
@@ -1344,11 +1339,12 @@ pub fn remove_ibc_channel(
 /// # Errors
 /// Will return contract error
 #[allow(clippy::needless_pass_by_value)]
-pub fn unbond(
+pub fn remote_unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     amount: Uint128,
+    recipient: Recipient,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
@@ -1360,6 +1356,9 @@ pub fn unbond(
         return Err(ContractError::InvalidExchangeRate {});
     }
 
+    let (recipient, recipient_channel_id, recipient_ibc_channel_id) =
+        split_and_validate_recipient(deps.storage, recipient)?;
+
     let unstake_request_event = utils::delegation::unstake_request_in_batch(
         &env.clone(),
         deps.storage,
@@ -1367,9 +1366,9 @@ pub fn unbond(
         info.sender.to_string(),
         amount,
         None,
-        None,
-        None,
-        None,
+        recipient,
+        recipient_channel_id,
+        recipient_ibc_channel_id,
     )?;
 
     let response = Response::new()
