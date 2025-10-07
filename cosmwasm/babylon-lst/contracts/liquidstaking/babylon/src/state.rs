@@ -173,6 +173,7 @@ pub struct OldUnbondRecordIndexes<'a> {
     pub batch: MultiIndex<'a, String, OldUnbondRecord, u64>,
 }
 
+#[allow(clippy::elidable_lifetime_names)]
 impl<'a> IndexList<OldUnbondRecord> for OldUnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<OldUnbondRecord>> + '_> {
         let v: Vec<&dyn Index<OldUnbondRecord>> = vec![
@@ -236,6 +237,7 @@ pub struct UnbondRecordIndexes<'a> {
     pub batch: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
+#[allow(clippy::elidable_lifetime_names)]
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
         let v: Vec<&dyn Index<UnbondRecord>> = vec![
