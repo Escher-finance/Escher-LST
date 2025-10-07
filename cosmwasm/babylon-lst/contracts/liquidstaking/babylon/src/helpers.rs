@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Coin, CosmosMsg, Decimal, StdResult, Uint128, WasmMsg, to_json_binary};
+use cosmwasm_std::{to_json_binary, Addr, Coin, CosmosMsg, Decimal, StdResult, Uint128, WasmMsg};
 
 use crate::msg::ExecuteMsg;
 
@@ -9,6 +9,7 @@ const DECIMAL_FRACTIONAL: Uint128 = Uint128::new(1_000_000_000_000_000_000u128);
 pub struct LstTemplateContract(pub Addr);
 
 impl LstTemplateContract {
+    #[must_use]
     pub fn addr(&self) -> Addr {
         self.0.clone()
     }
@@ -24,7 +25,8 @@ impl LstTemplateContract {
     }
 }
 
-pub fn split_revenue(amount: Uint128, fee_rate: Decimal, denom: String) -> (Coin, Coin) {
+#[must_use]
+pub fn split_revenue(amount: Uint128, fee_rate: Decimal, denom: &str) -> (Coin, Coin) {
     println!("{:?}", Decimal::one().atomics());
     let decimal_fract = Decimal::new(DECIMAL_FRACTIONAL * DECIMAL_FRACTIONAL);
     let fract = (fee_rate * decimal_fract).to_uint_ceil();
@@ -34,11 +36,11 @@ pub fn split_revenue(amount: Uint128, fee_rate: Decimal, denom: String) -> (Coin
     (
         Coin {
             amount: redelegate_amount,
-            denom: denom.clone(),
+            denom: denom.to_string(),
         },
         Coin {
             amount: fee_amount,
-            denom: denom.clone(),
+            denom: denom.to_string(),
         },
     )
 }
