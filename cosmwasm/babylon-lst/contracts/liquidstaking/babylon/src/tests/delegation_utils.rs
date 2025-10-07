@@ -2,9 +2,10 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
+    assert_approx_eq, from_json,
+    testing::{mock_dependencies, mock_env, MockQuerier},
     Addr, AnyMsg, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
-    StakingMsg, Timestamp, Uint128, assert_approx_eq, from_json,
-    testing::{MockQuerier, mock_dependencies, mock_env},
+    StakingMsg, Timestamp, Uint128,
 };
 use cw_multi_test::{App, IntoAddr};
 use prost::Message;
@@ -15,13 +16,13 @@ use crate::{
     msg::{BondData, DelegationDiff, ValidatorDelegation},
     proto,
     state::{
-        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE, STATE, STATUS,
-        SUPPLY_QUEUE, State, SupplyQueue, TOKEN_COUNT, UnbondRecord, Validator, ValidatorsRegistry,
-        WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue, unbond_record,
+        unbond_record, BurnQueue, MintQueue, State, SupplyQueue, UnbondRecord, Validator,
+        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE,
+        STATE, STATUS, SUPPLY_QUEUE, TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
     },
-    tests::{NATIVE_DENOM, mock_parameters, setup_validators_delegation},
+    tests::{mock_parameters, setup_validators_delegation, NATIVE_DENOM},
     utils::{
-        batch::{Batch, BatchStatus, batches},
+        batch::{batches, Batch, BatchStatus},
         calc::{self, normalize_supply_queue, normalize_total_supply},
         delegation::*,
     },
@@ -153,10 +154,10 @@ fn test_get_restaking_msgs() {
         },
     ];
     let msgs = get_restaking_msgs(
-        delegator.clone(),
+        &delegator.clone(),
         surplus_validators,
         deficient_validators,
-        "denom".to_string(),
+        "denom",
     );
     assert!(!msgs.is_empty());
     let zero_redelegate = msgs.iter().find(|msg| {
@@ -198,10 +199,10 @@ fn test_get_restaking_msgs() {
         },
     ];
     let msgs = get_restaking_msgs(
-        delegator.clone(),
+        &delegator.clone(),
         surplus_validators,
         deficient_validators,
-        "denom".to_string(),
+        "denom",
     );
     let mut net_amounts = msgs
         .into_iter()
@@ -247,8 +248,7 @@ fn test_get_delegate_to_validator_msgs() {
             weight: 20,
         },
     ];
-    let msgs =
-        get_delegate_to_validator_msgs(delegator.clone(), delegate_amount, coin_denom, validators);
+    let msgs = get_delegate_to_validator_msgs(&delegator, delegate_amount, coin_denom, validators);
     let amounts = msgs
         .into_iter()
         .map(|msg| {
@@ -304,7 +304,7 @@ fn test_get_delegate_to_validator_msgs_should_skip_zero_delegate_amount() {
         },
     ]);
     let msgs = get_delegate_to_validator_msgs(
-        delegator.clone(),
+        &delegator,
         Uint128::from(100_u128),
         "denom".to_string(),
         validators,
@@ -641,10 +641,10 @@ fn test_adjust_validators_delegation() {
         get_surplus_deficit_validators(validator_delegation_map, correct_validator_delegation_map);
 
     let msgs: Vec<CosmosMsg> = get_restaking_msgs(
-        delegator_addr.to_string(),
+        &delegator_addr.to_string(),
         surplus_validators,
         deficient_validators,
-        denom,
+        &denom,
     );
 
     assert!(!msgs.is_empty());
@@ -677,9 +677,9 @@ fn test_get_undelegate_msgs() {
         (other_validator.clone(), Decimal::from_str("0.0").unwrap()),
     ]);
     let (total_undelegate_amount, msgs, mut atts) = get_undelegate_msgs(
-        delegator.clone(),
+        &delegator,
         undelegate_amount,
-        coin_denom.clone(),
+        &coin_denom,
         validator_delegation_ratio,
     );
     assert_eq!(total_undelegate_amount, Uint128::new(900));
@@ -1006,7 +1006,7 @@ fn test_process_bond() {
     assert_eq!(
         msgs,
         get_delegate_to_validator_msgs(
-            delegator.to_string(),
+            &delegator.to_string(),
             amount,
             params.underlying_coin_denom,
             validators
@@ -1140,7 +1140,7 @@ fn test_delegate() {
     assert_eq!(
         msgs,
         get_delegate_to_validator_msgs(
-            delegator.to_string(),
+            &delegator.to_string(),
             amount,
             params.underlying_coin_denom,
             validators
@@ -1387,11 +1387,9 @@ fn test_submit_pending_batch() {
             _ => false,
         }
     }));
-    assert!(
-        events
-            .iter()
-            .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT)
-    );
+    assert!(events
+        .iter()
+        .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT));
 }
 
 #[test]
@@ -1415,8 +1413,7 @@ fn validator_restaking_adjustment() {
 
     let denom = "muno".to_string();
     let delegator = "bbn123glhewf3w66cquy6hr7urjv3589srheqj3abc".to_string();
-    let msgs =
-        crate::utils::delegation::get_restaking_msgs(delegator, surplus, deficit, denom.clone());
+    let msgs = crate::utils::delegation::get_restaking_msgs(&delegator, surplus, deficit, &denom);
 
     let staking_msg = get_redelegate_msg(30000, denom.clone(), "A".to_string(), "C".to_string());
     assert_eq!(msgs.first().unwrap(), &staking_msg);
@@ -1452,8 +1449,7 @@ fn validator_restaking_adjustment_2() {
 
     let denom = "muno".to_string();
     let delegator = "bbn123glhewf3w66cquy6hr7urjv3589srheqj3abc".to_string();
-    let msgs =
-        crate::utils::delegation::get_restaking_msgs(delegator, surplus, deficit, denom.clone());
+    let msgs = crate::utils::delegation::get_restaking_msgs(&delegator, surplus, deficit, &denom);
 
     let staking_msg = get_redelegate_msg(30000, denom.clone(), "A".to_string(), "C".to_string());
     assert_eq!(msgs.first().unwrap(), &staking_msg);
@@ -1489,8 +1485,7 @@ fn validator_restaking_adjustment_3() {
 
     let denom = "muno".to_string();
     let delegator = "bbn123glhewf3w66cquy6hr7urjv3589srheqj3abc".to_string();
-    let msgs =
-        crate::utils::delegation::get_restaking_msgs(delegator, surplus, deficit, denom.clone());
+    let msgs = crate::utils::delegation::get_restaking_msgs(&delegator, surplus, deficit, &denom);
 
     let staking_msg = get_redelegate_msg(30000, denom.clone(), "A".to_string(), "D".to_string());
     assert_eq!(msgs.first().unwrap(), &staking_msg);
@@ -1621,12 +1616,8 @@ fn validators_restaking_adjustment_5() {
 
     let denom = "ubbn".to_string();
     let delegator = "bbn123glhewf3w66cquy6hr7urjv3589srheqj3abc".to_string();
-    let msgs: Vec<CosmosMsg> = get_restaking_msgs(
-        delegator,
-        surplus_validators,
-        deficient_validators,
-        denom.clone(),
-    );
+    let msgs: Vec<CosmosMsg> =
+        get_restaking_msgs(&delegator, surplus_validators, deficient_validators, &denom);
     println!("\nmsgs: {msgs:#?}");
 
     let staking_msg = get_redelegate_msg(
@@ -1756,12 +1747,8 @@ fn validators_restaking_adjustment_6() {
     let denom = "ubbn".to_string();
 
     let delegator = "bbn123glhewf3w66cquy6hr7urjv3589srheqj3abc".to_string();
-    let msgs: Vec<CosmosMsg> = get_restaking_msgs(
-        delegator,
-        surplus_validators,
-        deficient_validators,
-        denom.clone(),
-    );
+    let msgs: Vec<CosmosMsg> =
+        get_restaking_msgs(&delegator, surplus_validators, deficient_validators, &denom);
     println!("\nmsgs: {msgs:#?}");
 
     let staking_msg = get_redelegate_msg(65u128, denom.clone(), figment, fiona.clone());
@@ -1953,10 +1940,10 @@ fn validators_restaking_adjustment_7() {
     );
 
     let msgs: Vec<CosmosMsg> = get_restaking_msgs(
-        delegator_addr.to_string(),
+        &delegator_addr.to_string(),
         surplus_validators,
         deficient_validators,
-        denom.clone(),
+        &denom,
     );
 
     let mut new_delegation_map: HashMap<String, Uint128> = validator_delegation_map.clone();
@@ -2178,10 +2165,10 @@ fn validators_restaking_adjustment_8() {
     );
 
     let msgs: Vec<CosmosMsg> = get_restaking_msgs(
-        delegator_addr.to_string(),
+        &delegator_addr.to_string(),
         surplus_validators,
         deficient_validators,
-        denom.clone(),
+        &denom,
     );
     println!("msgs: {msgs:#?}");
 

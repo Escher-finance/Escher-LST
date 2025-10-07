@@ -76,7 +76,7 @@ pub struct BatchIndexes<'a> {
     pub status: MultiIndex<'a, String, Batch, u64>,
 }
 
-impl<'a> IndexList<Batch> for BatchIndexes<'a> {
+impl IndexList<Batch> for BatchIndexes<'_> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<Batch>> + '_> {
         let v: Vec<&dyn Index<Batch>> = vec![&self.status];
         Box::new(v.into_iter())
@@ -85,6 +85,7 @@ impl<'a> IndexList<Batch> for BatchIndexes<'a> {
 
 const BATCH_NAMESPACE: &str = "batch";
 
+#[must_use]
 pub fn batches<'a>() -> IndexedMap<u64, Batch, BatchIndexes<'a>> {
     let indexes = BatchIndexes {
         status: MultiIndex::new(
