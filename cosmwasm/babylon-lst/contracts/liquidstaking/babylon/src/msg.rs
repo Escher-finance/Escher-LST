@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256, Uint64};
+use cosmwasm_schema::{QueryResponses, cw_serde};
+use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint64, Uint128, Uint256};
+use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use cw2::ContractVersion;
 use cw20::Cw20ReceiveMsg;
-use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use serde::{Deserialize, Serialize};
 use unionlabs_primitives::{Bytes, H256};
 
@@ -88,6 +88,21 @@ pub enum Cw20PayloadMsg {
         recipient: Option<String>,
         recipient_channel_id: Option<u32>,
         recipient_ibc_channel_id: Option<String>,
+    },
+}
+
+#[cw_serde]
+pub enum Recipient {
+    OnChain {
+        address: Addr,
+    },
+    Zkgm {
+        address: String,
+        channel_id: u32,
+    },
+    IBC {
+        address: String,
+        ibc_channel_id: String,
     },
 }
 
@@ -179,6 +194,7 @@ pub enum ExecuteMsg {
     },
     RemoteUnbond {
         amount: Uint128,
+        recipient: Recipient,
     },
 }
 

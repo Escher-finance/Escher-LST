@@ -3,8 +3,9 @@ use std::collections::HashSet;
 use cosmwasm_std::{Addr, Coin, QuerierWrapper, Uint128};
 
 use crate::{
-    state::{Parameters, QuoteToken, Validator},
     ContractError,
+    msg::Recipient,
+    state::{Parameters, QuoteToken, Validator},
 };
 
 /// Errors:
@@ -104,6 +105,57 @@ pub fn validate_recipient(
         }
     }
     Ok(on_chain_recipient)
+}
+
+/// Errors:
+/// - Returns contract error if zkgm channel id is 0
+#[allow(clippy::type_complexity)]
+pub fn split_and_validate_recipient(
+    storage: &mut dyn cosmwasm_std::Storage,
+    recipient: Recipient,
+) -> Result<(Option<String>, Option<u32>, Option<String>), ContractError> {
+    let (recipient_addr, recipient_channel_id, recipient_ibc_channel_id) = match recipient {
+        Recipient::OnChain { address } => (Some(address.to_string()), None, None),
+        Recipient::Zkgm {
+            address,
+            channel_id,
+        } => {
+            if channel_id == 0 {
+                return Err(ContractError::InvalidChannelId {});
+            }
+            let Ok(_) = crate::state::CHAINS.load(storage, channel_id) else {
+                return Err(ContractError::InvalidChannelId {});
+            };
+            (Some(address.clone()), Some(channel_id), None)
+        }
+        Recipient::IBC {
+            address,
+            ibc_channel_id,
+        } => {
+            let ibc_channel_result: Result<String, cosmwasm_std::StdError> =
+                crate::state::IBC_CHANNELS.load(storage, ibc_channel_id.clone());
+            if ibc_channel_result.is_err() {
+                return Err(ContractError::InvalidIBCChannelId {});
+            }
+
+            let prefix = ibc_channel_result.unwrap();
+
+            if !address.starts_with(&prefix) {
+                return Err(ContractError::InvalidAddress {
+                    kind: "recipient".into(),
+                    address,
+                    reason: format!("address prefix must starts with {prefix}"),
+                });
+            }
+            (Some(address), None, Some(ibc_channel_id))
+        }
+    };
+
+    Ok((
+        recipient_addr,
+        recipient_channel_id,
+        recipient_ibc_channel_id,
+    ))
 }
 
 #[must_use]

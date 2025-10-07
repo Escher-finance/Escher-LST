@@ -13,6 +13,7 @@ macro_rules! id {
         pub struct $T(#[doc(hidden)] NonZeroU32);
 
         impl $T {
+            #[must_use]
             pub const fn from_raw(raw: u32) -> Option<$T> {
                 match NonZeroU32::new(raw) {
                     Some(id) => Some(Self(id)),
@@ -20,18 +21,22 @@ macro_rules! id {
                 }
             }
 
+            #[must_use]
             pub const fn new(id: NonZeroU32) -> Self {
                 Self(id)
             }
 
+            #[must_use]
             pub const fn get(&self) -> NonZeroU32 {
                 self.0
             }
 
+            #[must_use]
             pub const fn raw(&self) -> u32 {
                 self.0.get()
             }
 
+            #[must_use]
             pub const fn checked_add(&self, rhs: u32) -> Option<Self> {
                 match self.get().checked_add(rhs) {
                     Some(id) => Some(Self::new(id)),
