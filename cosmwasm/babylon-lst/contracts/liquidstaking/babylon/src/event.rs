@@ -1,4 +1,4 @@
-use cosmwasm_std::{Attribute, Decimal, Event, Timestamp, Uint128, attr};
+use cosmwasm_std::{attr, Attribute, Decimal, Event, Timestamp, Uint128};
 
 use crate::state::Validator;
 pub const BOND_EVENT: &str = "bond";
@@ -183,7 +183,7 @@ pub fn ProcessUnbondingEvent(
     };
 
     let recipient_ibc_channel_id: String = match recipient_ibc_channel_id {
-        Some(channel_id) => channel_id.to_string(),
+        Some(channel_id) => channel_id.clone(),
         None => String::new(),
     };
 
@@ -209,7 +209,7 @@ pub fn ProcessBatchUnbondingEvent(
     released_amount: Uint128,
     total_amount: Uint128,
     denom: String,
-    record_ids: Vec<u64>,
+    record_ids: &[u64],
 ) -> Event {
     Event::new(PROCESS_BATCH_UNBONDING_EVENT.to_string())
         .add_attribute("total_amount", total_amount.to_string())
@@ -261,7 +261,7 @@ pub fn UnstakeRequestEvent(
     };
 
     let recipient_ibc_channel_id: String = match recipient_ibc_channel_id {
-        Some(channel_id) => channel_id.to_string(),
+        Some(channel_id) => channel_id.clone(),
         None => String::new(),
     };
 
@@ -312,6 +312,7 @@ pub fn SplitRewardEvent(
 pub const BATCH_RELEASED_EVENT: &str = "batch_released";
 
 #[allow(non_snake_case)]
+#[must_use]
 pub fn BatchReleasedEvent(batch_id: u64, time: Timestamp) -> Event {
     Event::new(BATCH_RELEASED_EVENT.to_string())
         .add_attribute("batch_id", format!("{batch_id}"))
