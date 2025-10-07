@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use cosmwasm_std::{Addr, Coin, QuerierWrapper, Uint128};
 
 use crate::{
-    ContractError,
     state::{Parameters, QuoteToken, Validator},
+    ContractError,
 };
 
 /// Errors:
@@ -54,7 +54,7 @@ pub fn validate_recipient(
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     recipient_ibc_channel_id: Option<String>,
-    salt: Option<String>,
+    salt: &Option<String>,
 ) -> Result<bool, ContractError> {
     let mut on_chain_recipient = false;
     // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
@@ -109,9 +109,9 @@ pub fn validate_recipient(
 #[must_use]
 pub fn is_on_chain_recipient(
     deps: &cosmwasm_std::Deps,
-    recipient: Option<String>,
+    recipient: &Option<String>,
     recipient_channel_id: Option<u32>,
-    recipient_ibc_channel_id: Option<String>,
+    recipient_ibc_channel_id: &Option<String>,
 ) -> bool {
     let mut on_chain_recipient = false;
     if recipient.is_some() && recipient_channel_id.is_none() && recipient_ibc_channel_id.is_none() {
@@ -129,7 +129,7 @@ pub fn is_on_chain_recipient(
 pub fn validate_remote_sender(
     querier: QuerierWrapper,
     sender: &Addr,
-    params: Parameters,
+    params: &Parameters,
 ) -> Result<(), ContractError> {
     // assume sender is cw-account contract address if contract creator is the ucs03 contract
     match querier.query_wasm_contract_info(sender) {
