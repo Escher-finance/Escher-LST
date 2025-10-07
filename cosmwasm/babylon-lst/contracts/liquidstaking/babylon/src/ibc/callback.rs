@@ -129,7 +129,7 @@ pub fn ibc_destination_callback(
         Some(payload.recipient.clone()),
         payload.recipient_channel_id,
         None,
-        Some(salt.clone()),
+        &Some(salt.clone()),
     );
 
     if on_chain_recipient.is_err() {
