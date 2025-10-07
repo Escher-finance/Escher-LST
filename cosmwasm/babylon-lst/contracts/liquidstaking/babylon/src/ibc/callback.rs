@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    Decimal, DepsMut, Env, IbcBasicResponse, IbcDestinationCallbackMsg, StdAck, StdError,
-    StdResult, Uint128, ensure_eq, entry_point, from_json,
+    ensure_eq, entry_point, from_json, Decimal, DepsMut, Env, IbcBasicResponse,
+    IbcDestinationCallbackMsg, StdAck, StdError, StdResult, Uint128,
 };
 use ibc::apps::transfer::types::proto::transfer::v2::FungibleTokenPacketData;
 
@@ -14,6 +14,7 @@ use crate::{
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
 pub fn ibc_destination_callback(
     deps: DepsMut,
     env: Env,
@@ -77,7 +78,7 @@ pub fn ibc_destination_callback(
     let payload = match payload {
         Ok(payload) => payload,
         Err(err) => {
-            return failure_handler(
+            return Ok(failure_handler(
                 env,
                 None,
                 packet_data.clone(),
@@ -85,7 +86,7 @@ pub fn ibc_destination_callback(
                 amount,
                 coin_denom,
                 err.to_string(),
-            );
+            ));
         }
     };
 
@@ -109,7 +110,7 @@ pub fn ibc_destination_callback(
             "insufficient amount, not enough transfer fee, required: {required_amount}, received: {amount}"
         );
 
-        return failure_handler(
+        return Ok(failure_handler(
             env,
             Some(payload),
             packet_data,
@@ -117,8 +118,8 @@ pub fn ibc_destination_callback(
             amount,
             coin_denom,
             ibc_callback_error_message,
-        );
-    };
+        ));
+    }
 
     let delegator = env.contract.address.clone();
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
@@ -136,7 +137,7 @@ pub fn ibc_destination_callback(
             "invalid recipient, reason: {}",
             on_chain_recipient.unwrap_err()
         );
-        return failure_handler(
+        return Ok(failure_handler(
             env,
             Some(payload),
             packet_data,
@@ -144,7 +145,7 @@ pub fn ibc_destination_callback(
             amount,
             coin_denom,
             ibc_callback_error_message,
-        );
+        ));
     }
 
     let slippage_rate = match payload.slippage {
@@ -174,7 +175,7 @@ pub fn ibc_destination_callback(
     let (msgs, submsgs, bond_data) = match process_bond_result {
         Ok(ok) => ok,
         Err(err) => {
-            return failure_handler(
+            return Ok(failure_handler(
                 env,
                 Some(payload.clone()),
                 packet_data,
@@ -182,12 +183,12 @@ pub fn ibc_destination_callback(
                 amount,
                 coin_denom,
                 err.to_string(),
-            );
+            ));
         }
     };
 
     if let Err(err) = check_slippage(bond_data.mint_amount, payload.expected, slippage_rate) {
-        return failure_handler(
+        return Ok(failure_handler(
             env,
             Some(payload.clone()),
             packet_data.clone(),
@@ -195,7 +196,7 @@ pub fn ibc_destination_callback(
             amount,
             coin_denom,
             err.to_string(),
-        );
+        ));
     }
 
     // create bond event here
@@ -227,7 +228,7 @@ pub fn ibc_destination_callback(
         payload.recipient_channel_id,
         salt.clone(),
         true,
-        "".to_string(),
+        String::new(),
         env.block.time,
         transfer_fee,
     );
@@ -239,6 +240,7 @@ pub fn ibc_destination_callback(
         .add_submessages(submsgs))
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn failure_handler(
     env: Env,
     payload: Option<crate::msg::IBCCallbackPayload>,
@@ -247,7 +249,7 @@ fn failure_handler(
     transfer_amount: Uint128,
     denom: String,
     error_message: String,
-) -> StdResult<IbcBasicResponse> {
+) -> IbcBasicResponse {
     let msg = ibc_transfer_msg(
         channel_id.clone(),
         packet_data.sender.clone(),
@@ -295,7 +297,7 @@ fn failure_handler(
         transfer_fee,
     );
 
-    Ok(IbcBasicResponse::new()
+    IbcBasicResponse::new()
         .add_event(ibc_callback_event)
-        .add_message(msg))
+        .add_message(msg)
 }
