@@ -1,9 +1,9 @@
 use cosmwasm_std::testing::mock_dependencies;
 
 use crate::{
-    ContractError,
     state::{QuoteToken, Validator},
     utils::validation::*,
+    ContractError,
 };
 
 #[test]
@@ -86,9 +86,9 @@ fn test_is_on_chain_recipient() {
     let recipient_channel_id = None;
     let is_same_chain_recipient = crate::utils::validation::is_on_chain_recipient(
         &deps.as_ref(),
-        recipient,
+        &recipient,
         recipient_channel_id,
-        None,
+        &None,
     );
 
     println!("recipient_addr: {recipient_addr}");
@@ -98,18 +98,18 @@ fn test_is_on_chain_recipient() {
     let recipient = Some("0xbb74285235846c9d98280ac92ab8007382e51234".to_string());
     let is_same_chain_recipient = crate::utils::validation::is_on_chain_recipient(
         &deps.as_ref(),
-        recipient,
+        &recipient,
         recipient_channel_id,
-        None,
+        &None,
     );
     assert!(!is_same_chain_recipient);
 
     let recipient = Some("uniondefghabcuxz7l0vcusq5jc9zvzpm8ec2au39x123".to_string());
     let is_same_chain_recipient = crate::utils::validation::is_on_chain_recipient(
         &deps.as_ref(),
-        recipient,
+        &recipient,
         recipient_channel_id,
-        None,
+        &None,
     );
     assert!(!is_same_chain_recipient);
 }
