@@ -1,8 +1,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, Event,
-    QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128, to_json_binary,
+    to_json_binary, Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env,
+    Event, QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128,
 };
 use prost::Message;
 use unionlabs_primitives::{Bytes, H256};
@@ -13,7 +13,6 @@ use super::{
     calc::{calculate_exchange_rate, calculate_fee_from_reward},
 };
 use crate::{
-    ContractError,
     event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
     execute::StakerUndelegation,
     msg::{
@@ -22,16 +21,17 @@ use crate::{
     },
     proto,
     state::{
-        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN,
-        REWARD_BALANCE, STATE, SUPPLY_QUEUE, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL,
-        UnbondRecord, VALIDATORS_REGISTRY, Validator, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE,
-        increment_tokens, unbond_record,
+        increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
+        UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, VALIDATORS_REGISTRY,
+        WITHDRAW_REWARD_QUEUE,
     },
     utils::{
         batch::batches,
         calc::{self, check_slippage_with_min_mint_amount},
         delegation, token,
     },
+    ContractError,
 };
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 900;
@@ -448,7 +448,7 @@ pub fn process_bond(
     block_height: u64,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
-    on_chain_recipient: bool,
+    _on_chain_recipient: bool,
     transfer_fee: Option<Uint128>,
 ) -> Result<(Vec<CosmosMsg>, Vec<SubMsg>, BondData), ContractError> {
     if amount < params.min_bond {
@@ -546,16 +546,9 @@ pub fn process_bond(
     SUPPLY_QUEUE.save(storage, &supply_queue)?;
 
     if !cfg!(test) {
-        let minted_token_recipient =
-            if !on_chain_recipient && (channel_id.is_some() || recipient_channel_id.is_some()) {
-                params.transfer_handler
-            } else {
-                delegator.to_string()
-            };
-
         // Start to mint according to staked token only if it is not test
         let sub_msg: SubMsg = token::get_staked_token_submsg(
-            minted_token_recipient,
+            delegator.to_string(),
             mint_amount,
             params.liquidstaking_denom.clone(),
             payload_bin,

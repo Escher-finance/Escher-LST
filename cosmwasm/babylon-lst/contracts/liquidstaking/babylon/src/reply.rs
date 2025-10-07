@@ -99,27 +99,6 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
         };
         let params = PARAMETERS.load(deps.storage)?;
 
-        // allow/approve ucs03 to transfer on behalf of transfer handler via authz
-        let allowance_msg = crate::utils::authz::get_authz_increase_allowance_msg(
-            params.transfer_handler.clone(),
-            env.contract.address.to_string(),
-            params.cw20_address.to_string(),
-            params.zkgm_token_minter,
-            amount,
-            &[],
-        )?;
-
-        msgs.push(allowance_msg);
-
-        let mut funds = vec![];
-
-        if transfer_fee > Uint128::zero() {
-            funds.push(Coin {
-                amount: transfer_fee,
-                denom: params.underlying_coin_denom.clone(),
-            });
-        }
-
         let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
         quote_token_string.clone_from(&quote_token.lst_quote_token);
 
