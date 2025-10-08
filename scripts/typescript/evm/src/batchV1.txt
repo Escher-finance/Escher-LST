@@ -1,0 +1,374 @@
+import { Instruction } from "@unionlabs/sdk/ucs03";
+
+import { ethers } from "ethers";
+import { createWalletClient, encodeAbiParameters, encodeFunctionData, getContract, http, parseAbiParameter, prepareEncodeFunctionData, PrivateKeyAccount, publicActions, toHex } from "viem";
+import { Address } from "viem";
+import { transferAndCallInstruction, transferInstruction } from "./protocol.js";
+import { ucs03abi } from "./Ucs03.js";
+import { erc20Abi } from "./Erc20.js";
+import { privateKeyToAccount } from "viem/accounts";
+import { mainnet } from "viem/chains";
+
+
+export function getSalt() {
+    const rawSalt = new Uint8Array(32)
+    crypto.getRandomValues(rawSalt)
+    const salt = toHex(rawSalt);
+    return salt
+}
+
+export function getTimeoutInNanoseconds24HoursFromNow(): bigint {
+    const millisecondsNow = Date.now() // current time in ms
+    const millisecondsIn24Hours = 24 * 60 * 60 * 1000 * 3 // 24 hours in ms * 3
+    const totalMilliseconds = millisecondsNow + millisecondsIn24Hours
+    return BigInt(totalMilliseconds) * BigInt(1_000_000) // convert ms to ns
+}
+
+es", res);
+}
+
+const bondFromEthToBabylon = async (signer: ethers.Wallet, amount: bigint) => {
+    let sender = await signer.getAddress();
+    let ucs03address = "0x5fbe74a283f7954f10aa04c2edf55578811aeb03";
+    let channelId: bigint = BigInt(1); // eth channel id to babylon mainnet is 1
+    //let channelId: bigint = BigInt(3); // holesky channel id to babylon testnet is 3
+    //let channelId: bigint = BigInt(7); // sepolia channel id to babylon testnet is 7
+    const denomAddress = "0xe53dcec07d16d88e386ae0710e86d9a400f83c31"; //erc20 baby on Eth
+    //const denomAddress = "0x77b99a27a5fed3bc8fb3e2f1063181f82ec48637"; //erc20 baby on Holesky
+    //const denomAddress = "0xbd030914ab8d7ab1bd626f09e47c7cc2881550a3"; // erc20 baby on sepolia
+    const receiver = "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g"; // escher lst contract on babylon
+    // const receiver = "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss";
+    let quoteToken: Address = "0x7562626e";
+    // let baseTokenSymbol = "ubbn";
+    // let baseTokenName = "ubbn";
+    let baseTokenSymbol = "BABY";
+    let baseTokenName = "Babylon";
+    let baseTokenDecimals = 6;
+    let baseTokenPath = BigInt(1); // 0 for erc20
+    let salt = getSalt();
+    console.log(salt);
+    let expected = Math.floor(Number(amount) / 1.0193);
+    console.log("expected", expected);
+
+    //approve ucs03 contract to transfer first
+    // const erc20Contract = new ethers.Contract(denomAddress, erc20Abi, signer);
+    // const resp = await erc20Contract.approve(ucs03address, amount);
+    // console.log(resp);
+
+    // let txReceipt = await resp.wait();
+    // console.log(txReceipt);
+
+    let payload = {
+        bond: { amount: amount.toString(), salt: salt, expected: expected.toString() }
+    };
+
+    let instruction =
+        transferAndCallInstruction(baseTokenPath, sender.toLowerCase(), receiver, denomAddress, amount, baseTokenSymbol, baseTokenName, baseTokenDecimals, quoteToken, amount, payload);
+
+    console.log("instruction", JSON.stringify(instruction));
+
+    const ucs03Contract = new ethers.Contract(ucs03address, ucs03abi, signer);
+
+    const transferAndCallRes = await ucs03Contract.send(
+        channelId,
+        0,
+        getTimeoutInNanoseconds24HoursFromNow(),
+        salt,
+        {
+            opcode: 2,
+            version: 0,
+            operand: Instruction.encodeAbi(instruction),
+        },
+        { gasLimit: 500000 } // Adjust gas limit as needed
+    );
+
+    console.log(transferAndCallRes);
+    let transferAndCallReceipt = await transferAndCallRes.wait();
+    console.log(transferAndCallReceipt);
+}
+
+
+const transferEbabyFromEthToBabylon = async (signer: ethers.Wallet, amount: bigint) => {
+    let sender = await signer.getAddress();
+    let ucs03address = "0x5fbe74a283f7954f10aa04c2edf55578811aeb03";
+    let channelId: bigint = BigInt(1); // eth channel id to babylon mainnet is 1
+    const denomAddress = "0x70df20655b3e294facb436383435754dbee3cd70"; //erc20 ebaby on Eth
+    const receiver = "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz"; // escher lst contract on babylon
+    let quoteToken: Address = "0x62626e3173376a7a7a37637975716d793578707230377965706b61356e676b7465787366657275326372347865777738393766746a373773763330663573";
+    let baseTokenSymbol = "eBABY";
+    let baseTokenName = "ebbn";
+    let baseTokenDecimals = 6;
+    let baseTokenPath = BigInt(1);
+    let salt = getSalt();
+    console.log(salt);
+
+    //approve ucs03 contract to transfer first
+    // const erc20Contract = new ethers.Contract(denomAddress, erc20Abi, signer);
+    // const resp = await erc20Contract.approve(ucs03address, amount);
+    // console.log(resp);
+
+    // let txReceipt = await resp.wait();
+    // console.log(txReceipt);
+
+    let instruction =
+        transferInstruction(baseTokenPath, sender.toLowerCase(), receiver, denomAddress, amount, baseTokenSymbol, baseTokenName, baseTokenDecimals, quoteToken, amount);
+
+    console.log("instruction", JSON.stringify(instruction));
+
+
+    const ucs03Contract = new ethers.Contract(ucs03address, ucs03abi, signer);
+
+    const transferAndCallRes = await ucs03Contract.send(
+        channelId,
+        0,
+        getTimeoutInNanoseconds24HoursFromNow(),
+        salt,
+        {
+            opcode: 2,
+            version: 0,
+            operand: Instruction.encodeAbi(instruction),
+        },
+        { gasLimit: 500000 } // Adjust gas limit as needed
+    );
+
+    console.log(transferAndCallRes);
+    let transferAndCallReceipt = await transferAndCallRes.wait();
+    console.log(transferAndCallReceipt);
+}
+
+const transferBabyFromEthToBabylon = async (signer: ethers.Wallet, amount: bigint) => {
+    let sender = await signer.getAddress();
+    let ucs03address = "0x5fbe74a283f7954f10aa04c2edf55578811aeb03";
+    let channelId: bigint = BigInt(1); // eth channel id to babylon mainnet is 1
+    const denomAddress = "0x77b99a27a5fed3bc8fb3e2f1063181f82ec48637"; //erc20 baby on Eth
+    const receiver = "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz"; // escher lst contract on babylon
+    let quoteToken: Address = "0x7562626e"; //DEnom name in babylon (ubbn) in hex
+    let baseTokenSymbol = "ubbn";
+    let baseTokenName = "ubbn";
+    let baseTokenDecimals = 6;
+    let baseTokenPath = BigInt(1);
+    let salt = getSalt();
+    console.log(salt);
+
+    //approve ucs03 contract to transfer first
+    const erc20Contract = new ethers.Contract(denomAddress, erc20Abi, signer);
+    const resp = await erc20Contract.approve(ucs03address, amount);
+    console.log(resp);
+
+    let txReceipt = await resp.wait();
+    console.log(txReceipt);
+
+    let instruction =
+        transferInstruction(baseTokenPath, sender.toLowerCase(), receiver, denomAddress, amount, baseTokenSymbol, baseTokenName, baseTokenDecimals, quoteToken, amount);
+
+    console.log("instruction", JSON.stringify(instruction));
+
+
+    const ucs03Contract = new ethers.Contract(ucs03address, ucs03abi, signer);
+
+    const transferAndCallRes = await ucs03Contract.send(
+        channelId,
+        0,
+        getTimeoutInNanoseconds24HoursFromNow(),
+        salt,
+        {
+            opcode: 2,
+            version: 0,
+            operand: Instruction.encodeAbi(instruction),
+        },
+        { gasLimit: 500000 } // Adjust gas limit as needed
+    );
+
+    console.log(transferAndCallRes);
+    let transferAndCallReceipt = await transferAndCallRes.wait();
+    console.log(transferAndCallReceipt);
+}
+
+
+const unbondEbabyFromEthToBabylon = async (signer: ethers.Wallet, amount: bigint) => {
+    let sender = await signer.getAddress();
+    let ucs03address = "0x5fbe74a283f7954f10aa04c2edf55578811aeb03";
+    let channelId: bigint = BigInt(1); // eth channel id to babylon mainnet is 1
+    const denomAddress = "0x70df20655b3e294facb436383435754dbee3cd70"; //erc20 ebaby on Eth
+    const receiver = "bbn1m7zr5jw4k9z22r9ajggf4ucalwy7uxvu9gkw6tnsmv42lvjpkwasagek5g"; // escher lst contract on babylon
+    let quoteToken: Address = "0x62626e3173376a7a7a37637975716d793578707230377965706b61356e676b7465787366657275326372347865777738393766746a373773763330663573"; //hex of cw20 ebaby on babylon
+    let baseTokenSymbol = "eBABY";
+    let baseTokenName = "ebbn";
+    let baseTokenDecimals = 6;
+    let baseTokenPath = BigInt(1);
+    let salt = getSalt();
+    console.log(salt);
+
+    //approve ucs03 contract to transfer first
+    const erc20Contract = new ethers.Contract(denomAddress, erc20Abi, signer);
+    const resp = await erc20Contract.approve(ucs03address, amount);
+    console.log(resp);
+
+    let txReceipt = await resp.wait();
+    console.log(txReceipt);
+
+    let payload = {
+        unbond: { amount: amount.toString() }
+    };
+    let instruction =
+        transferAndCallInstruction(baseTokenPath, sender.toLowerCase(), receiver, denomAddress, amount, baseTokenSymbol, baseTokenName, baseTokenDecimals, quoteToken, amount, payload);
+
+    console.log("instruction", JSON.stringify(instruction));
+
+
+    const ucs03Contract = new ethers.Contract(ucs03address, ucs03abi, signer);
+
+    const transferAndCallRes = await ucs03Contract.send(
+        channelId,
+        0,
+        getTimeoutInNanoseconds24HoursFromNow(),
+        salt,
+        {
+            opcode: 2,
+            version: 0,
+            operand: Instruction.encodeAbi(instruction),
+        },
+        { gasLimit: 500000 } // Adjust gas limit as needed
+    );
+
+    console.log(transferAndCallRes);
+    let transferAndCallReceipt = await transferAndCallRes.wait();
+    console.log(transferAndCallReceipt);
+}
+
+const batchTransferBabyFromEthToBabylon = async (account: PrivateKeyAccount, amount: bigint) => {
+    // NOTE: This isn't working yet either because the RPC isn't supporting or not encoding the calldata correctly
+
+    const walletClient = createWalletClient({
+        account,
+        chain: mainnet,
+        transport: http(RPC_URL),
+    }).extend(publicActions);
+
+    const sender = account.address;
+    const ucs03address: Address = "0x5fbe74a283f7954f10aa04c2edf55578811aeb03";
+    const channelId = BigInt(1); // eth channel id to babylon mainnet is 1
+    const denomAddress: Address = "0xe53dcec07d16d88e386ae0710e86d9a400f83c31"; //erc20 baby on Eth
+    const receiver = "bbn1y3u4mw39adngenlzwqm6hz60flz25gsxh2s9x4"; // nuno's address
+    const quoteToken = "0x7562626e"; //DEnom name in babylon (ubbn) in hex
+    const baseTokenSymbol = "BABY";
+    const baseTokenName = "Babylon";
+    const baseTokenDecimals = 6;
+    const baseTokenPath = BigInt(1);
+    const salt = getSalt();
+
+    // Using MetaMask's EIP7702StatelessDeleGator
+    const DELEGATOR = "0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B"
+    const delegatorExecuteAbi = [{
+        "inputs": [
+          {
+            "internalType": "ModeCode",
+            "name": "_mode",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes",
+            "name": "_executionCalldata",
+            "type": "bytes"
+          }
+        ],
+        "name": "execute",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+    }] as const;
+
+    const instruction =
+        transferInstruction(baseTokenPath, sender.toLowerCase(), receiver, denomAddress, amount, baseTokenSymbol, baseTokenName, baseTokenDecimals, quoteToken, amount);
+
+    console.log({ instruction });
+
+    const unionSendData = {
+        target: ucs03address,
+        value: 0n,
+        data: encodeFunctionData({
+            abi: ucs03abi,
+            functionName: 'send',
+            args: [
+                Number(channelId),
+                BigInt(0),
+                getTimeoutInNanoseconds24HoursFromNow(),
+                salt,
+                {
+                    opcode: 2,
+                    version: 0,
+                    operand: Instruction.encodeAbi(instruction),
+                }
+            ]
+        }),
+    };
+
+    const approveData = {
+        target: denomAddress,
+        value: 0n,
+        data: encodeFunctionData({
+            abi: erc20Abi,
+            functionName: 'approve',
+            args: [ucs03address, amount]
+        })
+    };
+
+    // Just send to myself an arbitrary value
+    const transferData = {
+        target: sender,
+        value: 10n,
+        data: `0x` as const
+    };
+
+    const batchCalldata = encodeAbiParameters(
+        [parseAbiParameter('(address,uint256,bytes)[]')],
+        [[
+            [transferData.target, transferData.value, transferData.data],
+            [approveData.target, approveData.value, approveData.data],
+            [unionSendData.target, unionSendData.value, unionSendData.data],
+        ]]
+    );
+
+    const data = encodeFunctionData({
+        abi: delegatorExecuteAbi,
+        functionName: 'execute',
+        args: ['0x0100000000000000000000000000000000000000000000000000000000000000', batchCalldata]
+    });
+
+    const authorization = await walletClient.prepareAuthorization({
+        account,
+        chainId: 1,
+        contractAddress: DELEGATOR,
+        executor: 'self'
+    });
+    const signedAuthorization = await walletClient.signAuthorization(authorization);
+    const hash = await walletClient.sendTransaction({
+        authorizationList: [signedAuthorization],
+        data,
+        to: sender
+    });
+    console.log({ hash });
+    const receipt = await walletClient.waitForTransactionReceipt({
+        hash
+    });
+    console.log({ receipt });
+}
+
+var RPC_URL = "https://eth.drpc.org";
+var provider = new ethers.JsonRpcProvider(RPC_URL);
+var privateKey = process.env.PRIVATE_KEY;
+
+
+if (privateKey) {
+    const account = privateKeyToAccount(privateKey as `0x{string}`);
+    batchTransferBabyFromEthToBabylon(account, 30000n);
+} else {
+    console.log("no private key in env var");
+}
+
+//unbondEbabyFromEthToBabylon(signer, 50000n);
+
+// Please do in 1 batch for the transactions:
+// 1. transfer ETH/USDC to specific address in ETH to pay fee
+// 2. approval to transfer BABY to specified spender: which is zkgm minter contract
+// 3. transfer baby from eth to babylon address (any address) via ucs03/union
