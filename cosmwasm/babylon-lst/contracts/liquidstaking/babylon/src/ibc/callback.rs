@@ -8,9 +8,8 @@ use ibc::apps::transfer::types::proto::transfer::v2::FungibleTokenPacketData;
 
 use crate::{
     event::IbcCallbackEvent,
-    state::{PARAMETERS, VALIDATORS_REGISTRY},
-    utils,
-    utils::{calc::check_slippage, transfer::ibc_transfer_msg},
+    state::{PARAMETERS, STATUS, VALIDATORS_REGISTRY},
+    utils::{self, calc::check_slippage, transfer::ibc_transfer_msg},
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -30,6 +29,13 @@ pub fn ibc_destination_callback(
         StdAck::success(b"\x01").to_binary(), // this is how a successful transfer ack looks
         StdError::generic_err("only want to handle successful transfers")
     );
+
+    let status = STATUS.load(deps.storage)?;
+    if status.bond_is_paused {
+        return Err(StdError::generic_err(
+            "can not bond to this contract while bond is paused",
+        ));
+    }
 
     // At this point we know that this is a callback for a successful transfer,
     // but not to whom it is going, how much and what denom.

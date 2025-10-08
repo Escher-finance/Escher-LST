@@ -529,11 +529,6 @@ pub fn process_rewards(
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
-    let status = STATUS.load(deps.storage)?;
-    if status.unbond_is_paused {
-        return Err(ContractError::FunctionalityUnderMaintenance {});
-    }
-
     let params = PARAMETERS.load(deps.storage)?;
     let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
     let coin_denom = params.underlying_coin_denom;
