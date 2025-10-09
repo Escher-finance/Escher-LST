@@ -26,12 +26,12 @@ const bytecode_base_checksum = "0xec827349ed4c1fec5a9c3462ff7c979d4c40e7aa43b16e
 const module_hash = "0x120970d812836f19888625587a4606a5ad23cef31c8684e601771552548fc6b9" as const;
 
 const bondSepolia = async (signer: ethers.Wallet, channel_id: number, amount: bigint) => {
-    const PROXY_ADDRESS = await getAddress(signer.address as `0x${string}`, ChannelId.make(channel_id), BABYLON_UCS03, bytecode_base_checksum, module_hash);
+    const PROXY_ADDRESS = await getAddress(signer.address as `0x${string}`, ChannelId.make(SEPOLIA_TO_BABYLON_DESTINATION_CHANNEL_ID), BABYLON_UCS03, bytecode_base_checksum, module_hash);
     await bondFromSepoliaToBabylon(signer, amount, channel_id, PROXY_ADDRESS.address)
 }
 
 const unbondSepolia = async (signer: ethers.Wallet, channel_id: number, amount: bigint) => {
-    const PROXY_ADDRESS = await getAddress(signer.address as `0x${string}`, ChannelId.make(channel_id), BABYLON_UCS03, bytecode_base_checksum, module_hash);
+    const PROXY_ADDRESS = await getAddress(signer.address as `0x${string}`, ChannelId.make(SEPOLIA_TO_BABYLON_DESTINATION_CHANNEL_ID), BABYLON_UCS03, bytecode_base_checksum, module_hash);
     await unbondFromSepoliaToBabylon(signer, amount, channel_id, PROXY_ADDRESS.address)
 }
 

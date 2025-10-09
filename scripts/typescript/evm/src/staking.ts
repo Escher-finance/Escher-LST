@@ -121,7 +121,7 @@ export const createBabylonUnbondPayload = (
             lst_address: string, recipient_address: string, amount: string, channel_id: number
         }
 ) => {
-    const bondMsg = {
+    const unbondMsg = {
         remote_unbond: {
             amount,
             recipient: {
@@ -133,24 +133,24 @@ export const createBabylonUnbondPayload = (
         }
     } as const;
 
-    const bondPayload = {
+    const payload = {
         wasm: {
             execute: {
                 contract_addr: lst_address,
-                msg: Buffer.from(JSON.stringify(bondMsg)).toString("base64"),
+                msg: Buffer.from(JSON.stringify(unbondMsg)).toString("base64"),
                 funds: [],
             },
         }
     }
 
-    return bondPayload;
+    return payload;
 }
 
-export const createIncreaseAllowance = (ucs03_token_minter: string, amount: string, contractAddress: string) => {
+export const createIncreaseAllowance = (spender: string, amount: string, contractAddress: string) => {
     // Allowance Call
     const allowanceMsg = {
         increase_allowance: {
-            spender: ucs03_token_minter,
+            spender,
             amount
         }
     } as const;
@@ -442,75 +442,6 @@ export const bondFromSepoliaToBabylon = async (signer: ethers.Wallet, amount: bi
 
 
 
-export const unbondFromSepoliaToBabylon = async (signer: ethers.Wallet, amount: bigint, channel_id: number, proxy_address: string) => {
-    let salt = getSalt();
-    console.log(salt);
-
-    const erc20Contract = new ethers.Contract(EBABY_ERC20_SEPOLIA, erc20Abi, signer);
-    const resp = await erc20Contract.approve(ETH_UCS03, amount);
-    console.log(resp);
-
-    let txReceipt = await resp.wait();
-    console.log(txReceipt);
-
-    let sender = await signer.getAddress();
-
-    console.log("amount:", amount);
-
-    let tokenOrder =
-        tokenOrderV2Unescrow(sender.toLowerCase(), proxy_address, EBABY_ERC20_SEPOLIA, amount, EBABY_ON_BABYLON_QUOTE_TOKEN, amount);
-
-    let calls = await getBabylonUnbondCallsInstruction(sender, amount.toString(), BABYLON_TO_SEPOLIA_CHANNEL_ID, proxy_address);
-
-    console.log({ tokenOrder, calls });
-    // // Batch Call
-    const batchCall: Batch = getInstructionBatch([
-        tokenOrder, calls
-    ]);
-
-    //console.log({ tokenOrder, calls });
-    console.log({ batchCall });
-
-    const batchInstructions: [{ version: number; opcode: number; operand: `0x${string}`; }[]] = [
-        [
-            // Tokenorder, send eBaby token
-            {
-                version: tokenOrder.version,
-                opcode: tokenOrder.opcode,
-                operand: encodeTokenOrderV2(tokenOrder)
-            },
-
-            // Bond message
-            {
-                version: calls.version,
-                opcode: calls.opcode,
-                operand: encodeCall(calls)
-            },
-        ]
-    ];
-    const batchOperand = encodeAbiParameters(BatchAbi(), batchInstructions);
-    //console.log({ batchInstructions, batchOperand });
-
-    const ucs03Contract = new ethers.Contract(ETH_UCS03, ucs03abi, signer);
-
-    const transferAndCallRes = await ucs03Contract.send(
-        channel_id,
-        0, //eureka set to false
-        getTimeoutInNanoseconds7DaysFromNow(),
-        salt,
-        {
-            version: batchCall.version,
-            opcode: batchCall.opcode,
-            operand: batchOperand
-        },
-        { gasLimit: 500000 } // Adjust gas limit as needed
-    );
-
-    console.log(transferAndCallRes);
-    let transferAndCallReceipt = await transferAndCallRes.wait();
-    console.log(transferAndCallReceipt);
-}
-
 
 
 export const bondFromHoleskyToBabylon = async (signer: ethers.Wallet, amount: bigint, channel_id: number, proxy_address: string) => {
@@ -584,6 +515,76 @@ export const bondFromHoleskyToBabylon = async (signer: ethers.Wallet, amount: bi
     console.log(transferAndCallReceipt);
 }
 
+
+
+export const unbondFromSepoliaToBabylon = async (signer: ethers.Wallet, amount: bigint, channel_id: number, proxy_address: string) => {
+    let salt = getSalt();
+    console.log(salt);
+
+    const erc20Contract = new ethers.Contract(EBABY_ERC20_SEPOLIA, erc20Abi, signer);
+    const resp = await erc20Contract.approve(ETH_UCS03, amount);
+    console.log(resp);
+
+    let txReceipt = await resp.wait();
+    console.log(txReceipt);
+
+    let sender = await signer.getAddress();
+
+    console.log("amount:", amount);
+
+    let tokenOrder =
+        tokenOrderV2Unescrow(sender.toLowerCase(), proxy_address, EBABY_ERC20_SEPOLIA, amount, EBABY_ON_BABYLON_QUOTE_TOKEN, amount);
+
+    let calls = await getBabylonUnbondCallsInstruction(sender, amount.toString(), BABYLON_TO_SEPOLIA_CHANNEL_ID, proxy_address);
+
+    console.log({ tokenOrder, calls });
+    // // Batch Call
+    const batchCall: Batch = getInstructionBatch([
+        tokenOrder, calls
+    ]);
+
+    //console.log({ tokenOrder, calls });
+    console.log({ batchCall });
+
+    const batchInstructions: [{ version: number; opcode: number; operand: `0x${string}`; }[]] = [
+        [
+            // Tokenorder, send eBaby token
+            {
+                version: tokenOrder.version,
+                opcode: tokenOrder.opcode,
+                operand: encodeTokenOrderV2(tokenOrder)
+            },
+
+            // Bond message
+            {
+                version: calls.version,
+                opcode: calls.opcode,
+                operand: encodeCall(calls)
+            },
+        ]
+    ];
+    const batchOperand = encodeAbiParameters(BatchAbi(), batchInstructions);
+    //console.log({ batchInstructions, batchOperand });
+
+    const ucs03Contract = new ethers.Contract(ETH_UCS03, ucs03abi, signer);
+
+    const transferAndCallRes = await ucs03Contract.send(
+        channel_id,
+        0, //eureka set to false
+        getTimeoutInNanoseconds7DaysFromNow(),
+        salt,
+        {
+            version: batchCall.version,
+            opcode: batchCall.opcode,
+            operand: batchOperand
+        },
+        { gasLimit: 500000 } // Adjust gas limit as needed
+    );
+
+    console.log(transferAndCallRes);
+    let transferAndCallReceipt = await transferAndCallRes.wait();
+    console.log(transferAndCallReceipt);
+}
 
 
 export const fetchExchangeRate = async (rate: string) => {
