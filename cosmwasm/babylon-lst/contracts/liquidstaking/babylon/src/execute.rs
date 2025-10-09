@@ -1,8 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo,
-    Response, StdError, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary, wasm_execute,
+    attr, from_json, to_json_binary, wasm_execute, Addr, Attribute, BankMsg, Coin, CosmosMsg,
+    Decimal, DepsMut, DistributionMsg, Env, Event, MessageInfo, Response, StdError, SubMsg,
+    Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use unionlabs_primitives::Bytes;
@@ -15,23 +16,23 @@ use crate::{
     },
     helpers,
     msg::{
-        BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, Recipient,
+        BatchAmount, BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, Recipient,
         RewardMigrateMsg, ZkgmTransfer,
     },
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
-        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
-        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, PARAMETERS,
+        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
+        SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{BatchStatus, batches},
+        batch::{batches, BatchStatus},
         calc::{
-            calculate_exchange_rate, calculate_fee_from_reward, check_slippage,
-            get_last_epoch_block, get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
+            calculate_exchange_rate, calculate_fee_from_reward, get_last_epoch_block,
+            get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
         },
         delegation::{get_actual_total_delegated, get_actual_total_reward, submit_pending_batch},
         transfer::{self, get_send_bank_msg, ibc_transfer_msg},
@@ -55,63 +56,72 @@ pub fn bond(
     info: MessageInfo,
     slippage: Option<Decimal>,
     expected: Uint128,
-    recipient: Option<String>,
-    recipient_channel_id: Option<u32>,
-    salt: Option<String>,
+    recipient: Recipient,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
-
-    let on_chain_recipient =
-        validate_recipient(&deps, recipient.clone(), recipient_channel_id, None, &salt)?;
-
     let params = PARAMETERS.load(deps.storage)?;
-    let validators_reg = VALIDATORS_REGISTRY.load(deps.storage)?;
-    let coin_denom = params.underlying_coin_denom.clone();
-    let sender = info.sender;
-    let delegator = env.contract.address;
 
-    let payment = validate_required_coin(
+    let coin = validate_required_coin(
         &info.funds,
         &Coin {
             amount: params.min_bond,
-            denom: coin_denom.clone(),
+            denom: params.underlying_coin_denom.clone(),
         },
     )?;
 
-    let slippage_rate = match slippage {
-        Some(rate) => rate,
-        None => Decimal::percent(1),
-    };
-
-    let (msgs, sub_msgs, bond_data) = utils::delegation::process_bond(
+    // handle delegation to validators
+    let (mut msgs, bond_data) = utils::delegation::delegate(
         deps.storage,
         deps.querier,
-        sender.to_string(),
-        sender.to_string(),
-        delegator.clone(),
-        payment.amount,
-        env.block.time.nanos(),
-        params,
-        validators_reg.clone(),
-        salt.unwrap_or_default(),
-        None,
-        env.block.height,
-        recipient.clone(),
-        recipient_channel_id,
-        on_chain_recipient,
-        None,
+        env.clone(),
+        coin.amount,
+        expected,
+        slippage,
     )?;
 
-    check_slippage(bond_data.mint_amount, expected, slippage_rate)?;
+    let (the_recipient, recipient_channel_id, recipient_ibc_channel_id) =
+        split_and_validate_recipient(deps.storage, recipient.clone())?;
+
+    match recipient {
+        Recipient::OnChain { address } => {
+            // mint staked token to on chain recipient address
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: bond_data.cw20_address,
+                msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint {
+                    recipient: address.to_string(),
+                    amount: bond_data.mint_amount,
+                })?,
+                funds: vec![],
+            }));
+        }
+        Recipient::Zkgm {
+            address: _,
+            channel_id: _,
+        } => {
+            // mint staked token to sender because it will transfer via ucs03 zkgm from original sender
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: bond_data.cw20_address,
+                msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint {
+                    recipient: info.sender.to_string(),
+                    amount: bond_data.mint_amount,
+                })?,
+                funds: vec![],
+            }));
+        }
+        Recipient::IBC {
+            address: _,
+            ibc_channel_id: _,
+        } => return Err(ContractError::FunctionalityUnderMaintenance {}),
+    }
 
     // create bond event here
     let bond_event = BondEvent(
-        sender.to_string(),
-        sender.to_string(),
-        payment.amount,
+        info.sender.to_string(),
+        info.sender.to_string(),
+        coin.amount,
         bond_data.delegated_amount,
         bond_data.mint_amount,
         bond_data.total_bond_amount,
@@ -119,30 +129,25 @@ pub fn bond(
         bond_data.exchange_rate,
         String::new(),
         env.block.time,
-        coin_denom.clone(),
-        recipient.clone(),
+        params.underlying_coin_denom.clone(),
+        the_recipient.clone(),
         recipient_channel_id,
         bond_data.reward_balance,
         bond_data.unclaimed_reward,
-        None,
+        recipient_ibc_channel_id,
     );
-
-    if bond_data.mint_amount == Uint128::zero() {
-        return Err(ContractError::InvalidMintAmount {});
-    }
 
     let res: Response = Response::new()
         .add_messages(msgs)
-        .add_submessages(sub_msgs)
         .add_event(bond_event)
         .add_attributes(vec![
             attr("action", "bond"),
-            attr("from", sender.clone()),
-            attr("staker", sender.clone()),
-            attr("recipient", recipient.unwrap_or(sender.into())),
+            attr("from", info.sender.clone()),
+            attr("staker", info.sender.clone()),
+            attr("recipient", the_recipient.unwrap_or(info.sender.into())),
             attr("channel_id", recipient_channel_id.unwrap_or(0).to_string()),
-            attr("bond_amount", payment.amount.to_string()),
-            attr("denom", coin_denom.clone()),
+            attr("bond_amount", coin.amount.to_string()),
+            attr("denom", params.underlying_coin_denom.clone()),
             attr("minted", bond_data.mint_amount),
             attr("exchange_rate", bond_data.exchange_rate.to_string()),
         ]);
@@ -188,6 +193,7 @@ pub fn remote_bond(
         env.clone(),
         coin.amount,
         min_mint_amount,
+        None,
     )?;
 
     // mint staked token to mint_to_address
@@ -1447,6 +1453,79 @@ pub fn transfer(
         .add_attribute("to", to.clone())
         .add_attribute("amount", amount.to_string())
         .add_attribute("channel_id", channel_id.to_string());
+
+    Ok(response)
+}
+
+/// Slash batch by setting the new correct received amount for each batch id
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::needless_pass_by_value)]
+pub fn slash_batch(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    new_received_amounts: Vec<BatchAmount>,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let mut events: Vec<Event> = vec![];
+    for BatchAmount {
+        batch_id,
+        received_amount,
+    } in &new_received_amounts
+    {
+        let mut batch = batches().load(deps.storage, *batch_id)?;
+        if batch.status != BatchStatus::Submitted {
+            return Err(ContractError::BatchStatusIncorrect {
+                actual: batch.status,
+                expected: BatchStatus::Submitted,
+            });
+        }
+
+        let next_action_time = batch
+            .next_batch_action_time
+            .ok_or(ContractError::BatchNextActionTimeNotSet)?;
+
+        let expected_native_unstaked = batch
+            .expected_native_unstaked
+            .ok_or(ContractError::BatchExpectedNativeUnstakedNotSet)?;
+
+        if env.block.time.seconds() < next_action_time {
+            return Err(ContractError::BatchNotReady {
+                actual: env.block.time.seconds(),
+                expected: next_action_time,
+            });
+        }
+
+        if *received_amount > expected_native_unstaked {
+            return Err(ContractError::SlashBatchReceivedAmountExceedExpected {
+                batch_id: *batch_id,
+                received_amount: *received_amount,
+                expected_native_unstaked,
+            });
+        }
+
+        batch.received_native_unstaked = Some(*received_amount);
+        batch.update_status(BatchStatus::Received, None);
+
+        batches().save(deps.storage, *batch_id, &batch)?;
+
+        events.push(BatchReceivedEvent(
+            batch.id,
+            received_amount.to_string(),
+            env.block.time,
+        ));
+        events.push(
+            Event::new("slash_batch")
+                .add_attribute("batch_id", batch_id.to_string())
+                .add_attribute("received_amount", received_amount.to_string()),
+        );
+    }
+
+    let response = Response::new().add_events(events);
 
     Ok(response)
 }
