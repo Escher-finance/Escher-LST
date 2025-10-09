@@ -6,15 +6,52 @@ import {
   CardFooter,
   Button,
   Input,
+  SelectItem,
+  Select,
 } from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import { useState } from "react";
 import { getSalt } from "@/app/lib/utils";
-import { toHex } from "viem";
+import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
+import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
+import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2Escrow } from "@/app/lib/ucs03";
+import { Instruction } from "@unionlabs/sdk/Ucs03";
+import { toUtf8 } from "@cosmjs/encoding";
 
 interface KeyProps {
   stateKey: number;
   setStateKey: (key: number) => void;
+}
+const recipient_types = [
+  { key: "on_chain", label: "On Chain" },
+  { key: "zkgm", label: "Zkgm" },
+];
+
+export const chains = [
+  { key: "sepolia", label: "Sepolia" },
+  { key: "holesky", label: "Holesky" },
+];
+
+
+const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
+  let allowanceMsg = {
+    increase_allowance: {
+      spender,
+      amount,
+    }
+  }
+  console.log(JSON.stringify(allowanceMsg));
+  const executeAllowanceMsg = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: MsgExecuteContract.fromPartial({
+      sender,
+      contract,
+      msg: toUtf8(JSON.stringify(allowanceMsg)),
+      funds: []
+    }),
+  };
+
+  return executeAllowanceMsg;
 }
 
 export default function Bond({ stateKey, setStateKey }: KeyProps) {
@@ -44,38 +81,96 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const amount = formEntries.amount.toString();
-    let recipient = formEntries.recipient.toString();
-    const recipient_channel_id = formEntries.recipient_channel_id.toString();
+    let recipient_type = formEntries.recipient_type.toString();
+    let recipient_address = formEntries.address.toString();
+    const chain_id = formEntries.chain_id.toString();
+
+    console.log("exchange rate", liquidity.exchange_rate);
 
     const expected = Math.floor(Number(amount) / liquidity.exchange_rate);
-    const encoder = new TextEncoder();
-    const recipient_hex = toHex(encoder.encode(recipient));
 
-
-    const msg = {
+    const bondMsg = {
       bond: {
-        salt: getSalt(),
         expected: expected.toString(),
-        recipient: recipient == "" ? null : recipient.indexOf("0x") == -1 ? recipient_hex : recipient,
-        recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
+        recipient: recipient_type == "on_chain" ? { on_chain: { address: recipient_address } } : { zkgm: { address: recipient_address, channel_id: network?.escher?.channel[chain_id]?.sourceChannelId } },
+
       },
     };
+
+
+    const funds = [{
+      amount,
+      denom: network?.stakeCurrency.coinMinimalDenom
+    }];
+
+    const executeBondMsg = {
+      typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+      value: MsgExecuteContract.fromPartial({
+        sender: userAddress,
+        contract: network?.contracts.lst,
+        msg: toUtf8(JSON.stringify(bondMsg)),
+        funds
+      }),
+    };
+
 
     if (Number(amount) < 1000) {
       alert("Sorry, minimal bond amount is 1000000");
       return;
     }
 
-    console.log(JSON.stringify(msg));
+    let baseToken = network?.escher?.stakedBaseToken;
+    let quoteToken = network?.escher?.channel[chain_id].stakedQuoteToken;
+
+    if (!baseToken) {
+      alert("No base token");
+      return;
+    }
+
+    let allowanceMsg = getExecuteAllowanceMsg(network?.contracts.cw20, userAddress, network?.escher?.tokenMinter, expected.toString());
+
+    let tokenOrder = tokenOrderV2Escrow(userAddress.toLowerCase(), recipient_address, baseToken, BigInt(expected), quoteToken as '0x${string}');
+    let cosmos_msg = {
+      send: {
+        channel_id: network?.escher?.channel[chain_id]?.sourceChannelId,
+        timeout_height: "0",
+        timeout_timestamp: getTimeoutInNanoseconds7DaysFromNow().toString(),
+        salt: getSalt(),
+        instruction: encodeInstruction(Instruction.make({
+          opcode: 3,
+          version: 2,
+          operand: encodeTokenOrderV2(tokenOrder),
+        })),
+      },
+    };
+    const executeSendMsg = {
+      typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+      value: MsgExecuteContract.fromPartial({
+        sender: userAddress,
+        contract: network?.escher?.ucs03,
+        msg: toUtf8(JSON.stringify(cosmos_msg)),
+        funds: []
+      }),
+    };
+
+
+    let msgs = [executeBondMsg];
+
+    console.log("recipient_type", recipient_type);
+
+    if (recipient_type == "zkgm") {
+      msgs = [executeBondMsg, allowanceMsg, executeSendMsg];
+    }
+
+    console.log(JSON.stringify(msgs));
+
     try {
       setIsLoading(true);
-      const funds = [{
-        amount,
-        denom: network?.stakeCurrency.coinMinimalDenom
-      }];
-      const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto", "execute bond", funds);
+      const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "transfer from babylon");
       alert(res?.transactionHash);
       let newKey = stateKey + 1;
+      setStateKey(newKey);
+      setIsLoading(false);
       setStateKey(newKey);
       setIsLoading(false);
     } catch (err) {
@@ -95,16 +190,21 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
               label="Amount"
               defaultValue="10000"
             />
+            <Select className="max-w-xs" label="Select Recipient" variant="flat" name="recipient_type" defaultSelectedKeys="zkgm">
+              {recipient_types.map((chain: any) => (
+                <SelectItem key={chain.key}>{chain.label}</SelectItem>
+              ))}
+            </Select>
             <Input
-              name="recipient"
-              label="Recipient (example: xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds for xion via zkgm)"
-              defaultValue=""
+              name="address"
+              label="Recipient address (example: xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds)"
+              defaultValue={userAddress ? userAddress : ""}
             />
-            <Input
-              name="recipient_channel_id"
-              label="Recipient Channel ID (4 for osmosis on mainnet)"
-              defaultValue="0"
-            />
+            <Select className="max-w-xs" label="Select destination chain" variant="flat" name="chain_id" defaultSelectedKeys="sepolia">
+              {chains.map((chain) => (
+                <SelectItem key={chain.key}>{chain.label}</SelectItem>
+              ))}
+            </Select>
           </CardBody>
           <CardFooter>
             <Button type="submit" isLoading={isLoading}>Bond</Button>
