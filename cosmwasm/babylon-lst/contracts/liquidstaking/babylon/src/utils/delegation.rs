@@ -1,18 +1,20 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    to_json_binary, Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env,
-    Event, QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128,
+    Addr, AnyMsg, Attribute, Binary, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, Event,
+    QuerierWrapper, StdResult, Storage, SubMsg, Timestamp, Uint128, to_json_binary,
 };
+use cw20::{Cw20QueryMsg, TokenInfoResponse};
 use prost::Message;
 use unionlabs_primitives::{Bytes, H256};
 
 use super::{
     authz::get_authz_ucs03_transfer,
     batch::{Batch, BatchStatus},
-    calc::{calculate_exchange_rate, calculate_fee_from_reward},
+    calc::calculate_fee_from_reward,
 };
 use crate::{
+    ContractError,
     event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
     execute::StakerUndelegation,
     msg::{
@@ -21,17 +23,16 @@ use crate::{
     },
     proto,
     state::{
-        increment_tokens, unbond_record, BurnQueue, MintQueue, Parameters, SupplyQueue,
-        UnbondRecord, Validator, ValidatorsRegistry, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-        REWARD_BALANCE, STATE, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, VALIDATORS_REGISTRY,
-        WITHDRAW_REWARD_QUEUE,
+        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN,
+        REWARD_BALANCE, STATE, SUPPLY_QUEUE, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL,
+        UnbondRecord, VALIDATORS_REGISTRY, Validator, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE,
+        increment_tokens, unbond_record,
     },
     utils::{
         batch::batches,
         calc::{self, check_slippage_with_min_mint_amount},
         delegation, token,
     },
-    ContractError,
 };
 
 pub const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 900;
@@ -482,11 +483,19 @@ pub fn process_bond(
     let total_bond_amount: Uint128;
     let reward_balance: Uint128;
     let unclaimed_reward: Uint128;
+    let total_supply: Uint128;
+
     if cfg!(test) {
         total_bond_amount = get_mock_total_reward(state.total_bond_amount);
         reward_balance = Uint128::zero();
         unclaimed_reward = Uint128::zero();
+        total_supply = state.total_supply;
+
     } else {
+        let token_info: TokenInfoResponse =
+        querier.query_wasm_smart(params.cw20_address.to_string(), &Cw20QueryMsg::TokenInfo {})?;
+        total_supply = token_info.total_supply;
+        
         state.total_delegated_amount = delegated_amount;
         unclaimed_reward = get_unclaimed_reward(
             querier,
@@ -507,7 +516,7 @@ pub fn process_bond(
     let exchange_rate = if total_bond_amount == Uint128::zero() {
         Decimal::one()
     } else {
-        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+        calc::calculate_exchange_rate(total_bond_amount, total_supply, &supply_queue)
     };
 
     if exchange_rate < Decimal::one() {
@@ -519,7 +528,7 @@ pub fn process_bond(
     // after update exchange rate we update the state
     state.bond_counter += 1;
     state.total_bond_amount = total_bond_amount + amount;
-    state.total_supply += mint_amount;
+    state.total_supply = total_supply + mint_amount;
     state.total_delegated_amount += amount;
     state.last_bond_time = bond_time;
     state.exchange_rate = exchange_rate;
@@ -582,13 +591,11 @@ pub fn query_liquidity(
     block_height: u64,
     fee_rate: Decimal,
     supply_queue: &mut SupplyQueue,
+    total_supply: Uint128,
 ) -> Result<LiquidityState, ContractError> {
-    let mut state = STATE.load(storage)?;
-
     let delegated_amount =
         get_actual_total_delegated(querier, delegator.clone(), &coin_denom, &validators_list)?;
 
-    state.total_delegated_amount = delegated_amount;
     let unclaimed_reward = get_unclaimed_reward(querier, delegator, &coin_denom, &validators_list)?;
 
     let reward_balance =
@@ -603,7 +610,7 @@ pub fn query_liquidity(
     let exchange_rate = if assets == Uint128::zero() {
         Decimal::one()
     } else {
-        calc::calculate_exchange_rate(assets, state.total_supply, supply_queue)
+        calc::calculate_exchange_rate(assets, total_supply, supply_queue)
     };
 
     if exchange_rate < Decimal::one() {
@@ -631,6 +638,7 @@ pub fn delegate(
     env: Env,
     amount: Uint128,
     min_mint_amount: Uint128,
+    slippage: Option<Decimal>,
 ) -> Result<(Vec<CosmosMsg>, RemoteBondData), ContractError> {
     let params = PARAMETERS.load(storage)?;
 
@@ -651,6 +659,15 @@ pub fn delegate(
 
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
 
+    let total_supply = if cfg!(test) {
+            STATE.load(storage)?.total_supply
+        } else {
+            let token_info: TokenInfoResponse =
+            querier.query_wasm_smart(params.cw20_address.to_string(), &Cw20QueryMsg::TokenInfo {})?;
+
+            token_info.total_supply
+    };
+
     let liquidity = query_liquidity(
         storage,
         querier,
@@ -660,11 +677,17 @@ pub fn delegate(
         env.block.height,
         params.fee_rate,
         &mut supply_queue,
+        total_supply,
     )?;
 
     let mint_amount = calc::calculate_staking_token_from_rate(amount, liquidity.exchange_rate);
 
-    check_slippage_with_min_mint_amount(min_mint_amount, mint_amount, Decimal::percent(1))?;
+    let slippage_rate = match slippage {
+        Some(rate) => rate,
+        None => Decimal::percent(1),
+    };
+
+    check_slippage_with_min_mint_amount(min_mint_amount, mint_amount, slippage_rate)?;
 
     supply_queue.mint.push(MintQueue {
         block: env.block.height,
@@ -677,7 +700,7 @@ pub fn delegate(
     // after update exchange rate we update the state
     state.bond_counter += 1;
     state.total_bond_amount = liquidity.assets + amount;
-    state.total_supply += mint_amount;
+    state.total_supply = total_supply + mint_amount;
     state.total_delegated_amount = liquidity.delegated + amount;
     state.last_bond_time = env.block.time.nanos();
     state.exchange_rate = liquidity.exchange_rate;
@@ -780,11 +803,19 @@ pub fn submit_pending_batch(
         return Err(ContractError::ZeroSupplyOrDelegatedAmount {});
     }
 
+    let total_supply = if cfg!(test) {
+            state.total_supply
+        } else {
+            let token_info: TokenInfoResponse =
+            deps.querier.query_wasm_smart(params.cw20_address.to_string(), &Cw20QueryMsg::TokenInfo {})?;
+            token_info.total_supply
+    };
+
     calc::normalize_supply_queue(&mut supply_queue, block_height);
     let current_exchange_rate = if total_bond_amount == Uint128::zero() {
         Decimal::one()
     } else {
-        calc::calculate_exchange_rate(total_bond_amount, state.total_supply, &supply_queue)
+        calc::calculate_exchange_rate(total_bond_amount, total_supply, &supply_queue)
     };
 
     // calculate how much native token undelegated amount from staked token amount base on current exchange rate
@@ -826,10 +857,9 @@ pub fn submit_pending_batch(
 
     // // update total bond, supply and exchange rate here
     state.total_bond_amount = total_bond_amount - total_undelegate_amount;
-    state.total_supply -= batch.total_liquid_stake;
+    state.total_supply = total_supply - batch.total_liquid_stake;
     state.total_delegated_amount = delegated_amount - total_undelegate_amount;
-    state.exchange_rate =
-        calculate_exchange_rate(state.total_bond_amount, state.total_supply, &supply_queue);
+    state.exchange_rate = current_exchange_rate;
     STATE.save(deps.storage, &state)?;
 
     batch.expected_native_unstaked = Some(total_undelegate_amount);
