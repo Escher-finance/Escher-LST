@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use cosmwasm_std::{Decimal, Uint128};
 
-use crate::{ContractError, execute::*, state::QuoteToken, utils};
+use crate::{execute::*, state::QuoteToken, utils, ContractError};
 
 #[test]
 fn test_calculate_native_token() {
@@ -116,4 +116,292 @@ fn test_update_quote_token_channel_id_should_match() {
     // Fails - channel_id doesn't match
     let err = update_quote_token(deps.as_mut(), env, info, channel_id, quote_token).unwrap_err();
     assert!(matches!(err, ContractError::InvalidQuoteTokens {}));
+}
+
+#[test]
+fn test_slash_batch() {
+    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
+
+    use crate::{
+        contract::execute,
+        error::ContractError,
+        msg::{BatchAmount, ExecuteMsg},
+        utils::batch::{batches, Batch, BatchStatus},
+    };
+
+    let mut deps = mock_dependencies();
+    let mut env = mock_env();
+
+    // Setup owner
+    let owner = deps.api.addr_make("owner");
+    let non_owner = deps.api.addr_make("non_owner");
+    cw_ownable::initialize_owner(&mut deps.storage, &deps.api, Some(owner.as_str())).unwrap();
+
+    // Test 1: Only owner can access
+    let info = message_info(&non_owner, &[]);
+    let msg = ExecuteMsg::SlashBatch {
+        new_received_amounts: vec![],
+    };
+    let err = execute(deps.as_mut(), env.clone(), info, msg).unwrap_err();
+    assert!(matches!(err, ContractError::Ownership(_)));
+
+    // Test 2: Only batch with submitted status can be slashed
+    // Create a batch with Pending status
+    let batch_id_pending = 1u64;
+    let batch_pending = Batch {
+        id: batch_id_pending,
+        total_liquid_stake: cosmwasm_std::Uint128::new(1000),
+        expected_native_unstaked: Some(cosmwasm_std::Uint128::new(900)),
+        received_native_unstaked: None,
+        unbond_records_count: 5,
+        next_batch_action_time: Some(env.block.time.seconds() + 1000),
+        status: BatchStatus::Pending,
+    };
+    batches()
+        .save(deps.as_mut().storage, batch_id_pending, &batch_pending)
+        .unwrap();
+
+    let info = message_info(&owner, &[]);
+    let msg = ExecuteMsg::SlashBatch {
+        new_received_amounts: vec![BatchAmount {
+            batch_id: batch_id_pending,
+            received_amount: cosmwasm_std::Uint128::new(800),
+        }],
+    };
+    let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+    assert!(matches!(
+        err,
+        ContractError::BatchStatusIncorrect {
+            actual: _,
+            expected: _
+        }
+    ));
+
+    // Test 3: Batch not ready - block time is before next_batch_action_time
+    let batch_id_not_ready = 7u64;
+    let future_time = env.block.time.seconds() + 10000;
+    let batch_not_ready = Batch {
+        id: batch_id_not_ready,
+        total_liquid_stake: cosmwasm_std::Uint128::new(1000),
+        expected_native_unstaked: Some(cosmwasm_std::Uint128::new(900)),
+        received_native_unstaked: None,
+        unbond_records_count: 5,
+        next_batch_action_time: Some(future_time),
+        status: BatchStatus::Submitted,
+    };
+    batches()
+        .save(deps.as_mut().storage, batch_id_not_ready, &batch_not_ready)
+        .unwrap();
+
+    let msg = ExecuteMsg::SlashBatch {
+        new_received_amounts: vec![BatchAmount {
+            batch_id: batch_id_not_ready,
+            received_amount: cosmwasm_std::Uint128::new(800),
+        }],
+    };
+    let not_ready_err = execute(deps.as_mut(), env.clone(), info.clone(), msg);
+    assert!(not_ready_err.is_err());
+
+    // Test 4: Batch without next_batch_action_time should fail
+    let batch_id_no_action_time = 8u64;
+    let batch_no_action_time = Batch {
+        id: batch_id_no_action_time,
+        total_liquid_stake: cosmwasm_std::Uint128::new(1000),
+        expected_native_unstaked: Some(cosmwasm_std::Uint128::new(900)),
+        received_native_unstaked: None,
+        unbond_records_count: 5,
+        next_batch_action_time: None, // No action time set
+        status: BatchStatus::Submitted,
+    };
+    batches()
+        .save(
+            deps.as_mut().storage,
+            batch_id_no_action_time,
+            &batch_no_action_time,
+        )
+        .unwrap();
+
+    let msg = ExecuteMsg::SlashBatch {
+        new_received_amounts: vec![BatchAmount {
+            batch_id: batch_id_no_action_time,
+            received_amount: cosmwasm_std::Uint128::new(800),
+        }],
+    };
+    let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+    assert!(matches!(err, ContractError::BatchNextActionTimeNotSet));
+
+    // Test 5: Create batch with Submitted status and test successful slash
+    // Set env time to be after the batch action time
+    let batch_id_submitted = 2u64;
+    let expected_amount = cosmwasm_std::Uint128::new(1000);
+    let received_amount = cosmwasm_std::Uint128::new(800);
+    let batch_action_time = env.block.time.seconds() + 100;
+    let batch_submitted = Batch {
+        id: batch_id_submitted,
+        total_liquid_stake: cosmwasm_std::Uint128::new(1100),
+        expected_native_unstaked: Some(expected_amount),
+        received_native_unstaked: None,
+        unbond_records_count: 10,
+        next_batch_action_time: Some(batch_action_time),
+        status: BatchStatus::Submitted,
+    };
+    batches()
+        .save(deps.as_mut().storage, batch_id_submitted, &batch_submitted)
+        .unwrap();
+
+    // Move time forward to be after batch_action_time
+    env.block.time = env.block.time.plus_seconds(200);
+
+    let msg = ExecuteMsg::SlashBatch {
+        new_received_amounts: vec![BatchAmount {
+            batch_id: batch_id_submitted,
+            received_amount,
+        }],
+    };
+
+    let res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+    // Verify response has events
+    assert_eq!(res.events.len(), 2); // BatchReceivedEvent + slash_batch event
+
+    // Verify batch status changed to Received
+    let updated_batch = batches()
+        .load(deps.as_ref().storage, batch_id_submitted)
+        .unwrap();
+    assert!(matches!(updated_batch.status, BatchStatus::Received));
+    assert_eq!(
+        updated_batch.received_native_unstaked,
+        Some(received_amount)
+    );
+
+    // Test 6: Check received amount not over the expected native unstaked amount
+    let batch_id_over = 3u64;
+    let expected_amount_3 = cosmwasm_std::Uint128::new(1000);
+    let received_amount_over = cosmwasm_std::Uint128::new(1001); // Over expected
+    let batch_over = Batch {
+        id: batch_id_over,
+        total_liquid_stake: cosmwasm_std::Uint128::new(1100),
+        expected_native_unstaked: Some(expected_amount_3),
+        received_native_unstaked: None,
+        unbond_records_count: 8,
+        next_batch_action_time: Some(env.block.time.seconds() - 100), // In the past
+        status: BatchStatus::Submitted,
+    };
+    batches()
+        .save(deps.as_mut().storage, batch_id_over, &batch_over)
+        .unwrap();
+
+    let msg = ExecuteMsg::SlashBatch {
+        new_received_amounts: vec![BatchAmount {
+            batch_id: batch_id_over,
+            received_amount: received_amount_over,
+        }],
+    };
+    let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+    assert!(matches!(
+        err,
+        ContractError::SlashBatchReceivedAmountExceedExpected { .. }
+    ));
+
+    // Test 7: Multiple batches can be slashed at once and received amounts set correctly
+    let batch_id_multi_1 = 4u64;
+    let batch_id_multi_2 = 5u64;
+
+    let batch_multi_1 = Batch {
+        id: batch_id_multi_1,
+        total_liquid_stake: cosmwasm_std::Uint128::new(2000),
+        expected_native_unstaked: Some(cosmwasm_std::Uint128::new(1800)),
+        received_native_unstaked: None,
+        unbond_records_count: 15,
+        next_batch_action_time: Some(env.block.time.seconds() - 1000), // In the past
+        status: BatchStatus::Submitted,
+    };
+
+    let batch_multi_2 = Batch {
+        id: batch_id_multi_2,
+        total_liquid_stake: cosmwasm_std::Uint128::new(3000),
+        expected_native_unstaked: Some(cosmwasm_std::Uint128::new(2700)),
+        received_native_unstaked: None,
+        unbond_records_count: 20,
+        next_batch_action_time: Some(env.block.time.seconds() - 500), // In the past
+        status: BatchStatus::Submitted,
+    };
+
+    batches()
+        .save(deps.as_mut().storage, batch_id_multi_1, &batch_multi_1)
+        .unwrap();
+    batches()
+        .save(deps.as_mut().storage, batch_id_multi_2, &batch_multi_2)
+        .unwrap();
+
+    let received_multi_1 = cosmwasm_std::Uint128::new(1500);
+    let received_multi_2 = cosmwasm_std::Uint128::new(2500);
+
+    let msg = ExecuteMsg::SlashBatch {
+        new_received_amounts: vec![
+            BatchAmount {
+                batch_id: batch_id_multi_1,
+                received_amount: received_multi_1,
+            },
+            BatchAmount {
+                batch_id: batch_id_multi_2,
+                received_amount: received_multi_2,
+            },
+        ],
+    };
+    let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+    // Verify events (2 events per batch: BatchReceivedEvent + slash_batch)
+    assert_eq!(res.events.len(), 4);
+
+    // Verify both batches updated correctly
+    let updated_batch_1 = batches()
+        .load(deps.as_ref().storage, batch_id_multi_1)
+        .unwrap();
+    assert!(matches!(updated_batch_1.status, BatchStatus::Received));
+    assert_eq!(
+        updated_batch_1.received_native_unstaked,
+        Some(received_multi_1)
+    );
+
+    let updated_batch_2 = batches()
+        .load(deps.as_ref().storage, batch_id_multi_2)
+        .unwrap();
+    assert!(matches!(updated_batch_2.status, BatchStatus::Received));
+    assert_eq!(
+        updated_batch_2.received_native_unstaked,
+        Some(received_multi_2)
+    );
+
+    // Test 8: Batch without expected_native_unstaked should fail
+    let batch_id_no_expected = 6u64;
+    let batch_no_expected = Batch {
+        id: batch_id_no_expected,
+        total_liquid_stake: cosmwasm_std::Uint128::new(1000),
+        expected_native_unstaked: None, // No expected amount set
+        received_native_unstaked: None,
+        unbond_records_count: 5,
+        next_batch_action_time: Some(env.block.time.seconds() - 100), // In the past
+        status: BatchStatus::Submitted,
+    };
+    batches()
+        .save(
+            deps.as_mut().storage,
+            batch_id_no_expected,
+            &batch_no_expected,
+        )
+        .unwrap();
+
+    let info = message_info(&owner, &[]);
+    let msg = ExecuteMsg::SlashBatch {
+        new_received_amounts: vec![BatchAmount {
+            batch_id: batch_id_no_expected,
+            received_amount: cosmwasm_std::Uint128::new(500),
+        }],
+    };
+    let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+    assert!(matches!(
+        err,
+        ContractError::BatchExpectedNativeUnstakedNotSet
+    ));
 }
