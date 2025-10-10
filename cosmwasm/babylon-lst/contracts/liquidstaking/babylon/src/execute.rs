@@ -1,9 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, wasm_execute, Addr, Attribute, BankMsg, Coin, CosmosMsg,
-    Decimal, DepsMut, DistributionMsg, Env, Event, MessageInfo, Response, StdError, SubMsg,
-    Uint128, WasmMsg,
+    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, Event,
+    MessageInfo, Response, StdError, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
+    wasm_execute,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use unionlabs_primitives::Bytes;
@@ -16,20 +16,20 @@ use crate::{
     },
     helpers,
     msg::{
-        BatchAmount, BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg, Recipient,
-        RewardMigrateMsg, ZkgmTransfer,
+        BatchReceivedAmount, BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg,
+        Recipient, RewardMigrateMsg, ZkgmTransfer,
     },
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, PARAMETERS,
-        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
-        SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
+        Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
+        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{batches, BatchStatus},
+        batch::{BatchStatus, batches},
         calc::{
             calculate_exchange_rate, calculate_fee_from_reward, get_last_epoch_block,
             get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
@@ -1351,6 +1351,10 @@ pub fn remote_unbond(
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
 
+    let params = PARAMETERS.load(deps.storage)?;
+    // assume sender is cw-account contract address if contract creator is the ucs03 contract
+    validate_remote_sender(deps.querier, &info.sender, &params)?;
+
     let state = STATE.load(deps.storage)?;
     if state.exchange_rate < Decimal::one() {
         return Err(ContractError::InvalidExchangeRate {});
@@ -1373,7 +1377,7 @@ pub fn remote_unbond(
 
     let response = Response::new()
         .add_message(wasm_execute(
-            PARAMETERS.load(deps.storage)?.cw20_address.to_string(),
+            params.cw20_address.to_string(),
             &Cw20ExecuteMsg::TransferFrom {
                 owner: info.sender.to_string(),
                 recipient: env.contract.address.to_string(),
@@ -1467,14 +1471,14 @@ pub fn slash_batch(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    new_received_amounts: Vec<BatchAmount>,
+    new_received_amounts: Vec<BatchReceivedAmount>,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     let mut events: Vec<Event> = vec![];
-    for BatchAmount {
-        batch_id,
-        received_amount,
+    for BatchReceivedAmount {
+        id: batch_id,
+        received: received_amount,
     } in &new_received_amounts
     {
         let mut batch = batches().load(deps.storage, *batch_id)?;

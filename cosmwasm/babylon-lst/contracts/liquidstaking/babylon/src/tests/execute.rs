@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use cosmwasm_std::{Decimal, Uint128};
 
-use crate::{execute::*, state::QuoteToken, utils, ContractError};
+use crate::{ContractError, execute::*, state::QuoteToken, utils};
 
 #[test]
 fn test_calculate_native_token() {
@@ -125,8 +125,8 @@ fn test_slash_batch() {
     use crate::{
         contract::execute,
         error::ContractError,
-        msg::{BatchAmount, ExecuteMsg},
-        utils::batch::{batches, Batch, BatchStatus},
+        msg::{BatchReceivedAmount, ExecuteMsg},
+        utils::batch::{Batch, BatchStatus, batches},
     };
 
     let mut deps = mock_dependencies();
@@ -163,9 +163,9 @@ fn test_slash_batch() {
 
     let info = message_info(&owner, &[]);
     let msg = ExecuteMsg::SlashBatch {
-        new_received_amounts: vec![BatchAmount {
-            batch_id: batch_id_pending,
-            received_amount: cosmwasm_std::Uint128::new(800),
+        new_received_amounts: vec![BatchReceivedAmount {
+            id: batch_id_pending,
+            received: cosmwasm_std::Uint128::new(800),
         }],
     };
     let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
@@ -194,9 +194,9 @@ fn test_slash_batch() {
         .unwrap();
 
     let msg = ExecuteMsg::SlashBatch {
-        new_received_amounts: vec![BatchAmount {
-            batch_id: batch_id_not_ready,
-            received_amount: cosmwasm_std::Uint128::new(800),
+        new_received_amounts: vec![BatchReceivedAmount {
+            id: batch_id_not_ready,
+            received: cosmwasm_std::Uint128::new(800),
         }],
     };
     let not_ready_err = execute(deps.as_mut(), env.clone(), info.clone(), msg);
@@ -222,9 +222,9 @@ fn test_slash_batch() {
         .unwrap();
 
     let msg = ExecuteMsg::SlashBatch {
-        new_received_amounts: vec![BatchAmount {
-            batch_id: batch_id_no_action_time,
-            received_amount: cosmwasm_std::Uint128::new(800),
+        new_received_amounts: vec![BatchReceivedAmount {
+            id: batch_id_no_action_time,
+            received: cosmwasm_std::Uint128::new(800),
         }],
     };
     let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
@@ -253,9 +253,9 @@ fn test_slash_batch() {
     env.block.time = env.block.time.plus_seconds(200);
 
     let msg = ExecuteMsg::SlashBatch {
-        new_received_amounts: vec![BatchAmount {
-            batch_id: batch_id_submitted,
-            received_amount,
+        new_received_amounts: vec![BatchReceivedAmount {
+            id: batch_id_submitted,
+            received: received_amount,
         }],
     };
 
@@ -292,9 +292,9 @@ fn test_slash_batch() {
         .unwrap();
 
     let msg = ExecuteMsg::SlashBatch {
-        new_received_amounts: vec![BatchAmount {
-            batch_id: batch_id_over,
-            received_amount: received_amount_over,
+        new_received_amounts: vec![BatchReceivedAmount {
+            id: batch_id_over,
+            received: received_amount_over,
         }],
     };
     let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
@@ -339,13 +339,13 @@ fn test_slash_batch() {
 
     let msg = ExecuteMsg::SlashBatch {
         new_received_amounts: vec![
-            BatchAmount {
-                batch_id: batch_id_multi_1,
-                received_amount: received_multi_1,
+            BatchReceivedAmount {
+                id: batch_id_multi_1,
+                received: received_multi_1,
             },
-            BatchAmount {
-                batch_id: batch_id_multi_2,
-                received_amount: received_multi_2,
+            BatchReceivedAmount {
+                id: batch_id_multi_2,
+                received: received_multi_2,
             },
         ],
     };
@@ -394,9 +394,9 @@ fn test_slash_batch() {
 
     let info = message_info(&owner, &[]);
     let msg = ExecuteMsg::SlashBatch {
-        new_received_amounts: vec![BatchAmount {
-            batch_id: batch_id_no_expected,
-            received_amount: cosmwasm_std::Uint128::new(500),
+        new_received_amounts: vec![BatchReceivedAmount {
+            id: batch_id_no_expected,
+            received: cosmwasm_std::Uint128::new(500),
         }],
     };
     let err = execute(deps.as_mut(), env, info, msg).unwrap_err();

@@ -490,12 +490,11 @@ pub fn process_bond(
         reward_balance = Uint128::zero();
         unclaimed_reward = Uint128::zero();
         total_supply = state.total_supply;
-
     } else {
-        let token_info: TokenInfoResponse =
-        querier.query_wasm_smart(params.cw20_address.to_string(), &Cw20QueryMsg::TokenInfo {})?;
+        let token_info: TokenInfoResponse = querier
+            .query_wasm_smart(params.cw20_address.to_string(), &Cw20QueryMsg::TokenInfo {})?;
         total_supply = token_info.total_supply;
-        
+
         state.total_delegated_amount = delegated_amount;
         unclaimed_reward = get_unclaimed_reward(
             querier,
@@ -660,12 +659,12 @@ pub fn delegate(
     let mut supply_queue: SupplyQueue = SUPPLY_QUEUE.load(storage)?;
 
     let total_supply = if cfg!(test) {
-            STATE.load(storage)?.total_supply
-        } else {
-            let token_info: TokenInfoResponse =
-            querier.query_wasm_smart(params.cw20_address.to_string(), &Cw20QueryMsg::TokenInfo {})?;
+        STATE.load(storage)?.total_supply
+    } else {
+        let token_info: TokenInfoResponse = querier
+            .query_wasm_smart(params.cw20_address.to_string(), &Cw20QueryMsg::TokenInfo {})?;
 
-            token_info.total_supply
+        token_info.total_supply
     };
 
     let liquidity = query_liquidity(
@@ -804,11 +803,12 @@ pub fn submit_pending_batch(
     }
 
     let total_supply = if cfg!(test) {
-            state.total_supply
-        } else {
-            let token_info: TokenInfoResponse =
-            deps.querier.query_wasm_smart(params.cw20_address.to_string(), &Cw20QueryMsg::TokenInfo {})?;
-            token_info.total_supply
+        state.total_supply
+    } else {
+        let token_info: TokenInfoResponse = deps
+            .querier
+            .query_wasm_smart(params.cw20_address.to_string(), &Cw20QueryMsg::TokenInfo {})?;
+        token_info.total_supply
     };
 
     calc::normalize_supply_queue(&mut supply_queue, block_height);
