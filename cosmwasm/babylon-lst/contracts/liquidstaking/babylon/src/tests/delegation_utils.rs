@@ -1110,8 +1110,15 @@ fn test_delegate() {
 
     let querier: QuerierWrapper<Empty> = QuerierWrapper::new(&deps.querier);
 
-    let (msgs, new_bond_data) =
-        delegate(&mut deps.storage, querier, env, amount, min_mint_amount, None).unwrap();
+    let (msgs, new_bond_data) = delegate(
+        &mut deps.storage,
+        querier,
+        env,
+        amount,
+        min_mint_amount,
+        None,
+    )
+    .unwrap();
 
     let updated_state = STATE.load(deps.as_mut().storage).unwrap();
 
@@ -1523,8 +1530,7 @@ fn validator_restaking_adjustment_4() {
 
     let denom = "muno".to_string();
     let delegator = "bbn123glhewf3w66cquy6hr7urjv3589srheqj3abc".to_string();
-    let msgs =
-        crate::utils::delegation::get_restaking_msgs(&delegator, surplus, deficit, &denom);
+    let msgs = crate::utils::delegation::get_restaking_msgs(&delegator, surplus, deficit, &denom);
 
     let staking_msg = get_redelegate_msg(3000, denom.clone(), "A".to_string(), "C".to_string());
     assert_eq!(msgs.first().unwrap(), &staking_msg);
