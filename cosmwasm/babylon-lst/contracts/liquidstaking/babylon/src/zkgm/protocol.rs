@@ -2,8 +2,9 @@ use std::str::FromStr;
 
 use alloy::{primitives::U256, sol_types::SolValue};
 use cosmwasm_std::{
-    Binary, Coin, CosmosMsg, Timestamp, Uint64, Uint128, to_json_binary, wasm_execute,
+    Addr, Binary, Coin, CosmosMsg, Env, Timestamp, Uint64, Uint128, to_json_binary, wasm_execute,
 };
+use sha2::{Digest, Sha256};
 use ucs03_zkgm::com::{
     Batch, INSTR_VERSION_0, INSTR_VERSION_1, INSTR_VERSION_2, Instruction, OP_BATCH,
     OP_TOKEN_ORDER, TOKEN_ORDER_KIND_ESCROW, TokenOrderV2,
@@ -12,11 +13,40 @@ use unionlabs_primitives::{Bytes, H256};
 
 use crate::{
     ContractError,
-    msg::Ucs03ExecuteMsg,
+    msg::{Ucs03ExecuteMsg, ZkgmTransfer},
     state::{PARAMETERS, QUOTE_TOKEN},
     types::ChannelId,
+    utils::transfer::send_token_order_v2_escrow,
     zkgm::com::FungibleAssetOrder,
 };
+
+/// Generate a salt based on block timestamp and sender address
+/// Equivalent to Solidity:
+/// ```solidity
+/// bytes memory rawSalt = abi.encodePacked(block.timestamp, msg.sender);
+/// bytes32 salt = keccak256(rawSalt);
+/// ```
+///
+/// # Arguments
+/// * `env` - Environment containing block information (time)
+/// * `sender` - Address of the message sender
+///
+/// # Returns
+/// * `String` - The generated salt as a 0x string
+#[must_use]
+pub fn generate_salt(env: &Env, sender: &Addr) -> String {
+    let mut hasher = Sha256::new();
+
+    // Encode timestamp (block.time in nanoseconds as u64)
+    let timestamp_nanos = env.block.time.nanos();
+    hasher.update(timestamp_nanos.to_be_bytes());
+
+    // Encode sender address
+    hasher.update(sender.as_bytes());
+
+    // Finalize hash and convert to hex string
+    format!("0x{:x}", hasher.finalize())
+}
 
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 pub fn ucs03_transfer(
@@ -171,4 +201,35 @@ pub fn ucs03_transfer_v2(
     let msg = wasm_execute(params.ucs03_relay_contract.clone(), &transfer_msg, funds)?;
 
     Ok(msg.into())
+}
+
+#[derive(Debug)]
+pub struct Ucs03Zkgm {
+    pub contract: String,
+    pub token_pair: TokenPair,
+}
+
+#[derive(Debug)]
+pub struct TokenPair {
+    pub base_token: String,
+    pub quote_token: String,
+}
+
+impl Ucs03Zkgm {
+    #[must_use]
+    pub fn new(contract: String, token_pair: TokenPair) -> Ucs03Zkgm {
+        Ucs03Zkgm {
+            contract,
+            token_pair,
+        }
+    }
+
+    pub fn transfer_escrow(&self, payload: &ZkgmTransfer) -> Result<CosmosMsg, ContractError> {
+        send_token_order_v2_escrow(
+            &self.contract,
+            payload,
+            &self.token_pair.base_token,
+            &self.token_pair.quote_token,
+        )
+    }
 }

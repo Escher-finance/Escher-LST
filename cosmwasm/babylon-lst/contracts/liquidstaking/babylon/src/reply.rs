@@ -102,7 +102,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
         let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
         quote_token_string.clone_from(&quote_token.lst_quote_token);
 
-        let send_msg = transfer::transfer_escrow_v2(
+        let send_msg = transfer::send_token_order_v2_escrow(
             &params.ucs03_relay_contract.clone(),
             &ZkgmTransfer {
                 sender: env.contract.address.to_string(),
@@ -110,10 +110,10 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
                 recipient,
                 recipient_channel_id: channel_id,
                 salt: payload.salt,
+                time: env.block.time,
             },
             params.cw20_address.as_ref(),
             &quote_token_string,
-            env.block.time,
         )?;
 
         msgs.push(send_msg);

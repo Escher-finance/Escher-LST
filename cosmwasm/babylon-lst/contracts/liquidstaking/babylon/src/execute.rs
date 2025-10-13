@@ -35,13 +35,13 @@ use crate::{
             get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
         },
         delegation::{get_actual_total_delegated, get_actual_total_reward, submit_pending_batch},
-        transfer::{self, get_send_bank_msg, ibc_transfer_msg},
+        transfer::{get_send_bank_msg, ibc_transfer_msg},
         validation::{
             split_and_validate_recipient, validate_recipient, validate_remote_sender,
             validate_required_coin, validate_validators,
         },
     },
-    zkgm::protocol::ucs03_transfer_v2,
+    zkgm::protocol::{TokenPair, Ucs03Zkgm, generate_salt, ucs03_transfer_v2},
 };
 
 /// process bond call to contract
@@ -101,9 +101,9 @@ pub fn bond(
             address: _,
             channel_id: _,
         } => {
-            // mint staked token to sender because it will transfer via ucs03 zkgm from original sender
+            // mint staked token to this contract
             msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: bond_data.cw20_address,
+                contract_addr: bond_data.cw20_address.clone(),
                 msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint {
                     recipient: info.sender.to_string(),
                     amount: bond_data.mint_amount,
@@ -114,7 +114,11 @@ pub fn bond(
         Recipient::IBC {
             address: _,
             ibc_channel_id: _,
-        } => return Err(ContractError::FunctionalityUnderMaintenance {}),
+        } => {
+            return Err(ContractError::UnsupportedOperation {
+                msg: "can not send liquid staking token via ibc".to_string(),
+            });
+        }
     }
 
     // create bond event here
@@ -137,21 +141,7 @@ pub fn bond(
         recipient_ibc_channel_id,
     );
 
-    let res: Response = Response::new()
-        .add_messages(msgs)
-        .add_event(bond_event)
-        .add_attributes(vec![
-            attr("action", "bond"),
-            attr("from", info.sender.clone()),
-            attr("staker", info.sender.clone()),
-            attr("recipient", the_recipient.unwrap_or(info.sender.into())),
-            attr("channel_id", recipient_channel_id.unwrap_or(0).to_string()),
-            attr("bond_amount", coin.amount.to_string()),
-            attr("denom", params.underlying_coin_denom.clone()),
-            attr("minted", bond_data.mint_amount),
-            attr("exchange_rate", bond_data.exchange_rate.to_string()),
-        ]);
-
+    let res: Response = Response::new().add_messages(msgs).add_event(bond_event);
     Ok(res)
 }
 
@@ -882,19 +872,21 @@ pub fn process_batch_withdrawal(
                 };
 
                 // send native token back via ucs03
-                let msg = transfer::transfer_escrow_v2(
-                    &ucs03_relay_contract,
-                    &ZkgmTransfer {
-                        sender: lst_contract.to_string(),
-                        amount: unstake_return_native_amount,
-                        recipient: recipient.clone(),
-                        recipient_channel_id,
-                        salt,
+                let msg = Ucs03Zkgm::new(
+                    ucs03_relay_contract.clone(),
+                    TokenPair {
+                        base_token: denom.clone(),
+                        quote_token: quote_token.quote_token.clone(),
                     },
-                    &denom,
-                    &quote_token.quote_token,
+                )
+                .transfer_escrow(&ZkgmTransfer {
+                    sender: lst_contract.to_string(),
+                    amount: unstake_return_native_amount,
+                    recipient: recipient.clone(),
+                    recipient_channel_id,
+                    salt,
                     time,
-                )?;
+                })?;
                 send_msgs.push(msg);
             } else if let Some(recipient_ibc_channel_id) = &undelegation.recipient_ibc_channel_id {
                 if let Some(recipient) = &undelegation.recipient {

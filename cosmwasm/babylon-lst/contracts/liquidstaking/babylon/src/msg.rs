@@ -453,4 +453,5 @@ pub struct ZkgmTransfer {
     pub recipient: String,
     pub recipient_channel_id: u32,
     pub salt: String,
+    pub time: Timestamp,
 }

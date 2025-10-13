@@ -1,22 +1,15 @@
-use std::str::FromStr;
-
 use cosmwasm_std::{
-    Decimal, DepsMut, Env, IbcBasicResponse, IbcDestinationCallbackMsg, StdAck, StdError,
-    StdResult, Uint128, ensure_eq, entry_point, from_json,
+    DepsMut, Env, IbcBasicResponse, IbcDestinationCallbackMsg, StdAck, StdError, StdResult,
+    ensure_eq, entry_point,
 };
-use ibc::apps::transfer::types::proto::transfer::v2::FungibleTokenPacketData;
 
-use crate::{
-    event::IbcCallbackEvent,
-    state::{PARAMETERS, STATUS, VALIDATORS_REGISTRY},
-    utils::{self, calc::check_slippage, transfer::ibc_transfer_msg},
-};
+use crate::state::STATUS;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 #[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
 pub fn ibc_destination_callback(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     msg: IbcDestinationCallbackMsg,
 ) -> StdResult<IbcBasicResponse> {
     ensure_eq!(
@@ -37,6 +30,11 @@ pub fn ibc_destination_callback(
         ));
     }
 
+    Err(StdError::generic_err(
+        "stake from ibc not supported right now",
+    ))
+
+    /*
     // At this point we know that this is a callback for a successful transfer,
     // but not to whom it is going, how much and what denom.
 
@@ -244,8 +242,10 @@ pub fn ibc_destination_callback(
         .add_event(ibc_callback_event)
         .add_messages(msgs)
         .add_submessages(submsgs))
+         */
 }
 
+/*
 #[allow(clippy::needless_pass_by_value)]
 fn failure_handler(
     env: Env,
@@ -307,3 +307,4 @@ fn failure_handler(
         .add_event(ibc_callback_event)
         .add_message(msg)
 }
+ */
