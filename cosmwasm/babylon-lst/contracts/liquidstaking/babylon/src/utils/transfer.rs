@@ -8,6 +8,7 @@ use cosmwasm_std::{
 use ucs03_zkgm::com::{
     INSTR_VERSION_2, Instruction, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_ESCROW, TokenOrderV2,
 };
+use unionlabs_primitives::Bytes;
 
 use crate::{
     ContractError,
@@ -111,15 +112,34 @@ pub fn ibc_transfer_msg(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn transfer_escrow_v2(
+pub fn send_token_order_v2_escrow(
     ucs03_relay_contract: &str,
     payload: &ZkgmTransfer,
     base_token: &str,
     quote_token: &str,
-    time: Timestamp,
 ) -> Result<CosmosMsg, ContractError> {
     let Ok(transfer_amount) = payload.amount.u128().try_into() else {
         return Err(ContractError::InvalidPayload {});
+    };
+    let receiver: Bytes = match Bytes::from_str(payload.recipient.as_str()) {
+        Ok(r) => r,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "recipient".into(),
+                address: payload.recipient.clone(),
+                reason: "address must be in hex and starts with 0x".to_string(),
+            });
+        }
+    };
+    let quote_token: Bytes = match Bytes::from_str(quote_token) {
+        Ok(q) => q,
+        Err(_) => {
+            return Err(ContractError::InvalidAddress {
+                kind: "quote_token".into(),
+                address: quote_token.to_string(),
+                reason: "address must be in hex and starts with 0x".to_string(),
+            });
+        }
     };
 
     let fungible_order_instruction = Instruction {
@@ -127,7 +147,7 @@ pub fn transfer_escrow_v2(
         opcode: OP_TOKEN_ORDER,
         operand: TokenOrderV2 {
             sender: payload.sender.as_bytes().to_vec().into(),
-            receiver: Vec::from(payload.recipient.clone()).into(),
+            receiver: Vec::from(receiver).into(),
             base_token: base_token.as_bytes().to_vec().into(),
             base_amount: transfer_amount,
             quote_token: Vec::from(quote_token).into(),
@@ -141,7 +161,7 @@ pub fn transfer_escrow_v2(
 
     let timeout_timestamp_offset: u64 = 86400; // 1 day period
     let timeout_timestamp =
-        Timestamp::from_nanos(time.plus_seconds(timeout_timestamp_offset).nanos());
+        Timestamp::from_nanos(payload.time.plus_seconds(timeout_timestamp_offset).nanos());
 
     let salt: unionlabs_primitives::H256 =
         match unionlabs_primitives::H256::from_str(payload.salt.as_str()) {

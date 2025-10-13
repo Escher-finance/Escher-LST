@@ -168,4 +168,7 @@ pub enum ContractError {
         received_amount: cosmwasm_std::Uint128,
         expected_native_unstaked: cosmwasm_std::Uint128,
     },
+
+    #[error("unsupported operation: {msg}")]
+    UnsupportedOperation { msg: String },
 }
