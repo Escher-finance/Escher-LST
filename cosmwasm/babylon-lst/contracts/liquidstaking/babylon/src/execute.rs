@@ -41,7 +41,7 @@ use crate::{
             validate_required_coin, validate_validators,
         },
     },
-    zkgm::protocol::{TokenPair, Ucs03Zkgm, generate_salt, ucs03_transfer_v2},
+    zkgm::protocol::{TokenPair, Ucs03Zkgm, ucs03_transfer_v2},
 };
 
 /// process bond call to contract
@@ -821,7 +821,7 @@ pub fn process_batch_withdrawal(
 
     let mut quote_token_map: HashMap<u32, QuoteToken> = HashMap::new();
 
-    for (i, ((staker, _), undelegation)) in staker_undelegation.iter().enumerate() {
+    for (i, ((staker, _, _), undelegation)) in staker_undelegation.iter().enumerate() {
         // if recipient channel id is set or channel id is set, it means that the receiver/recipient is on other chain
         // then if channel_id is set but without recipient channel id also without recipient, it will send back to staker via original channel id
         let is_on_chain_recipient = utils::validation::is_on_chain_recipient(
