@@ -1151,7 +1151,7 @@ pub fn get_staker_undelegation(
     block_height: u64,
 ) -> Result<
     (
-        HashMap<(String, String), StakerUndelegation>,
+        HashMap<(String, String, String), StakerUndelegation>,
         Vec<u64>,
         Uint128,
     ),
@@ -1162,7 +1162,8 @@ pub fn get_staker_undelegation(
     let mut unbond_record_ids = vec![];
 
     // hash map with tuple of staker and recipient as key
-    let mut staker_undelegation: HashMap<(String, String), StakerUndelegation> = HashMap::new();
+    let mut staker_undelegation: HashMap<(String, String, String), StakerUndelegation> =
+        HashMap::new();
 
     for record in unbonding_records.iter_mut() {
         let record_recipient_ibc_channel_id = UNBOND_RECIPIENT_IBC_CHANNEL
@@ -1173,6 +1174,7 @@ pub fn get_staker_undelegation(
             .entry((
                 record.staker.clone(),
                 record.recipient.clone().unwrap_or(String::new()),
+                record.recipient_channel_id.unwrap_or_default().to_string(),
             ))
             .and_modify(|e| e.unstake_amount += record.amount)
             .or_insert(StakerUndelegation {
@@ -1218,9 +1220,11 @@ pub fn get_staker_undelegation(
     );
     for (i, record) in unbonding_records.iter_mut().enumerate() {
         let recipient = record.recipient.clone().unwrap_or_default();
-        let Some(staker_undelegation) =
-            staker_undelegation.get_mut(&(record.staker.clone(), recipient))
-        else {
+        let Some(staker_undelegation) = staker_undelegation.get_mut(&(
+            record.staker.clone(),
+            recipient,
+            record.recipient_channel_id.unwrap_or_default().to_string(),
+        )) else {
             continue;
         };
         let dust = dust_distribution[i];

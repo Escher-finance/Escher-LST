@@ -334,6 +334,119 @@ fn test_staker_undelegation_with_dust_distribution() {
 }
 
 #[test]
+fn test_staker_undelegation_with_same_recipient() {
+    let total_received_amount = Uint128::from_str("2022599").unwrap();
+    let total_liquid_stake: Uint128 = Uint128::from_str("1949557").unwrap();
+    let unbond_record_1 = crate::state::UnbondRecord {
+        id: 101,
+        height: 730_899,
+        sender: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        staker: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        channel_id: None,
+        amount: Uint128::new(540_000_u128),
+        released_height: 0,
+        released: false,
+        batch_id: 27,
+        recipient: Some("0x15Ee7c367F4232241028c36E720803100757c6e9".into()),
+        recipient_channel_id: Some(1),
+    };
+
+    let unbond_record_2 = crate::state::UnbondRecord {
+        id: 101,
+        height: 730_899,
+        sender: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        staker: "bbn1yj3h4tjw8s6n0cd6jmc0s9pqmud57yk5hf2nvf".into(),
+        channel_id: None,
+        amount: Uint128::new(409_557_u128),
+        released_height: 0,
+        released: false,
+        batch_id: 27,
+        recipient: Some("0x15Ee7c367F4232241028c36E720803100757c6e9".into()),
+        recipient_channel_id: Some(2),
+    };
+
+    let unbond_record_3 = crate::state::UnbondRecord {
+        id: 101,
+        height: 730_899,
+        sender: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        staker: "bbn132ltlddr9gkun8kgrefquem2w754kpy8z5j4wx".into(),
+        channel_id: None,
+        amount: Uint128::new(1_000_000_u128),
+        released_height: 0,
+        released: false,
+        batch_id: 27,
+        recipient: None,
+        recipient_channel_id: None,
+    };
+
+    let mut store = cosmwasm_std::testing::MockStorage::new();
+
+    let (staker_undelegations, _, _) = crate::utils::delegation::get_staker_undelegation(
+        &mut store,
+        total_received_amount,
+        &mut [unbond_record_1, unbond_record_2, unbond_record_3],
+        total_liquid_stake,
+        1000,
+    )
+    .unwrap();
+
+    assert_eq!(3, staker_undelegations.len());
+
+    let unbond_record_1 = crate::state::UnbondRecord {
+        id: 101,
+        height: 730_899,
+        sender: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        staker: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        channel_id: None,
+        amount: Uint128::new(540_000_u128),
+        released_height: 0,
+        released: false,
+        batch_id: 27,
+        recipient: Some("0x15Ee7c367F4232241028c36E720803100757c6e9".into()),
+        recipient_channel_id: Some(1),
+    };
+
+    let unbond_record_2 = crate::state::UnbondRecord {
+        id: 101,
+        height: 730_899,
+        sender: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        staker: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        channel_id: None,
+        amount: Uint128::new(409_557_u128),
+        released_height: 0,
+        released: false,
+        batch_id: 27,
+        recipient: Some("0x15Ee7c367F4232241028c36E720803100757c6e9".into()),
+        recipient_channel_id: Some(1),
+    };
+
+    let unbond_record_3 = crate::state::UnbondRecord {
+        id: 101,
+        height: 730_899,
+        sender: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        staker: "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz".into(),
+        channel_id: None,
+        amount: Uint128::new(1_000_000_u128),
+        released_height: 0,
+        released: false,
+        batch_id: 27,
+        recipient: Some("0x15Ee7c367F4232241028c36E720803100757c6e9".into()),
+        recipient_channel_id: Some(2),
+    };
+
+    let (staker_undelegations, _, _) = crate::utils::delegation::get_staker_undelegation(
+        &mut store,
+        total_received_amount,
+        &mut [unbond_record_1, unbond_record_2, unbond_record_3],
+        total_liquid_stake,
+        1000,
+    )
+    .unwrap();
+
+    assert_eq!(2, staker_undelegations.len());
+}
+
+#[test]
 fn test_normalize_reward_balance() {
     let mut deps = mock_dependencies();
 
