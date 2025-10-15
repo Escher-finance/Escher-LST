@@ -31,9 +31,9 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
     const formData = new FormData(form);
     const formEntries = Object.fromEntries(formData.entries());
     const amount = formEntries.amount.toString();
-    const recipient = formEntries.recipient.toString();
+    const recipient = formEntries.recipient.toString().trim();
     const recipient_channel_id = formEntries.recipient_channel_id.toString();
-    const recipient_ibc_channel_id = formEntries.recipient_ibc_channel_id.toString();
+    //const recipient_ibc_channel_id = formEntries.recipient_ibc_channel_id.toString();
     const encoder = new TextEncoder();
     const recipient_hex = toHex(encoder.encode(recipient));
 
@@ -68,9 +68,9 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
       const unbondingPayload = {
         unstake: {
           amount,
-          recipient: recipient.indexOf("bbn") != -1 ? recipient : recipient_ibc_channel_id != "" ? recipient : recipient_hex,
-          recipient_channel_id: recipient_channel_id == "" ? null : Number(recipient_channel_id),
-          recipient_ibc_channel_id: recipient_ibc_channel_id == "" ? null : recipient_ibc_channel_id,
+          recipient: recipient_channel_id == "0" ? recipient : recipient.indexOf("0x") == -1 ? recipient_hex : recipient,
+          recipient_channel_id: recipient_channel_id == "0" ? null : Number(recipient_channel_id),
+          recipient_ibc_channel_id: null,
         }
       };
 
@@ -121,18 +121,13 @@ export default function Unbond({ stateKey, setStateKey }: KeyProps) {
             <Input
               isRequired
               name="recipient"
-              label="Recipient (example: xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds for xion via zkgm, osmo1vnglhewf3w66cquy6hr7urjv3589srhelhn6df for osmosis via IBC)"
-              defaultValue="xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds"
+              label="Recipient (example: bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz or 0x15Ee7c367F4232241028c36E720803100757c6e9 for other chain)"
+              defaultValue="bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz"
             />
             <Input
               name="recipient_channel_id"
-              label="Recipient Channel ID (4 for osmosis mainnet) (set blank to make it null)"
-              defaultValue=""
-            />
-            <Input
-              name="recipient_ibc_channel_id"
-              label="Recipient IBC Channel ID (channel-3 for osmosis mainnet) (set blank to make it null)"
-              defaultValue=""
+              label="Recipient Channel ID (1 for sepolia, 2 for holesky)"
+              defaultValue="0"
             />
           </CardBody>
           <CardFooter>
