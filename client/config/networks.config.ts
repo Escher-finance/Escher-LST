@@ -102,7 +102,7 @@ const currency: Record<SupportedNetworks, Currency> = {
 
 const Networks: Record<SupportedNetworks, ChainConfig> = {
   "babylon-testnet": {
-    chainId: "bbn-test-5",
+    chainId: "bbn-test-6",
     chainName: "babylon-testnet",
     rest: "https://babylon-testnet-api.nodes.guru",
     rpc: "https://babylon-testnet-rpc.nodes.guru",
@@ -121,16 +121,16 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     currencies: [currency["babylon-testnet"]],
     feeCurrencies: [currency["babylon-testnet"]],
     contracts: {
-      lst: "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss",
-      cw20: "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9",
-      reward: "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss",
+      lst: "bbn1ufs3tlq4umljk0qfe8k5ya0x6hpavn897u2cnf9k0en9jr7qarqqsam25v",
+      cw20: "bbn1wkwy0xh89ksdgj9hr347dyd2dw7zesmtrue6kfzyml4vdtz6e5ws8eag3a",
+      reward: "bbn1ufs3tlq4umljk0qfe8k5ya0x6hpavn897u2cnf9k0en9jr7qarqqsam25v",
     },
     gasPrice: "0.0025ubbn",
     escher: {
-      lst: "bbn1ug4tume0pw6d4u7r6rhae6cp3udyrv7cr0angx8qegw7ur25sdxq4krcss",
+      lst: "bbn1ufs3tlq4umljk0qfe8k5ya0x6hpavn897u2cnf9k0en9jr7qarqqsam25v",
       ucs03: "bbn1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292q77945h",
       babyDenom: "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9",
-      ebabyDenom: "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9",
+      ebabyDenom: "bbn1wkwy0xh89ksdgj9hr347dyd2dw7zesmtrue6kfzyml4vdtz6e5ws8eag3a",
       tokenMinter: "bbn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf",
       nativeBaseToken: "0x7562626e",
       stakedBaseToken: "0x62626e31636e7833347038327a6e677130757561656e64736e65307834733567736d376770776b326573387a6b38727a38746e6a39333871717971386639",
