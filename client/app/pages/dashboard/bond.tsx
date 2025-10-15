@@ -89,19 +89,18 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
     const amount = formEntries.amount.toString();
     let recipient_type = formEntries.recipient_type.toString();
     let recipient_address = formEntries.address.toString();
-    const chain_id = formEntries.chain_id.toString();
+    const chain_id = formEntries.chain_id?.toString();
 
     console.log("exchange rate", liquidity.exchange_rate);
 
     const expected = Math.floor(Number(amount) / Number(liquidity.exchange_rate));
 
     const bondMsg = {
-      bond: {
+      local_bond: {
         expected: expected.toString(),
         recipient: recipient_type == "on_chain" ? { on_chain: { address: recipient_address } } : { zkgm: { address: recipient_address, channel_id: network?.escher?.channel[chain_id]?.sourceChannelId } },
       },
     };
-
 
     const funds = [{
       amount,
@@ -124,48 +123,51 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
       return;
     }
 
-    let baseToken = network?.escher?.stakedBaseToken;
-    let quoteToken = network?.escher?.channel[chain_id].stakedQuoteToken;
 
-    if (!baseToken) {
-      alert("No base token");
-      return;
-    }
-
-    let allowanceMsg = getExecuteAllowanceMsg(network?.contracts.cw20, userAddress, network?.escher?.tokenMinter, expected.toString());
-
-    let tokenOrder = tokenOrderV2Escrow(userAddress.toLowerCase(), recipient_address, baseToken, BigInt(expected), quoteToken as '0x${string}');
-    let cosmos_msg = {
-      send: {
-        channel_id: network?.escher?.channel[chain_id]?.sourceChannelId,
-        timeout_height: "0",
-        timeout_timestamp: getTimeoutInNanoseconds7DaysFromNow().toString(),
-        salt: getSalt(),
-        instruction: encodeInstruction(Instruction.make({
-          opcode: 3,
-          version: 2,
-          operand: encodeTokenOrderV2(tokenOrder),
-        })),
-      },
-    };
-    const executeSendMsg = {
-      typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
-      value: MsgExecuteContract.fromPartial({
-        sender: userAddress,
-        contract: network?.escher?.ucs03,
-        msg: toUtf8(JSON.stringify(cosmos_msg)),
-        funds: []
-      }),
-    };
-
-
-    let msgs = [executeBondMsg, allowanceMsg, executeSendMsg];
-
+    let msgs = [];
     console.log("recipient_type", selectedRecipientType);
 
-    if (selectedRecipientType == "on_chain") {
+    if (selectedRecipientType != "zkgm") {
       msgs = [executeBondMsg];
+    } else {
+      let baseToken = network?.escher?.stakedBaseToken;
+      let quoteToken = chain_id ? network?.escher?.channel[chain_id].stakedQuoteToken : "";
+
+      if (!baseToken) {
+        alert("No base token");
+        return;
+      }
+
+      let allowanceMsg = getExecuteAllowanceMsg(network?.contracts.cw20, userAddress, network?.escher?.tokenMinter, expected.toString());
+
+      let tokenOrder = tokenOrderV2Escrow(userAddress.toLowerCase(), recipient_address, baseToken, BigInt(expected), quoteToken as '0x${string}');
+      let cosmos_msg = {
+        send: {
+          channel_id: network?.escher?.channel[chain_id]?.sourceChannelId,
+          timeout_height: "0",
+          timeout_timestamp: getTimeoutInNanoseconds7DaysFromNow().toString(),
+          salt: getSalt(),
+          instruction: encodeInstruction(Instruction.make({
+            opcode: 3,
+            version: 2,
+            operand: encodeTokenOrderV2(tokenOrder),
+          })),
+        },
+      };
+      const executeSendMsg = {
+        typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+        value: MsgExecuteContract.fromPartial({
+          sender: userAddress,
+          contract: network?.escher?.ucs03,
+          msg: toUtf8(JSON.stringify(cosmos_msg)),
+          funds: []
+        }),
+      };
+
+      msgs = [executeBondMsg, allowanceMsg, executeSendMsg];
     }
+
+
 
     console.log(JSON.stringify(msgs));
 
