@@ -163,6 +163,7 @@ pub fn instantiate(
 /// # Errors
 /// Will return contract error
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[allow(clippy::too_many_lines)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -171,6 +172,27 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Bond {
+            slippage,
+            expected,
+            recipient,
+            recipient_channel_id: _,
+            salt: _,
+        } => {
+            let default_recipient = info.sender.clone().to_string();
+            let recipient_string = recipient.unwrap_or(default_recipient);
+            let recipient_address = deps.api.addr_validate(&recipient_string)?;
+            execute::bond(
+                deps,
+                env,
+                info,
+                slippage,
+                expected,
+                crate::msg::Recipient::OnChain {
+                    address: recipient_address,
+                },
+            )
+        }
+        ExecuteMsg::LocalBond {
             slippage,
             expected,
             recipient,
