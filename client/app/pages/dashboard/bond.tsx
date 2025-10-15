@@ -58,6 +58,12 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
   const { userAddress, client, network } = useGlobalContext();
 
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRecipientType, setSelectedRecipientType] = useState<string | undefined>(undefined);
+
+  const handleSelectionChange = (e: any) => {
+    setSelectedRecipientType(e.target.value);
+  };
+
 
   const handleSubmit = async (e: any) => {
 
@@ -87,13 +93,12 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
 
     console.log("exchange rate", liquidity.exchange_rate);
 
-    const expected = Math.floor(Number(amount) / liquidity.exchange_rate);
+    const expected = Math.floor(Number(amount) / Number(liquidity.exchange_rate));
 
     const bondMsg = {
       bond: {
         expected: expected.toString(),
         recipient: recipient_type == "on_chain" ? { on_chain: { address: recipient_address } } : { zkgm: { address: recipient_address, channel_id: network?.escher?.channel[chain_id]?.sourceChannelId } },
-
       },
     };
 
@@ -154,19 +159,19 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
     };
 
 
-    let msgs = [executeBondMsg];
+    let msgs = [executeBondMsg, allowanceMsg, executeSendMsg];
 
-    console.log("recipient_type", recipient_type);
+    console.log("recipient_type", selectedRecipientType);
 
-    if (recipient_type == "zkgm") {
-      msgs = [executeBondMsg, allowanceMsg, executeSendMsg];
+    if (selectedRecipientType == "on_chain") {
+      msgs = [executeBondMsg];
     }
 
     console.log(JSON.stringify(msgs));
 
     try {
       setIsLoading(true);
-      const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "transfer from babylon");
+      const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "bond from babylon");
       alert(res?.transactionHash);
       let newKey = stateKey + 1;
       setStateKey(newKey);
@@ -190,28 +195,29 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
               label="Amount"
               defaultValue="10000"
             />
-            <Select className="max-w-xs" label="Select Recipient" variant="flat" name="recipient_type" defaultSelectedKeys="zkgm">
+            <Select isRequired className="max-w-xs" label="Select Recipient" variant="flat" name="recipient_type" defaultSelectedKeys={["on_chain"]}
+              onChange={handleSelectionChange}>
               {recipient_types.map((chain: any) => (
                 <SelectItem key={chain.key}>{chain.label}</SelectItem>
               ))}
             </Select>
             <Input
               name="address"
-              label="Recipient address (example: xion1vnglhewf3w66cquy6hr7urjv3589srhe496gds)"
+              label="Recipient address (example: bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz / 0x15Ee7c367F4232241028c36E720803100757c6e9)"
               defaultValue={userAddress ? userAddress : ""}
             />
-            <Select className="max-w-xs" label="Select destination chain" variant="flat" name="chain_id" defaultSelectedKeys="sepolia">
+            {selectedRecipientType && selectedRecipientType == "zkgm" && <Select className="max-w-xs" label="Select destination chain" variant="flat" name="chain_id" defaultSelectedKeys={["sepolia"]}>
               {chains.map((chain) => (
                 <SelectItem key={chain.key}>{chain.label}</SelectItem>
               ))}
-            </Select>
+            </Select>}
           </CardBody>
           <CardFooter>
             <Button type="submit" isLoading={isLoading}>Bond</Button>
           </CardFooter>
         </Card>
       </form>
-    </div>
+    </div >
   );
 }
 

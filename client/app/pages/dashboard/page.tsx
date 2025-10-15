@@ -16,6 +16,7 @@ import UnionBond from "./union_bond";
 import UnionInfo from "./union_info";
 import TransferFromBabylon from "./transfer_from_babylon";
 import UnionUnbond from "./union_unbond";
+import TransferBaby from "./transfer_baby";
 //import ZkgmUnbond from "./zkgm_unbond";
 
 export default function Dashboard() {
@@ -61,6 +62,9 @@ export default function Dashboard() {
                 <TransferFromBabylon stateKey={stateKey} setStateKey={setStateKey} />
               </Tab>
 
+              <Tab key={"transfer_baby_via_contract"} title="Transfer Baby via Contract" >
+                <TransferBaby stateKey={stateKey} setStateKey={setStateKey} />
+              </Tab>
             </Tabs>
 
           </div>
