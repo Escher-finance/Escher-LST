@@ -1,7 +1,7 @@
 
 
 import { ethers } from "ethers";
-import { bondFromSepoliaToBabylon, bondFromHoleskyToUnion, bondFromHoleskyToBabylon, unbondFromSepoliaToBabylon } from "./staking.js";
+import { bondFromSepoliaToBabylon, bondFromHoleskyToUnion, bondFromHoleskyToBabylon, unbondFromSepoliaToBabylon, unbondFromHoleskyToBabylon } from "./staking.js";
 import { transferBabyFromEthToBabylon } from "./transfer.js";
 import { predictQuoteToken } from "./protocolV1.js";
 import { toHex } from "viem";
@@ -19,8 +19,8 @@ const SEPOLIA_TO_BABYLON_DESTINATION_CHANNEL_ID = 1;
 const BABYLON_UCS03 = "bbn1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292q77945h";
 
 //const BABYLON_RECEIVER = "bbn1vnglhewf3w66cquy6hr7urjv3589srheqj3myz";
-//var RPC_URL = "https://holesky.drpc.org";
-var RPC_URL = "https://eth-sepolia.public.blastapi.io";
+var HOLESKY_RPC_URL = "https://holesky.drpc.org";
+var SEPOLIA_RPC_URL = "https://1rpc.io/sepolia";
 
 const bytecode_base_checksum = "0xec827349ed4c1fec5a9c3462ff7c979d4c40e7aa43b16ed34469d04ff835f2a1" as const;
 const module_hash = "0x120970d812836f19888625587a4606a5ad23cef31c8684e601771552548fc6b9" as const;
@@ -32,13 +32,20 @@ const bondSepolia = async (signer: ethers.Wallet, channel_id: number, amount: bi
 
 const unbondSepolia = async (signer: ethers.Wallet, channel_id: number, amount: bigint) => {
     const PROXY_ADDRESS = await getAddress(signer.address as `0x${string}`, ChannelId.make(SEPOLIA_TO_BABYLON_DESTINATION_CHANNEL_ID), BABYLON_UCS03, bytecode_base_checksum, module_hash);
+    console.log(PROXY_ADDRESS);
     await unbondFromSepoliaToBabylon(signer, amount, channel_id, PROXY_ADDRESS.address)
 }
 
-// const bondHolesky = async (signer: ethers.Wallet, channel_id: number, amount: bigint) => {
-//     const PROXY_ADDRESS = await getAddress(signer.address as `0x${string}`, ChannelId.make(HOLESKY_TO_BABYLON_DESTINATION_CHANNEL_ID), BABYLON_UCS03, bytecode_base_checksum, module_hash);
-//     await bondFromHoleskyToBabylon(signer, amount, channel_id, PROXY_ADDRESS.address);
-// }
+const unbondHolesky = async (signer: ethers.Wallet, channel_id: number, amount: bigint) => {
+    const PROXY_ADDRESS = await getAddress(signer.address as `0x${string}`, ChannelId.make(HOLESKY_TO_BABYLON_DESTINATION_CHANNEL_ID), BABYLON_UCS03, bytecode_base_checksum, module_hash);
+    console.log(PROXY_ADDRESS);
+    //await unbondFromHoleskyToBabylon(signer, amount, channel_id, PROXY_ADDRESS.address)
+}
+
+const bondHolesky = async (signer: ethers.Wallet, channel_id: number, amount: bigint) => {
+    const PROXY_ADDRESS = await getAddress(signer.address as `0x${string}`, ChannelId.make(HOLESKY_TO_BABYLON_DESTINATION_CHANNEL_ID), BABYLON_UCS03, bytecode_base_checksum, module_hash);
+    await bondFromHoleskyToBabylon(signer, amount, channel_id, PROXY_ADDRESS.address);
+}
 
 // const transfer = async (signer: ethers.Wallet, amount: bigint, receiver: string) => {
 //     await transferBabyFromEthToBabylon(signer, amount, receiver, HOLESKY_TO_BABYLON_CHANNEL_ID);
@@ -61,15 +68,20 @@ const getAddress = async (sender: `0x${string}`,
     return receiver;
 }
 
-var provider = new ethers.JsonRpcProvider(RPC_URL);
+var holeskyProvider = new ethers.JsonRpcProvider(HOLESKY_RPC_URL);
+var sepoliaProvider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
 var privateKey = process.env.PRIVATE_KEY;
 
 
 if (privateKey) {
-    let signer = new ethers.Wallet(privateKey, provider);
 
-    let amount = 10000n;
-    unbondSepolia(signer, Number(SEPOLIA_TO_BABYLON_CHANNEL_ID), amount);
+    let amount = 11000n;
+    // let sepoliaSigner = new ethers.Wallet(privateKey, sepoliaProvider);
+    // unbondSepolia(sepoliaSigner, Number(SEPOLIA_TO_BABYLON_CHANNEL_ID), amount);
+
+    let signer = new ethers.Wallet(privateKey, holeskyProvider);
+    unbondHolesky(signer, Number(HOLESKY_TO_BABYLON_CHANNEL_ID), amount);
+
     //bond(signer, Number(HOLESKY_TO_BABYLON_CHANNEL_ID), amount);
 
 } else {

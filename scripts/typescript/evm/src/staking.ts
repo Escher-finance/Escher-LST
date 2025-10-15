@@ -44,6 +44,8 @@ const BABYLON_RPC_URL = "https://babylon-testnet-rpc.polkachu.com";
 
 const EBABY_ON_BABYLON_CONTRACT_ADDRESS = "bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9";
 const EBABY_ERC20_SEPOLIA = "0x4f8514fb579baf4c7c0e5486ab6793333552c534";
+const EBABY_ERC20_HOLESKY = "0xe5551306179361cfd169435c4f27445e81ba630a";
+
 const BABYLON_UCS03 = "bbn1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292q77945h";
 const BABYLON_ZKGM_MINTER_ADDRESS = "bbn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf";
 
@@ -586,6 +588,76 @@ export const unbondFromSepoliaToBabylon = async (signer: ethers.Wallet, amount: 
     console.log(transferAndCallReceipt);
 }
 
+
+
+export const unbondFromHoleskyToBabylon = async (signer: ethers.Wallet, amount: bigint, channel_id: number, proxy_address: string) => {
+    let salt = getSalt();
+    console.log(salt);
+
+    const erc20Contract = new ethers.Contract(EBABY_ERC20_HOLESKY, erc20Abi, signer);
+    const resp = await erc20Contract.approve(ETH_UCS03, amount);
+    console.log(resp);
+
+    let txReceipt = await resp.wait();
+    console.log(txReceipt);
+
+    let sender = await signer.getAddress();
+
+    console.log("amount:", amount);
+
+    let tokenOrder =
+        tokenOrderV2Unescrow(sender.toLowerCase(), proxy_address, EBABY_ERC20_HOLESKY, amount, EBABY_ON_BABYLON_QUOTE_TOKEN, amount);
+
+    let calls = await getBabylonUnbondCallsInstruction(sender, amount.toString(), BABYLON_TO_HOLESKY_CHANNEL_ID, proxy_address);
+
+    console.log({ tokenOrder, calls });
+    // // Batch Call
+    const batchCall: Batch = getInstructionBatch([
+        tokenOrder, calls
+    ]);
+
+    //console.log({ tokenOrder, calls });
+    console.log({ batchCall });
+
+    const batchInstructions: [{ version: number; opcode: number; operand: `0x${string}`; }[]] = [
+        [
+            // Tokenorder, send eBaby token
+            {
+                version: tokenOrder.version,
+                opcode: tokenOrder.opcode,
+                operand: encodeTokenOrderV2(tokenOrder)
+            },
+
+            // Bond message
+            {
+                version: calls.version,
+                opcode: calls.opcode,
+                operand: encodeCall(calls)
+            },
+        ]
+    ];
+    const batchOperand = encodeAbiParameters(BatchAbi(), batchInstructions);
+    //console.log({ batchInstructions, batchOperand });
+
+    const ucs03Contract = new ethers.Contract(ETH_UCS03, ucs03abi, signer);
+
+    const transferAndCallRes = await ucs03Contract.send(
+        channel_id,
+        0, //eureka set to false
+        getTimeoutInNanoseconds7DaysFromNow(),
+        salt,
+        {
+            version: batchCall.version,
+            opcode: batchCall.opcode,
+            operand: batchOperand
+        },
+        { gasLimit: 500000 } // Adjust gas limit as needed
+    );
+
+    console.log(transferAndCallRes);
+    let transferAndCallReceipt = await transferAndCallRes.wait();
+    console.log(transferAndCallReceipt);
+}
 
 export const fetchExchangeRate = async (rate: string) => {
     try {
