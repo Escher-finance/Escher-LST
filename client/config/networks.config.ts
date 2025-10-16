@@ -56,7 +56,7 @@ export type ChainConfig = {
     escher: EscherConfig;
 };
 
-type SupportedNetworks =
+export type SupportedNetworks =
     | "babylon-testnet"
     | "babylon-mainnet"
     | "osmosis-testnet"
@@ -202,19 +202,34 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
                 "bbn1s7jzz7cyuqmy5xpr07yepka5ngktexsferu2cr4xeww897ftj77sv30f5s",
             tokenMinter:
                 "bbn1c723xf74f0r9g4uyn0cv2t7pkgcq7x0gaw5h773j78rk35w0j0usslxen6",
+            nativeBaseToken: "0x7562626e",
+            stakedBaseToken:
+                "0x62626e3173376a7a7a37637975716d793578707230377965706b61356e676b7465787366657275326372347865777738393766746a373773763330663573",
             channel: {
                 osmosis: {
                     sourceChannelId: 4,
                     destinationChannelId: 1,
                     sourceIbcChannelId: "channel-3",
                     destinationIbcChannelId: "channel-101635",
+                    stakedQuoteToken:
+                        "0x666163746f72792f6f736d6f313272337963373675396c7865333379656d737461746e773836303263756c646a7a727472386c6d6e7079636d64337a3764346a73787836306b632f46774e68466157337a4c786f4c5567584364576a71427a6376474e506142374232585a716d32786772423933",
+                },
+                ethereum: {
+                    sourceChannelId: 3,
+                    destinationChannelId: 1,
+                    sourceIbcChannelId: "channel-3",
+                    destinationIbcChannelId: "channel-101635",
+                    nativeQuoteToken:
+                        "0xe53dcec07d16d88e386ae0710e86d9a400f83c31",
+                    stakedQuoteToken:
+                        "0x70df20655b3e294facb436383435754dbee3cd70",
                 },
             },
         },
     },
     "osmosis-testnet": {
         chainId: "osmo-test-5",
-        chainName: "Osmosis (Testnet)",
+        chainName: "osmosis-testnet",
         rpc: "https://rpc.testnet.osmosis.zone",
         rest: "https://lcd.osmotest5.osmosis.zone",
         stakeCurrency: currency["osmosis-testnet"],
@@ -258,7 +273,7 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
     },
     "osmosis-mainnet": {
         chainId: "osmosis-1",
-        chainName: "Osmosis (Mainnet)",
+        chainName: "osmosis-mainnet",
         rpc: "https://rpc.osmosis.zone",
         rest: "https://lcd.osmosis.zone",
         stakeCurrency: currency["osmosis-mainnet"],
@@ -290,19 +305,23 @@ const Networks: Record<SupportedNetworks, ChainConfig> = {
                 "factory/osmo12r3yc76u9lxe33yemstatnw8602culdjzrtr8lmnpycmd3z7d4jsxx60kc/FwNhFaW3zLxoLUgXCdWjqBzcvGNPaB7B2XZqm2xgrB93",
             tokenMinter:
                 "osmo12r3yc76u9lxe33yemstatnw8602culdjzrtr8lmnpycmd3z7d4jsxx60kc",
+            stakedBaseToken:
+                "0x666163746f72792f6f736d6f313272337963373675396c7865333379656d737461746e773836303263756c646a7a727472386c6d6e7079636d64337a3764346a73787836306b632f46774e68466157337a4c786f4c5567584364576a71427a6376474e506142374232585a716d32786772423933",
             channel: {
                 babylon: {
                     sourceIbcChannelId: "channel-101635",
                     sourceChannelId: 1,
                     destinationChannelId: 4,
                     destinationIbcChannelId: "channel-3",
+                    stakedQuoteToken:
+                        "0x62626e3173376a7a7a37637975716d793578707230377965706b61356e676b7465787366657275326372347865777738393766746a373773763330663573",
                 },
             },
         },
     },
     "union-testnet": {
         chainId: "union-testnet-10",
-        chainName: "uniontestnet",
+        chainName: "union-testnet",
         rest: "https://rest.rpc-node.union-testnet-10.union.build",
         rpc: "https://rpc.rpc-node.union-testnet-10.union.build",
         stakeCurrency: currency["union-testnet"],

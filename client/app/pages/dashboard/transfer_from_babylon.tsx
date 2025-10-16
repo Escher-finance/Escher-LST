@@ -22,10 +22,19 @@ import { useState } from "react";
     return this.toString();
 };
 
-export const chains = [
-    { key: "sepolia", label: "Sepolia" },
-    { key: "holesky", label: "Holesky" },
-];
+type Chain = {
+    [key: string]: { key: string; label: string }[];
+};
+
+export const chains: Chain = {
+    "babylon-testnet": [
+        { key: "sepolia", label: "Sepolia" },
+        { key: "holesky", label: "Holesky" },
+    ],
+    "babylon-mainnet": [
+        { key: "ethereum", label: "Ethereum" },
+    ]
+};
 
 export const denoms = [
     { key: "ubbn", label: "Baby" },
@@ -97,6 +106,8 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
 
         let tokenOrder = tokenOrderV2Escrow(userAddress.toLowerCase(), recipient, baseToken, amount, quoteToken as '0x${string}');
 
+        console.log(JSON.stringify(tokenOrder));
+
         let cosmos_msg = {
             send: {
                 channel_id: network?.escher?.channel[destination_chain]?.sourceChannelId,
@@ -163,12 +174,14 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
                             label="Recipient"
                             defaultValue={receiver}
                         />
-                        <Select className="max-w-xs" label="Select destination chain" variant="flat" name="destination_chain">
-                            {chains.map((chain) => (
+                        <Select className="max-w-xs" label="Select destination chain" variant="flat" name="destination_chain"
+                            defaultSelectedKeys={[chains[network?.chainName][0].key]}
+                        >
+                            {chains[network?.chainName.toString()].map((chain) => (
                                 <SelectItem key={chain.key}>{chain.label}</SelectItem>
                             ))}
                         </Select>
-                        <Select className="max-w-xs" label="Select denom" variant="flat" name="denom">
+                        <Select className="max-w-xs" label="Select denom" variant="flat" name="denom" defaultSelectedKeys={["ubbn"]}>
                             {denoms.map((denom) => (
                                 <SelectItem key={denom.key}>{denom.label}</SelectItem>
                             ))}
@@ -176,6 +189,7 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
                         <div className="text-sm italic p-1">
                             Note: To send to sepolia and holesky, after send the packet need to run curl to relay (see README at client folder for CURL example)
                         </div>
+                        <div>{[chains[network?.chainName][0].key]}</div>
 
                     </CardBody>
                     <CardFooter>

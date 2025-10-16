@@ -62,9 +62,6 @@ export default function Dashboard() {
                 <TransferFromBabylon stateKey={stateKey} setStateKey={setStateKey} />
               </Tab>
 
-              <Tab key={"transfer_baby_via_contract"} title="Transfer Baby via Contract" >
-                <TransferBaby stateKey={stateKey} setStateKey={setStateKey} />
-              </Tab>
             </Tabs>
 
           </div>
