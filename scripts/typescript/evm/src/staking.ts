@@ -18,6 +18,7 @@ import { HexFromJson } from "@unionlabs/sdk/schema/hex";
 import { Brand } from "effect/Brand";
 import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { Batch, BatchAbi } from "@unionlabs/sdk/Ucs03";
+import { String } from "effect/Schema";
 
 const UNION_RPC_URL = "https://rpc.rpc-node.union-testnet-10.union.build";
 const UNION_UCS03 =
@@ -83,7 +84,7 @@ const EBABY_ERC20_SEPOLIA = "0x4f8514fb579baf4c7c0e5486ab6793333552c534";
 const EBABY_ERC20_HOLESKY = "0xe5551306179361cfd169435c4f27445e81ba630a";
 const EBABY_ERC20_ETHEREUM = "0x70df20655b3e294facb436383435754dbee3cd70";
 
-const EBABY_ERC20 = {
+const EBABY_ERC20: Record<string, string> = {
   sepolia: EBABY_ERC20_SEPOLIA,
   holesky: EBABY_ERC20_HOLESKY,
   ethereum: EBABY_ERC20_ETHEREUM,
@@ -293,11 +294,13 @@ export const getBabylonCallsInstruction = async (
   min_mint_amount: bigint,
   proxy_address: string,
   channel_id: number,
-  mainnet: boolean
+  ethChainName: string
 ) => {
-  let lst_address = mainnet
-    ? BABYLON_MAINNET_LST_CONTRACT
-    : BABYLON_LST_CONTRACT;
+  let lst_address =
+    ethChainName == "ethereum"
+      ? BABYLON_MAINNET_LST_CONTRACT
+      : BABYLON_LST_CONTRACT;
+
   let bondPayload = createBabylonBondPayload({
     lst_address,
     mint_to_address: proxy_address,
@@ -308,9 +311,10 @@ export const getBabylonCallsInstruction = async (
 
   console.log(JSON.stringify(bondPayload));
 
-  let ebabyOnBabylon = mainnet
-    ? EBABY_ON_BABYLON_MAINNET
-    : EBABY_ON_BABYLON_TESTNET;
+  let ebabyOnBabylon =
+    ethChainName == "ethereum"
+      ? EBABY_ON_BABYLON_MAINNET
+      : EBABY_ON_BABYLON_TESTNET;
 
   let allowancePayload = createIncreaseAllowance(
     BABYLON_ZKGM_MINTER_ADDRESS,
@@ -326,7 +330,7 @@ export const getBabylonCallsInstruction = async (
       channel_id: channel_id as number & Brand<"ChannelId">,
       metadata: toHex(""),
       minAmount: min_mint_amount,
-      quoteToken: EBABY_ERC20_SEPOLIA as `0x${string}`,
+      quoteToken: EBABY_ERC20[ethChainName] as `0x${string}`,
       receiver: proxy_address,
       sender: sender as `0x${string}`,
       ucs03: BABYLON_UCS03,
@@ -354,20 +358,23 @@ export const getBabylonUnbondCallsInstruction = async (
   sender: string,
   amount: string,
   channel_id: number,
-  proxy_address: string
+  proxy_address: string,
+  is_mainnet: boolean
 ) => {
   // give allowance to lst contract to transfer ebaby from proxy contract
   let allowancePayload = createIncreaseAllowance(
-    BABYLON_LST_CONTRACT,
+    is_mainnet ? BABYLON_MAINNET_LST_CONTRACT : BABYLON_LST_CONTRACT,
     amount,
-    EBABY_ON_BABYLON_MAINNET
+    is_mainnet ? EBABY_ON_BABYLON_MAINNET : EBABY_ON_BABYLON_TESTNET
   );
 
   console.log(JSON.stringify(allowancePayload));
 
   // call unbond to lst contract
   let unbondPayload = createBabylonUnbondPayload({
-    lst_address: BABYLON_LST_CONTRACT,
+    lst_address: is_mainnet
+      ? BABYLON_MAINNET_LST_CONTRACT
+      : BABYLON_LST_CONTRACT,
     recipient_address: sender,
     amount,
     channel_id,
@@ -516,7 +523,7 @@ export const bondFromEthereumToBabylon = async (
     min_mint_amount,
     proxy_address,
     BABYLON_SOURCE_CHANNEL_ID[ethChainName],
-    mainnet
+    ethChainName
   );
 
   console.log({ tokenOrder, calls });
@@ -568,17 +575,18 @@ export const bondFromEthereumToBabylon = async (
   console.log(transferAndCallReceipt);
 };
 
-export const unbondFromSepoliaToBabylon = async (
+export const unbondFromEthToBabylon = async (
   signer: ethers.Wallet,
   amount: bigint,
   channel_id: number,
-  proxy_address: string
+  proxy_address: string,
+  ethChainName: string
 ) => {
   let salt = getSalt();
   console.log(salt);
 
   const erc20Contract = new ethers.Contract(
-    EBABY_ERC20_SEPOLIA,
+    EBABY_ERC20[ethChainName],
     erc20Abi,
     signer
   );
@@ -592,109 +600,26 @@ export const unbondFromSepoliaToBabylon = async (
 
   console.log("amount:", amount);
 
+  let isMainnet = ethChainName == "ethereum";
+  let ebabyOnBabylon = isMainnet
+    ? EBABY_ON_BABYLON_MAINNET
+    : EBABY_ON_BABYLON_TESTNET;
+
   let tokenOrder = tokenOrderV2Unescrow(
     sender.toLowerCase(),
     proxy_address,
-    EBABY_ERC20_SEPOLIA,
+    EBABY_ERC20[ethChainName],
     amount,
-    EBABY_ON_BABYLON_QUOTE_TOKEN,
+    toHex(ebabyOnBabylon),
     amount
   );
 
   let calls = await getBabylonUnbondCallsInstruction(
     sender,
     amount.toString(),
-    BABYLON_TO_SEPOLIA_CHANNEL_ID,
-    proxy_address
-  );
-
-  console.log({ tokenOrder, calls });
-  // // Batch Call
-  const batchCall: Batch = getInstructionBatch([tokenOrder, calls]);
-
-  //console.log({ tokenOrder, calls });
-  console.log({ batchCall });
-
-  const batchInstructions: [
-    { version: number; opcode: number; operand: `0x${string}` }[]
-  ] = [
-    [
-      // Tokenorder, send eBaby token
-      {
-        version: tokenOrder.version,
-        opcode: tokenOrder.opcode,
-        operand: encodeTokenOrderV2(tokenOrder),
-      },
-
-      // Bond message
-      {
-        version: calls.version,
-        opcode: calls.opcode,
-        operand: encodeCall(calls),
-      },
-    ],
-  ];
-  const batchOperand = encodeAbiParameters(BatchAbi(), batchInstructions);
-  //console.log({ batchInstructions, batchOperand });
-
-  const ucs03Contract = new ethers.Contract(ETH_UCS03, ucs03abi, signer);
-
-  const transferAndCallRes = await ucs03Contract.send(
-    channel_id,
-    0, //eureka set to false
-    getTimeoutInNanoseconds7DaysFromNow(),
-    salt,
-    {
-      version: batchCall.version,
-      opcode: batchCall.opcode,
-      operand: batchOperand,
-    },
-    { gasLimit: 500000 } // Adjust gas limit as needed
-  );
-
-  console.log(transferAndCallRes);
-  let transferAndCallReceipt = await transferAndCallRes.wait();
-  console.log(transferAndCallReceipt);
-};
-
-export const unbondFromHoleskyToBabylon = async (
-  signer: ethers.Wallet,
-  amount: bigint,
-  channel_id: number,
-  proxy_address: string
-) => {
-  let salt = getSalt();
-  console.log(salt);
-
-  const erc20Contract = new ethers.Contract(
-    EBABY_ERC20_HOLESKY,
-    erc20Abi,
-    signer
-  );
-  const resp = await erc20Contract.approve(ETH_UCS03, amount);
-  console.log(resp);
-
-  let txReceipt = await resp.wait();
-  console.log(txReceipt);
-
-  let sender = await signer.getAddress();
-
-  console.log("amount:", amount);
-
-  let tokenOrder = tokenOrderV2Unescrow(
-    sender.toLowerCase(),
+    BABYLON_SOURCE_CHANNEL_ID[ethChainName],
     proxy_address,
-    EBABY_ERC20_HOLESKY,
-    amount,
-    EBABY_ON_BABYLON_QUOTE_TOKEN,
-    amount
-  );
-
-  let calls = await getBabylonUnbondCallsInstruction(
-    sender,
-    amount.toString(),
-    BABYLON_TO_HOLESKY_CHANNEL_ID,
-    proxy_address
+    isMainnet
   );
 
   console.log({ tokenOrder, calls });
