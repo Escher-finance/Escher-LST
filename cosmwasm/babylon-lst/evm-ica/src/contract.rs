@@ -13,6 +13,8 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 */
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+/// # Errors
+/// Will return contract error
 pub fn instantiate(
     _deps: DepsMut,
     _env: Env,
@@ -23,6 +25,8 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+/// # Errors
+/// Will return contract error
 pub fn execute(
     _deps: DepsMut,
     _env: Env,
@@ -33,6 +37,8 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+/// # Errors
+/// Will return contract error
 pub fn query(_deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<Binary> {
     unimplemented!()
 }
