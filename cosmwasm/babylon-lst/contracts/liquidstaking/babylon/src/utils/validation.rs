@@ -36,7 +36,6 @@ pub fn validate_validators(validators: &[Validator]) -> Result<(), ContractError
 pub fn validate_quote_tokens(quote_tokens: &[QuoteToken]) -> Result<(), ContractError> {
     let unique_quote_tokens_len = quote_tokens
         .iter()
-        .cloned()
         .map(|quote_token| quote_token.channel_id)
         .collect::<HashSet<_>>()
         .len();

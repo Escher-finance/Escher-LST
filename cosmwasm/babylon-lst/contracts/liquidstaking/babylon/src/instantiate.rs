@@ -25,13 +25,9 @@ pub fn instantiate2(
 
     let code_info_result = deps.querier.query_wasm_code_info(code_id);
 
-    if code_info_result.is_err() {
+    if let Err(code_info_err) = code_info_result {
         return Err(ContractError::InvalidCodeID {
-            message: format!(
-                "Wallet code id : {} not found, {}",
-                code_id,
-                code_info_result.unwrap_err()
-            ),
+            message: format!("Wallet code id : {code_id} not found, {code_info_err:?}"),
         });
     }
 
