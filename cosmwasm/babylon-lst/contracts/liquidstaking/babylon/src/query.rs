@@ -1,32 +1,33 @@
 use std::marker::PhantomData;
 
 use cosmwasm_std::{
-    Binary, Decimal, Deps, Env, FullDelegation, Order, Storage, Uint128, entry_point,
-    to_json_binary,
+    entry_point, to_json_binary, Binary, Decimal, Deps, Env, FullDelegation, Order, Storage,
+    Uint128,
 };
-use cw_ownable::get_ownership;
 use cw2::ContractVersion;
+use cw_ownable::get_ownership;
 
 use crate::{
-    ContractError,
-    msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
+    msg::{Balance, GitInfo, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
     state::{
-        PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
-        SUPPLY_QUEUE, State, Status, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL, UnbondRecord,
-        VALIDATORS_REGISTRY, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue,
-        unbond_record,
+        unbond_record, Parameters, QuoteToken, State, Status, SupplyQueue, UnbondRecord,
+        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE, STATE,
+        STATUS, SUPPLY_QUEUE, UNBOND_RECIPIENT_IBC_CHANNEL, VALIDATORS_REGISTRY,
+        WITHDRAW_REWARD_QUEUE,
     },
     utils::{
-        batch::{Batch, BatchStatus, batches},
+        batch::{batches, Batch, BatchStatus},
         calc::{self, calculate_fee_from_reward, calculate_query_bounds},
         delegation::{get_actual_total_delegated, get_unclaimed_reward},
     },
+    ContractError,
 };
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 #[allow(clippy::needless_pass_by_value)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     Ok(match msg {
+        QueryMsg::GitInfo {} => to_json_binary(&query_git_info()?),
         QueryMsg::State {} => to_json_binary(&query_state(deps.storage)?),
         QueryMsg::Parameters {} => to_json_binary(&query_params(deps.storage)?),
         QueryMsg::Validators {} => to_json_binary(&query_validators(deps.storage)?),
@@ -95,6 +96,13 @@ pub fn query_version(storage: &dyn Storage) -> Result<ContractVersion, ContractE
 pub fn query_state(storage: &dyn Storage) -> Result<State, ContractError> {
     let state = STATE.load(storage)?;
     Ok(state)
+}
+
+pub fn query_git_info() -> Result<GitInfo, ContractError> {
+    let git_info = GitInfo {
+        git: format!("{}:{}", env!("VERGEN_GIT_BRANCH"), env!("VERGEN_GIT_SHA")),
+    };
+    Ok(git_info)
 }
 
 pub fn query_params(storage: &dyn Storage) -> Result<Parameters, ContractError> {
