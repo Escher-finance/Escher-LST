@@ -13,8 +13,8 @@ pub mod validation_utils;
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    Addr, Coin, Decimal, OwnedDeps, Uint128,
     testing::{MockApi, MockQuerier, MockStorage},
+    Addr, Coin, Decimal, OwnedDeps, Uint128,
 };
 use cw_multi_test::{App, ContractWrapper, Executor};
 

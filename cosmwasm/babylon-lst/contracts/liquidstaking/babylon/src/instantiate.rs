@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, WasmMsg, instantiate2_address, to_json_binary,
+    instantiate2_address, to_json_binary, Addr, Binary, CosmosMsg, Decimal, DepsMut, Env, WasmMsg,
 };
 
 use crate::{error::ContractError, msg::InstantiateRewardMsg};

@@ -1,9 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, Event,
-    MessageInfo, Response, StdError, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
-    wasm_execute,
+    attr, from_json, to_json_binary, wasm_execute, Addr, Attribute, BankMsg, Coin, CosmosMsg,
+    Decimal, DepsMut, DistributionMsg, Env, Event, MessageInfo, Response, StdError, SubMsg,
+    Uint128, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use unionlabs_primitives::Bytes;
@@ -22,14 +22,14 @@ use crate::{
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
-        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
-        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, PARAMETERS,
+        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
+        SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{BatchStatus, batches},
+        batch::{batches, BatchStatus},
         calc::{
             calculate_exchange_rate, calculate_fee_from_reward, get_last_epoch_block,
             get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
@@ -41,7 +41,7 @@ use crate::{
             validate_required_coin, validate_validators,
         },
     },
-    zkgm::protocol::{TokenPair, Ucs03Zkgm, ucs03_transfer_v2},
+    zkgm::protocol::{ucs03_transfer_v2, TokenPair, Ucs03Zkgm},
 };
 
 /// process bond call to contract

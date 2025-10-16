@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use cosmwasm_std::{Decimal, Uint128};
 
-use crate::{ContractError, execute::*, state::QuoteToken, utils};
+use crate::{execute::*, state::QuoteToken, utils, ContractError};
 
 #[test]
 fn test_calculate_native_token() {
@@ -126,7 +126,7 @@ fn test_slash_batch() {
         contract::execute,
         error::ContractError,
         msg::{BatchReceivedAmount, ExecuteMsg},
-        utils::batch::{Batch, BatchStatus, batches},
+        utils::batch::{batches, Batch, BatchStatus},
     };
 
     let mut deps = mock_dependencies();

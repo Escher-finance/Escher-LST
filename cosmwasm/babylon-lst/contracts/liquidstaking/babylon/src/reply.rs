@@ -1,14 +1,14 @@
 use cosmwasm_std::{
-    Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, SubMsg, Uint128, WasmMsg,
-    attr, entry_point, from_json, to_json_binary,
+    attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
+    Env, Reply, Response, SubMsg, Uint128, WasmMsg,
 };
 
 use crate::{
     error::ContractError,
     msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload, ZkgmTransfer},
     state::{
-        PARAMETERS, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, SUPPLY_QUEUE,
-        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+        Parameters, WithdrawReward, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, SUPPLY_QUEUE, WITHDRAW_REWARD_QUEUE,
     },
     utils::{calc::get_next_epoch, transfer},
 };
