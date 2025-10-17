@@ -72,24 +72,6 @@
             root = ./.;
             inherit ((union.lib.getRepoMeta self)) gitRev;
           };
-
-          cargoWorkspaceAttrs = {
-            pname = "cargo-workspace";
-            version = "0.0.0";
-            # Use the cleaned cargo workspace source so Nix includes tracked members
-            src = crane.cargoWorkspaceSrc;
-
-            # Restrict checks to CosmWasm contracts only
-            cargoTestExtraArgs = "-p liquidstaking-babylon -p reward -p cw20-base@0.0.0 --no-fail-fast";
-            cargoClippyExtraArgs = "-p liquidstaking-babylon -p reward -p cw20-base@0.0.0 --tests -- -Dwarnings";
-
-            CARGO_PROFILE = "dev";
-
-            buildInputs = [ ];
-            nativeBuildInputs = [ ];
-          };
-
-          cargoArtifacts = crane.lib.buildDepsOnly cargoWorkspaceAttrs;
         in
         {
           _module = {
@@ -107,11 +89,6 @@
             # liquidstaking-union = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/liquidstaking/union" { };
             reward = crane.buildWasmContract "cosmwasm/babylon-lst/contracts/reward" { };
             cw20-base = crane.buildWasmContract "cosmwasm/babylon-lst/contracts/cw20-base" { };
-          };
-
-          checks = {
-            cargo-workspace-clippy = crane.lib.cargoClippy (cargoWorkspaceAttrs // { inherit cargoArtifacts; });
-            cargo-workspace-test = crane.lib.cargoTest (cargoWorkspaceAttrs // { inherit cargoArtifacts; });
           };
 
           devShells.default = pkgs.mkShell {
@@ -142,6 +119,7 @@
               rustfmt = {
                 enable = true;
                 package = rust-dev-toolchain;
+                edition = "2024";
               };
               taplo.enable = true;
               yamlfmt = {

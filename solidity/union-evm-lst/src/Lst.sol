@@ -445,13 +445,14 @@ contract Lst is
             BaseToken(s_config.baseToken).approve(s_config.zkgm, batch.stakeAmount);
             uint64 timeoutTimestamp = uint64(block.timestamp + 604800) * 1_000_000_000; // timeout to 7 days
             // // call union LST contract to process total amount of stake and unstake records in the batch via zkgm
-            IZkgm(s_config.zkgm).send(
-                s_config.unionChannelId,
-                0,
-                timeoutTimestamp,
-                _salt,
-                getTransferAndCallInstruction(address(this), batch.stakeAmount, bytes(payload))
-            );
+            IZkgm(s_config.zkgm)
+                .send(
+                    s_config.unionChannelId,
+                    0,
+                    timeoutTimestamp,
+                    _salt,
+                    getTransferAndCallInstruction(address(this), batch.stakeAmount, bytes(payload))
+                );
         }
     }
 
