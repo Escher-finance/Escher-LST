@@ -98,9 +98,10 @@ pub fn set_config(
     let mut config = CONFIG.load(deps.storage)?;
 
     if let Some(fee_rate) = fee_rate
-        && fee_rate > Decimal::one() {
-            return Err(ContractError::InvalidFeeRate {});
-        }
+        && fee_rate > Decimal::one()
+    {
+        return Err(ContractError::InvalidFeeRate {});
+    }
 
     config.lst_contract_address = lst_contract_address
         .clone()

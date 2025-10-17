@@ -653,9 +653,10 @@ pub fn set_parameters(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     if let Some(rate) = fee_rate
-        && rate > Decimal::one() {
-            return Err(ContractError::InvalidFeeRate {});
-        }
+        && rate > Decimal::one()
+    {
+        return Err(ContractError::InvalidFeeRate {});
+    }
 
     let mut params = PARAMETERS.load(deps.storage)?;
 
@@ -888,16 +889,17 @@ pub fn process_batch_withdrawal(
                 })?;
                 send_msgs.push(msg);
             } else if let Some(recipient_ibc_channel_id) = &undelegation.recipient_ibc_channel_id
-                && let Some(recipient) = &undelegation.recipient {
-                    let msg = ibc_transfer_msg(
-                        recipient_ibc_channel_id.clone(),
-                        recipient.clone(),
-                        unstake_return_native_amount,
-                        &denom,
-                        time,
-                    );
-                    send_msgs.push(msg);
-                }
+                && let Some(recipient) = &undelegation.recipient
+            {
+                let msg = ibc_transfer_msg(
+                    recipient_ibc_channel_id.clone(),
+                    recipient.clone(),
+                    unstake_return_native_amount,
+                    &denom,
+                    time,
+                );
+                send_msgs.push(msg);
+            }
         }
 
         let ev = ProcessUnbondingEvent(

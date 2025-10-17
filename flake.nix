@@ -116,20 +116,22 @@
 
           devShells.default = pkgs.mkShell {
             name = "union-devShell";
-            buildInputs =
-              [ rust-dev-toolchain ]
-              ++ (with pkgs; [
-                jq
-                marksman
-                nil
-                protobuf
-                yq
-                wasm-tools
-                binaryen
-              ]);
+            buildInputs = [
+              rust-dev-toolchain
+            ]
+            ++ (with pkgs; [
+              jq
+              marksman
+              nil
+              protobuf
+              yq
+              wasm-tools
+              binaryen
+            ]);
             nativeBuildInputs = [
               config.treefmt.build.wrapper
-            ] ++ pkgs.lib.attrsets.attrValues config.treefmt.build.programs;
+            ]
+            ++ pkgs.lib.attrsets.attrValues config.treefmt.build.programs;
 
             RUST_SRC_PATH = "${rust-dev-toolchain}/lib/rustlib/src/rust/library";
             PROTOC = "${pkgs.protobuf}/bin/protoc";
@@ -142,6 +144,7 @@
               rustfmt = {
                 enable = true;
                 package = rust-dev-toolchain;
+                edition = "2024";
               };
               taplo.enable = true;
               yamlfmt = {

@@ -105,9 +105,10 @@ pub fn instantiate(
     let total_supply = create_accounts(&mut deps, &msg.initial_balances)?;
 
     if let Some(limit) = msg.get_cap()
-        && total_supply > limit {
-            return Err(StdError::generic_err("Initial supply greater than cap").into());
-        }
+        && total_supply > limit
+    {
+        return Err(StdError::generic_err("Initial supply greater than cap").into());
+    }
 
     let mint = match msg.mint {
         Some(m) => Some(MinterData {
@@ -316,9 +317,10 @@ pub fn execute_mint(
     // update supply and enforce cap
     config.total_supply += amount;
     if let Some(limit) = config.get_cap()
-        && config.total_supply > limit {
-            return Err(ContractError::CannotExceedCap {});
-        }
+        && config.total_supply > limit
+    {
+        return Err(ContractError::CannotExceedCap {});
+    }
     TOKEN_INFO.save(deps.storage, &config)?;
 
     // add amount to recipient balance
