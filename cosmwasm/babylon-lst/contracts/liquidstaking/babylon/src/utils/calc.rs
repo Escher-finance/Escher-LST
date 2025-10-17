@@ -4,8 +4,8 @@ use cosmwasm_std::{Decimal, QuerierWrapper, StdResult, Uint128, Uint256};
 use cw20::TokenInfoResponse;
 
 use crate::{
-    state::{BurnQueue, MintQueue, SupplyQueue, WithdrawRewardQueue, SUPPLY_QUEUE},
     ContractError,
+    state::{BurnQueue, MintQueue, SUPPLY_QUEUE, SupplyQueue, WithdrawRewardQueue},
 };
 
 /// return how much staking token from underlying native coin denom

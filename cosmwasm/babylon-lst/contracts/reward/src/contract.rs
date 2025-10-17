@@ -1,13 +1,13 @@
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Storage};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::{entry_point, to_json_binary};
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Storage};
 use cw2::set_contract_version;
 
 use crate::{
     error::ContractError,
     execute,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{Config, CONFIG},
+    state::{CONFIG, Config},
 };
 
 // version info for migration info

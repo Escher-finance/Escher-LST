@@ -2,7 +2,7 @@
 authors       = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 description   = "Basic implementation of a CosmWasm-20 compliant token"
 documentation = "https://docs.cosmwasm.com"
-edition       = "2021"
+edition       = "2024"
 homepage      = "https://cosmwasm.com"
 license       = "Apache-2.0"
 name          = "cw20-base"

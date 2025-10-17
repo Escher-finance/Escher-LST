@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    ensure_eq, entry_point, DepsMut, Env, IbcBasicResponse, IbcDestinationCallbackMsg, StdAck,
-    StdError, StdResult,
+    DepsMut, Env, IbcBasicResponse, IbcDestinationCallbackMsg, StdAck, StdError, StdResult,
+    ensure_eq, entry_point,
 };
 
 use crate::state::STATUS;

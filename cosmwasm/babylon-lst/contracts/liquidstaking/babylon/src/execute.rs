@@ -1,9 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, wasm_execute, Addr, Attribute, BankMsg, Coin, CosmosMsg,
-    Decimal, DepsMut, DistributionMsg, Env, Event, MessageInfo, Response, StdError, SubMsg,
-    Uint128, WasmMsg,
+    Addr, Attribute, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, Event,
+    MessageInfo, Response, StdError, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
+    wasm_execute,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use unionlabs_primitives::Bytes;
@@ -22,14 +22,14 @@ use crate::{
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, QuoteToken, Status, Validator, WithdrawReward, WithdrawRewardQueue, PARAMETERS,
-        PENDING_BATCH_ID, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS,
-        SUPPLY_QUEUE, VALIDATORS_REGISTRY, WITHDRAW_REWARD_QUEUE,
+        Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
+        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
     },
     types::ChannelId,
     utils::{
         self,
-        batch::{batches, BatchStatus},
+        batch::{BatchStatus, batches},
         calc::{
             calculate_exchange_rate, calculate_fee_from_reward, get_last_epoch_block,
             get_next_epoch, normalize_withdraw_reward_queue, to_uint128,
@@ -41,7 +41,7 @@ use crate::{
             validate_required_coin, validate_validators,
         },
     },
-    zkgm::protocol::{ucs03_transfer_v2, TokenPair, Ucs03Zkgm},
+    zkgm::protocol::{TokenPair, Ucs03Zkgm, ucs03_transfer_v2},
 };
 
 /// process bond call to contract
@@ -652,11 +652,10 @@ pub fn set_parameters(
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
-    if let Some(rate) = fee_rate {
-        if rate > Decimal::one() {
+    if let Some(rate) = fee_rate
+        && rate > Decimal::one() {
             return Err(ContractError::InvalidFeeRate {});
         }
-    }
 
     let mut params = PARAMETERS.load(deps.storage)?;
 
@@ -888,8 +887,8 @@ pub fn process_batch_withdrawal(
                     time,
                 })?;
                 send_msgs.push(msg);
-            } else if let Some(recipient_ibc_channel_id) = &undelegation.recipient_ibc_channel_id {
-                if let Some(recipient) = &undelegation.recipient {
+            } else if let Some(recipient_ibc_channel_id) = &undelegation.recipient_ibc_channel_id
+                && let Some(recipient) = &undelegation.recipient {
                     let msg = ibc_transfer_msg(
                         recipient_ibc_channel_id.clone(),
                         recipient.clone(),
@@ -899,7 +898,6 @@ pub fn process_batch_withdrawal(
                     );
                     send_msgs.push(msg);
                 }
-            }
         }
 
         let ev = ProcessUnbondingEvent(

@@ -2,10 +2,9 @@
 use std::{collections::HashMap, str::FromStr};
 
 use cosmwasm_std::{
-    assert_approx_eq, from_json,
-    testing::{mock_dependencies, mock_env, MockQuerier},
     Addr, AnyMsg, Attribute, Coin, CosmosMsg, DecCoin, Decimal, Decimal256, Empty, QuerierWrapper,
-    StakingMsg, Timestamp, Uint128,
+    StakingMsg, Timestamp, Uint128, assert_approx_eq, from_json,
+    testing::{MockQuerier, mock_dependencies, mock_env},
 };
 use cw_multi_test::{App, IntoAddr};
 use prost::Message;
@@ -16,13 +15,13 @@ use crate::{
     msg::{BondData, DelegationDiff, ValidatorDelegation},
     proto,
     state::{
-        unbond_record, BurnQueue, MintQueue, State, SupplyQueue, UnbondRecord, Validator,
-        ValidatorsRegistry, WithdrawRewardQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE,
-        STATE, STATUS, SUPPLY_QUEUE, TOKEN_COUNT, WITHDRAW_REWARD_QUEUE,
+        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE, STATE, STATUS,
+        SUPPLY_QUEUE, State, SupplyQueue, TOKEN_COUNT, UnbondRecord, Validator, ValidatorsRegistry,
+        WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue, unbond_record,
     },
-    tests::{mock_parameters, setup_validators_delegation, NATIVE_DENOM},
+    tests::{NATIVE_DENOM, mock_parameters, setup_validators_delegation},
     utils::{
-        batch::{batches, Batch, BatchStatus},
+        batch::{Batch, BatchStatus, batches},
         calc::{self, normalize_supply_queue, normalize_total_supply},
         delegation::*,
     },
@@ -1394,9 +1393,11 @@ fn test_submit_pending_batch() {
             _ => false,
         }
     }));
-    assert!(events
-        .iter()
-        .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT));
+    assert!(
+        events
+            .iter()
+            .all(|event| event.ty == SUBMIT_BATCH_EVENT || event.ty == UNBOND_EVENT)
+    );
 }
 
 #[test]

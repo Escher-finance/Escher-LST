@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
-    Uint128,
+    Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128,
+    attr,
 };
 
 use crate::{
@@ -97,11 +97,10 @@ pub fn set_config(
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     let mut config = CONFIG.load(deps.storage)?;
 
-    if let Some(fee_rate) = fee_rate {
-        if fee_rate > Decimal::one() {
+    if let Some(fee_rate) = fee_rate
+        && fee_rate > Decimal::one() {
             return Err(ContractError::InvalidFeeRate {});
         }
-    }
 
     config.lst_contract_address = lst_contract_address
         .clone()

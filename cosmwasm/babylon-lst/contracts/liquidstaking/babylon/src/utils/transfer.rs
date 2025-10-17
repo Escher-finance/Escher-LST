@@ -2,22 +2,22 @@ use std::str::FromStr;
 
 use alloy::sol_types::SolValue;
 use cosmwasm_std::{
-    wasm_execute, Addr, BankMsg, Coin, CosmosMsg, IbcMsg, IbcTimeout, StdError, Storage, Timestamp,
-    Uint128, Uint64,
+    Addr, BankMsg, Coin, CosmosMsg, IbcMsg, IbcTimeout, StdError, Storage, Timestamp, Uint64,
+    Uint128, wasm_execute,
 };
 use ucs03_zkgm::com::{
-    Instruction, TokenOrderV2, INSTR_VERSION_2, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_ESCROW,
+    INSTR_VERSION_2, Instruction, OP_TOKEN_ORDER, TOKEN_ORDER_KIND_ESCROW, TokenOrderV2,
 };
 use unionlabs_primitives::Bytes;
 
 use crate::{
+    ContractError,
     execute::StakerUndelegation,
     msg::{Ucs03ExecuteMsg, ZkgmTransfer},
     types::ChannelId,
     utils::delegation::{
-        get_unbonding_ucs03_transfer_cosmos_msg, DEFAULT_TIMEOUT_TIMESTAMP_OFFSET,
+        DEFAULT_TIMEOUT_TIMESTAMP_OFFSET, get_unbonding_ucs03_transfer_cosmos_msg,
     },
-    ContractError,
 };
 
 #[must_use]

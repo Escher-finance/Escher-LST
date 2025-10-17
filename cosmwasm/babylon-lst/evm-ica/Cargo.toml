@@ -1,6 +1,6 @@
 [package]
 authors = ["Isak Rickyanto <isak@favoritemedium.com>"]
-edition = "2021"
+edition = "2024"
 name    = "evm-ica"
 version = "0.1.0"
 

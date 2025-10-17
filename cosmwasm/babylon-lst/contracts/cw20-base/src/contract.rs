@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order::Ascending, Response, StdError,
-    StdResult, Uint128,
+    Binary, Deps, DepsMut, Env, MessageInfo, Order::Ascending, Response, StdError, StdResult,
+    Uint128, to_json_binary,
 };
 use cw2::{ensure_from_older_version, set_contract_version};
 use cw20::{
@@ -19,8 +19,8 @@ use crate::{
     error::ContractError,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     state::{
-        MinterData, TokenInfo, ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, LOGO, MARKETING_INFO,
-        TOKEN_INFO,
+        ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, LOGO, MARKETING_INFO, MinterData, TOKEN_INFO,
+        TokenInfo,
     },
 };
 
@@ -104,11 +104,10 @@ pub fn instantiate(
     // create initial accounts
     let total_supply = create_accounts(&mut deps, &msg.initial_balances)?;
 
-    if let Some(limit) = msg.get_cap() {
-        if total_supply > limit {
+    if let Some(limit) = msg.get_cap()
+        && total_supply > limit {
             return Err(StdError::generic_err("Initial supply greater than cap").into());
         }
-    }
 
     let mint = match msg.mint {
         Some(m) => Some(MinterData {
@@ -316,11 +315,10 @@ pub fn execute_mint(
 
     // update supply and enforce cap
     config.total_supply += amount;
-    if let Some(limit) = config.get_cap() {
-        if config.total_supply > limit {
+    if let Some(limit) = config.get_cap()
+        && config.total_supply > limit {
             return Err(ContractError::CannotExceedCap {});
         }
-    }
     TOKEN_INFO.save(deps.storage, &config)?;
 
     // add amount to recipient balance
@@ -606,9 +604,8 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::{
-        coins, from_json,
+        Addr, CosmosMsg, StdError, SubMsg, WasmMsg, coins, from_json,
         testing::{message_info, mock_dependencies, mock_dependencies_with_balance, mock_env},
-        Addr, CosmosMsg, StdError, SubMsg, WasmMsg,
     };
 
     use super::*;
@@ -1316,9 +1313,9 @@ mod tests {
 
     mod migration {
         use cosmwasm_std::Empty;
-        use cw20::{AllAllowancesResponse, AllSpenderAllowancesResponse, SpenderAllowanceInfo};
         use cw_multi_test::{App, Contract, ContractWrapper, Executor};
         use cw_utils::Expiration;
+        use cw20::{AllAllowancesResponse, AllSpenderAllowancesResponse, SpenderAllowanceInfo};
 
         use super::*;
 

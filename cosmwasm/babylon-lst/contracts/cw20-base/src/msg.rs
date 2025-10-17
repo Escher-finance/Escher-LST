@@ -1,4 +1,4 @@
-use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_schema::{QueryResponses, cw_serde};
 use cosmwasm_std::{StdError, StdResult, Uint128};
 pub use cw20::Cw20ExecuteMsg as ExecuteMsg;
 use cw20::{Cw20Coin, Logo, MinterResponse};

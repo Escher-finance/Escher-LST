@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use cosmwasm_std::{Addr, Coin, QuerierWrapper, Uint128};
 
 use crate::{
+    ContractError,
     msg::Recipient,
     state::{Parameters, QuoteToken, Validator},
-    ContractError,
 };
 
 /// Errors:
