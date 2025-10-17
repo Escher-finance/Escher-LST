@@ -1,10 +1,28 @@
-use cosmwasm_std::{Uint128, testing::mock_dependencies};
+use cosmwasm_std::{testing::mock_dependencies, Uint128};
 
 use crate::{
-    ContractError,
     query::*,
-    state::{UnbondRecord, unbond_record},
+    state::{unbond_record, UnbondRecord},
+    ContractError,
 };
+
+#[test]
+fn test_query_git_info() {
+    let git_info = query_git_info().unwrap().git;
+    dbg!(&git_info);
+    let mut parts = git_info.splitn(2, ':');
+    let branch = parts.next().unwrap();
+    assert!(
+        !branch.is_empty()
+            && branch.chars().all(|c| c.is_ascii_alphanumeric()
+                || c == '.'
+                || c == '_'
+                || c == '-'
+                || c == '/')
+    );
+    let hash = parts.next().unwrap();
+    assert!(hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit()))
+}
 
 #[test]
 fn test_query_unbond_record() {
@@ -58,11 +76,9 @@ fn test_query_unbond_record() {
     )
     .unwrap();
     assert_eq!(unbond_recs.len(), 6);
-    assert!(
-        unbond_recs
-            .iter()
-            .all(|r| r.staker == staker && r.id >= 10 && r.id <= 15)
-    );
+    assert!(unbond_recs
+        .iter()
+        .all(|r| r.staker == staker && r.id >= 10 && r.id <= 15));
     // Query by staker_released
     let unbond_recs = query_unbond_record(
         &deps.storage,

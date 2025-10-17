@@ -23,6 +23,7 @@ broken-intra-doc-links = "deny"
 
 [workspace.dependencies]
 alloy            = { version = "0.15.3", default-features = false }
+anyhow           = { version = "1.0.100" }
 bincode          = { version = "2.0.1", default-features = false }
 cosmos-sdk-proto = { version = "0.27.0", default-features = false }
 cosmwasm-schema  = { version = "2.2.2" }
@@ -48,6 +49,7 @@ serde_bytes      = { version = "0.11.15" }
 sha2             = { version = "0.10.9" }
 thiserror        = { version = "1.0.58" }
 tiny-keccak      = { version = "2.0.2", features = ["keccak"] }
+vergen-git2      = { version = "1.0.7" }
 
 # unionlabs
 embed-commit         = { git = "https://github.com/unionlabs/union", default-features = false }

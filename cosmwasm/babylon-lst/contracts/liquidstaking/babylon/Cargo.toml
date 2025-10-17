@@ -1,4 +1,5 @@
 [package]
+build   = "build.rs"
 edition = "2021"
 name    = "liquidstaking-babylon"
 version = "0.1.196"
@@ -38,6 +39,10 @@ unionlabs-primitives = { workspace = true, features = ["serde"] }
 cw-multi-test   = { workspace = true, features = ["staking"] }
 hex-literal     = { workspace = true }
 serde-json-wasm = { workspace = true }
+
+[build-dependencies]
+anyhow      = { workspace = true }
+vergen-git2 = { workspace = true }
 
 [features]
 bincode  = ["dep:bincode"]
