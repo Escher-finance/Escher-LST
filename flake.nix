@@ -72,24 +72,6 @@
             root = ./.;
             inherit ((union.lib.getRepoMeta self)) gitRev;
           };
-
-          cargoWorkspaceAttrs = {
-            pname = "cargo-workspace";
-            version = "0.0.0";
-            # Use the cleaned cargo workspace source so Nix includes tracked members
-            src = crane.cargoWorkspaceSrc;
-
-            # Restrict checks to CosmWasm contracts only
-            cargoTestExtraArgs = "-p liquidstaking-babylon -p reward -p cw20-base@0.0.0 --no-fail-fast";
-            cargoClippyExtraArgs = "-p liquidstaking-babylon -p reward -p cw20-base@0.0.0 --tests -- -Dwarnings";
-
-            CARGO_PROFILE = "dev";
-
-            buildInputs = [ ];
-            nativeBuildInputs = [ ];
-          };
-
-          cargoArtifacts = crane.lib.buildDepsOnly cargoWorkspaceAttrs;
         in
         {
           _module = {
