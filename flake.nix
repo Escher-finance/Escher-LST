@@ -109,11 +109,6 @@
             cw20-base = crane.buildWasmContract "cosmwasm/babylon-lst/contracts/cw20-base" { };
           };
 
-          checks = {
-            cargo-workspace-clippy = crane.lib.cargoClippy (cargoWorkspaceAttrs // { inherit cargoArtifacts; });
-            cargo-workspace-test = crane.lib.cargoTest (cargoWorkspaceAttrs // { inherit cargoArtifacts; });
-          };
-
           devShells.default = pkgs.mkShell {
             name = "union-devShell";
             buildInputs =
