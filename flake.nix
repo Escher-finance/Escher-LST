@@ -142,6 +142,7 @@
               rustfmt = {
                 enable = true;
                 package = rust-dev-toolchain;
+                edition = "2024";
               };
               taplo.enable = true;
               yamlfmt = {
