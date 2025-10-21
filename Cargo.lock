@@ -2644,7 +2644,7 @@ checksum = "df1d3c3b53da64cf5760482273a98e575c651a67eec7f77df96b5b642de8f039"
 
 [[package]]
 name = "liquidstaking-babylon"
-version = "0.1.196"
+version = "0.1.197"
 dependencies = [
  "alloy 0.15.11",
  "anyhow",
