@@ -122,7 +122,7 @@ pub enum ExecuteMsg {
     },
     LocalBond {
         slippage: Option<Decimal>,
-        expected: Uint128,
+        min_mint_amount: Uint128,
         recipient: Recipient,
     },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator

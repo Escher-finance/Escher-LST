@@ -226,8 +226,8 @@ pub fn ibc_destination_callback(
 
     // create bond event here
     let bond_event = BondEvent(
-        packet_data.sender.to_string(),
-        packet_data.sender.to_string(),
+        packet_data.sender.clone(),
+        packet_data.sender.clone(),
         amount,
         bond_data.delegated_amount,
         bond_data.mint_amount,
@@ -245,7 +245,7 @@ pub fn ibc_destination_callback(
     );
 
     let ibc_callback_event = IbcCallbackEvent(
-        packet_data.sender.clone(),
+        packet_data.sender,
         channel_id.clone(),
         amount,
         payload.amount,
