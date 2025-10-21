@@ -103,6 +103,7 @@
                 yq
                 wasm-tools
                 binaryen
+                pkg-config
               ]);
             nativeBuildInputs = [
               config.treefmt.build.wrapper
