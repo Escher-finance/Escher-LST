@@ -331,15 +331,6 @@ pub struct MintTokensPayload {
 }
 
 #[cw_serde]
-pub struct MintAndSendZkgmPayload {
-    pub sender: String,
-    pub staker: String,
-    pub amount: Uint128,
-    pub salt: String,
-    pub recipient: Recipient,
-}
-
-#[cw_serde]
 pub struct BondRewardsPayload {
     pub amount: Uint128,
     pub validator: String,
