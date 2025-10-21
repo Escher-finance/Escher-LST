@@ -1,17 +1,20 @@
 use cosmwasm_std::{
     DepsMut, Env, IbcBasicResponse, IbcDestinationCallbackMsg, StdAck, StdError, StdResult,
-    ensure_eq, entry_point,
+    Uint128, ensure_eq, entry_point, from_json,
+};
+use ibc::apps::transfer::types::proto::transfer::v2::FungibleTokenPacketData;
+
+use crate::{
+    event::IbcCallbackEvent,
+    state::{PARAMETERS, STATUS, VALIDATORS_REGISTRY},
+    utils::{self, transfer::ibc_transfer_msg},
 };
 
-use crate::state::STATUS;
-
-#[cfg_attr(not(feature = "library"), entry_point)]
-#[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
-pub fn ibc_destination_callback(
-    deps: DepsMut,
-    _env: Env,
-    msg: IbcDestinationCallbackMsg,
-) -> StdResult<IbcBasicResponse> {
+fn validate_and_parse_ibc_callback_msg(
+    deps: &DepsMut,
+    env: &Env,
+    msg: &IbcDestinationCallbackMsg,
+) -> StdResult<FungibleTokenPacketData> {
     ensure_eq!(
         msg.packet.dest.port_id,
         "transfer", // transfer module uses this port by default
@@ -30,14 +33,6 @@ pub fn ibc_destination_callback(
         ));
     }
 
-    Err(StdError::generic_err(
-        "stake from ibc not supported right now",
-    ))
-
-    /*
-    // At this point we know that this is a callback for a successful transfer,
-    // but not to whom it is going, how much and what denom.
-
     // Parse the packet data to get that information:
     let packet_data: FungibleTokenPacketData = from_json(&msg.packet.data)?;
 
@@ -50,26 +45,45 @@ pub fn ibc_destination_callback(
         StdError::generic_err("only want to handle transfers to this contract")
     );
 
-    let params = PARAMETERS.load(deps.storage)?;
+    Ok(packet_data)
+}
 
+fn validate_ibc_denom(
+    msg: &IbcDestinationCallbackMsg,
+    underlying_denom: &str,
+    ibc_packet_denom: &str,
+) -> StdResult<()> {
     // We only care about this chain's native token in this example.
     // The `packet_data.denom` is formatted as `{port id}/{channel id}/{denom}`,
     // where the port id and channel id are the source chain's identifiers.
     let native_denom_on_source_chain = format!(
         "{}/{}/{}",
-        msg.packet.src.port_id,
-        msg.packet.src.channel_id,
-        params.underlying_coin_denom.clone(),
+        msg.packet.src.port_id, msg.packet.src.channel_id, underlying_denom,
     );
 
     ensure_eq!(
-        packet_data.denom,
+        ibc_packet_denom,
         native_denom_on_source_chain,
         StdError::generic_err("unsupported coin denom")
     );
 
-    let memo = packet_data.memo.clone();
-    let payload: Result<crate::msg::IBCCallbackPayload, StdError> = from_json(memo.as_bytes());
+    Ok(())
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+#[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
+pub fn ibc_destination_callback(
+    deps: DepsMut,
+    env: Env,
+    msg: IbcDestinationCallbackMsg,
+) -> StdResult<IbcBasicResponse> {
+    let packet_data = validate_and_parse_ibc_callback_msg(&deps, &env, &msg)?;
+
+    let params = PARAMETERS.load(deps.storage)?;
+    validate_ibc_denom(&msg, &params.underlying_coin_denom, &packet_data.denom)?;
+
+    let payload: Result<crate::msg::IBCCallbackPayload, StdError> =
+        from_json(packet_data.memo.as_bytes());
 
     let channel_id: String = msg.packet.dest.channel_id;
     let coin_denom = params.underlying_coin_denom.clone();
@@ -107,8 +121,6 @@ pub fn ibc_destination_callback(
         required_amount += transfer_fee;
     }
 
-    let salt = payload.salt.clone();
-
     if amount < required_amount {
         let ibc_callback_error_message = format!(
             "insufficient amount, not enough transfer fee, required: {required_amount}, received: {amount}"
@@ -133,7 +145,7 @@ pub fn ibc_destination_callback(
         Some(payload.recipient.clone()),
         payload.recipient_channel_id,
         None,
-        &Some(salt.clone()),
+        &Some(payload.salt.clone()),
     );
 
     if on_chain_recipient.is_err() {
@@ -152,76 +164,25 @@ pub fn ibc_destination_callback(
         ));
     }
 
-    let slippage_rate = match payload.slippage {
-        Some(rate) => rate,
-        None => Decimal::from_str("0.01").unwrap(),
-    };
-
-    let process_bond_result = utils::delegation::process_bond(
-        deps.storage,
-        deps.querier,
-        packet_data.sender.clone(),
-        packet_data.sender.clone(),
-        delegator.clone(),
-        payload.amount,
-        env.block.time.nanos(),
-        params,
-        validators_reg.clone(),
-        salt.clone(),
-        None,
-        env.block.height,
-        Some(payload.recipient.clone()),
-        payload.recipient_channel_id,
-        on_chain_recipient.unwrap(),
-        payload.transfer_fee,
-    );
-
-    let (msgs, submsgs, bond_data) = match process_bond_result {
-        Ok(ok) => ok,
-        Err(err) => {
-            return Ok(failure_handler(
-                env,
-                Some(payload.clone()),
-                packet_data,
-                channel_id,
-                amount,
-                coin_denom,
-                err.to_string(),
-            ));
-        }
-    };
-
-    if let Err(err) = check_slippage(bond_data.mint_amount, payload.expected, slippage_rate) {
-        return Ok(failure_handler(
-            env,
-            Some(payload.clone()),
-            packet_data.clone(),
-            channel_id,
-            amount,
-            coin_denom,
-            err.to_string(),
-        ));
-    }
-
-    // create bond event here
-    let bond_event = crate::event::BondEvent(
-        packet_data.sender.clone(),
-        packet_data.sender.clone(),
-        payload.amount,
-        bond_data.delegated_amount,
-        bond_data.mint_amount,
-        bond_data.total_bond_amount,
-        bond_data.total_supply,
-        bond_data.exchange_rate,
-        "0".into(),
-        env.block.time,
-        coin_denom,
-        Some(payload.recipient.clone()),
-        payload.recipient_channel_id,
-        bond_data.reward_balance,
-        bond_data.unclaimed_reward,
-        Some(channel_id.clone()),
-    );
+    // // create bond event here
+    // let bond_event = crate::event::BondEvent(
+    //     packet_data.sender.clone(),
+    //     packet_data.sender.clone(),
+    //     payload.amount,
+    //     bond_data.delegated_amount,
+    //     bond_data.mint_amount,
+    //     bond_data.total_bond_amount,
+    //     bond_data.total_supply,
+    //     bond_data.exchange_rate,
+    //     "0".into(),
+    //     env.block.time,
+    //     coin_denom,
+    //     Some(payload.recipient.clone()),
+    //     payload.recipient_channel_id,
+    //     bond_data.reward_balance,
+    //     bond_data.unclaimed_reward,
+    //     Some(channel_id.clone()),
+    // );
 
     let ibc_callback_event = IbcCallbackEvent(
         packet_data.sender.clone(),
@@ -230,22 +191,20 @@ pub fn ibc_destination_callback(
         payload.amount,
         payload.recipient.clone(),
         payload.recipient_channel_id,
-        salt.clone(),
+        payload.salt.clone(),
         true,
         String::new(),
         env.block.time,
         transfer_fee,
     );
 
-    Ok(IbcBasicResponse::new()
-        .add_event(bond_event)
-        .add_event(ibc_callback_event)
-        .add_messages(msgs)
-        .add_submessages(submsgs))
-         */
+    Ok(IbcBasicResponse::new())
+    // .add_event(ibc_callback_event)
+    // .add_event(bond_event)
+    // .add_messages(msgs)
+    // .add_submessages(submsgs))
 }
 
-/*
 #[allow(clippy::needless_pass_by_value)]
 fn failure_handler(
     env: Env,
@@ -307,4 +266,3 @@ fn failure_handler(
         .add_event(ibc_callback_event)
         .add_message(msg)
 }
- */
