@@ -23,7 +23,6 @@ broken-intra-doc-links = "deny"
 
 [workspace.dependencies]
 alloy            = { version = "0.15.3", default-features = false }
-anyhow           = { version = "1.0.100" }
 bincode          = { version = "2.0.1", default-features = false }
 cosmos-sdk-proto = { version = "0.27.0", default-features = false }
 cosmwasm-schema  = { version = "2.2.2" }

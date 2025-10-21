@@ -41,7 +41,6 @@ hex-literal     = { workspace = true }
 serde-json-wasm = { workspace = true }
 
 [build-dependencies]
-anyhow      = { workspace = true }
 vergen-git2 = { workspace = true }
 
 [features]
