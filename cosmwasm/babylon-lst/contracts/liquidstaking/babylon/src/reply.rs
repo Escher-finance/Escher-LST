@@ -15,6 +15,7 @@ use crate::{
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
+pub const MINT_AND_SEND_ZKGM_REPLY_ID: u64 = 127;
 
 #[entry_point]
 /// Errors:
@@ -28,6 +29,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     }
 
     match msg.id {
+        MINT_AND_SEND_ZKGM_REPLY_ID => on_mint_and_send_zkgm(&deps, &env, msg),
         MINT_CW20_TOKENS_REPLY_ID => on_mint_cw20_tokens(deps, &env, msg),
         PROCESS_WITHDRAW_REWARD_REPLY_ID => on_process_rewards(deps, env, msg),
         SPLIT_REWARD_REPLY_ID => on_split_reward(deps, &env, msg),
@@ -142,6 +144,38 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
         .add_attribute("transfer_handler", params.transfer_handler)
         .add_attribute("transfer_fee", transfer_fee)
         .add_attribute("staked_token_balance", balance.balance.to_string());
+
+    Ok(res)
+}
+
+fn on_mint_and_send_zkgm(
+    deps: &DepsMut,
+    _env: &Env,
+    msg: Reply,
+) -> Result<Response, ContractError> {
+    let payload: ZkgmTransfer = from_json(msg.payload)?;
+
+    let params = PARAMETERS.load(deps.storage)?;
+
+    let quote_token = QUOTE_TOKEN.load(deps.storage, payload.recipient_channel_id)?;
+
+    let send_msg = transfer::send_token_order_v2_escrow(
+        &params.ucs03_relay_contract.clone(),
+        &payload,
+        params.cw20_address.as_ref(), // base token of staked token (ebaby on babylon)
+        &quote_token.lst_quote_token, // quote token of staked token (ebaby on target chain)
+    )?;
+
+    let res: Response = Response::new()
+        .add_message(send_msg)
+        .add_attribute("action", "send_zkgm")
+        .add_attribute("sender", payload.sender.clone())
+        .add_attribute("recipient", format!("{:?}", payload.recipient))
+        .add_attribute("channel_id", payload.recipient_channel_id.to_string())
+        .add_attribute("amount", payload.amount.to_string())
+        .add_attribute("denom", params.liquidstaking_denom)
+        .add_attribute("base_denom", params.cw20_address)
+        .add_attribute("quote_token", quote_token.lst_quote_token);
 
     Ok(res)
 }

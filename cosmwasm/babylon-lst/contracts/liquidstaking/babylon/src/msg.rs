@@ -331,6 +331,15 @@ pub struct MintTokensPayload {
 }
 
 #[cw_serde]
+pub struct MintAndSendZkgmPayload {
+    pub sender: String,
+    pub staker: String,
+    pub amount: Uint128,
+    pub salt: String,
+    pub recipient: Recipient,
+}
+
+#[cw_serde]
 pub struct BondRewardsPayload {
     pub amount: Uint128,
     pub validator: String,
@@ -423,11 +432,9 @@ pub struct RewardMigrateMsg {}
 pub struct IBCCallbackPayload {
     pub amount: Uint128,
     pub slippage: Option<Decimal>,
-    pub expected: Uint128,
+    pub min_mint_amount: Uint128,
     pub salt: String,
-    pub recipient: String,
-    pub recipient_channel_id: Option<u32>,
-    pub transfer_fee: Option<Uint128>,
+    pub recipient: Recipient,
 }
 
 pub struct InjectData {
@@ -460,7 +467,7 @@ pub struct LiquidityState {
     pub exchange_rate: Decimal,
 }
 
-#[derive(Debug)]
+#[cw_serde]
 pub struct ZkgmTransfer {
     pub sender: String,
     pub amount: Uint128,
