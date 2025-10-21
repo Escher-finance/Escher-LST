@@ -1,19 +1,15 @@
 "use client";
 
-import {
-    Card,
-    CardBody,
-    CardFooter,
-    Button,
-    Input,
-} from "@heroui/react";
+import { Card, CardBody, CardFooter, Button, Input } from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
-import { createSendIBCMsg, getTimeoutInNanoseconds24HoursFromNow } from "@/app/lib/ibc";
+import {
+    createSendIBCMsg,
+    getTimeoutInNanoseconds24HoursFromNow,
+} from "@/app/lib/ibc";
 import { toHex } from "viem";
 import { getSalt } from "@/app/lib/utils";
 import { BaseNetworks } from "@/config/networks.config";
 import { useState } from "react";
-
 
 const transfer_fee = BigInt(0);
 interface KeyProps {
@@ -27,10 +23,12 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
 
     const baby_denom = network?.escher?.babyDenom;
 
-
     const testnet = network?.chainName.includes("testnet") ? true : false;
-    const baby_lst_contract = testnet ? BaseNetworks["babylon-testnet"].escher.lst : BaseNetworks["babylon-mainnet"].escher.lst;
-    const sourceChannel = network?.escher?.channel["babylon"]?.sourceIbcChannelId;
+    const baby_lst_contract = testnet
+        ? BaseNetworks["babylon-testnet"].escher.lst
+        : BaseNetworks["babylon-mainnet"].escher.lst;
+    const sourceChannel =
+        network?.escher?.channel["babylon"]?.sourceIbcChannelId;
 
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
@@ -40,7 +38,8 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
         const formEntries = Object.fromEntries(formData.entries());
         const amount = BigInt(formEntries.amount.toString());
         const recipient = formEntries.recipient.toString();
-        const recipient_channel_id = formEntries.recipient_channel_id.toString();
+        const recipient_channel_id =
+            formEntries.recipient_channel_id.toString();
 
         if (userAddress === undefined || userAddress === null) {
             alert("Please connect your wallet");
@@ -53,14 +52,17 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
 
         let payload = {
             dest_callback: {
-                address: baby_lst_contract
+                address: baby_lst_contract,
             },
             salt: getSalt(),
             amount: amount.toString(),
-            recipient: recipient_channel_id == "" ? recipient : toHex(recipient),
-            recipient_channel_id: recipient_channel_id == "" ? null : Number(recipient_channel_id),
-            expected,
-            transfer_fee: transfer_fee.toString(),
+            recipient: {
+                zkgm: {
+                    address: toHex(recipient),
+                    channel_id: Number(recipient_channel_id),
+                },
+            },
+            min_mint_amount: expected,
         };
 
         console.log("payload", JSON.stringify(payload));
@@ -68,7 +70,10 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
         const msg = createSendIBCMsg({
             sender: userAddress,
             denom: baby_denom,
-            amount: recipient_channel_id != "" ? (amount + transfer_fee).toString() : amount.toString(),
+            amount:
+                recipient_channel_id != ""
+                    ? (amount + transfer_fee).toString()
+                    : amount.toString(),
             sourceChannel,
             receiver: baby_lst_contract,
             timeoutTimestamp: getTimeoutInNanoseconds24HoursFromNow(),
@@ -77,7 +82,12 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
 
         console.log(JSON.stringify(msg));
         try {
-            const res = await client?.signAndBroadcast(userAddress, [msg], "auto", "stake to babylon from osmosis");
+            const res = await client?.signAndBroadcast(
+                userAddress,
+                [msg],
+                "auto",
+                "stake to babylon from osmosis",
+            );
             alert(res?.transactionHash);
 
             let newKey = stateKey + 1;
@@ -90,7 +100,6 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
     };
 
     return (
-
         <div className="w-full flex flex-col">
             <form onSubmit={handleSubmit} className="w-full flex">
                 <Card className="w-full flex">
@@ -133,14 +142,15 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
                         />
                     </CardBody>
                     <CardFooter>
-                        <Button type="submit" isLoading={isLoading}>Submit</Button>
+                        <Button type="submit" isLoading={isLoading}>
+                            Submit
+                        </Button>
                     </CardFooter>
                 </Card>
             </form>
         </div>
     );
 }
-
 
 //https://btc.union.build/explorer/packets/0xce8c32b71b5a7608b6b1afdea4fbb53c66cb026ed68916891d557277adbcfd4c
 
