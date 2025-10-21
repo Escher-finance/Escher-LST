@@ -194,9 +194,9 @@ pub fn execute(
         }
         ExecuteMsg::LocalBond {
             slippage,
-            expected,
+            min_mint_amount,
             recipient,
-        } => execute::bond(deps, env, info, slippage, expected, recipient),
+        } => execute::bond(deps, env, info, slippage, min_mint_amount, recipient),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
