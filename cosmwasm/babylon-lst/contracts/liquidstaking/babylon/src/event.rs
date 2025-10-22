@@ -363,7 +363,6 @@ pub fn IbcCallbackEvent(
     bond_status: bool,
     error_message: String,
     time: Timestamp,
-    transfer_fee: Uint128,
 ) -> Event {
     let recipient_channel_id: String = match recipient_channel_id {
         Some(channel_id) => channel_id.to_string(),
@@ -381,5 +380,5 @@ pub fn IbcCallbackEvent(
         .add_attribute("bond_status", bond_status.to_string())
         .add_attribute("error_message", error_message)
         .add_attribute("time", format!("{}", time.nanos()))
-        .add_attribute("transfer_fee", transfer_fee.to_string())
+        .add_attribute("transfer_fee", "0")
 }

@@ -122,7 +122,7 @@ pub enum ExecuteMsg {
     },
     LocalBond {
         slippage: Option<Decimal>,
-        expected: Uint128,
+        min_mint_amount: Uint128,
         recipient: Recipient,
     },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
@@ -423,11 +423,9 @@ pub struct RewardMigrateMsg {}
 pub struct IBCCallbackPayload {
     pub amount: Uint128,
     pub slippage: Option<Decimal>,
-    pub expected: Uint128,
+    pub min_mint_amount: Uint128,
     pub salt: String,
-    pub recipient: String,
-    pub recipient_channel_id: Option<u32>,
-    pub transfer_fee: Option<Uint128>,
+    pub recipient: Recipient,
 }
 
 pub struct InjectData {
@@ -460,7 +458,7 @@ pub struct LiquidityState {
     pub exchange_rate: Decimal,
 }
 
-#[derive(Debug)]
+#[cw_serde]
 pub struct ZkgmTransfer {
     pub sender: String,
     pub amount: Uint128,
