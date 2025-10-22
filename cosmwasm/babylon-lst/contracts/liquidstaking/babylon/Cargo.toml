@@ -2,7 +2,7 @@
 build   = "build.rs"
 edition = "2021"
 name    = "liquidstaking-babylon"
-version = "0.1.197"
+version = "0.1.198"
 
 [lints]
 workspace = true
@@ -41,7 +41,6 @@ hex-literal     = { workspace = true }
 serde-json-wasm = { workspace = true }
 
 [build-dependencies]
-anyhow      = { workspace = true }
 vergen-git2 = { workspace = true }
 
 [features]
