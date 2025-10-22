@@ -7,13 +7,17 @@ import {
     Button,
     Input,
     Select,
-    SelectItem
+    SelectItem,
 } from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
 import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
-import { encodeInstruction, encodeTokenOrderV2, tokenOrderV2Escrow } from "@/app/lib/ucs03";
+import {
+    encodeInstruction,
+    encodeTokenOrderV2,
+    tokenOrderV2Escrow,
+} from "@/app/lib/ucs03";
 import { Instruction } from "@unionlabs/sdk/Ucs03";
 import { getSalt } from "@/app/lib/utils";
 import { useState } from "react";
@@ -33,7 +37,8 @@ export const chains: Chain = {
     ],
     "babylon-mainnet": [
         { key: "ethereum", label: "Ethereum" },
-    ]
+        { key: "osmosis", label: "Osmosis" },
+    ],
 };
 
 export const denoms = [
@@ -41,41 +46,46 @@ export const denoms = [
     { key: "ebbn", label: "eBaby" },
 ];
 
-
-const getExecuteAllowanceMsg = (contract: string, sender: string, spender: string, amount: string) => {
+const getExecuteAllowanceMsg = (
+    contract: string,
+    sender: string,
+    spender: string,
+    amount: string,
+) => {
     let allowanceMsg = {
         increase_allowance: {
             spender,
             amount,
-        }
-    }
+        },
+    };
     console.log(JSON.stringify(allowanceMsg));
     const executeAllowanceMsg = {
-        typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+        typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
         value: MsgExecuteContract.fromPartial({
             sender,
             contract,
             msg: toUtf8(JSON.stringify(allowanceMsg)),
-            funds: []
+            funds: [],
         }),
     };
 
     return executeAllowanceMsg;
-}
+};
 
 interface KeyProps {
     stateKey: number;
     setStateKey: (key: number) => void;
 }
 
-export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps) {
+export default function TransferFromBabylon({
+    stateKey,
+    setStateKey,
+}: KeyProps) {
     const { userAddress, client, network } = useGlobalContext();
     const [isLoading, setIsLoading] = useState(false);
 
     const ucs03_contract = network?.escher?.ucs03;
     const receiver = "0x15Ee7c367F4232241028c36E720803100757c6e9";
-
-
 
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
@@ -94,45 +104,60 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
             return;
         }
 
-
-        let baseToken = denom === "ubbn" ? network?.escher?.nativeBaseToken : network?.escher?.stakedBaseToken;
-        let quoteToken = denom === "ubbn" ? network?.escher?.channel[destination_chain].nativeQuoteToken : network?.escher?.channel[destination_chain].stakedQuoteToken;
-        let funds = denom === "ubbn" ? [{ amount: amount.toString(), denom }] : [];
+        let baseToken =
+            denom === "ubbn"
+                ? network?.escher?.nativeBaseToken
+                : network?.escher?.stakedBaseToken;
+        let quoteToken =
+            denom === "ubbn"
+                ? network?.escher?.channel[destination_chain].nativeQuoteToken
+                : network?.escher?.channel[destination_chain].stakedQuoteToken;
+        let funds =
+            denom === "ubbn" ? [{ amount: amount.toString(), denom }] : [];
 
         if (!baseToken) {
             alert("No base token");
             return;
         }
 
-        let tokenOrder = tokenOrderV2Escrow(userAddress.toLowerCase(), recipient, baseToken, amount, quoteToken as '0x${string}');
+        let tokenOrder = tokenOrderV2Escrow(
+            userAddress.toLowerCase(),
+            recipient,
+            baseToken,
+            amount,
+            quoteToken as "0x${string}",
+        );
 
         console.log(JSON.stringify(tokenOrder));
 
         let cosmos_msg = {
             send: {
-                channel_id: network?.escher?.channel[destination_chain]?.sourceChannelId,
+                channel_id:
+                    network?.escher?.channel[destination_chain]
+                        ?.sourceChannelId,
                 timeout_height: "0",
-                timeout_timestamp: getTimeoutInNanoseconds7DaysFromNow().toString(),
+                timeout_timestamp:
+                    getTimeoutInNanoseconds7DaysFromNow().toString(),
                 salt: getSalt(),
-                instruction: encodeInstruction(Instruction.make({
-                    opcode: 3,
-                    version: 2,
-                    operand: encodeTokenOrderV2(tokenOrder),
-                })),
+                instruction: encodeInstruction(
+                    Instruction.make({
+                        opcode: 3,
+                        version: 2,
+                        operand: encodeTokenOrderV2(tokenOrder),
+                    }),
+                ),
             },
         };
 
-
         const executeTransferMsg = {
-            typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+            typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
             value: MsgExecuteContract.fromPartial({
                 sender: userAddress,
                 contract: ucs03_contract,
                 msg: toUtf8(JSON.stringify(cosmos_msg)),
-                funds
+                funds,
             }),
         };
-
 
         let msgs = [];
 
@@ -141,12 +166,22 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
         } else {
             const zkgm_token_minter = network?.escher?.tokenMinter;
             const cw20Contract = network?.contracts.cw20;
-            let allowanceMsg = getExecuteAllowanceMsg(cw20Contract, userAddress, zkgm_token_minter, amount.toString());
+            let allowanceMsg = getExecuteAllowanceMsg(
+                cw20Contract,
+                userAddress,
+                zkgm_token_minter,
+                amount.toString(),
+            );
             msgs = [allowanceMsg, executeTransferMsg];
         }
 
         try {
-            const res = await client?.signAndBroadcast(userAddress, msgs, "auto", "transfer from babylon");
+            const res = await client?.signAndBroadcast(
+                userAddress,
+                msgs,
+                "auto",
+                "transfer from babylon",
+            );
             alert(res?.transactionHash);
             let newKey = stateKey + 1;
             setStateKey(newKey);
@@ -174,29 +209,49 @@ export default function TransferFromBabylon({ stateKey, setStateKey }: KeyProps)
                             label="Recipient"
                             defaultValue={receiver}
                         />
-                        <Select className="max-w-xs" label="Select destination chain" variant="flat" name="destination_chain"
-                            defaultSelectedKeys={[chains[network?.chainName][0].key]}
+                        <Select
+                            className="max-w-xs"
+                            label="Select destination chain"
+                            variant="flat"
+                            name="destination_chain"
+                            defaultSelectedKeys={[
+                                chains[network?.chainName][0].key,
+                            ]}
                         >
-                            {chains[network?.chainName.toString()].map((chain) => (
-                                <SelectItem key={chain.key}>{chain.label}</SelectItem>
-                            ))}
+                            {chains[network?.chainName.toString()].map(
+                                (chain) => (
+                                    <SelectItem key={chain.key}>
+                                        {chain.label}
+                                    </SelectItem>
+                                ),
+                            )}
                         </Select>
-                        <Select className="max-w-xs" label="Select denom" variant="flat" name="denom" defaultSelectedKeys={["ubbn"]}>
+                        <Select
+                            className="max-w-xs"
+                            label="Select denom"
+                            variant="flat"
+                            name="denom"
+                            defaultSelectedKeys={["ubbn"]}
+                        >
                             {denoms.map((denom) => (
-                                <SelectItem key={denom.key}>{denom.label}</SelectItem>
+                                <SelectItem key={denom.key}>
+                                    {denom.label}
+                                </SelectItem>
                             ))}
                         </Select>
                         <div className="text-sm italic p-1">
-                            Note: To send to sepolia and holesky, after send the packet need to run curl to relay (see README at client folder for CURL example)
+                            Note: To send to sepolia and holesky, after send the
+                            packet need to run curl to relay (see README at
+                            client folder for CURL example)
                         </div>
-                        <div>{[chains[network?.chainName][0].key]}</div>
-
                     </CardBody>
                     <CardFooter>
-                        <Button type="submit" isLoading={isLoading}>Submit</Button>
+                        <Button type="submit" isLoading={isLoading}>
+                            Submit
+                        </Button>
                     </CardFooter>
                 </Card>
             </form>
-        </div >
+        </div>
     );
 }
