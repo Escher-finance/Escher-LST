@@ -48,7 +48,9 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
 
         const exchange_rate = Number(formEntries.exchange_rate);
         console.log("Exchange Rate:", exchange_rate);
-        const expected = Math.floor(Number(amount) / exchange_rate).toString();
+        const min_mint_amount = Math.floor(
+            (Number(amount) / Number(exchange_rate)) * 0.995,
+        );
 
         let payload = {
             dest_callback: {
@@ -62,7 +64,7 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
                     channel_id: Number(recipient_channel_id),
                 },
             },
-            min_mint_amount: expected,
+            min_mint_amount: min_mint_amount.toString(),
         };
 
         console.log("payload", JSON.stringify(payload));
@@ -138,7 +140,7 @@ export default function IbcBond({ stateKey, setStateKey }: KeyProps) {
                             isRequired
                             name="exchange_rate"
                             label="Exchange rate"
-                            defaultValue="1.056"
+                            defaultValue="1.10523"
                         />
                     </CardBody>
                     <CardFooter>
