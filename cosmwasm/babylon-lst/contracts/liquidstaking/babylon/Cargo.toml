@@ -1,5 +1,4 @@
 [package]
-build   = "build.rs"
 edition = "2021"
 name    = "liquidstaking-babylon"
 version = "0.1.198"

@@ -217,18 +217,11 @@ pub struct Balance {
     pub amount: Uint128,
 }
 
-#[cw_serde]
-pub struct GitInfo {
-    pub git: String,
-}
-
 #[cw_ownable_query]
 #[non_exhaustive]
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(GitInfo)]
-    GitInfo {},
     #[returns(State)]
     State {},
     #[returns(Parameters)]
