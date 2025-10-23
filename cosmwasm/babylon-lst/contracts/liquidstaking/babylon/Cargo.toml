@@ -1,8 +1,7 @@
 [package]
-build   = "build.rs"
 edition = "2021"
 name    = "liquidstaking-babylon"
-version = "0.1.199"
+version = "0.1.200"
 
 [lints]
 workspace = true

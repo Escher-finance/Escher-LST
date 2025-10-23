@@ -9,7 +9,7 @@ use cw2::ContractVersion;
 
 use crate::{
     ContractError,
-    msg::{Balance, GitInfo, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
+    msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
     state::{
         PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
         SUPPLY_QUEUE, State, Status, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL, UnbondRecord,
@@ -27,7 +27,6 @@ use crate::{
 #[allow(clippy::needless_pass_by_value)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     Ok(match msg {
-        QueryMsg::GitInfo {} => to_json_binary(&query_git_info()?),
         QueryMsg::State {} => to_json_binary(&query_state(deps.storage)?),
         QueryMsg::Parameters {} => to_json_binary(&query_params(deps.storage)?),
         QueryMsg::Validators {} => to_json_binary(&query_validators(deps.storage)?),
@@ -96,13 +95,6 @@ pub fn query_version(storage: &dyn Storage) -> Result<ContractVersion, ContractE
 pub fn query_state(storage: &dyn Storage) -> Result<State, ContractError> {
     let state = STATE.load(storage)?;
     Ok(state)
-}
-
-pub fn query_git_info() -> Result<GitInfo, ContractError> {
-    let git_info = GitInfo {
-        git: format!("{}:{}", env!("VERGEN_GIT_BRANCH"), env!("VERGEN_GIT_SHA")),
-    };
-    Ok(git_info)
 }
 
 pub fn query_params(storage: &dyn Storage) -> Result<Parameters, ContractError> {
