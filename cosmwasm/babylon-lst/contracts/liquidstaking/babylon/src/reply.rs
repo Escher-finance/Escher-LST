@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, SubMsg, Uint128, WasmMsg,
-    attr, entry_point, from_json, to_json_binary,
+    attr, entry_point, from_json, to_json_binary, wasm_execute,
 };
 
 use crate::{
@@ -11,6 +11,7 @@ use crate::{
         WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
     },
     utils::{calc::get_next_epoch, transfer},
+    zkgm::protocol::{TokenPair, Ucs03Zkgm},
 };
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
@@ -153,26 +154,40 @@ fn on_mint_and_send_zkgm(
     _env: &Env,
     msg: Reply,
 ) -> Result<Response, ContractError> {
-    let payload: ZkgmTransfer = from_json(msg.payload)?;
-
+    let zkgm_transfer: ZkgmTransfer = from_json(msg.payload)?;
     let params = PARAMETERS.load(deps.storage)?;
+    let quote_token = QUOTE_TOKEN.load(deps.storage, zkgm_transfer.recipient_channel_id)?;
 
-    let quote_token = QUOTE_TOKEN.load(deps.storage, payload.recipient_channel_id)?;
-
-    let send_msg = transfer::send_token_order_v2_escrow(
-        &params.ucs03_relay_contract.clone(),
-        &payload,
-        params.cw20_address.as_ref(), // base token of staked token (ebaby on babylon)
-        &quote_token.lst_quote_token, // quote token of staked token (ebaby on target chain)
+    // create allowance msg to zkgm token minter
+    let allowance_msg = wasm_execute(
+        params.cw20_address.clone(),
+        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+            spender: params.zkgm_token_minter,
+            amount: zkgm_transfer.amount,
+            expires: None,
+        },
+        vec![],
     )?;
 
+    // create send ucs03 zkgm msg
+    let send_msg = Ucs03Zkgm::new(
+        params.ucs03_relay_contract.clone(),
+        TokenPair {
+            base_token: params.cw20_address.to_string(),
+            quote_token: quote_token.lst_quote_token.clone(),
+        },
+    )
+    .transfer_escrow(&zkgm_transfer)?;
+
+    let msgs: Vec<CosmosMsg> = vec![allowance_msg.into(), send_msg];
+
     let res: Response = Response::new()
-        .add_message(send_msg)
+        .add_messages(msgs)
         .add_attribute("action", "send_zkgm")
-        .add_attribute("sender", payload.sender.clone())
-        .add_attribute("recipient", format!("{:?}", payload.recipient))
-        .add_attribute("channel_id", payload.recipient_channel_id.to_string())
-        .add_attribute("amount", payload.amount.to_string())
+        .add_attribute("sender", zkgm_transfer.sender.clone())
+        .add_attribute("recipient", zkgm_transfer.recipient)
+        .add_attribute("channel_id", zkgm_transfer.recipient_channel_id.to_string())
+        .add_attribute("amount", zkgm_transfer.amount.to_string())
         .add_attribute("denom", params.liquidstaking_denom)
         .add_attribute("base_denom", params.cw20_address)
         .add_attribute("quote_token", quote_token.lst_quote_token);
