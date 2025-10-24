@@ -18,6 +18,7 @@ use crate::{
     utils::delegation::{
         DEFAULT_TIMEOUT_TIMESTAMP_OFFSET, get_unbonding_ucs03_transfer_cosmos_msg,
     },
+    zkgm::protocol::TokenPair,
 };
 
 #[must_use]
@@ -115,8 +116,8 @@ pub fn ibc_transfer_msg(
 pub fn send_token_order_v2_escrow(
     ucs03_relay_contract: &str,
     payload: &ZkgmTransfer,
-    base_token: &str,
-    quote_token: &str,
+    token_pair: &TokenPair,
+    funds: &[Coin],
 ) -> Result<CosmosMsg, ContractError> {
     let Ok(transfer_amount) = payload.amount.u128().try_into() else {
         return Err(ContractError::InvalidPayload {});
@@ -131,12 +132,12 @@ pub fn send_token_order_v2_escrow(
             });
         }
     };
-    let quote_token: Bytes = match Bytes::from_str(quote_token) {
+    let quote_token: Bytes = match Bytes::from_str(&token_pair.quote_token) {
         Ok(q) => q,
         Err(_) => {
             return Err(ContractError::InvalidAddress {
                 kind: "quote_token".into(),
-                address: quote_token.to_string(),
+                address: token_pair.quote_token.to_string(),
                 reason: "address must be in hex and starts with 0x".to_string(),
             });
         }
@@ -148,7 +149,7 @@ pub fn send_token_order_v2_escrow(
         operand: TokenOrderV2 {
             sender: payload.sender.as_bytes().to_vec().into(),
             receiver: Vec::from(receiver).into(),
-            base_token: base_token.as_bytes().to_vec().into(),
+            base_token: token_pair.base_token.as_bytes().to_vec().into(),
             base_amount: transfer_amount,
             quote_token: Vec::from(quote_token).into(),
             quote_amount: transfer_amount,
@@ -159,7 +160,7 @@ pub fn send_token_order_v2_escrow(
         .into(),
     };
 
-    let timeout_timestamp_offset: u64 = 86400; // 1 day period
+    let timeout_timestamp_offset: u64 = 604800; // 7 days period
     let timeout_timestamp =
         Timestamp::from_nanos(payload.time.plus_seconds(timeout_timestamp_offset).nanos());
 
@@ -186,11 +187,7 @@ pub fn send_token_order_v2_escrow(
         instruction: fungible_order_instruction.abi_encode_params().into(),
     };
 
-    let funds = vec![Coin {
-        denom: base_token.to_string(),
-        amount: payload.amount,
-    }];
-    let msg = wasm_execute(ucs03_relay_contract, &send_msg, funds)?;
+    let msg = wasm_execute(ucs03_relay_contract, &send_msg, funds.to_vec())?;
 
     Ok(msg.into())
 }
