@@ -21,9 +21,11 @@ import {
 import { ChainRegistry } from "@unionlabs/sdk/ChainRegistry";
 import { UniversalChainId } from "@unionlabs/sdk/schema/chain";
 import { TokenOrder, Ucs03, Ucs05, Utils } from "@unionlabs/sdk";
-import { Effect, pipe, Schema } from "effect";
-import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
+import { Effect, Schema } from "effect";
+import { getSalt, getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
 import { ChannelId } from "@unionlabs/sdk/schema/channel";
+import { HexFromJson } from "@unionlabs/sdk/schema/hex";
+import { Batch, BatchAbi } from "@unionlabs/sdk/Ucs03";
 
 export const U_FROM_UNION_SOLVER_METADATA_TESTNET =
     "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000014ba5ed44733953d79717f6269357c77718c8ba5ed0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
@@ -111,6 +113,40 @@ export const tokenOrderV2Escrow = (
             quoteToken,
             amount,
             TOKEN_ORDER_KIND_ESCROW,
+            toHex(""),
+        ],
+    });
+
+    return tokenOrderV2;
+};
+
+export const tokenOrderV2Unescrow = (
+    sender: string,
+    receiver: string,
+    baseToken: string,
+    baseAmount: bigint,
+    quoteToken: `0x${string}`,
+    quoteAmount: bigint,
+) => {
+    let senderHex = sender.startsWith("0x") ? (sender as Hex) : toHex(sender);
+    let receiverHex = receiver.startsWith("0x")
+        ? (receiver as Hex)
+        : toHex(receiver);
+    let baseTokenHex = baseToken.startsWith("0x")
+        ? (baseToken as Hex)
+        : toHex(baseToken);
+
+    let tokenOrderV2: TokenOrderV2 = TokenOrderV2.make({
+        opcode: OP_CODE_TOKEN_ORDER_V2,
+        version: TOKEN_ORDER_V2_VERSION,
+        operand: [
+            senderHex,
+            receiverHex,
+            baseTokenHex,
+            baseAmount,
+            quoteToken,
+            quoteAmount,
+            TOKEN_ORDER_KIND_UNESCROW,
             toHex(""),
         ],
     });
@@ -322,3 +358,168 @@ export const getSendbackCallMsg = (params: GetSendbackCallMsgParams) =>
         );
         return sendCall;
     }).pipe(Effect.provide(ChainRegistry.Default));
+
+export const createUnbondPayload = ({
+    lst_address,
+    recipient_address,
+    amount,
+    channel_id,
+}: {
+    lst_address: string;
+    recipient_address: string;
+    amount: string;
+    channel_id: number;
+}) => {
+    const unbondMsg = {
+        remote_unbond: {
+            amount,
+            recipient: {
+                zkgm: {
+                    address: recipient_address,
+                    channel_id,
+                },
+            },
+        },
+    } as const;
+
+    const payload = {
+        wasm: {
+            execute: {
+                contract_addr: lst_address,
+                msg: Buffer.from(JSON.stringify(unbondMsg)).toString("base64"),
+                funds: [],
+            },
+        },
+    };
+
+    return payload;
+};
+
+export const createIncreaseAllowance = (
+    spender: string,
+    amount: string,
+    contractAddress: string,
+) => {
+    // Allowance Call
+    const allowanceMsg = {
+        increase_allowance: {
+            spender,
+            amount,
+        },
+    } as const;
+    const allowancePayload = {
+        wasm: {
+            execute: {
+                contract_addr: contractAddress,
+                msg: Buffer.from(JSON.stringify(allowanceMsg)).toString(
+                    "base64",
+                ),
+                funds: [],
+            },
+        },
+    };
+
+    return allowancePayload;
+};
+
+export const getUnbondCallsInstruction = async (
+    sender: string,
+    amount: string,
+    channel_id: number,
+    proxy_address: string,
+    lst_address: string,
+    cw20_address: string,
+) => {
+    // give allowance to lst contract to transfer ebaby from proxy contract
+    let allowancePayload = createIncreaseAllowance(
+        lst_address,
+        amount,
+        cw20_address,
+    );
+
+    console.log(JSON.stringify(allowancePayload));
+
+    // call unbond to lst contract
+    let unbondPayload = createUnbondPayload({
+        lst_address,
+        recipient_address: sender,
+        amount,
+        channel_id,
+    });
+
+    // Calls
+    const callsPayload = [allowancePayload, unbondPayload];
+
+    const calls = callInstruction(
+        sender.toLowerCase(),
+        toHex(proxy_address),
+        Schema.decodeSync(HexFromJson)(callsPayload),
+    );
+
+    return calls;
+};
+
+export const unbondFromEthToBabylon = async (
+    sender: string,
+    amount: bigint,
+    channel_id: number,
+    proxy_address: string,
+    ethChainName: string,
+) => {
+    let salt = getSalt();
+    console.log(salt);
+
+    console.log("amount:", amount);
+
+    let tokenOrder = tokenOrderV2Unescrow(
+        sender.toLowerCase(),
+        proxy_address,
+        EBABY_ERC20[ethChainName],
+        amount,
+        toHex(ebabyOnBabylon),
+        amount,
+    );
+
+    let calls = await getUnbondCallsInstruction(
+        sender,
+        amount.toString(),
+        BABYLON_SOURCE_CHANNEL_ID[ethChainName],
+        proxy_address,
+        isMainnet,
+    );
+
+    console.log({ tokenOrder, calls });
+    // // Batch Call
+    const batchCall: Batch = getInstructionBatch([tokenOrder, calls]);
+
+    //console.log({ tokenOrder, calls });
+    console.log({ batchCall });
+
+    const batchInstructions: [
+        { version: number; opcode: number; operand: `0x${string}` }[],
+    ] = [
+        [
+            // Tokenorder, send eBaby token
+            {
+                version: tokenOrder.version,
+                opcode: tokenOrder.opcode,
+                operand: encodeTokenOrderV2(tokenOrder),
+            },
+
+            // Bond message
+            {
+                version: calls.version,
+                opcode: calls.opcode,
+                operand: encodeCall(calls),
+            },
+        ],
+    ];
+    const batchOperand = encodeAbiParameters(BatchAbi(), batchInstructions);
+    //console.log({ batchInstructions, batchOperand });
+
+    return Instruction.make({
+        version: batchCall.version,
+        opcode: batchCall.opcode,
+        operand: batchOperand,
+    });
+};
