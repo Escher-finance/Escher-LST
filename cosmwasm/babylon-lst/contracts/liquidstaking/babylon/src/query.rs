@@ -9,7 +9,7 @@ use cw2::ContractVersion;
 
 use crate::{
     ContractError,
-    msg::{Balance, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
+    msg::{Balance, GitInfo, IBCChannel, IbcChannelId, QueryMsg, StakingLiquidity},
     state::{
         PARAMETERS, Parameters, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, STATE, STATUS,
         SUPPLY_QUEUE, State, Status, SupplyQueue, UNBOND_RECIPIENT_IBC_CHANNEL, UnbondRecord,
@@ -53,6 +53,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         }
         QueryMsg::Ownership {} => to_json_binary(&get_ownership(deps.storage)?),
         QueryMsg::Version {} => to_json_binary(&query_version(deps.storage)?),
+        QueryMsg::GitInfo {} => to_json_binary(&query_git_info()?),
         QueryMsg::Batch {
             id,
             status,
@@ -90,6 +91,11 @@ pub fn query_quote_token(
 pub fn query_version(storage: &dyn Storage) -> Result<ContractVersion, ContractError> {
     let ver = cw2::get_contract_version(storage)?;
     Ok(ver)
+}
+
+pub fn query_git_info() -> Result<GitInfo, ContractError> {
+    let rev = option_env!("GIT_REV").unwrap_or("unknown").to_string();
+    Ok(GitInfo { rev })
 }
 
 pub fn query_state(storage: &dyn Storage) -> Result<State, ContractError> {
