@@ -18,7 +18,6 @@ import { HexFromJson } from "@unionlabs/sdk/schema/hex";
 import { Brand } from "effect/Brand";
 import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { Batch, BatchAbi } from "@unionlabs/sdk/Ucs03";
-import { String } from "effect/Schema";
 
 const UNION_RPC_URL = "https://rpc.rpc-node.union-testnet-10.union.build";
 const UNION_UCS03 =
@@ -92,8 +91,12 @@ const EBABY_ERC20: Record<string, string> = {
 
 const BABYLON_UCS03 =
   "bbn1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292q77945h";
-const BABYLON_ZKGM_MINTER_ADDRESS =
-  "bbn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf";
+
+const BABYLON_ZKGM_MINTER_ADDRESS: Record<string, string> = {
+  sepolia: "bbn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf",
+  holesky: "bbn1sakazthycqgzer50nqgr5ta4vy3gwz8wxla3s8rd8pql4ctmz5qssg39sf",
+  ethereum: "bbn1c723xf74f0r9g4uyn0cv2t7pkgcq7x0gaw5h773j78rk35w0j0usslxen6",
+};
 
 declare global {
   interface BigInt {
@@ -317,7 +320,7 @@ export const getBabylonCallsInstruction = async (
       : EBABY_ON_BABYLON_TESTNET;
 
   let allowancePayload = createIncreaseAllowance(
-    BABYLON_ZKGM_MINTER_ADDRESS,
+    BABYLON_ZKGM_MINTER_ADDRESS[ethChainName],
     min_mint_amount.toString(),
     ebabyOnBabylon
   );
@@ -506,8 +509,10 @@ export const bondFromEthereumToBabylon = async (
   let mainnet = ethChainName === "ethereum";
   let rate = await fetchBabylonExchangeRate("exchange_rate", mainnet);
   console.log("rate", rate);
-  let min_mint_amount = BigInt(Math.floor(Number(amount) * Number(rate)));
-
+  let min_mint_amount = BigInt(
+    Math.floor((Number(amount) / Number(rate)) * 0.995)
+  );
+  console.log("min_mint_amount", min_mint_amount);
   let tokenOrder = tokenOrderV2Unescrow(
     sender.toLowerCase(),
     proxy_address,
