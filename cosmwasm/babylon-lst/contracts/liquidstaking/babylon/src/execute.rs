@@ -842,13 +842,13 @@ pub fn process_batch_withdrawal(
         };
 
         if is_on_chain_recipient {
-            let msg = get_send_bank_msg(
+            // send unstaked token via cosmos bankmsg::send
+            send_msgs.push(get_send_bank_msg(
                 staker,
                 undelegation.recipient.clone().as_ref(),
                 &denom,
                 unstake_return_native_amount,
-            );
-            send_msgs.push(msg);
+            ));
         } else {
             // if recipient channel id is set, it means that the receiver/recipient is on other chain
             // but if channel_id is set but recipient also recipient_channel_id is none, it will send to staker
@@ -873,38 +873,38 @@ pub fn process_batch_withdrawal(
 
                 // send native token back via ucs03
                 // no need to increase allowance as we send native denom
-                let msg = Ucs03Zkgm::new(
-                    ucs03_relay_contract.clone(),
-                    TokenPair {
-                        base_token: denom.clone(),
-                        quote_token: quote_token.quote_token.clone(),
-                    },
-                )
-                .transfer_escrow_with_funds(
-                    &ZkgmTransfer {
-                        sender: lst_contract.to_string(),
-                        amount: unstake_return_native_amount,
-                        recipient: recipient.clone(),
-                        recipient_channel_id,
-                        salt,
-                        time,
-                    },
-                    &[Coin {
-                        amount: unstake_return_native_amount,
-                        denom: denom.clone(),
-                    }], // need to attach funds to send unstaked token which is based on native denom
-                )?;
-                send_msgs.push(msg);
+                send_msgs.push(
+                    Ucs03Zkgm::new(
+                        ucs03_relay_contract.clone(),
+                        TokenPair {
+                            base_token: denom.clone(),
+                            quote_token: quote_token.quote_token.clone(),
+                        },
+                    )
+                    .transfer_escrow_with_funds(
+                        &ZkgmTransfer {
+                            sender: lst_contract.to_string(),
+                            amount: unstake_return_native_amount,
+                            recipient: recipient.clone(),
+                            recipient_channel_id,
+                            salt,
+                            time,
+                        },
+                        &[Coin {
+                            amount: unstake_return_native_amount,
+                            denom: denom.clone(),
+                        }], // need to attach funds to send unstaked token which is based on native denom
+                    )?,
+                );
             } else if let Some(recipient_ibc_channel_id) = &undelegation.recipient_ibc_channel_id {
                 if let Some(recipient) = &undelegation.recipient {
-                    let msg = ibc_transfer_msg(
+                    send_msgs.push(ibc_transfer_msg(
                         recipient_ibc_channel_id.clone(),
                         recipient.clone(),
                         unstake_return_native_amount,
                         &denom,
                         time,
-                    );
-                    send_msgs.push(msg);
+                    ));
                 }
             }
         }
