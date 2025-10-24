@@ -217,6 +217,11 @@ pub struct Balance {
     pub amount: Uint128,
 }
 
+#[cw_serde]
+pub struct GitInfo {
+    pub rev: String,
+}
+
 #[cw_ownable_query]
 #[non_exhaustive]
 #[cw_serde]
@@ -247,6 +252,8 @@ pub enum QueryMsg {
     },
     #[returns(ContractVersion)]
     Version {},
+    #[returns(GitInfo)]
+    GitInfo {},
     #[returns(QuoteToken)]
     QuoteToken { channel_id: u32 },
     #[returns(Vec<Batch>)]
