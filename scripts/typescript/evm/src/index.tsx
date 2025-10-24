@@ -48,8 +48,8 @@ const module_hash =
 
 const unbond = async (
   signer: ethers.Wallet,
-  amount: bigint,
-  ethChainName: string
+  ethChainName: string,
+  amount: bigint
 ) => {
   const channel_id = Number(ETH_BABYLON_SOURCE_CHANNEL[ethChainName]);
   const PROXY_ADDRESS = await getAddress(
@@ -60,6 +60,7 @@ const unbond = async (
     module_hash
   );
   console.log(PROXY_ADDRESS);
+
   await unbondFromEthToBabylon(
     signer,
     amount,
@@ -129,16 +130,18 @@ var sepoliaProvider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
 var ethereumProvider = new ethers.JsonRpcProvider(ETHEREUM_RPC_URL);
 var privateKey = process.env.PRIVATE_KEY;
 
-let amount = 1000n;
+let amount = 10000n;
 
 if (privateKey) {
   // let sepoliaSigner = new ethers.Wallet(privateKey, sepoliaProvider);
   // unbondSepolia(sepoliaSigner, Number(SEPOLIA_TO_BABYLON_CHANNEL_ID), amount);
   // let signer = new ethers.Wallet(privateKey, holeskyProvider);
-  // unbond(signer, "ethereum", amount);
-  // let ethereumSigner = new ethers.Wallet(privateKey, ethereumProvider);
+  //
   // transferBabyFromEthereum(ethereumSigner);
-  // bond(ethereumSigner, "ethereum", 10000n);
+
+  let ethereumSigner = new ethers.Wallet(privateKey, ethereumProvider);
+  //bond(ethereumSigner, "ethereum", 10000n);
+  unbond(ethereumSigner, "ethereum", 10000n);
 } else {
   console.log("no private key in env var");
 }
@@ -161,12 +164,12 @@ if (privateKey) {
 // cw20 of ebaby on babylon address = bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9
 //predictWrappedTokenV2(signer, 7n, toHex("bbn1cnx34p82zngq0uuaendsne0x4s5gsm7gpwk2es8zk8rz8tnj938qqyq8f9"));
 
-let address = await getAddress(
-  "0x15Ee7c367F4232241028c36E720803100757c6e9",
-  ChannelId.make(3),
-  "bbn1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292q77945h",
-  bytecode_base_checksum,
-  module_hash
-);
+// let address = await getAddress(
+//   "0x15Ee7c367F4232241028c36E720803100757c6e9",
+//   ChannelId.make(3),
+//   "bbn1336jj8ertl8h7rdvnz4dh5rqahd09cy0x43guhsxx6xyrztx292q77945h",
+//   bytecode_base_checksum,
+//   module_hash
+// );
 
-console.log(address);
+// console.log(address);
