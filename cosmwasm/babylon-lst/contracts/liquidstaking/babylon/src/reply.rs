@@ -102,24 +102,44 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response,
         };
         let params = PARAMETERS.load(deps.storage)?;
 
+        // create allowance msg to zkgm token minter
+        msgs.push(
+            wasm_execute(
+                params.cw20_address.clone(),
+                &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+                    spender: params.zkgm_token_minter,
+                    amount,
+                    expires: None,
+                },
+                vec![],
+            )?
+            .into(),
+        );
+
         let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
         quote_token_string.clone_from(&quote_token.lst_quote_token);
 
-        let send_msg = transfer::send_token_order_v2_escrow(
-            &params.ucs03_relay_contract.clone(),
-            &ZkgmTransfer {
-                sender: env.contract.address.to_string(),
-                amount,
-                recipient,
-                recipient_channel_id: channel_id,
-                salt: payload.salt,
-                time: env.block.time,
-            },
-            params.cw20_address.as_ref(),
-            &quote_token_string,
-        )?;
-
-        msgs.push(send_msg);
+        // create send ucs03 zkgm msg
+        msgs.push(
+            Ucs03Zkgm::new(
+                params.ucs03_relay_contract.clone(),
+                TokenPair {
+                    base_token: params.cw20_address.to_string(),
+                    quote_token: quote_token_string.clone(),
+                },
+            )
+            .transfer_escrow_with_funds(
+                &ZkgmTransfer {
+                    sender: env.contract.address.to_string(),
+                    amount,
+                    recipient,
+                    recipient_channel_id: channel_id,
+                    salt: payload.salt,
+                    time: env.block.time,
+                },
+                &[], // to transfer cw20 based token (liquid staking token), no need to attach funds
+            )?,
+        );
     } else {
         let receiver = match payload.recipient.clone() {
             Some(receiver) => receiver,
@@ -158,28 +178,29 @@ fn on_mint_and_send_zkgm(
     let params = PARAMETERS.load(deps.storage)?;
     let quote_token = QUOTE_TOKEN.load(deps.storage, zkgm_transfer.recipient_channel_id)?;
 
-    // create allowance msg to zkgm token minter
-    let allowance_msg = wasm_execute(
-        params.cw20_address.clone(),
-        &cw20::Cw20ExecuteMsg::IncreaseAllowance {
-            spender: params.zkgm_token_minter,
-            amount: zkgm_transfer.amount,
-            expires: None,
-        },
-        vec![],
-    )?;
-
-    // create send ucs03 zkgm msg
-    let send_msg = Ucs03Zkgm::new(
-        params.ucs03_relay_contract.clone(),
-        TokenPair {
-            base_token: params.cw20_address.to_string(),
-            quote_token: quote_token.lst_quote_token.clone(),
-        },
-    )
-    .transfer_escrow(&zkgm_transfer)?;
-
-    let msgs: Vec<CosmosMsg> = vec![allowance_msg.into(), send_msg];
+    // construct send allowance and ucs03 zkgm send message
+    let msgs: Vec<CosmosMsg> = vec![
+        // 1. send allowance msg
+        wasm_execute(
+            params.cw20_address.clone(),
+            &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+                spender: params.zkgm_token_minter,
+                amount: zkgm_transfer.amount,
+                expires: None,
+            },
+            vec![],
+        )?
+        .into(),
+        // 2. send to ucs03 msg without funds as we transfer cw20 denom
+        Ucs03Zkgm::new(
+            params.ucs03_relay_contract.clone(),
+            TokenPair {
+                base_token: params.cw20_address.to_string(),
+                quote_token: quote_token.lst_quote_token.clone(),
+            },
+        )
+        .transfer_escrow_with_funds(&zkgm_transfer, &[])?,
+    ];
 
     let res: Response = Response::new()
         .add_messages(msgs)
