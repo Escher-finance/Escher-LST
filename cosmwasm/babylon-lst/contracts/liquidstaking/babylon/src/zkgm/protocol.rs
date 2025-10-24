@@ -224,12 +224,11 @@ impl Ucs03Zkgm {
         }
     }
 
-    pub fn transfer_escrow(&self, payload: &ZkgmTransfer) -> Result<CosmosMsg, ContractError> {
-        send_token_order_v2_escrow(
-            &self.contract,
-            payload,
-            &self.token_pair.base_token,
-            &self.token_pair.quote_token,
-        )
+    pub fn transfer_escrow_with_funds(
+        &self,
+        payload: &ZkgmTransfer,
+        funds: &[Coin],
+    ) -> Result<CosmosMsg, ContractError> {
+        send_token_order_v2_escrow(&self.contract, payload, &self.token_pair, funds)
     }
 }
