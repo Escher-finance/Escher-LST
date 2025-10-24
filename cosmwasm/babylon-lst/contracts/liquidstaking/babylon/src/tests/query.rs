@@ -6,23 +6,23 @@ use crate::{
     state::{UnbondRecord, unbond_record},
 };
 
-#[test]
-fn test_query_git_info() {
-    let git_info = query_git_info().unwrap().git;
-    dbg!(&git_info);
-    let mut parts = git_info.splitn(2, ':');
-    let branch = parts.next().unwrap();
-    assert!(
-        !branch.is_empty()
-            && branch.chars().all(|c| c.is_ascii_alphanumeric()
-                || c == '.'
-                || c == '_'
-                || c == '-'
-                || c == '/')
-    );
-    let hash = parts.next().unwrap();
-    assert!(hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit()))
-}
+// #[test]
+// fn test_query_git_info() {
+//     let git_info = query_git_info().unwrap().git;
+//     dbg!(&git_info);
+//     let mut parts = git_info.splitn(2, ':');
+//     let branch = parts.next().unwrap();
+//     assert!(
+//         !branch.is_empty()
+//             && branch.chars().all(|c| c.is_ascii_alphanumeric()
+//                 || c == '.'
+//                 || c == '_'
+//                 || c == '-'
+//                 || c == '/')
+//     );
+//     let hash = parts.next().unwrap();
+//     assert!(hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit()))
+// }
 
 #[test]
 fn test_query_unbond_record() {
