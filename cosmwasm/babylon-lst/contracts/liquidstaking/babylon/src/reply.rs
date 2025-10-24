@@ -10,7 +10,7 @@ use crate::{
         PARAMETERS, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, SUPPLY_QUEUE,
         WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
     },
-    utils::{calc::get_next_epoch, transfer},
+    utils::calc::get_next_epoch,
     zkgm::protocol::{TokenPair, Ucs03Zkgm},
 };
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
