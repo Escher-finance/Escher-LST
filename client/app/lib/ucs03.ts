@@ -26,6 +26,10 @@ import { getSalt, getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
 import { ChannelId } from "@unionlabs/sdk/schema/channel";
 import { HexFromJson } from "@unionlabs/sdk/schema/hex";
 import { Batch, BatchAbi } from "@unionlabs/sdk/Ucs03";
+import Networks, {
+    ChainConfig,
+    SupportedNetworks,
+} from "@/config/networks.config";
 
 export const U_FROM_UNION_SOLVER_METADATA_TESTNET =
     "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000014ba5ed44733953d79717f6269357c77718c8ba5ed0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
@@ -459,33 +463,44 @@ export const getUnbondCallsInstruction = async (
     return calls;
 };
 
-export const unbondFromEthToBabylon = async (
+export const unbond = async (
     sender: string,
     amount: bigint,
-    channel_id: number,
-    proxy_address: string,
-    ethChainName: string,
+    proxyAddress: string,
+    targetChain: "babylon",
+    network: ChainConfig,
 ) => {
     let salt = getSalt();
     console.log(salt);
 
+    if (
+        !network?.escher?.stakedBaseToken ||
+        !network?.escher?.channel[targetChain].stakedQuoteToken
+    ) {
+        throw Error("no staked base token or staked quote token");
+    }
     console.log("amount:", amount);
 
     let tokenOrder = tokenOrderV2Unescrow(
         sender.toLowerCase(),
-        proxy_address,
-        EBABY_ERC20[ethChainName],
+        proxyAddress,
+        network?.escher?.stakedBaseToken,
         amount,
-        toHex(ebabyOnBabylon),
+        toHex(network?.escher?.channel[targetChain].stakedQuoteToken),
         amount,
     );
 
+    let targetChainName: SupportedNetworks =
+        network?.chainName.indexOf("mainnet") != -1
+            ? `${targetChain}-mainnet`
+            : `${targetChain}-testnet`;
     let calls = await getUnbondCallsInstruction(
         sender,
         amount.toString(),
-        BABYLON_SOURCE_CHANNEL_ID[ethChainName],
-        proxy_address,
-        isMainnet,
+        network?.escher?.channel[targetChain].sourceChannelId,
+        proxyAddress,
+        Networks[targetChainName].contracts.lst,
+        Networks[targetChainName].contracts.cw20,
     );
 
     console.log({ tokenOrder, calls });
@@ -515,7 +530,6 @@ export const unbondFromEthToBabylon = async (
         ],
     ];
     const batchOperand = encodeAbiParameters(BatchAbi(), batchInstructions);
-    //console.log({ batchInstructions, batchOperand });
 
     return Instruction.make({
         version: batchCall.version,
