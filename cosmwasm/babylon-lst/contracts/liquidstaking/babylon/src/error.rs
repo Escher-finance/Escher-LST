@@ -160,6 +160,9 @@ pub enum ContractError {
     #[error("no salt")]
     NoSalt,
 
+    #[error("invalid salt")]
+    InvalidSalt(#[from] unionlabs_primitives::encoding::HexPrefixedFromStrError),
+
     #[error("batch received amount: {received_amount} exceed {expected_native_unstaked}")]
     SlashBatchReceivedAmountExceedExpected {
         batch_id: u64,

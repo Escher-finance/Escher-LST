@@ -3,7 +3,7 @@ use cosmwasm_std::testing::mock_dependencies;
 use crate::{
     ContractError,
     state::{QuoteToken, Validator},
-    utils::validation::*,
+    utils::validation::{self, *},
 };
 
 #[test]
@@ -115,6 +115,32 @@ fn test_is_on_chain_recipient() {
 }
 
 #[test]
-fn test_validate_recipient_channel_id_none() {
-    let channel_id = None;
+fn test_validate_recipient_on_chain_recipient() {
+    let mut deps = mock_dependencies();
+    let recipient = deps.api.addr_make("user");
+
+    // invalid recipient
+    assert!(
+        validation::validate_recipient(
+            &deps.as_mut(),
+            Some("invalid".to_string()),
+            None,
+            None,
+            &None,
+        )
+        .is_err()
+    );
+
+    // missing recipient
+    assert!(validation::validate_recipient(&deps.as_mut(), None, None, None, &None).is_err());
+
+    let on_chain_recipient = validation::validate_recipient(
+        &deps.as_mut(),
+        Some(recipient.to_string()),
+        None,
+        None,
+        &None,
+    )
+    .unwrap();
+    assert_eq!(on_chain_recipient, true);
 }
