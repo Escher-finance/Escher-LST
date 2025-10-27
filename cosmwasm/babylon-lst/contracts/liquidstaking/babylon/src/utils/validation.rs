@@ -60,8 +60,14 @@ pub fn validate_recipient(
     let mut on_chain_recipient = false;
     // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
     if recipient.is_some() && recipient_channel_id.is_none() && recipient_ibc_channel_id.is_none() {
-        deps.api
-            .addr_validate(recipient.clone().unwrap().as_str())?;
+        match recipient.as_ref() {
+            Some(recipient) => deps.api.addr_validate(recipient.as_str())?,
+            None => {
+                return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+                    "missing recipient",
+                )));
+            }
+        };
         on_chain_recipient = true;
     }
 
