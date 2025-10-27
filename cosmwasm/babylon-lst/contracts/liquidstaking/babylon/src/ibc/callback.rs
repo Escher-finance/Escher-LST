@@ -5,7 +5,7 @@ use cosmwasm_std::{
 use ibc::apps::transfer::types::proto::transfer::v2::FungibleTokenPacketData;
 
 use crate::{
-    event::{BondEvent, IbcCallbackEvent},
+    event::{BondEvent, BondEventParams, IbcCallbackEvent},
     msg::{Recipient, ZkgmTransfer},
     reply::MINT_AND_SEND_ZKGM_REPLY_ID,
     state::{PARAMETERS, STATUS},
@@ -179,7 +179,7 @@ pub fn ibc_destination_callback(
         Recipient::OnChain { address } => {
             // mint staked token to on chain recipient address
             msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: bond_data.cw20_address,
+                contract_addr: bond_data.cw20_address.clone(),
                 msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint {
                     recipient: address.to_string(),
                     amount: bond_data.mint_amount,
@@ -224,25 +224,16 @@ pub fn ibc_destination_callback(
         }
     }
 
-    // create bond event here
-    let bond_event = BondEvent(
-        packet_data.sender.clone(),
-        packet_data.sender.clone(),
-        amount,
-        bond_data.delegated_amount,
-        bond_data.mint_amount,
-        bond_data.total_bond_amount,
-        bond_data.total_supply,
-        bond_data.exchange_rate,
-        String::new(),
-        env.block.time,
-        params.underlying_coin_denom.clone(),
-        the_recipient.clone(),
+    let bond_event = BondEvent(BondEventParams {
+        sender: packet_data.sender.clone(),
+        staker: packet_data.sender.clone(),
+        bond_data,
+        channel_id: String::new(),
+        time: env.block.time,
+        recipient: the_recipient.clone(),
         recipient_channel_id,
-        bond_data.reward_balance,
-        bond_data.unclaimed_reward,
-        recipient_ibc_channel_id,
-    );
+        ibc_channel_id: recipient_ibc_channel_id,
+    });
 
     let ibc_callback_event = IbcCallbackEvent(
         packet_data.sender,

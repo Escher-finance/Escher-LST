@@ -1,57 +1,56 @@
 use cosmwasm_std::{Attribute, Decimal, Event, Timestamp, Uint128, attr};
 
-use crate::state::Validator;
+use crate::{msg::BondData, state::Validator};
 pub const BOND_EVENT: &str = "bond";
+
+/// Struct to encapsulate BondEvent parameters
+#[derive(Clone, Debug)]
+pub struct BondEventParams {
+    pub sender: String,
+    pub staker: String,
+    pub bond_data: BondData,
+    pub channel_id: String,
+    pub time: Timestamp,
+    pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
+    pub ibc_channel_id: Option<String>,
+}
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
 #[must_use]
-pub fn BondEvent(
-    sender: String,
-    staker: String,
-    bond_amount: Uint128,
-    delegated_amount: Uint128,
-    minted_amount: Uint128,
-    total_bond_amount: Uint128,
-    total_supply: Uint128,
-    exchange_rate: Decimal,
-    channel_id: String,
-    time: Timestamp,
-    denom: String,
-    recipient: Option<String>,
-    recipient_channel_id: Option<u32>,
-    reward_balance: Uint128,
-    unclaimed_reward: Uint128,
-    ibc_channel_id: Option<String>,
-) -> Event {
-    let recipient = recipient.unwrap_or_default();
+pub fn BondEvent(params: BondEventParams) -> Event {
+    let recipient = params.recipient.unwrap_or_default();
 
-    let recipient_channel_id: String = match recipient_channel_id {
+    let recipient_channel_id: String = match params.recipient_channel_id {
         Some(channel_id) => channel_id.to_string(),
         None => "0".to_string(),
     };
 
-    let ibc_channel_id: String = match ibc_channel_id {
+    let ibc_channel_id: String = match params.ibc_channel_id {
         Some(channel_id) => channel_id.clone(),
         None => String::new(),
     };
 
     Event::new(BOND_EVENT.to_string())
-        .add_attribute("sender", sender)
-        .add_attribute("staker", staker)
-        .add_attribute("channel_id", channel_id)
-        .add_attribute("bond_amount", bond_amount)
-        .add_attribute("output_amount", minted_amount)
-        .add_attribute("delegated_amount", delegated_amount)
-        .add_attribute("total_bond_amount", total_bond_amount)
-        .add_attribute("total_supply", total_supply)
-        .add_attribute("exchange_rate", exchange_rate.atomics().to_string())
-        .add_attribute("time", format!("{}", time.nanos()))
-        .add_attribute("denom", denom)
+        .add_attribute("sender", params.sender)
+        .add_attribute("staker", params.staker)
+        .add_attribute("channel_id", params.channel_id)
+        .add_attribute("bond_amount", params.bond_data.bond_amount)
+        .add_attribute("output_amount", params.bond_data.mint_amount)
+        .add_attribute("delegated_amount", params.bond_data.delegated_amount)
+        .add_attribute("total_bond_amount", params.bond_data.total_bond_amount)
+        .add_attribute("total_supply", params.bond_data.total_supply)
+        .add_attribute(
+            "exchange_rate",
+            params.bond_data.exchange_rate.atomics().to_string(),
+        )
+        .add_attribute("time", format!("{}", params.time.nanos()))
+        .add_attribute("denom", params.bond_data.denom)
         .add_attribute("recipient", recipient)
         .add_attribute("recipient_channel_id", recipient_channel_id)
-        .add_attribute("reward_balance", reward_balance)
-        .add_attribute("unclaimed_reward", unclaimed_reward)
+        .add_attribute("reward_balance", params.bond_data.reward_balance)
+        .add_attribute("unclaimed_reward", params.bond_data.unclaimed_reward)
         .add_attribute("ibc_channel_id", ibc_channel_id)
 }
 

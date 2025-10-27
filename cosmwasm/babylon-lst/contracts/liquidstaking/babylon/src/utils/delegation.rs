@@ -18,7 +18,7 @@ use crate::{
     event::{SubmitBatchEvent, UnbondEventsFromAtts, UnstakeRequestEvent},
     execute::StakerUndelegation,
     msg::{
-        BondData, DelegationDiff, InjectData, LiquidityState, MintTokensPayload, RemoteBondData,
+        BondData, DelegationDiff, InjectData, LiquidityState, MintTokensPayload,
         ValidatorDelegation,
     },
     proto,
@@ -569,6 +569,9 @@ pub fn process_bond(
         msgs,
         sub_msgs,
         BondData {
+            bond_amount: amount,
+            denom: params.liquidstaking_denom.clone(),
+            cw20_address: params.cw20_address.to_string(),
             mint_amount,
             delegated_amount: state.total_delegated_amount,
             total_bond_amount: state.total_bond_amount,
@@ -638,7 +641,7 @@ pub fn delegate(
     amount: Uint128,
     min_mint_amount: Uint128,
     slippage: Option<Decimal>,
-) -> Result<(Vec<CosmosMsg>, RemoteBondData), ContractError> {
+) -> Result<(Vec<CosmosMsg>, BondData), ContractError> {
     let params = PARAMETERS.load(storage)?;
 
     let validators_reg = VALIDATORS_REGISTRY.load(storage)?;
@@ -708,7 +711,7 @@ pub fn delegate(
 
     Ok((
         msgs,
-        RemoteBondData {
+        BondData {
             denom: params.underlying_coin_denom.clone(),
             bond_amount: amount,
             mint_amount,

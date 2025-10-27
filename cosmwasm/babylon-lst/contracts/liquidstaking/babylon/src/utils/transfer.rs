@@ -137,7 +137,7 @@ pub fn send_token_order_v2_escrow(
         Err(_) => {
             return Err(ContractError::InvalidAddress {
                 kind: "quote_token".into(),
-                address: token_pair.quote_token.to_string(),
+                address: token_pair.quote_token.clone(),
                 reason: "address must be in hex and starts with 0x".to_string(),
             });
         }
