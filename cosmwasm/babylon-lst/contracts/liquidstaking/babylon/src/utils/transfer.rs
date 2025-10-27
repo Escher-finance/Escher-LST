@@ -160,7 +160,7 @@ pub fn send_token_order_v2_escrow(
         .into(),
     };
 
-    let timeout_timestamp_offset: u64 = 604800; // 7 days period
+    let timeout_timestamp_offset: u64 = 604_800; // 7 days period
     let timeout_timestamp =
         Timestamp::from_nanos(payload.time.plus_seconds(timeout_timestamp_offset).nanos());
 
