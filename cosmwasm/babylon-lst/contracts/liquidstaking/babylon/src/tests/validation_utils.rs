@@ -363,6 +363,32 @@ fn test_split_and_validate_recipient_zkgm() {
 }
 
 #[test]
+fn test_split_and_validate_recipient_ibc() {
+    let mut deps = mock_dependencies();
+    let ibc_channel_id = "channel-1".to_string();
+    let recipient_addr = "cosmwasmeeeeeeeeeeee".to_string();
+    let recipient = Recipient::IBC {
+        address: recipient_addr.clone(),
+        ibc_channel_id: ibc_channel_id.clone(),
+    };
+
+    IBC_CHANNELS
+        .save(
+            &mut deps.storage,
+            ibc_channel_id.clone(),
+            &"cosmwasm".to_string(),
+        )
+        .unwrap();
+
+    let result =
+        validation::split_and_validate_recipient(&deps.storage, &deps.api, recipient.clone())
+            .unwrap();
+    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.1, None);
+    assert_eq!(result.2, Some(ibc_channel_id));
+}
+
+#[test]
 fn test_validate_hex() {
     let value = "0xeeEEeeE98622c19Ea339Ea8827ae22Bbfc732671ce9Ea8827ae22Bbfc732671c".to_string();
 
