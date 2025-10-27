@@ -1,4 +1,4 @@
-use cosmwasm_std::testing::mock_dependencies;
+use cosmwasm_std::{Coin, Uint128, testing::mock_dependencies};
 
 use crate::{
     ContractError,
@@ -310,4 +310,30 @@ fn test_validate_hex() {
 
     validation::validate_hex(&value, "hex", Some(64)).unwrap();
     validation::validate_hex(&value, "hex", None).unwrap();
+}
+
+#[test]
+fn test_validate_required_coin() {
+    let coin = Coin::new(100_u128, "a".to_string());
+    let coin_other = Coin::new(100_u128, "b".to_string());
+
+    // invalid coin
+    assert!(validation::validate_required_coin(&[coin_other.clone()], &coin).is_err());
+
+    // insufficient amount
+    assert!(
+        validation::validate_required_coin(
+            &[coin_other.clone(), coin.clone()],
+            &Coin::new(coin.amount + Uint128::one(), coin.denom.clone()),
+        )
+        .is_err()
+    );
+
+    validation::validate_required_coin(&[coin.clone()], &coin).unwrap();
+    validation::validate_required_coin(&[coin_other.clone(), coin.clone()], &coin).unwrap();
+    validation::validate_required_coin(
+        &[coin_other.clone(), coin.clone()],
+        &Coin::new(coin.amount - Uint128::one(), coin.denom.clone()),
+    )
+    .unwrap();
 }
