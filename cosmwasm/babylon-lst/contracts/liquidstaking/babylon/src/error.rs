@@ -162,7 +162,7 @@ pub enum ContractError {
     #[error("invalid salt")]
     InvalidSalt(#[from] unionlabs_primitives::encoding::HexPrefixedFromStrError),
 
-    #[error("batch received amount exceed expected")]
+    #[error("batch received amount: {received_amount} exceed {expected_native_unstaked}")]
     SlashBatchReceivedAmountExceedExpected {
         batch_id: u64,
         received_amount: cosmwasm_std::Uint128,
@@ -171,4 +171,10 @@ pub enum ContractError {
 
     #[error("unsupported operation: {msg}")]
     UnsupportedOperation { msg: String },
+
+    #[error("insufficient allowance, {allowance} is lower than {required}")]
+    InsufficientAllowance {
+        allowance: cosmwasm_std::Uint128,
+        required: cosmwasm_std::Uint128,
+    },
 }

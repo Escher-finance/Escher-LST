@@ -1243,6 +1243,24 @@ pub fn unbond(
     let (recipient, recipient_channel_id, recipient_ibc_channel_id) =
         split_and_validate_recipient(deps.storage, recipient)?;
 
+    let params = PARAMETERS.load(deps.storage)?;
+
+    // add allowance check first
+    let allowance_response: cw20::AllowanceResponse = deps.querier.query_wasm_smart(
+        params.cw20_address.to_string(),
+        &cw20::Cw20QueryMsg::Allowance {
+            owner: info.sender.to_string(),
+            spender: env.contract.address.to_string(),
+        },
+    )?;
+
+    if allowance_response.allowance < amount {
+        return Err(ContractError::InsufficientAllowance {
+            allowance: allowance_response.allowance,
+            required: amount,
+        });
+    }
+
     let unstake_request_event = utils::delegation::unstake_request_in_batch(
         &env.clone(),
         deps.storage,
@@ -1259,7 +1277,7 @@ pub fn unbond(
     // it will throw error if sender not yet increase allowance to this contract
     let response = Response::new()
         .add_message(wasm_execute(
-            PARAMETERS.load(deps.storage)?.cw20_address.to_string(),
+            params.cw20_address.to_string(),
             &Cw20ExecuteMsg::TransferFrom {
                 owner: info.sender.to_string(),
                 recipient: env.contract.address.to_string(),
