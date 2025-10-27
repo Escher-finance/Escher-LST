@@ -141,7 +141,7 @@ pub fn split_and_validate_recipient(
             address,
             channel_id,
         } => {
-            // Used to pass salt verifications
+            // Used to bypass salt verifications
             let dummy_valid_salt =
                 "0xe5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf".to_string();
             let recipient = Some(address);

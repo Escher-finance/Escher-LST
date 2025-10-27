@@ -2,6 +2,7 @@ use cosmwasm_std::{Coin, Uint128, testing::mock_dependencies};
 
 use crate::{
     ContractError,
+    msg::Recipient,
     state::{CHAINS, Chain, IBC_CHANNELS, QuoteToken, Validator},
     utils::validation::{self, *},
 };
@@ -320,6 +321,20 @@ fn test_validate_recipient_ibc_channel_id() {
     )
     .unwrap();
     assert_eq!(on_chain_recipient, false);
+}
+
+#[test]
+fn test_split_and_validate_recipient_on_chain() {
+    let deps = mock_dependencies();
+    let recipient_addr = deps.api.addr_make("user");
+    let recipient = Recipient::OnChain {
+        address: recipient_addr.clone(),
+    };
+    let result =
+        validation::split_and_validate_recipient(&deps.storage, &deps.api, recipient).unwrap();
+    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.1, None);
+    assert_eq!(result.2, None);
 }
 
 #[test]
