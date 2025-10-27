@@ -134,7 +134,7 @@ pub enum ContractError {
     #[error("invalid/unsupported recipient ibc channel id")]
     InvalidIBCChannelId {},
 
-    #[error("invalid {kind} address: {address} because: {reason}")]
+    #[error("invalid {kind} address/hex: {address} because: {reason}")]
     InvalidAddress {
         kind: String,
         address: String,
@@ -158,9 +158,6 @@ pub enum ContractError {
 
     #[error("no salt")]
     NoSalt,
-
-    #[error("invalid salt")]
-    InvalidSalt(#[from] unionlabs_primitives::encoding::HexPrefixedFromStrError),
 
     #[error("batch received amount: {received_amount} exceed {expected_native_unstaked}")]
     SlashBatchReceivedAmountExceedExpected {
