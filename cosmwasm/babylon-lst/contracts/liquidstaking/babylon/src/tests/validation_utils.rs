@@ -113,3 +113,8 @@ fn test_is_on_chain_recipient() {
     );
     assert!(!is_same_chain_recipient);
 }
+
+#[test]
+fn test_validate_recipient_channel_id_none() {
+    let channel_id = None;
+}
