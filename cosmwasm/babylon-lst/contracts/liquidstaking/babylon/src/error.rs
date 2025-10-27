@@ -1,5 +1,6 @@
 use cosmwasm_std::StdError;
 use cw_ownable::OwnershipError;
+use cw_utils::PaymentError;
 use thiserror::Error;
 
 use crate::utils::batch::BatchStatus;
@@ -177,4 +178,7 @@ pub enum ContractError {
         allowance: cosmwasm_std::Uint128,
         required: cosmwasm_std::Uint128,
     },
+
+    #[error(transparent)]
+    Payment(#[from] PaymentError),
 }
