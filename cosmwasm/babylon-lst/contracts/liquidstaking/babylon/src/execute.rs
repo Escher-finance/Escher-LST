@@ -56,7 +56,7 @@ pub fn bond(
     env: Env,
     info: MessageInfo,
     slippage: Option<Decimal>,
-    expected: Uint128,
+    min_mint_amount: Uint128,
     recipient: Recipient,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
@@ -79,7 +79,7 @@ pub fn bond(
         deps.querier,
         env.clone(),
         coin.amount,
-        expected,
+        min_mint_amount,
         slippage,
     )?;
 
@@ -125,6 +125,7 @@ pub fn bond(
     let bond_event = BondEvent(BondEventParams {
         sender: info.sender.to_string(),
         staker: info.sender.to_string(),
+        min_mint_amount,
         bond_data,
         channel_id: String::new(),
         time: env.block.time,
@@ -192,6 +193,7 @@ pub fn remote_bond(
     let bond_event = BondEvent(BondEventParams {
         sender: info.sender.to_string(),
         staker: info.sender.to_string(),
+        min_mint_amount,
         bond_data,
         channel_id: String::new(),
         time: env.block.time,
