@@ -72,19 +72,19 @@ pub fn validate_recipient(
             return Err(ContractError::InvalidChannelId {});
         }
 
-        if !recipient.clone().unwrap().starts_with("0x") {
-            return Err(ContractError::InvalidAddress {
-                kind: "recipient".into(),
-                address: recipient.unwrap(),
-                reason: "address must be in hex and starts with 0x".to_string(),
-            });
-        }
+        match recipient.as_ref() {
+            Some(recipient) => validate_hex(recipient, "recipient", None),
+            None => Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+                "missing recipient",
+            ))),
+        }?;
 
-        if salt.is_none() {
-            return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+        match salt.as_ref() {
+            Some(salt) => validate_salt(salt),
+            None => Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
                 "missing salt",
-            )));
-        }
+            ))),
+        }?;
     }
 
     if let Some(recipient_ibc_channel_id) = recipient_ibc_channel_id {
@@ -96,14 +96,24 @@ pub fn validate_recipient(
 
         let prefix = ibc_channel_result.unwrap();
 
-        if !recipient.clone().unwrap().starts_with(&prefix) {
-            return Err(ContractError::InvalidAddress {
-                kind: "recipient".into(),
-                address: recipient.unwrap(),
-                reason: format!("address prefix must starts with {prefix}"),
-            });
-        }
+        match recipient.as_ref() {
+            Some(recipient) => {
+                if recipient.starts_with(&prefix) {
+                    Ok(())
+                } else {
+                    Err(ContractError::InvalidAddress {
+                        kind: "recipient".into(),
+                        address: recipient.to_string(),
+                        reason: format!("missing {prefix} prefix"),
+                    })
+                }
+            }
+            None => Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+                "missing recipient",
+            ))),
+        }?;
     }
+
     Ok(on_chain_recipient)
 }
 
@@ -190,4 +200,40 @@ pub fn validate_required_coin(funds: &[Coin], min_bond: &Coin) -> Result<Coin, C
         return Err(ContractError::BondAmountTooLow {});
     }
     Ok(coin)
+}
+
+pub fn validate_salt(salt: &str) -> Result<(), ContractError> {
+    validate_hex(salt, "sal", Some(64))
+}
+
+pub fn validate_hex(
+    value: &str,
+    label_for_error: &str,
+    length: Option<usize>,
+) -> Result<(), ContractError> {
+    let hex = value
+        .strip_prefix("0x")
+        .ok_or(ContractError::InvalidAddress {
+            kind: label_for_error.into(),
+            address: value.to_string(),
+            reason: "missing 0x prefix".to_string(),
+        })?;
+    if !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(ContractError::InvalidAddress {
+            kind: label_for_error.into(),
+            address: value.to_string(),
+            reason: "invalid hex chars".to_string(),
+        });
+    }
+    if let Some(length) = length {
+        let hex_len = hex.len();
+        if hex_len != length {
+            return Err(ContractError::InvalidAddress {
+                kind: label_for_error.into(),
+                address: value.to_string(),
+                reason: format!("invalid length, expected {length}, got {hex_len}"),
+            });
+        }
+    }
+    Ok(())
 }
