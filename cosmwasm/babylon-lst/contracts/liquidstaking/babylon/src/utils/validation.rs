@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use cosmwasm_std::{Coin, Uint128};
+use cosmwasm_std::{Api, Coin, Storage, Uint128};
 
 use crate::{
     ContractError,
@@ -51,7 +51,8 @@ pub fn validate_quote_tokens(quote_tokens: &[QuoteToken]) -> Result<(), Contract
 /// Errors:
 /// - Returns address/channel validation errors or missing salt errors.
 pub fn validate_recipient(
-    deps: &cosmwasm_std::DepsMut,
+    storage: &dyn Storage,
+    api: &dyn Api,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     recipient_ibc_channel_id: Option<String>,
@@ -61,7 +62,7 @@ pub fn validate_recipient(
     // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
     if recipient_channel_id.is_none() && recipient_ibc_channel_id.is_none() {
         match recipient.as_ref() {
-            Some(recipient) => deps.api.addr_validate(recipient.as_str())?,
+            Some(recipient) => api.addr_validate(recipient.as_str())?,
             None => {
                 return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
                     "missing recipient",
@@ -76,7 +77,7 @@ pub fn validate_recipient(
         if recipient_channel_id == 0 {
             return Err(ContractError::InvalidChannelId {});
         }
-        let channel_id = crate::state::CHAINS.load(deps.storage, recipient_channel_id);
+        let channel_id = crate::state::CHAINS.load(storage, recipient_channel_id);
         if channel_id.is_err() {
             return Err(ContractError::InvalidChannelId {});
         }
@@ -98,7 +99,7 @@ pub fn validate_recipient(
 
     if let Some(recipient_ibc_channel_id) = recipient_ibc_channel_id {
         let ibc_channel_result: Result<String, cosmwasm_std::StdError> =
-            crate::state::IBC_CHANNELS.load(deps.storage, recipient_ibc_channel_id);
+            crate::state::IBC_CHANNELS.load(storage, recipient_ibc_channel_id);
         if ibc_channel_result.is_err() {
             return Err(ContractError::InvalidIBCChannelId {});
         }
@@ -130,7 +131,8 @@ pub fn validate_recipient(
 /// - Returns contract error if zkgm channel id is 0
 #[allow(clippy::type_complexity)]
 pub fn split_and_validate_recipient(
-    storage: &mut dyn cosmwasm_std::Storage,
+    storage: &dyn Storage,
+    api: &dyn Api,
     recipient: Recipient,
 ) -> Result<(Option<String>, Option<u32>, Option<String>), ContractError> {
     let (recipient_addr, recipient_channel_id, recipient_ibc_channel_id) = match recipient {
@@ -139,34 +141,36 @@ pub fn split_and_validate_recipient(
             address,
             channel_id,
         } => {
-            if channel_id == 0 {
-                return Err(ContractError::InvalidChannelId {});
-            }
-            let Ok(_) = crate::state::CHAINS.load(storage, channel_id) else {
-                return Err(ContractError::InvalidChannelId {});
-            };
-            (Some(address.clone()), Some(channel_id), None)
+            // Used to pass salt verifications
+            let dummy_valid_salt =
+                "0xe5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf".to_string();
+            let recipient = Some(address);
+            let recipient_channel_id = Some(channel_id);
+            validate_recipient(
+                storage,
+                api,
+                recipient.clone(),
+                recipient_channel_id,
+                None,
+                &Some(dummy_valid_salt),
+            )?;
+            (recipient, recipient_channel_id, None)
         }
         Recipient::IBC {
             address,
             ibc_channel_id,
         } => {
-            let ibc_channel_result: Result<String, cosmwasm_std::StdError> =
-                crate::state::IBC_CHANNELS.load(storage, ibc_channel_id.clone());
-            if ibc_channel_result.is_err() {
-                return Err(ContractError::InvalidIBCChannelId {});
-            }
-
-            let prefix = ibc_channel_result.unwrap();
-
-            if !address.starts_with(&prefix) {
-                return Err(ContractError::InvalidAddress {
-                    kind: "recipient".into(),
-                    address,
-                    reason: format!("address prefix must start with {prefix}"),
-                });
-            }
-            (Some(address), None, Some(ibc_channel_id))
+            let recipient = Some(address);
+            let recipient_ibc_channel_id = Some(ibc_channel_id);
+            validate_recipient(
+                storage,
+                api,
+                recipient.clone(),
+                None,
+                recipient_ibc_channel_id.clone(),
+                &None,
+            )?;
+            (recipient, None, recipient_ibc_channel_id)
         }
     };
 
