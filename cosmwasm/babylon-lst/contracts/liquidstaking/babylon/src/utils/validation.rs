@@ -208,12 +208,13 @@ pub fn validate_hex(
     label_for_error: &str,
     length: Option<usize>,
 ) -> Result<(), ContractError> {
+    let prefix = "0x";
     let hex = value
-        .strip_prefix("0x")
+        .strip_prefix(prefix)
         .ok_or(ContractError::InvalidAddress {
             kind: label_for_error.into(),
             address: value.to_string(),
-            reason: "missing 0x prefix".to_string(),
+            reason: format!("missing {prefix} prefix"),
         })?;
     if !hex.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(ContractError::InvalidAddress {
