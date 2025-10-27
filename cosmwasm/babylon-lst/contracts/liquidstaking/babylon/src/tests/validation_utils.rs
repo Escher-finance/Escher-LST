@@ -173,6 +173,18 @@ fn test_validate_recipient_channel_id() {
         .is_err()
     );
 
+    // invalid channel_id
+    assert!(
+        validation::validate_recipient(
+            &deps.as_mut(),
+            Some(recipient.to_string()),
+            Some(0),
+            None,
+            &Some(salt.to_string()),
+        )
+        .is_err()
+    );
+
     // missing recipient
     assert!(
         validation::validate_recipient(

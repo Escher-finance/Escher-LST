@@ -73,6 +73,9 @@ pub fn validate_recipient(
 
     // if recipient_channel_id exists, must make sure the chain is supported and recipient address is in hex
     if let Some(recipient_channel_id) = recipient_channel_id {
+        if recipient_channel_id == 0 {
+            return Err(ContractError::InvalidChannelId {});
+        }
         let channel_id = crate::state::CHAINS.load(deps.storage, recipient_channel_id);
         if channel_id.is_err() {
             return Err(ContractError::InvalidChannelId {});
