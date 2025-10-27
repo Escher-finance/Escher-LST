@@ -188,9 +188,6 @@ pub fn is_on_chain_recipient(
 
 pub fn validate_required_coin(funds: &[Coin], min_bond: &Coin) -> Result<Coin, ContractError> {
     // coin must have be sent along with transaction and it should be in underlying coin denom
-    if funds.len() > 1usize {
-        return Err(ContractError::InvalidAsset {});
-    }
     let coin = funds
         .iter()
         .find(|x| x.denom == min_bond.denom && x.amount > Uint128::zero())
