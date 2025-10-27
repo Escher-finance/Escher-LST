@@ -11,8 +11,9 @@ use unionlabs_primitives::Bytes;
 use crate::{
     error::ContractError,
     event::{
-        BatchReceivedEvent, BatchReleasedEvent, BondEvent, ProcessBatchUnbondingEvent,
-        ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent, UpdateValidatorsEvent,
+        BatchReceivedEvent, BatchReleasedEvent, BondEvent, BondEventParams,
+        ProcessBatchUnbondingEvent, ProcessRewardsEvent, ProcessUnbondingEvent, SplitRewardEvent,
+        UpdateValidatorsEvent,
     },
     helpers,
     msg::{
@@ -89,7 +90,7 @@ pub fn bond(
         Recipient::OnChain { address } => {
             // mint staked token to on chain recipient address
             msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: bond_data.cw20_address,
+                contract_addr: bond_data.cw20_address.clone(),
                 msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint {
                     recipient: address.to_string(),
                     amount: bond_data.mint_amount,
@@ -121,25 +122,16 @@ pub fn bond(
         }
     }
 
-    // create bond event here
-    let bond_event = BondEvent(
-        info.sender.to_string(),
-        info.sender.to_string(),
-        coin.amount,
-        bond_data.delegated_amount,
-        bond_data.mint_amount,
-        bond_data.total_bond_amount,
-        bond_data.total_supply,
-        bond_data.exchange_rate,
-        String::new(),
-        env.block.time,
-        params.underlying_coin_denom.clone(),
-        the_recipient.clone(),
+    let bond_event = BondEvent(BondEventParams {
+        sender: info.sender.to_string(),
+        staker: info.sender.to_string(),
+        bond_data,
+        channel_id: String::new(),
+        time: env.block.time,
+        recipient: the_recipient.clone(),
         recipient_channel_id,
-        bond_data.reward_balance,
-        bond_data.unclaimed_reward,
-        recipient_ibc_channel_id,
-    );
+        ibc_channel_id: recipient_ibc_channel_id,
+    });
 
     let res: Response = Response::new().add_messages(msgs).add_event(bond_event);
     Ok(res)
@@ -188,7 +180,7 @@ pub fn remote_bond(
 
     // mint staked token to mint_to_address
     msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: bond_data.cw20_address,
+        contract_addr: bond_data.cw20_address.clone(),
         msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint {
             recipient: mint_to_address.to_string(),
             amount: bond_data.mint_amount,
@@ -197,24 +189,16 @@ pub fn remote_bond(
     }));
 
     // create bond event here
-    let bond_event = BondEvent(
-        info.sender.to_string(),
-        info.sender.to_string(),
-        bond_data.bond_amount,
-        bond_data.delegated_amount,
-        bond_data.mint_amount,
-        bond_data.total_bond_amount,
-        bond_data.total_supply,
-        bond_data.exchange_rate,
-        String::new(),
-        env.block.time,
-        bond_data.denom.clone(),
-        None,
-        None,
-        bond_data.reward_balance,
-        bond_data.unclaimed_reward,
-        None,
-    );
+    let bond_event = BondEvent(BondEventParams {
+        sender: info.sender.to_string(),
+        staker: info.sender.to_string(),
+        bond_data,
+        channel_id: String::new(),
+        time: env.block.time,
+        recipient: None,
+        recipient_channel_id: None,
+        ibc_channel_id: None,
+    });
 
     let res: Response = Response::new()
         .add_messages(msgs)

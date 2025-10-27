@@ -374,7 +374,7 @@ pub enum ZkgmMessage {
 }
 
 #[cw_serde]
-pub struct BondData {
+pub struct OldBondData {
     pub mint_amount: Uint128,
     pub delegated_amount: Uint128,
     pub total_bond_amount: Uint128,
@@ -385,7 +385,7 @@ pub struct BondData {
 }
 
 #[cw_serde]
-pub struct RemoteBondData {
+pub struct BondData {
     pub denom: String,
     pub bond_amount: Uint128,
     pub mint_amount: Uint128,
