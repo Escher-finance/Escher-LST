@@ -154,7 +154,7 @@ pub fn split_and_validate_recipient(
                 return Err(ContractError::InvalidAddress {
                     kind: "recipient".into(),
                     address,
-                    reason: format!("address prefix must starts with {prefix}"),
+                    reason: format!("address prefix must start with {prefix}"),
                 });
             }
             (Some(address), None, Some(ibc_channel_id))
