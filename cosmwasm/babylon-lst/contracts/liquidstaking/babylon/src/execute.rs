@@ -166,7 +166,8 @@ pub fn receive(
     };
 
     validate_recipient(
-        &deps,
+        deps.storage,
+        deps.api,
         recipient.clone(),
         recipient_channel_id,
         recipient_ibc_channel_id.clone(),
@@ -1243,7 +1244,7 @@ pub fn unbond(
     }
 
     let (recipient, recipient_channel_id, recipient_ibc_channel_id) =
-        split_and_validate_recipient(deps.storage, recipient)?;
+        split_and_validate_recipient(deps.storage, deps.api, recipient)?;
 
     let params = PARAMETERS.load(deps.storage)?;
 

@@ -154,7 +154,7 @@ pub fn ibc_destination_callback(
     };
 
     let (the_recipient, recipient_channel_id, recipient_ibc_channel_id) =
-        match split_and_validate_recipient(deps.storage, payload.recipient.clone()) {
+        match split_and_validate_recipient(deps.storage, deps.api, payload.recipient.clone()) {
             Ok((the_recipient, recipient_channel_id, recipient_ibc_channel_id)) => (
                 the_recipient,
                 recipient_channel_id,

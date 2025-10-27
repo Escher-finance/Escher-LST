@@ -116,13 +116,14 @@ fn test_is_on_chain_recipient() {
 
 #[test]
 fn test_validate_recipient_on_chain_recipient() {
-    let mut deps = mock_dependencies();
+    let deps = mock_dependencies();
     let recipient = deps.api.addr_make("user");
 
     // invalid recipient
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             Some("invalid".to_string()),
             None,
             None,
@@ -132,10 +133,13 @@ fn test_validate_recipient_on_chain_recipient() {
     );
 
     // missing recipient
-    assert!(validation::validate_recipient(&deps.as_mut(), None, None, None, &None).is_err());
+    assert!(
+        validation::validate_recipient(&deps.storage, &deps.api, None, None, None, &None).is_err()
+    );
 
     let on_chain_recipient = validation::validate_recipient(
-        &deps.as_mut(),
+        &deps.storage,
+        &deps.api,
         Some(recipient.to_string()),
         None,
         None,
@@ -164,7 +168,8 @@ fn test_validate_recipient_channel_id() {
     // unknown channel_id
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             Some(recipient.to_string()),
             Some(5),
             None,
@@ -176,7 +181,8 @@ fn test_validate_recipient_channel_id() {
     // invalid channel_id
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             Some(recipient.to_string()),
             Some(0),
             None,
@@ -188,7 +194,8 @@ fn test_validate_recipient_channel_id() {
     // missing recipient
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             None,
             Some(channel_id),
             None,
@@ -200,7 +207,8 @@ fn test_validate_recipient_channel_id() {
     // invalid recipient
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             Some("invalid".to_string()),
             Some(channel_id),
             None,
@@ -212,7 +220,8 @@ fn test_validate_recipient_channel_id() {
     // missing salt
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             Some(recipient.to_string()),
             Some(channel_id),
             None,
@@ -224,7 +233,8 @@ fn test_validate_recipient_channel_id() {
     // invalid salt
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             Some(recipient.to_string()),
             Some(channel_id),
             None,
@@ -234,7 +244,8 @@ fn test_validate_recipient_channel_id() {
     );
 
     let on_chain_recipient = validation::validate_recipient(
-        &deps.as_mut(),
+        &deps.storage,
+        &deps.api,
         Some(recipient.to_string()),
         Some(channel_id),
         None,
@@ -263,7 +274,8 @@ fn test_validate_recipient_ibc_channel_id() {
     // unknown channel_id
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             Some(recipient.to_string()),
             None,
             Some("channel-2".to_string()),
@@ -275,7 +287,8 @@ fn test_validate_recipient_ibc_channel_id() {
     // missing recipient
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             None,
             None,
             Some(ibc_channel_id.clone()),
@@ -287,7 +300,8 @@ fn test_validate_recipient_ibc_channel_id() {
     // invalid recipient
     assert!(
         validation::validate_recipient(
-            &deps.as_mut(),
+            &deps.storage,
+            &deps.api,
             Some("invalid".to_string()),
             None,
             Some(ibc_channel_id.clone()),
@@ -297,7 +311,8 @@ fn test_validate_recipient_ibc_channel_id() {
     );
 
     let on_chain_recipient = validation::validate_recipient(
-        &deps.as_mut(),
+        &deps.storage,
+        &deps.api,
         Some(recipient.to_string()),
         None,
         Some(ibc_channel_id.clone()),
