@@ -338,6 +338,31 @@ fn test_split_and_validate_recipient_on_chain() {
 }
 
 #[test]
+fn test_split_and_validate_recipient_zkgm() {
+    let mut deps = mock_dependencies();
+    let channel_id = 1;
+    let recipient_addr = "0xeeEEeeE98622c19Ea39Ea8827ae22Bbfc732671c".to_string();
+    let recipient = Recipient::Zkgm {
+        address: recipient_addr.clone(),
+        channel_id,
+    };
+
+    let chain = Chain {
+        prefix: "cosmwasm".to_string(),
+        name: "chain".to_string(),
+        chain_id: "chain-1".to_string(),
+        ucs03_channel_id: channel_id,
+    };
+    CHAINS.save(&mut deps.storage, channel_id, &chain).unwrap();
+
+    let result =
+        validation::split_and_validate_recipient(&deps.storage, &deps.api, recipient).unwrap();
+    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.1, Some(channel_id));
+    assert_eq!(result.2, None);
+}
+
+#[test]
 fn test_validate_hex() {
     let value = "0xeeEEeeE98622c19Ea339Ea8827ae22Bbfc732671ce9Ea8827ae22Bbfc732671c".to_string();
 
