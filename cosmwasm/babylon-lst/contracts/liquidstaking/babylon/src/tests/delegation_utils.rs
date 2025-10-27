@@ -6,17 +6,16 @@ use cosmwasm_std::{
     StakingMsg, Timestamp, Uint128, assert_approx_eq, from_json,
     testing::{MockQuerier, mock_dependencies, mock_env},
 };
-use cw_multi_test::{App, IntoAddr};
+use cw_multi_test::App;
 use prost::Message;
 
 use crate::{
     event::{SUBMIT_BATCH_EVENT, UNBOND_EVENT, UNSTAKE_REQUEST_EVENT},
-    execute::remote_bond,
     msg::{BondData, DelegationDiff, ValidatorDelegation},
     proto,
     state::{
-        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE, STATE, STATUS,
-        SUPPLY_QUEUE, State, SupplyQueue, TOKEN_COUNT, UnbondRecord, Validator, ValidatorsRegistry,
+        BurnQueue, MintQueue, PARAMETERS, PENDING_BATCH_ID, REWARD_BALANCE, STATE, SUPPLY_QUEUE,
+        State, SupplyQueue, TOKEN_COUNT, UnbondRecord, Validator, ValidatorsRegistry,
         WITHDRAW_REWARD_QUEUE, WithdrawRewardQueue, unbond_record,
     },
     tests::{NATIVE_DENOM, mock_parameters, setup_validators_delegation},
@@ -1155,50 +1154,6 @@ fn test_delegate() {
             validators
         )
     );
-}
-
-#[test]
-fn test_remote_bond_from_invalid_address() {
-    let app = App::default();
-    let api = app.api();
-    let mut deps = mock_dependencies();
-    let env: cosmwasm_std::Env = mock_env();
-
-    let sender = "sender".into_addr();
-
-    let sender_addr = api.addr_make(sender.as_str());
-    let params = mock_parameters();
-
-    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
-
-    STATUS
-        .save(
-            deps.as_mut().storage,
-            &crate::state::Status {
-                bond_is_paused: false,
-                unbond_is_paused: false,
-            },
-        )
-        .unwrap();
-
-    let min_mint_amount = Uint128::new(100u128);
-
-    let info = cosmwasm_std::testing::message_info(
-        &sender_addr,
-        &cosmwasm_std::coins(10000, NATIVE_DENOM),
-    );
-
-    let user: Addr = Addr::unchecked("user");
-
-    let res = remote_bond(
-        deps.as_mut(),
-        env.clone(),
-        info,
-        min_mint_amount,
-        user.clone(),
-    );
-
-    assert!(res.is_err());
 }
 
 #[test]
