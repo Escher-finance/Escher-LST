@@ -993,6 +993,8 @@ fn test_process_bond() {
     assert_eq!(
         bond_data,
         BondData {
+            bond_amount: amount,
+            denom: params.underlying_coin_denom.clone(),
             mint_amount,
             delegated_amount: updated_state.total_delegated_amount,
             total_bond_amount: updated_state.total_bond_amount,
@@ -1000,6 +1002,7 @@ fn test_process_bond() {
             total_supply: updated_state.total_supply,
             reward_balance: Uint128::zero(),
             unclaimed_reward: Uint128::zero(),
+            cw20_address: params.cw20_address.to_string(),
         }
     );
     assert_eq!(
