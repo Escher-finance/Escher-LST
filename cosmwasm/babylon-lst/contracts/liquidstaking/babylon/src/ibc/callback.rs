@@ -227,6 +227,7 @@ pub fn ibc_destination_callback(
     let bond_event = BondEvent(BondEventParams {
         sender: packet_data.sender.clone(),
         staker: packet_data.sender.clone(),
+        min_mint_amount: payload.min_mint_amount,
         bond_data,
         channel_id: String::new(),
         time: env.block.time,

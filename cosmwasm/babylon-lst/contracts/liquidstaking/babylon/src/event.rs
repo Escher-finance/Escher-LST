@@ -8,6 +8,7 @@ pub const BOND_EVENT: &str = "bond";
 pub struct BondEventParams {
     pub sender: String,
     pub staker: String,
+    pub min_mint_amount: Uint128,
     pub bond_data: BondData,
     pub channel_id: String,
     pub time: Timestamp,
@@ -35,6 +36,7 @@ pub fn BondEvent(params: BondEventParams) -> Event {
     Event::new(BOND_EVENT.to_string())
         .add_attribute("sender", params.sender)
         .add_attribute("staker", params.staker)
+        .add_attribute("min_mint_amount", params.min_mint_amount)
         .add_attribute("channel_id", params.channel_id)
         .add_attribute("bond_amount", params.bond_data.bond_amount)
         .add_attribute("output_amount", params.bond_data.mint_amount)
