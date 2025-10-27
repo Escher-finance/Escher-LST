@@ -2,7 +2,7 @@ use cosmwasm_std::testing::mock_dependencies;
 
 use crate::{
     ContractError,
-    state::{CHAINS, Chain, QuoteToken, Validator},
+    state::{CHAINS, Chain, IBC_CHANNELS, QuoteToken, Validator},
     utils::validation::{self, *},
 };
 
@@ -227,6 +227,69 @@ fn test_validate_recipient_channel_id() {
         Some(channel_id),
         None,
         &Some(salt.to_string()),
+    )
+    .unwrap();
+    assert_eq!(on_chain_recipient, false);
+}
+
+#[test]
+fn test_validate_recipient_ibc_channel_id() {
+    let mut deps = mock_dependencies();
+    let ibc_channel_id = "channel-1".to_string();
+
+    IBC_CHANNELS
+        .save(
+            &mut deps.storage,
+            ibc_channel_id.clone(),
+            &"cosmwasm".to_string(),
+        )
+        .unwrap();
+
+    let recipient = "cosmwasmeeeeeeeeeeee";
+    let salt = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+
+    // unknown channel_id
+    assert!(
+        validation::validate_recipient(
+            &deps.as_mut(),
+            Some(recipient.to_string()),
+            None,
+            Some("channel-2".to_string()),
+            &Some(salt.to_string()),
+        )
+        .is_err()
+    );
+
+    // missing recipient
+    assert!(
+        validation::validate_recipient(
+            &deps.as_mut(),
+            None,
+            None,
+            Some(ibc_channel_id.clone()),
+            &Some(salt.to_string()),
+        )
+        .is_err()
+    );
+
+    // invalid recipient
+    assert!(
+        validation::validate_recipient(
+            &deps.as_mut(),
+            Some("invalid".to_string()),
+            None,
+            Some(ibc_channel_id.clone()),
+            &Some(salt.to_string()),
+        )
+        .is_err()
+    );
+
+    let on_chain_recipient = validation::validate_recipient(
+        &deps.as_mut(),
+        Some(recipient.to_string()),
+        None,
+        Some(ibc_channel_id.clone()),
+        &None,
     )
     .unwrap();
     assert_eq!(on_chain_recipient, false);
