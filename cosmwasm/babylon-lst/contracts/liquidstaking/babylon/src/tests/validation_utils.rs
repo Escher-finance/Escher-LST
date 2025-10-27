@@ -294,3 +294,20 @@ fn test_validate_recipient_ibc_channel_id() {
     .unwrap();
     assert_eq!(on_chain_recipient, false);
 }
+
+#[test]
+fn test_validate_hex() {
+    let value = "0xeeEEeeE98622c19Ea339Ea8827ae22Bbfc732671ce9Ea8827ae22Bbfc732671c".to_string();
+
+    // bad length
+    assert!(validation::validate_hex(&value, "hex", Some(63)).is_err());
+
+    // missing prefix
+    assert!(validation::validate_hex(&value.strip_prefix("0x").unwrap(), "hex", None).is_err());
+
+    // invalid hex chars
+    assert!(validation::validate_hex("0xescher", "hex", None).is_err());
+
+    validation::validate_hex(&value, "hex", Some(64)).unwrap();
+    validation::validate_hex(&value, "hex", None).unwrap();
+}
