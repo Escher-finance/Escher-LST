@@ -181,22 +181,13 @@ pub fn execute(
             let default_recipient = info.sender.clone().to_string();
             let recipient_string = recipient.unwrap_or(default_recipient);
             let recipient_address = deps.api.addr_validate(&recipient_string)?;
-            execute::bond(
-                deps,
-                env,
-                info,
-                slippage,
-                expected,
-                crate::msg::Recipient::OnChain {
-                    address: recipient_address,
-                },
-            )
+            execute::bond(deps, env, info, slippage, expected, recipient_address)
         }
-        ExecuteMsg::LocalBond {
+        ExecuteMsg::BondV2 {
             slippage,
             min_mint_amount,
-            recipient,
-        } => execute::bond(deps, env, info, slippage, min_mint_amount, recipient),
+            mint_to_address,
+        } => execute::bond(deps, env, info, slippage, min_mint_amount, mint_to_address),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
@@ -267,12 +258,8 @@ pub fn execute(
         ExecuteMsg::RemoveIbcChannel { ibc_channel_id } => {
             execute::remove_ibc_channel(deps, info, ibc_channel_id)
         }
-        ExecuteMsg::RemoteBond {
-            min_mint_amount,
-            mint_to_address,
-        } => execute::remote_bond(deps, env, info, min_mint_amount, mint_to_address),
-        ExecuteMsg::RemoteUnbond { amount, recipient } => {
-            execute::remote_unbond(deps, env, info, amount, recipient)
+        ExecuteMsg::Unbond { amount, recipient } => {
+            execute::unbond(deps, env, info, amount, recipient)
         }
         ExecuteMsg::SlashBatch {
             new_received_amounts,

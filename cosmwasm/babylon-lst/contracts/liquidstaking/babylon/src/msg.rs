@@ -120,10 +120,12 @@ pub enum ExecuteMsg {
         recipient_channel_id: Option<u32>,
         salt: Option<String>,
     },
-    LocalBond {
+    // Delegate native denom `amount` to validator
+    // Issue liquid staking token and send to mint_to_address.
+    BondV2 {
         slippage: Option<Decimal>,
         min_mint_amount: Uint128,
-        recipient: Recipient,
+        mint_to_address: Addr,
     },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
@@ -193,11 +195,7 @@ pub enum ExecuteMsg {
     RemoveIbcChannel {
         ibc_channel_id: String,
     },
-    RemoteBond {
-        min_mint_amount: Uint128,
-        mint_to_address: Addr,
-    },
-    RemoteUnbond {
+    Unbond {
         amount: Uint128,
         recipient: Recipient,
     },

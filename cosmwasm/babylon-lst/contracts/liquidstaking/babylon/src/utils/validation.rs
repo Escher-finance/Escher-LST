@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
-use cosmwasm_std::{Addr, Coin, QuerierWrapper, Uint128};
+use cosmwasm_std::{Coin, Uint128};
 
 use crate::{
     ContractError,
     msg::Recipient,
-    state::{Parameters, QuoteToken, Validator},
+    state::{QuoteToken, Validator},
 };
 
 /// Errors:
@@ -174,35 +174,6 @@ pub fn is_on_chain_recipient(
     }
 
     on_chain_recipient
-}
-
-/// Errors:
-/// - Returns `InvalidAddress` when sender is not the expected cw-account contract.
-pub fn validate_remote_sender(
-    querier: QuerierWrapper,
-    sender: &Addr,
-    params: &Parameters,
-) -> Result<(), ContractError> {
-    // assume sender is cw-account contract address if contract creator is the ucs03 contract
-    match querier.query_wasm_contract_info(sender) {
-        Ok(contract_info) => {
-            if contract_info.creator.to_string() != params.ucs03_relay_contract {
-                return Err(ContractError::InvalidAddress {
-                    kind: "remote_bond".to_string(),
-                    address: sender.to_string(),
-                    reason: "not cw-account contract".to_string(),
-                });
-            }
-        }
-        Err(_) => {
-            return Err(ContractError::InvalidAddress {
-                kind: "remote_bond".to_string(),
-                address: sender.to_string(),
-                reason: "not a contract".to_string(),
-            });
-        }
-    }
-    Ok(())
 }
 
 pub fn validate_required_coin(funds: &[Coin], min_bond: &Coin) -> Result<Coin, ContractError> {

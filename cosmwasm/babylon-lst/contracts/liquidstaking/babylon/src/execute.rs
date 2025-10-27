@@ -38,8 +38,8 @@ use crate::{
         delegation::{get_actual_total_delegated, get_actual_total_reward, submit_pending_batch},
         transfer::{get_send_bank_msg, ibc_transfer_msg},
         validation::{
-            split_and_validate_recipient, validate_recipient, validate_remote_sender,
-            validate_required_coin, validate_validators,
+            split_and_validate_recipient, validate_recipient, validate_required_coin,
+            validate_validators,
         },
     },
     zkgm::protocol::{TokenPair, Ucs03Zkgm, ucs03_transfer_v2},
@@ -57,7 +57,7 @@ pub fn bond(
     info: MessageInfo,
     slippage: Option<Decimal>,
     min_mint_amount: Uint128,
-    recipient: Recipient,
+    mint_to_address: Addr,
 ) -> Result<Response, ContractError> {
     let status = STATUS.load(deps.storage)?;
     if status.bond_is_paused {
@@ -83,102 +83,6 @@ pub fn bond(
         slippage,
     )?;
 
-    let (the_recipient, recipient_channel_id, recipient_ibc_channel_id) =
-        split_and_validate_recipient(deps.storage, recipient.clone())?;
-
-    match recipient {
-        Recipient::OnChain { address } => {
-            // mint staked token to on chain recipient address
-            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: bond_data.cw20_address.clone(),
-                msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint {
-                    recipient: address.to_string(),
-                    amount: bond_data.mint_amount,
-                })?,
-                funds: vec![],
-            }));
-        }
-        Recipient::Zkgm {
-            address: _,
-            channel_id: _,
-        } => {
-            // mint staked token to this contract
-            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: bond_data.cw20_address.clone(),
-                msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint {
-                    recipient: info.sender.to_string(),
-                    amount: bond_data.mint_amount,
-                })?,
-                funds: vec![],
-            }));
-        }
-        Recipient::IBC {
-            address: _,
-            ibc_channel_id: _,
-        } => {
-            return Err(ContractError::UnsupportedOperation {
-                msg: "can not send liquid staking token via ibc".to_string(),
-            });
-        }
-    }
-
-    let bond_event = BondEvent(BondEventParams {
-        sender: info.sender.to_string(),
-        staker: info.sender.to_string(),
-        min_mint_amount,
-        bond_data,
-        channel_id: String::new(),
-        time: env.block.time,
-        recipient: the_recipient.clone(),
-        recipient_channel_id,
-        ibc_channel_id: recipient_ibc_channel_id,
-    });
-
-    let res: Response = Response::new().add_messages(msgs).add_event(bond_event);
-    Ok(res)
-}
-
-/// Process remote bond call to contract, this will not send to any other chain address as send staked token back is attached on zkgm Calls
-/// # Result
-/// Will return result of `cosmwasm_std::Response`
-/// # Errors
-/// Will return contract error
-#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
-pub fn remote_bond(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    min_mint_amount: Uint128,
-    mint_to_address: Addr,
-) -> Result<Response, ContractError> {
-    let status = STATUS.load(deps.storage)?;
-    if status.bond_is_paused {
-        return Err(ContractError::FunctionalityUnderMaintenance {});
-    }
-
-    let params = PARAMETERS.load(deps.storage)?;
-
-    let coin = validate_required_coin(
-        &info.funds,
-        &Coin {
-            amount: params.min_bond,
-            denom: params.underlying_coin_denom.clone(),
-        },
-    )?;
-
-    // assume sender is cw-account contract address if contract creator is the ucs03 contract
-    validate_remote_sender(deps.querier, &info.sender, &params)?;
-
-    // handle delegation to validators
-    let (mut msgs, bond_data) = utils::delegation::delegate(
-        deps.storage,
-        deps.querier,
-        env.clone(),
-        coin.amount,
-        min_mint_amount,
-        None,
-    )?;
-
     // mint staked token to mint_to_address
     msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: bond_data.cw20_address.clone(),
@@ -189,7 +93,6 @@ pub fn remote_bond(
         funds: vec![],
     }));
 
-    // create bond event here
     let bond_event = BondEvent(BondEventParams {
         sender: info.sender.to_string(),
         staker: info.sender.to_string(),
@@ -197,16 +100,12 @@ pub fn remote_bond(
         bond_data,
         channel_id: String::new(),
         time: env.block.time,
-        recipient: None,
+        recipient: Some(mint_to_address.to_string()),
         recipient_channel_id: None,
         ibc_channel_id: None,
     });
 
-    let res: Response = Response::new()
-        .add_messages(msgs)
-        .add_event(bond_event)
-        .add_attributes(vec![attr("action", "remote_bond")]);
-
+    let res: Response = Response::new().add_messages(msgs).add_event(bond_event);
     Ok(res)
 }
 
@@ -1324,7 +1223,7 @@ pub fn remove_ibc_channel(
 /// # Errors
 /// Will return contract error
 #[allow(clippy::needless_pass_by_value)]
-pub fn remote_unbond(
+pub fn unbond(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -1335,10 +1234,6 @@ pub fn remote_unbond(
     if status.unbond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});
     }
-
-    let params = PARAMETERS.load(deps.storage)?;
-    // assume sender is cw-account contract address if contract creator is the ucs03 contract
-    validate_remote_sender(deps.querier, &info.sender, &params)?;
 
     let state = STATE.load(deps.storage)?;
     if state.exchange_rate < Decimal::one() {
@@ -1360,9 +1255,11 @@ pub fn remote_unbond(
         recipient_ibc_channel_id,
     )?;
 
+    // transfer the unbonded token from sender to this contract
+    // it will throw error if sender not yet increase allowance to this contract
     let response = Response::new()
         .add_message(wasm_execute(
-            params.cw20_address.to_string(),
+            PARAMETERS.load(deps.storage)?.cw20_address.to_string(),
             &Cw20ExecuteMsg::TransferFrom {
                 owner: info.sender.to_string(),
                 recipient: env.contract.address.to_string(),
