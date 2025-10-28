@@ -128,7 +128,7 @@ pub fn split_and_validate_recipient(
             };
             (Some(address.clone()), Some(channel_id), None)
         }
-        Recipient::IBC {
+        Recipient::Ibc {
             address,
             ibc_channel_id,
         } => {
