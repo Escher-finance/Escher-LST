@@ -1,8 +1,17 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{Decimal, Uint128};
+use cosmwasm_std::{
+    Addr, Coin, Decimal, Uint128,
+    testing::{message_info, mock_dependencies, mock_env, mock_info},
+};
 
-use crate::{ContractError, execute::*, state::QuoteToken, utils};
+use crate::{
+    ContractError,
+    execute::*,
+    state::{PARAMETERS, QuoteToken, STATUS, Status},
+    tests::mock_parameters,
+    utils,
+};
 
 #[test]
 fn test_calculate_native_token() {
@@ -404,4 +413,41 @@ fn test_slash_batch() {
         err,
         ContractError::BatchExpectedNativeUnstakedNotSet
     ));
+}
+
+#[test]
+fn test_bond_must_fail_if_invalid_funds() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let denom = "denom".to_string();
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[Coin::new(amount, denom.clone())]);
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let mut params = mock_parameters();
+    params.underlying_coin_denom = denom.clone();
+    params.min_bond = amount + Uint128::one();
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+
+    let err = bond(
+        deps.as_mut(),
+        env,
+        info,
+        None,
+        Uint128::one(),
+        sender.clone(),
+    )
+    .unwrap_err();
+
+    assert!(matches!(err, ContractError::BondAmountTooLow {}))
 }
