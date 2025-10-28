@@ -903,3 +903,37 @@ fn test_update_validators_must_fail_if_sender_not_owner() {
         ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
     ))
 }
+
+#[test]
+fn test_update_quote_token_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = update_quote_token(
+        deps.as_mut(),
+        env,
+        info,
+        0,
+        QuoteToken {
+            channel_id: 0,
+            quote_token: String::new(),
+            lst_quote_token: String::new(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
