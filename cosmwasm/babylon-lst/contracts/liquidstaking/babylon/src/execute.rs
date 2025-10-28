@@ -171,9 +171,6 @@ pub fn receive(
         recipient.clone(),
         recipient_channel_id,
         recipient_ibc_channel_id.clone(),
-        &None,
-        // salt is not required in unbond request
-        false,
     )?;
 
     let unbond_amount = cw20_msg.amount;

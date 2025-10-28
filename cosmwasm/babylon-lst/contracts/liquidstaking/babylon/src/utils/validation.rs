@@ -49,15 +49,13 @@ pub fn validate_quote_tokens(quote_tokens: &[QuoteToken]) -> Result<(), Contract
 }
 
 /// Errors:
-/// - Returns address/channel validation errors or missing salt errors.
+/// - Returns address/channel validation errors
 pub fn validate_recipient(
     storage: &dyn Storage,
     api: &dyn Api,
     recipient: Option<String>,
     recipient_channel_id: Option<u32>,
     recipient_ibc_channel_id: Option<String>,
-    salt: &Option<String>,
-    require_salt_on_zkgm: bool,
 ) -> Result<bool, ContractError> {
     let mut on_chain_recipient = false;
     // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
@@ -88,18 +86,6 @@ pub fn validate_recipient(
             None => Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
                 "missing recipient",
             ))),
-        }?;
-
-        match salt.as_ref() {
-            Some(salt) => validate_salt(salt),
-            None => {
-                if require_salt_on_zkgm {
-                    return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
-                        "missing salt",
-                    )));
-                }
-                Ok(())
-            }
         }?;
     }
 
@@ -149,15 +135,7 @@ pub fn split_and_validate_recipient(
         } => {
             let recipient = Some(address);
             let recipient_channel_id = Some(channel_id);
-            validate_recipient(
-                storage,
-                api,
-                recipient.clone(),
-                recipient_channel_id,
-                None,
-                &None,
-                false,
-            )?;
+            validate_recipient(storage, api, recipient.clone(), recipient_channel_id, None)?;
             (recipient, recipient_channel_id, None)
         }
         Recipient::Ibc {
@@ -172,8 +150,6 @@ pub fn split_and_validate_recipient(
                 recipient.clone(),
                 None,
                 recipient_ibc_channel_id.clone(),
-                &None,
-                true,
             )?;
             (recipient, None, recipient_ibc_channel_id)
         }
