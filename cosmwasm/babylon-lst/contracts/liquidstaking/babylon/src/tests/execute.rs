@@ -3,7 +3,9 @@ use std::str::FromStr;
 use cosmwasm_std::{
     Coin, Decimal, Uint128,
     testing::{message_info, mock_dependencies, mock_env},
+    to_binary, to_json_binary,
 };
+use cw20::{AllowanceResponse, Cw20QueryMsg};
 
 use crate::{
     ContractError,
@@ -596,4 +598,56 @@ fn test_unbond_must_fail_if_invalid_recipient() {
     let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
 
     assert!(matches!(err, ContractError::InvalidChannelId {}));
+}
+
+#[test]
+fn test_unbond_must_fail_if_missing_allowance() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[]);
+
+    let recipient = Recipient::OnChain {
+        address: sender.clone(),
+    };
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let mut state = mock_state();
+    state.exchange_rate = Decimal::one();
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+
+    let params = mock_parameters();
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+
+    let allowance = amount - Uint128::one();
+    deps.querier.update_wasm(move |_query| {
+        let res = to_json_binary(&AllowanceResponse {
+            allowance,
+            ..Default::default()
+        })
+        .unwrap();
+        cosmwasm_std::SystemResult::Ok(cosmwasm_std::ContractResult::Ok(res))
+    });
+
+    let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
+
+    let ContractError::InsufficientAllowance {
+        allowance: allowance_result,
+        required,
+    } = err
+    else {
+        panic!("wrong err, got {}", err)
+    };
+
+    assert_eq!(allowance_result, allowance);
+    assert_eq!(required, amount);
 }
