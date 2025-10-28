@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    Addr, Coin, Decimal, Uint128,
-    testing::{message_info, mock_dependencies, mock_env, mock_info},
+    Coin, Decimal, Uint128,
+    testing::{message_info, mock_dependencies, mock_env},
 };
 
 use crate::{
@@ -413,6 +413,36 @@ fn test_slash_batch() {
         err,
         ContractError::BatchExpectedNativeUnstakedNotSet
     ));
+}
+
+#[test]
+fn test_bond_must_fail_if_paused() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    let status = Status {
+        bond_is_paused: true,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let err = bond(
+        deps.as_mut(),
+        env,
+        info,
+        None,
+        Uint128::one(),
+        sender.clone(),
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::FunctionalityUnderMaintenance {}
+    ))
 }
 
 #[test]
