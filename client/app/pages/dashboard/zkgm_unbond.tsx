@@ -4,42 +4,26 @@ import { Card, CardBody, CardFooter, Button, Input } from "@heroui/react";
 import { useGlobalContext } from "@/app/core/context";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
-import { encodeInstruction, unbond } from "@/app/lib/ucs03";
+import {
+    BYTECODE_BASE_CHECKSUM,
+    encodeInstruction,
+    getAddressFromEvm,
+    MODULE_HASH,
+    unbondSendToIBC,
+} from "@/app/lib/ucs03";
 import { Instruction } from "@unionlabs/sdk/Ucs03";
 import { getSalt } from "@/app/lib/utils";
 import { useState } from "react";
 import { getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
+import { Effect } from "effect";
+import { toHex } from "viem";
+import { ChannelId } from "@unionlabs/sdk/schema/channel";
+import Networks from "@/config/networks.config";
 
 interface KeyProps {
     stateKey: number;
     setStateKey: (key: number) => void;
 }
-
-const getExecuteAllowanceMsg = (
-    contract: string,
-    sender: string,
-    spender: string,
-    amount: string,
-) => {
-    let allowanceMsg = {
-        increase_allowance: {
-            spender,
-            amount,
-        },
-    };
-    console.log(JSON.stringify(allowanceMsg));
-    const executeAllowanceMsg = {
-        typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
-        value: MsgExecuteContract.fromPartial({
-            sender,
-            contract,
-            msg: toUtf8(JSON.stringify(allowanceMsg)),
-            funds: [],
-        }),
-    };
-
-    return executeAllowanceMsg;
-};
 
 export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
     const [isLoading, setIsLoading] = useState(false);
@@ -47,6 +31,12 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
     const { userAddress, client, network } = useGlobalContext();
     const ucs03_contract = network?.escher.ucs03;
     const channel_id = network?.escher.channel["babylon"]?.sourceChannelId;
+    const destination_channel_id =
+        network?.escher.channel["babylon"]?.destinationChannelId;
+    const targetChain =
+        network?.chainName.indexOf("testnet") != -1
+            ? "babylon-testnet"
+            : "babylon-mainnet";
 
     const handleSubmit = async (e: any) => {
         // Prevent the browser from reloading the page
@@ -61,20 +51,27 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
             return;
         }
 
-        const allowanceMsg = getExecuteAllowanceMsg(
-            ucs03_contract,
-            userAddress,
-            network?.escher?.tokenMinter,
-            amount.toString(),
+        console.log("destination_channel_id", destination_channel_id);
+        console.log("ucs03", Networks[targetChain].escher.ucs03);
+
+        const proxyAddress = await Effect.runPromise(
+            getAddressFromEvm({
+                path: BigInt(0),
+                channel: ChannelId.make(destination_channel_id),
+                sender: toHex(userAddress),
+                ucs03: Networks[targetChain].escher
+                    .ucs03 as `${string}1${string}`,
+                bytecode_base_checksum: BYTECODE_BASE_CHECKSUM,
+                module_hash: MODULE_HASH,
+            }),
         );
 
-        //todo: get proxyAddress here
-        let proxyAddress = "osmo17z2ea0dtzkpu9lc2eh0jcwxywh40th5ed2d9vr";
+        console.log("proxyAddress.address", proxyAddress.address);
 
-        let callsInstruction = await unbond(
+        let callsInstruction = await unbondSendToIBC(
             userAddress,
             amount,
-            proxyAddress,
+            proxyAddress.address,
             "babylon",
             network,
         );
@@ -96,15 +93,21 @@ export default function ZkgmUnbond({ stateKey, setStateKey }: KeyProps) {
                 sender: userAddress,
                 contract: ucs03_contract,
                 msg: toUtf8(JSON.stringify(sendMsg)),
-                funds: [],
+                funds: [
+                    {
+                        amount: amount.toString(),
+                        denom: network?.escher.ebabyDenom,
+                    },
+                ],
             }),
         };
 
         console.log(JSON.stringify(executeSendMsg));
         try {
+            setIsLoading(true);
             const res = await client?.signAndBroadcast(
                 userAddress,
-                [allowanceMsg, executeSendMsg],
+                [executeSendMsg],
                 "auto",
                 "unbond from osmosis to babylon",
             );
