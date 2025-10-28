@@ -990,3 +990,42 @@ fn test_set_status_must_fail_if_sender_not_owner() {
         ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
     ))
 }
+
+#[test]
+fn test_set_or_remove_chain_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = set_chain(
+        deps.as_mut(),
+        info.clone(),
+        crate::state::Chain {
+            name: String::new(),
+            chain_id: String::new(),
+            ucs03_channel_id: 0,
+            prefix: String::new(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ));
+
+    let err = remove_chain(deps.as_mut(), info, 0).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ));
+}
