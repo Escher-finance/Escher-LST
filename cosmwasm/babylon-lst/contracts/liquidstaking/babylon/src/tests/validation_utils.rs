@@ -422,10 +422,14 @@ fn test_validate_required_coin() {
         .is_err()
     );
 
+    // multiple coins
+    assert!(
+        validation::validate_required_coin(&[coin.clone(), coin_other.clone()], &coin).is_err()
+    );
+
     validation::validate_required_coin(&[coin.clone()], &coin).unwrap();
-    validation::validate_required_coin(&[coin_other.clone(), coin.clone()], &coin).unwrap();
     validation::validate_required_coin(
-        &[coin_other.clone(), coin.clone()],
+        &[coin.clone()],
         &Coin::new(coin.amount - Uint128::one(), coin.denom.clone()),
     )
     .unwrap();

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use cosmwasm_std::{Api, Coin, Storage, Uint128};
+use cosmwasm_std::{Api, Coin, Storage};
 
 use crate::{
     ContractError,
@@ -201,15 +201,16 @@ pub fn is_on_chain_recipient(
 
 pub fn validate_required_coin(funds: &[Coin], min_bond: &Coin) -> Result<Coin, ContractError> {
     // coin must have be sent along with transaction and it should be in underlying coin denom
-    let coin = funds
-        .iter()
-        .find(|x| x.denom == min_bond.denom && x.amount > Uint128::zero())
-        .cloned()
-        .ok_or_else(|| ContractError::NoAsset {})?;
+    let [coin] = funds else {
+        return Err(ContractError::NoAsset {});
+    };
+    if coin.denom != min_bond.denom || coin.amount.is_zero() {
+        return Err(ContractError::InvalidAsset {});
+    }
     if coin.amount < min_bond.amount {
         return Err(ContractError::BondAmountTooLow {});
     }
-    Ok(coin)
+    Ok(coin.clone())
 }
 
 pub fn validate_salt(salt: &str) -> Result<(), ContractError> {
