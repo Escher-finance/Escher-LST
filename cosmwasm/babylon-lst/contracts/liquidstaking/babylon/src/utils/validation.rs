@@ -57,6 +57,7 @@ pub fn validate_recipient(
     recipient_channel_id: Option<u32>,
     recipient_ibc_channel_id: Option<String>,
     salt: &Option<String>,
+    require_salt_on_zkgm: bool,
 ) -> Result<bool, ContractError> {
     let mut on_chain_recipient = false;
     // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
@@ -91,9 +92,14 @@ pub fn validate_recipient(
 
         match salt.as_ref() {
             Some(salt) => validate_salt(salt),
-            None => Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
-                "missing salt",
-            ))),
+            None => {
+                if require_salt_on_zkgm {
+                    return Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
+                        "missing salt",
+                    )));
+                }
+                Ok(())
+            }
         }?;
     }
 
@@ -141,9 +147,6 @@ pub fn split_and_validate_recipient(
             address,
             channel_id,
         } => {
-            // Used to bypass salt verifications
-            let dummy_valid_salt =
-                "0xe5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf".to_string();
             let recipient = Some(address);
             let recipient_channel_id = Some(channel_id);
             validate_recipient(
@@ -152,7 +155,8 @@ pub fn split_and_validate_recipient(
                 recipient.clone(),
                 recipient_channel_id,
                 None,
-                &Some(dummy_valid_salt),
+                &None,
+                false,
             )?;
             (recipient, recipient_channel_id, None)
         }
@@ -169,6 +173,7 @@ pub fn split_and_validate_recipient(
                 None,
                 recipient_ibc_channel_id.clone(),
                 &None,
+                true,
             )?;
             (recipient, None, recipient_ibc_channel_id)
         }

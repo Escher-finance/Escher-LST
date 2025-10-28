@@ -129,13 +129,15 @@ fn test_validate_recipient_on_chain_recipient() {
             None,
             None,
             &None,
+            true,
         )
         .is_err()
     );
 
     // missing recipient
     assert!(
-        validation::validate_recipient(&deps.storage, &deps.api, None, None, None, &None).is_err()
+        validation::validate_recipient(&deps.storage, &deps.api, None, None, None, &None, true)
+            .is_err()
     );
 
     let on_chain_recipient = validation::validate_recipient(
@@ -145,6 +147,7 @@ fn test_validate_recipient_on_chain_recipient() {
         None,
         None,
         &None,
+        true,
     )
     .unwrap();
     assert_eq!(on_chain_recipient, true);
@@ -175,6 +178,7 @@ fn test_validate_recipient_channel_id() {
             Some(5),
             None,
             &Some(salt.to_string()),
+            true,
         )
         .is_err()
     );
@@ -188,6 +192,7 @@ fn test_validate_recipient_channel_id() {
             Some(0),
             None,
             &Some(salt.to_string()),
+            true,
         )
         .is_err()
     );
@@ -201,6 +206,7 @@ fn test_validate_recipient_channel_id() {
             Some(channel_id),
             None,
             &Some(salt.to_string()),
+            true,
         )
         .is_err()
     );
@@ -214,6 +220,7 @@ fn test_validate_recipient_channel_id() {
             Some(channel_id),
             None,
             &Some(salt.to_string()),
+            true,
         )
         .is_err()
     );
@@ -227,6 +234,7 @@ fn test_validate_recipient_channel_id() {
             Some(channel_id),
             None,
             &None,
+            true,
         )
         .is_err()
     );
@@ -240,8 +248,23 @@ fn test_validate_recipient_channel_id() {
             Some(channel_id),
             None,
             &Some("salt".to_string()),
+            true,
         )
         .is_err()
+    );
+
+    // missing salt without requiring should pass
+    assert!(
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            Some(recipient.to_string()),
+            Some(channel_id),
+            None,
+            &None,
+            false,
+        )
+        .is_ok()
     );
 
     let on_chain_recipient = validation::validate_recipient(
@@ -251,6 +274,7 @@ fn test_validate_recipient_channel_id() {
         Some(channel_id),
         None,
         &Some(salt.to_string()),
+        true,
     )
     .unwrap();
     assert_eq!(on_chain_recipient, false);
@@ -281,6 +305,7 @@ fn test_validate_recipient_ibc_channel_id() {
             None,
             Some("channel-2".to_string()),
             &Some(salt.to_string()),
+            true,
         )
         .is_err()
     );
@@ -294,6 +319,7 @@ fn test_validate_recipient_ibc_channel_id() {
             None,
             Some(ibc_channel_id.clone()),
             &Some(salt.to_string()),
+            true,
         )
         .is_err()
     );
@@ -307,6 +333,7 @@ fn test_validate_recipient_ibc_channel_id() {
             None,
             Some(ibc_channel_id.clone()),
             &Some(salt.to_string()),
+            true,
         )
         .is_err()
     );
@@ -318,6 +345,7 @@ fn test_validate_recipient_ibc_channel_id() {
         None,
         Some(ibc_channel_id.clone()),
         &None,
+        true,
     )
     .unwrap();
     assert_eq!(on_chain_recipient, false);
