@@ -359,6 +359,16 @@ fn test_validate_hex() {
 }
 
 #[test]
+fn test_validate_salt() {
+    let value = "0xe5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf".to_string();
+
+    // bad length
+    assert!(validation::validate_salt(&value[..value.len() - 2]).is_err());
+
+    validation::validate_salt(&value).unwrap();
+}
+
+#[test]
 fn test_validate_required_coin() {
     let coin = Coin::new(100_u128, "a".to_string());
     let coin_other = Coin::new(100_u128, "b".to_string());
@@ -369,7 +379,7 @@ fn test_validate_required_coin() {
     // insufficient amount
     assert!(
         validation::validate_required_coin(
-            &[coin_other.clone(), coin.clone()],
+            &[coin.clone()],
             &Coin::new(coin.amount + Uint128::one(), coin.denom.clone()),
         )
         .is_err()
