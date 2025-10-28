@@ -135,7 +135,7 @@ pub enum ContractError {
     #[error("invalid/unsupported recipient ibc channel id")]
     InvalidIBCChannelId {},
 
-    #[error("invalid {kind} address: {address} because: {reason}")]
+    #[error("invalid {kind} address/hex: {address} because: {reason}")]
     InvalidAddress {
         kind: String,
         address: String,

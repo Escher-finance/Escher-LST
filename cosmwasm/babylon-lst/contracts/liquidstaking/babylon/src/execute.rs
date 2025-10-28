@@ -40,7 +40,7 @@ use crate::{
         transfer::{get_send_bank_msg, ibc_transfer_msg},
         validation::{
             split_and_validate_recipient, validate_recipient, validate_required_coin,
-            validate_validators,
+            validate_required_salt, validate_validators,
         },
     },
     zkgm::protocol::{TokenPair, Ucs03Zkgm, ucs03_transfer_v2},
@@ -166,12 +166,12 @@ pub fn receive(
     };
 
     validate_recipient(
-        &deps,
+        deps.storage,
+        deps.api,
         recipient.clone(),
         recipient_channel_id,
         recipient_ibc_channel_id.clone(),
-        &Some(String::new()),
-    )?; // salt is not required in unbond request
+    )?;
 
     let unbond_amount = cw20_msg.amount;
 
@@ -717,11 +717,7 @@ pub fn process_batch_withdrawal(
             &undelegation.recipient_ibc_channel_id.clone(),
         );
 
-        let salt = if let Some(salt) = salt.get(i) {
-            salt.clone()
-        } else {
-            return Err(ContractError::NoSalt);
-        };
+        let salt = validate_required_salt(&salt.get(i).map(|s| s.to_owned()))?;
 
         let Some(unstake_return_native_amount) = undelegation.unstake_return_native_amount else {
             return Err(ContractError::InvalidUnstakeReturnNativeAmount);
@@ -1243,7 +1239,7 @@ pub fn unbond(
     }
 
     let (recipient, recipient_channel_id, recipient_ibc_channel_id) =
-        split_and_validate_recipient(deps.storage, recipient)?;
+        split_and_validate_recipient(deps.storage, deps.api, recipient)?;
 
     let params = PARAMETERS.load(deps.storage)?;
 

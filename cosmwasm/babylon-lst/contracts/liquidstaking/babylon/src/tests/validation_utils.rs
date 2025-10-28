@@ -1,9 +1,10 @@
-use cosmwasm_std::testing::mock_dependencies;
+use cosmwasm_std::{Coin, Uint128, testing::mock_dependencies};
 
 use crate::{
     ContractError,
-    state::{QuoteToken, Validator},
-    utils::validation::*,
+    msg::Recipient,
+    state::{CHAINS, Chain, IBC_CHANNELS, QuoteToken, Validator},
+    utils::validation::{self, *},
 };
 
 #[test]
@@ -112,4 +113,300 @@ fn test_is_on_chain_recipient() {
         &None,
     );
     assert!(!is_same_chain_recipient);
+}
+
+#[test]
+fn test_validate_recipient_on_chain_recipient() {
+    let deps = mock_dependencies();
+    let recipient = deps.api.addr_make("user");
+
+    // invalid recipient
+    assert!(
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            Some("invalid".to_string()),
+            None,
+            None,
+        )
+        .is_err()
+    );
+
+    // missing recipient
+    assert!(validation::validate_recipient(&deps.storage, &deps.api, None, None, None).is_err());
+
+    let on_chain_recipient = validation::validate_recipient(
+        &deps.storage,
+        &deps.api,
+        Some(recipient.to_string()),
+        None,
+        None,
+    )
+    .unwrap();
+    assert_eq!(on_chain_recipient, true);
+}
+
+#[test]
+fn test_validate_recipient_channel_id() {
+    let mut deps = mock_dependencies();
+    let channel_id = 1;
+
+    let chain = Chain {
+        prefix: "cosmwasm".to_string(),
+        name: "chain".to_string(),
+        chain_id: "chain-1".to_string(),
+        ucs03_channel_id: channel_id,
+    };
+    CHAINS.save(&mut deps.storage, channel_id, &chain).unwrap();
+
+    let recipient = "0xeeEEeeE98622c19Ea39Ea8827ae22Bbfc732671c";
+
+    // unknown channel_id
+    assert!(
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            Some(recipient.to_string()),
+            Some(5),
+            None,
+        )
+        .is_err()
+    );
+
+    // invalid channel_id
+    assert!(
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            Some(recipient.to_string()),
+            Some(0),
+            None,
+        )
+        .is_err()
+    );
+
+    // missing recipient
+    assert!(
+        validation::validate_recipient(&deps.storage, &deps.api, None, Some(channel_id), None,)
+            .is_err()
+    );
+
+    // invalid recipient
+    assert!(
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            Some("invalid".to_string()),
+            Some(channel_id),
+            None,
+        )
+        .is_err()
+    );
+
+    let on_chain_recipient = validation::validate_recipient(
+        &deps.storage,
+        &deps.api,
+        Some(recipient.to_string()),
+        Some(channel_id),
+        None,
+    )
+    .unwrap();
+    assert_eq!(on_chain_recipient, false);
+}
+
+#[test]
+fn test_validate_recipient_ibc_channel_id() {
+    let mut deps = mock_dependencies();
+    let ibc_channel_id = "channel-1".to_string();
+
+    IBC_CHANNELS
+        .save(
+            &mut deps.storage,
+            ibc_channel_id.clone(),
+            &"cosmwasm".to_string(),
+        )
+        .unwrap();
+
+    let recipient = "cosmwasmeeeeeeeeeeee";
+
+    // unknown channel_id
+    assert!(
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            Some(recipient.to_string()),
+            None,
+            Some("channel-2".to_string()),
+        )
+        .is_err()
+    );
+
+    // missing recipient
+    assert!(
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            None,
+            None,
+            Some(ibc_channel_id.clone()),
+        )
+        .is_err()
+    );
+
+    // invalid recipient
+    assert!(
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            Some("invalid".to_string()),
+            None,
+            Some(ibc_channel_id.clone()),
+        )
+        .is_err()
+    );
+
+    let on_chain_recipient = validation::validate_recipient(
+        &deps.storage,
+        &deps.api,
+        Some(recipient.to_string()),
+        None,
+        Some(ibc_channel_id.clone()),
+    )
+    .unwrap();
+    assert_eq!(on_chain_recipient, false);
+}
+
+#[test]
+fn test_split_and_validate_recipient_on_chain() {
+    let deps = mock_dependencies();
+    let recipient_addr = deps.api.addr_make("user");
+    let recipient = Recipient::OnChain {
+        address: recipient_addr.clone(),
+    };
+    let result =
+        validation::split_and_validate_recipient(&deps.storage, &deps.api, recipient).unwrap();
+    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.1, None);
+    assert_eq!(result.2, None);
+}
+
+#[test]
+fn test_split_and_validate_recipient_zkgm() {
+    let mut deps = mock_dependencies();
+    let channel_id = 1;
+    let recipient_addr = "0xeeEEeeE98622c19Ea39Ea8827ae22Bbfc732671c".to_string();
+    let recipient = Recipient::Zkgm {
+        address: recipient_addr.clone(),
+        channel_id,
+    };
+
+    let chain = Chain {
+        prefix: "cosmwasm".to_string(),
+        name: "chain".to_string(),
+        chain_id: "chain-1".to_string(),
+        ucs03_channel_id: channel_id,
+    };
+    CHAINS.save(&mut deps.storage, channel_id, &chain).unwrap();
+
+    let result =
+        validation::split_and_validate_recipient(&deps.storage, &deps.api, recipient).unwrap();
+    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.1, Some(channel_id));
+    assert_eq!(result.2, None);
+}
+
+#[test]
+fn test_split_and_validate_recipient_ibc() {
+    let mut deps = mock_dependencies();
+    let ibc_channel_id = "channel-1".to_string();
+    let recipient_addr = "cosmwasmeeeeeeeeeeee".to_string();
+    let recipient = Recipient::Ibc {
+        address: recipient_addr.clone(),
+        ibc_channel_id: ibc_channel_id.clone(),
+    };
+
+    IBC_CHANNELS
+        .save(
+            &mut deps.storage,
+            ibc_channel_id.clone(),
+            &"cosmwasm".to_string(),
+        )
+        .unwrap();
+
+    let result =
+        validation::split_and_validate_recipient(&deps.storage, &deps.api, recipient.clone())
+            .unwrap();
+    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.1, None);
+    assert_eq!(result.2, Some(ibc_channel_id));
+}
+
+#[test]
+fn test_validate_hex() {
+    let value = "0xeeEEeeE98622c19Ea339Ea8827ae22Bbfc732671ce9Ea8827ae22Bbfc732671c".to_string();
+
+    // bad length
+    assert!(validation::validate_hex(&value, "hex", Some(63)).is_err());
+
+    // missing prefix
+    assert!(validation::validate_hex(&value.strip_prefix("0x").unwrap(), "hex", None).is_err());
+
+    // invalid hex chars
+    assert!(validation::validate_hex("0xescher", "hex", None).is_err());
+
+    validation::validate_hex(&value, "hex", Some(64)).unwrap();
+    validation::validate_hex(&value, "hex", None).unwrap();
+}
+
+#[test]
+fn test_validate_salt() {
+    let value = "0xe5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf".to_string();
+
+    // bad length
+    assert!(validation::validate_salt(&value[..value.len() - 2]).is_err());
+
+    validation::validate_salt(&value).unwrap();
+}
+
+#[test]
+fn test_validate_required_salt() {
+    let value = "0xe5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf".to_string();
+
+    // missing salt
+    assert!(validation::validate_required_salt(&None).is_err());
+
+    assert_eq!(
+        validation::validate_required_salt(&Some(value.clone())).unwrap(),
+        value
+    );
+}
+
+#[test]
+fn test_validate_required_coin() {
+    let coin = Coin::new(100_u128, "a".to_string());
+    let coin_other = Coin::new(100_u128, "b".to_string());
+
+    // invalid coin
+    assert!(validation::validate_required_coin(&[coin_other.clone()], &coin).is_err());
+
+    // insufficient amount
+    assert!(
+        validation::validate_required_coin(
+            &[coin.clone()],
+            &Coin::new(coin.amount + Uint128::one(), coin.denom.clone()),
+        )
+        .is_err()
+    );
+
+    // multiple coins
+    assert!(
+        validation::validate_required_coin(&[coin.clone(), coin_other.clone()], &coin).is_err()
+    );
+
+    validation::validate_required_coin(&[coin.clone()], &coin).unwrap();
+    validation::validate_required_coin(
+        &[coin.clone()],
+        &Coin::new(coin.amount - Uint128::one(), coin.denom.clone()),
+    )
+    .unwrap();
 }

@@ -9,7 +9,11 @@ use crate::{
     msg::{Recipient, ZkgmTransfer},
     reply::MINT_AND_SEND_ZKGM_REPLY_ID,
     state::{PARAMETERS, STATUS},
-    utils::{self, transfer::ibc_transfer_msg, validation::split_and_validate_recipient},
+    utils::{
+        self,
+        transfer::ibc_transfer_msg,
+        validation::{split_and_validate_recipient, validate_salt},
+    },
 };
 
 fn validate_and_parse_ibc_callback_msg(
@@ -154,7 +158,7 @@ pub fn ibc_destination_callback(
     };
 
     let (the_recipient, recipient_channel_id, recipient_ibc_channel_id) =
-        match split_and_validate_recipient(deps.storage, payload.recipient.clone()) {
+        match split_and_validate_recipient(deps.storage, deps.api, payload.recipient.clone()) {
             Ok((the_recipient, recipient_channel_id, recipient_ibc_channel_id)) => (
                 the_recipient,
                 recipient_channel_id,
@@ -200,6 +204,8 @@ pub fn ibc_destination_callback(
                 })?,
                 funds: vec![],
             });
+
+            validate_salt(&payload.salt).map_err(|err| StdError::generic_err(err.to_string()))?;
 
             let payload_bin = to_json_binary(&ZkgmTransfer {
                 sender: env.contract.address.to_string(),
