@@ -214,7 +214,7 @@ pub fn ibc_destination_callback(
                 .with_payload(payload_bin);
             sub_msgs.push(sub_msg);
         }
-        Recipient::IBC {
+        Recipient::Ibc {
             address: _,
             ibc_channel_id: _,
         } => {
@@ -295,7 +295,7 @@ fn failure_handler(
                 recipient = address;
                 recipient_channel_id = Some(channel_id);
             }
-            Recipient::IBC {
+            Recipient::Ibc {
                 address: _,
                 ibc_channel_id: _,
             } => {}

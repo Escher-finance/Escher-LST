@@ -5,6 +5,7 @@ use cosmwasm_std::{
     MessageInfo, Response, StdError, SubMsg, Uint128, WasmMsg, attr, from_json, to_json_binary,
     wasm_execute,
 };
+use cw_utils::nonpayable;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use unionlabs_primitives::Bytes;
 
@@ -1231,6 +1232,7 @@ pub fn unbond(
     amount: Uint128,
     recipient: Recipient,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
     let status = STATUS.load(deps.storage)?;
     if status.unbond_is_paused {
         return Err(ContractError::FunctionalityUnderMaintenance {});

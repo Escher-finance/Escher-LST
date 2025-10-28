@@ -100,7 +100,7 @@ pub enum Recipient {
         address: String,
         channel_id: u32,
     },
-    IBC {
+    Ibc {
         address: String,
         ibc_channel_id: String,
     },
