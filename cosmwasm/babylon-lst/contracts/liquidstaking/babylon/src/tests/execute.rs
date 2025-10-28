@@ -683,3 +683,35 @@ fn test_receive_must_fail_if_paused() {
         ContractError::FunctionalityUnderMaintenance {}
     ))
 }
+
+#[test]
+fn test_receive_must_fail_if_bad_sender() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let params = mock_parameters();
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+
+    let err = receive(
+        deps.as_mut(),
+        env,
+        info,
+        cw20::Cw20ReceiveMsg {
+            sender: sender.to_string(),
+            amount: Uint128::one(),
+            msg: Binary::default(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(err, ContractError::Unauthorized {}))
+}
