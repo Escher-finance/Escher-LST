@@ -367,7 +367,7 @@ fn test_split_and_validate_recipient_ibc() {
     let mut deps = mock_dependencies();
     let ibc_channel_id = "channel-1".to_string();
     let recipient_addr = "cosmwasmeeeeeeeeeeee".to_string();
-    let recipient = Recipient::IBC {
+    let recipient = Recipient::Ibc {
         address: recipient_addr.clone(),
         ibc_channel_id: ibc_channel_id.clone(),
     };
