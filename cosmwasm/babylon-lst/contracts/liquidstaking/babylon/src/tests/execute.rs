@@ -8,6 +8,7 @@ use cosmwasm_std::{
 use crate::{
     ContractError,
     execute::*,
+    msg::Recipient,
     state::{PARAMETERS, QuoteToken, STATUS, Status},
     tests::mock_parameters,
     utils,
@@ -16,7 +17,7 @@ use crate::{
 #[test]
 fn test_calculate_native_token() {
     let staking_token = Uint128::from(10000u32);
-    //60926366
+
     let exchange_rate = Decimal::from_ratio(
         Uint128::from(5_350_444_044_771_u128),
         Uint128::from(30000u128),
@@ -480,4 +481,29 @@ fn test_bond_must_fail_if_invalid_funds() {
     .unwrap_err();
 
     assert!(matches!(err, ContractError::BondAmountTooLow {}))
+}
+
+#[test]
+fn test_unbond_must_fail_if_funds_are_attached() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let denom = "denom".to_string();
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[Coin::new(amount, denom.clone())]);
+
+    let recipient = Recipient::OnChain {
+        address: sender.clone(),
+    };
+
+    let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Payment(cw_utils::PaymentError::NonPayable {})
+    ))
 }
