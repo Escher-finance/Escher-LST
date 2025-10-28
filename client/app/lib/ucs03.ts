@@ -4,6 +4,7 @@ import {
     Call,
     CallAbi,
     Batch,
+    BatchAbi,
     Schema as Ucs03Schema,
     InstructionAbi,
     Instruction,
@@ -11,21 +12,23 @@ import {
 } from "@unionlabs/sdk/Ucs03";
 import {
     Address,
+    bytesToHex,
     encodeAbiParameters,
-    encodePacked,
     encodeFunctionData,
+    encodePacked,
     Hex,
-    toHex,
     parseAbi,
+    fromHex,
+    toHex,
+    keccak256,
 } from "viem";
 import { ChainRegistry } from "@unionlabs/sdk/ChainRegistry";
 import { UniversalChainId } from "@unionlabs/sdk/schema/chain";
 import { TokenOrder, Ucs03, Ucs05, Utils } from "@unionlabs/sdk";
-import { Effect, Schema } from "effect";
+import { Effect, Schema, pipe } from "effect";
 import { getSalt, getTimeoutInNanoseconds7DaysFromNow } from "@/app/lib/utils";
 import { ChannelId } from "@unionlabs/sdk/schema/channel";
 import { HexFromJson } from "@unionlabs/sdk/schema/hex";
-import { Batch, BatchAbi } from "@unionlabs/sdk/Ucs03";
 import Networks, {
     ChainConfig,
     SupportedNetworks,
@@ -38,11 +41,18 @@ export const EU_FROM_UNION_SOLVER_METADATA_TESTNET =
 
 const TOKEN_ORDER_KIND_INITIALIZE = 0;
 const TOKEN_ORDER_KIND_ESCROW = 1;
+const TOKEN_ORDER_KIND_UNESCROW = 2;
 const TOKEN_ORDER_KIND_SOLVE = 3;
 const TOKEN_ORDER_V2_VERSION = 2;
 export const OP_CODE_CALL = 1;
 const OP_CODE_TOKEN_ORDER_V2 = 3;
 export const INSTR_VERSION_ZERO = 0;
+
+export const BYTECODE_BASE_CHECKSUM =
+    "0xec827349ed4c1fec5a9c3462ff7c979d4c40e7aa43b16ed34469d04ff835f2a1" as const;
+
+export const MODULE_HASH =
+    "0x120970d812836f19888625587a4606a5ad23cef31c8684e601771552548fc6b9" as const;
 
 export interface TokenMetadata {
     implementation: `0x${string}`; // bytes type in Solidity
@@ -378,13 +388,52 @@ export const createUnbondPayload = ({
         remote_unbond: {
             amount,
             recipient: {
-                zkgm: {
+                ibc: {
                     address: recipient_address,
                     channel_id,
                 },
             },
         },
     } as const;
+
+    const payload = {
+        wasm: {
+            execute: {
+                contract_addr: lst_address,
+                msg: Buffer.from(JSON.stringify(unbondMsg)).toString("base64"),
+                funds: [],
+            },
+        },
+    };
+
+    return payload;
+};
+
+export const createIBCUnbondPayload = ({
+    lst_address,
+    recipient_address,
+    amount,
+    ibc_channel_id,
+}: {
+    lst_address: string;
+    recipient_address: string;
+    amount: string;
+    ibc_channel_id: string;
+}) => {
+    const unbondMsg = {
+        remote_unbond: {
+            amount,
+            recipient: {
+                i_b_c: {
+                    address: recipient_address,
+                    ibc_channel_id,
+                },
+            },
+        },
+    } as const;
+
+    console.log("unbondMsg", JSON.stringify(unbondMsg));
+    console.log("lst_address", lst_address);
 
     const payload = {
         wasm: {
@@ -426,10 +475,10 @@ export const createIncreaseAllowance = (
     return allowancePayload;
 };
 
-export const getUnbondCallsInstruction = async (
+export const getIBCUnbondCallsInstruction = async (
     sender: string,
     amount: string,
-    channel_id: number,
+    ibc_channel_id: string,
     proxy_address: string,
     lst_address: string,
     cw20_address: string,
@@ -444,11 +493,11 @@ export const getUnbondCallsInstruction = async (
     console.log(JSON.stringify(allowancePayload));
 
     // call unbond to lst contract
-    let unbondPayload = createUnbondPayload({
+    let unbondPayload = createIBCUnbondPayload({
         lst_address,
         recipient_address: sender,
         amount,
-        channel_id,
+        ibc_channel_id,
     });
 
     // Calls
@@ -463,7 +512,7 @@ export const getUnbondCallsInstruction = async (
     return calls;
 };
 
-export const unbond = async (
+export const unbondSendToIBC = async (
     sender: string,
     amount: bigint,
     proxyAddress: string,
@@ -486,7 +535,7 @@ export const unbond = async (
         proxyAddress,
         network?.escher?.stakedBaseToken,
         amount,
-        toHex(network?.escher?.channel[targetChain].stakedQuoteToken),
+        network?.escher?.channel[targetChain].stakedQuoteToken as `0x${string}`,
         amount,
     );
 
@@ -494,21 +543,19 @@ export const unbond = async (
         network?.chainName.indexOf("mainnet") != -1
             ? `${targetChain}-mainnet`
             : `${targetChain}-testnet`;
-    let calls = await getUnbondCallsInstruction(
+
+    console.log(targetChainName, targetChainName);
+    let calls = await getIBCUnbondCallsInstruction(
         sender,
         amount.toString(),
-        network?.escher?.channel[targetChain].sourceChannelId,
+        network?.escher?.channel[targetChain].destinationIbcChannelId,
         proxyAddress,
         Networks[targetChainName].contracts.lst,
         Networks[targetChainName].contracts.cw20,
     );
 
-    console.log({ tokenOrder, calls });
     // // Batch Call
-    const batchCall: Batch = getInstructionBatch([tokenOrder, calls]);
-
-    //console.log({ tokenOrder, calls });
-    console.log({ batchCall });
+    const batchCall: Batch = getInstructionBatch([tokenOrder]);
 
     const batchInstructions: [
         { version: number; opcode: number; operand: `0x${string}` }[],
@@ -531,9 +578,97 @@ export const unbond = async (
     ];
     const batchOperand = encodeAbiParameters(BatchAbi(), batchInstructions);
 
+    console.log({ batchInstructions });
+
     return Instruction.make({
         version: batchCall.version,
         opcode: batchCall.opcode,
         operand: batchOperand,
     });
 };
+
+export interface GetAddressFromEvmParams {
+    path: bigint;
+    channel: ChannelId;
+    sender: `0x${string}`;
+    ucs03: `${string}1${string}`;
+    bytecode_base_checksum: `0x${string}`;
+    module_hash: `0x${string}`;
+}
+
+export const getAddressFromEvm = Effect.fn(function* (
+    params: GetAddressFromEvmParams,
+) {
+    const UCS03_ZKGM = Ucs05.CosmosDisplay.make({
+        address: params.ucs03,
+    });
+    const canonical_zkgm = Ucs05.anyDisplayToCanonical(UCS03_ZKGM);
+
+    const abi = [
+        {
+            name: "path",
+            type: "uint256",
+            internalType: "uint256",
+        },
+        {
+            name: "channelId",
+            type: "uint32",
+            internalType: "uint32",
+        },
+        {
+            name: "sender",
+            type: "bytes",
+            internalType: "bytes",
+        },
+    ] as const;
+
+    const salt = yield* pipe(
+        Effect.try(() =>
+            encodeAbiParameters(abi, [
+                params.path,
+                params.channel,
+                params.sender,
+            ] as const),
+        ),
+        Effect.map((encoded) => keccak256(encoded, "bytes")),
+    );
+
+    /**
+     * `n` from U64 to big-endian bytes
+     */
+    const u64toBeBytes = (n: bigint) => {
+        const buffer = new ArrayBuffer(8);
+        const view = new DataView(buffer);
+        view.setBigUint64(0, n);
+        return new Uint8Array(view.buffer);
+    };
+
+    const sha256 = Effect.fn((data: any) =>
+        Effect.tryPromise(() =>
+            globalThis.crypto.subtle.digest("SHA-256", data),
+        ),
+    );
+
+    const address = yield* pipe(
+        Uint8Array.from([
+            ...fromHex(params.module_hash, "bytes"),
+            ...new TextEncoder().encode("wasm"),
+            0, // null byte
+            ...u64toBeBytes(BigInt(32)), // checksum len as 64-bit big endian bytes of int
+            ...fromHex(params.bytecode_base_checksum, "bytes"),
+            ...u64toBeBytes(BigInt(32)), // creator canonical addr len
+            ...fromHex(canonical_zkgm, "bytes"),
+            ...u64toBeBytes(BigInt(32)), // len
+            ...salt,
+            ...u64toBeBytes(BigInt(0)),
+        ]),
+        sha256,
+        Effect.map((r) => new Uint8Array(r)),
+        Effect.map(bytesToHex),
+        Effect.flatMap(
+            Schema.decode(Ucs05.Bech32FromCanonicalBytesWithPrefix("bbn")),
+        ),
+    );
+
+    return Ucs05.CosmosDisplay.make({ address });
+});

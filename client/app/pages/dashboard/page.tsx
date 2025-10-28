@@ -16,8 +16,7 @@ import UnionBond from "./union_bond";
 import UnionInfo from "./union_info";
 import TransferFromBabylon from "./transfer_from_babylon";
 import UnionUnbond from "./union_unbond";
-import TransferBaby from "./transfer_baby";
-//import ZkgmUnbond from "./zkgm_unbond";
+import ZkgmUnbond from "./zkgm_unbond";
 
 export default function Dashboard() {
     const { network } = useGlobalContext();
@@ -82,9 +81,12 @@ export default function Dashboard() {
                                 setStateKey={setStateKey}
                             />
                         </Tab>
-                        {/* <Tab key="zkgm_unbond" title="ZKGM Unbond" >
-              <ZkgmUnbond stateKey={stateKey} setStateKey={setStateKey} />
-            </Tab> */}
+                        <Tab key="zkgm_unbond" title="ZKGM Unbond">
+                            <ZkgmUnbond
+                                stateKey={stateKey}
+                                setStateKey={setStateKey}
+                            />
+                        </Tab>
                     </Tabs>
                 )}
 
