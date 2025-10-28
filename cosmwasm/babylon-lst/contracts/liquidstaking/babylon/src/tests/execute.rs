@@ -738,3 +738,26 @@ fn test_submit_batch_must_fail_if_sender_not_owner() {
         ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
     ))
 }
+
+#[test]
+fn test_set_batch_received_amount_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = set_batch_received_amount(deps.as_mut(), env, info, 0, Uint128::one()).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
