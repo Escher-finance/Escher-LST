@@ -375,7 +375,10 @@ fn test_validate_required_salt() {
     // missing salt
     assert!(validation::validate_required_salt(&None).is_err());
 
-    validation::validate_required_salt(&Some(value)).unwrap();
+    assert_eq!(
+        validation::validate_required_salt(&Some(value.clone())).unwrap(),
+        value
+    );
 }
 
 #[test]

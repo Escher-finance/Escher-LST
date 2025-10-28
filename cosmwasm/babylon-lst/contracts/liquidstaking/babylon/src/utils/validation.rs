@@ -198,9 +198,12 @@ pub fn validate_salt(salt: &str) -> Result<(), ContractError> {
     validate_hex(salt, "salt", Some(64))
 }
 
-pub fn validate_required_salt(salt: &Option<String>) -> Result<(), ContractError> {
+pub fn validate_required_salt(salt: &Option<String>) -> Result<String, ContractError> {
     match salt {
-        Some(salt) => validate_salt(salt),
+        Some(salt) => {
+            validate_salt(salt)?;
+            Ok(salt.to_owned())
+        }
         None => Err(ContractError::NoSalt {}),
     }
 }
