@@ -3,9 +3,9 @@ use std::str::FromStr;
 use cosmwasm_std::{
     Coin, Decimal, Uint128,
     testing::{message_info, mock_dependencies, mock_env},
-    to_binary, to_json_binary,
+    to_json_binary,
 };
-use cw20::{AllowanceResponse, Cw20QueryMsg};
+use cw20::AllowanceResponse;
 
 use crate::{
     ContractError,
