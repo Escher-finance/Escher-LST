@@ -9,8 +9,8 @@ use crate::{
     ContractError,
     execute::*,
     msg::Recipient,
-    state::{PARAMETERS, QuoteToken, STATUS, Status},
-    tests::mock_parameters,
+    state::{PARAMETERS, QuoteToken, STATE, STATUS, Status},
+    tests::{mock_parameters, mock_state},
     utils,
 };
 
@@ -535,4 +535,34 @@ fn test_unbond_must_fail_if_paused() {
         err,
         ContractError::FunctionalityUnderMaintenance {},
     ))
+}
+
+#[test]
+fn test_unbond_must_fail_if_invalid_exchange_rate() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[]);
+
+    let recipient = Recipient::OnChain {
+        address: sender.clone(),
+    };
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let mut state = mock_state();
+    state.exchange_rate = Decimal::from_ratio(9_u128, 10_u128);
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+
+    let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
+
+    assert!(matches!(err, ContractError::InvalidExchangeRate {},))
 }
