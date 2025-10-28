@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{
-    Coin, Decimal, Uint128,
+    Binary, Coin, Decimal, Uint128,
     testing::{message_info, mock_dependencies, mock_env},
     to_json_binary,
 };
@@ -650,4 +650,36 @@ fn test_unbond_must_fail_if_missing_allowance() {
 
     assert_eq!(allowance_result, allowance);
     assert_eq!(required, amount);
+}
+
+#[test]
+fn test_receive_must_fail_if_paused() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: true,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let err = receive(
+        deps.as_mut(),
+        env,
+        info,
+        cw20::Cw20ReceiveMsg {
+            sender: sender.to_string(),
+            amount: Uint128::one(),
+            msg: Binary::default(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::FunctionalityUnderMaintenance {}
+    ))
 }
