@@ -564,5 +564,36 @@ fn test_unbond_must_fail_if_invalid_exchange_rate() {
 
     let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
 
-    assert!(matches!(err, ContractError::InvalidExchangeRate {},))
+    assert!(matches!(err, ContractError::InvalidExchangeRate {}));
+}
+
+#[test]
+fn test_unbond_must_fail_if_invalid_recipient() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[]);
+
+    let recipient = Recipient::Zkgm {
+        address: sender.to_string(),
+        channel_id: 0,
+    };
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let mut state = mock_state();
+    state.exchange_rate = Decimal::one();
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+
+    let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
+
+    assert!(matches!(err, ContractError::InvalidChannelId {}));
 }
