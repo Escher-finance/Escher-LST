@@ -369,6 +369,16 @@ fn test_validate_salt() {
 }
 
 #[test]
+fn test_validate_required_salt() {
+    let value = "0xe5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf1e5cf".to_string();
+
+    // missing salt
+    assert!(validation::validate_required_salt(&None).is_err());
+
+    validation::validate_required_salt(&Some(value)).unwrap();
+}
+
+#[test]
 fn test_validate_required_coin() {
     let coin = Coin::new(100_u128, "a".to_string());
     let coin_other = Coin::new(100_u128, "b".to_string());

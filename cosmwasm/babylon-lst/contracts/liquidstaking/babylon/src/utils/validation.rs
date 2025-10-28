@@ -195,7 +195,14 @@ pub fn validate_required_coin(funds: &[Coin], min_bond: &Coin) -> Result<Coin, C
 }
 
 pub fn validate_salt(salt: &str) -> Result<(), ContractError> {
-    validate_hex(salt, "sal", Some(64))
+    validate_hex(salt, "salt", Some(64))
+}
+
+pub fn validate_required_salt(salt: &Option<String>) -> Result<(), ContractError> {
+    match salt {
+        Some(salt) => validate_salt(salt),
+        None => Err(ContractError::NoSalt {}),
+    }
 }
 
 pub fn validate_hex(
