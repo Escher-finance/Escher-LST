@@ -155,7 +155,7 @@ export const createBabylonBondPayload = ({
   denom: string;
 }) => {
   const bondMsg = {
-    remote_bond: {
+    bond: {
       min_mint_amount,
       mint_to_address,
     },
@@ -186,7 +186,7 @@ export const createBabylonUnbondPayload = ({
   channel_id: number;
 }) => {
   const unbondMsg = {
-    remote_unbond: {
+    unbond: {
       amount,
       recipient: {
         zkgm: {
