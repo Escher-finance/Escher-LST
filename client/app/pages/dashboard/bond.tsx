@@ -102,20 +102,11 @@ export default function Bond({ stateKey, setStateKey }: KeyProps) {
             (Number(amount) / Number(liquidity.exchange_rate)) * 0.995,
         );
 
+        console.log("min_mint_amount", min_mint_amount);
         const bondMsg = {
-            local_bond: {
+            bond_v2: {
                 min_mint_amount: min_mint_amount.toString(),
-                recipient:
-                    recipient_type == "on_chain"
-                        ? { on_chain: { address: recipient_address } }
-                        : {
-                              zkgm: {
-                                  address: recipient_address,
-                                  channel_id:
-                                      network?.escher?.channel[chain_id]
-                                          ?.sourceChannelId,
-                              },
-                          },
+                mint_to_address: userAddress,
             },
         };
 
