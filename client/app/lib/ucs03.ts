@@ -421,10 +421,10 @@ export const createIBCUnbondPayload = ({
     ibc_channel_id: string;
 }) => {
     const unbondMsg = {
-        remote_unbond: {
+        unbond: {
             amount,
             recipient: {
-                i_b_c: {
+                ibc: {
                     address: recipient_address,
                     ibc_channel_id,
                 },
