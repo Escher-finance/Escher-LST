@@ -22,7 +22,7 @@ use crate::{
     contract::{execute, instantiate},
     msg::InstantiateMsg,
     query::query,
-    state::{Parameters, Validator},
+    state::{Parameters, State, Validator},
 };
 
 const NATIVE_DENOM: &str = "utoken";
@@ -90,6 +90,17 @@ pub fn mock_parameters() -> Parameters {
         transfer_fee: Uint128::from(20_000_000_u128),
         transfer_handler: Addr::unchecked("transfer_handler").to_string(),
         zkgm_token_minter: Addr::unchecked("zkgm_token_minter").to_string(),
+    }
+}
+
+pub fn mock_state() -> State {
+    State {
+        exchange_rate: Decimal::one(),
+        total_bond_amount: Uint128::new(1000),
+        total_delegated_amount: Uint128::new(1000),
+        total_supply: Uint128::new(1000),
+        bond_counter: 1,
+        last_bond_time: 0,
     }
 }
 

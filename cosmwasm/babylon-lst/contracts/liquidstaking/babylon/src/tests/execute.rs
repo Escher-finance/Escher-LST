@@ -1,13 +1,25 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{Decimal, Uint128};
+use cosmwasm_std::{
+    Binary, Coin, Decimal, Uint128,
+    testing::{message_info, mock_dependencies, mock_env},
+    to_json_binary,
+};
+use cw20::AllowanceResponse;
 
-use crate::{ContractError, execute::*, state::QuoteToken, utils};
+use crate::{
+    ContractError,
+    execute::*,
+    msg::Recipient,
+    state::{PARAMETERS, QuoteToken, STATE, STATUS, Status},
+    tests::{mock_parameters, mock_state},
+    utils,
+};
 
 #[test]
 fn test_calculate_native_token() {
     let staking_token = Uint128::from(10000u32);
-    //60926366
+
     let exchange_rate = Decimal::from_ratio(
         Uint128::from(5_350_444_044_771_u128),
         Uint128::from(30000u128),
@@ -403,5 +415,617 @@ fn test_slash_batch() {
     assert!(matches!(
         err,
         ContractError::BatchExpectedNativeUnstakedNotSet
+    ));
+}
+
+#[test]
+fn test_bond_must_fail_if_paused() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    let status = Status {
+        bond_is_paused: true,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let err = bond(
+        deps.as_mut(),
+        env,
+        info,
+        None,
+        Uint128::one(),
+        sender.clone(),
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::FunctionalityUnderMaintenance {}
+    ))
+}
+
+#[test]
+fn test_bond_must_fail_if_invalid_funds() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let denom = "denom".to_string();
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[Coin::new(amount, denom.clone())]);
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let mut params = mock_parameters();
+    params.underlying_coin_denom = denom.clone();
+    params.min_bond = amount + Uint128::one();
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+
+    let err = bond(
+        deps.as_mut(),
+        env,
+        info,
+        None,
+        Uint128::one(),
+        sender.clone(),
+    )
+    .unwrap_err();
+
+    assert!(matches!(err, ContractError::BondAmountTooLow {}))
+}
+
+#[test]
+fn test_unbond_must_fail_if_funds_are_attached() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let denom = "denom".to_string();
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[Coin::new(amount, denom.clone())]);
+
+    let recipient = Recipient::OnChain {
+        address: sender.clone(),
+    };
+
+    let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Payment(cw_utils::PaymentError::NonPayable {})
+    ))
+}
+
+#[test]
+fn test_unbond_must_fail_if_paused() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[]);
+
+    let recipient = Recipient::OnChain {
+        address: sender.clone(),
+    };
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: true,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::FunctionalityUnderMaintenance {},
+    ))
+}
+
+#[test]
+fn test_unbond_must_fail_if_invalid_exchange_rate() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[]);
+
+    let recipient = Recipient::OnChain {
+        address: sender.clone(),
+    };
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let mut state = mock_state();
+    state.exchange_rate = Decimal::from_ratio(9_u128, 10_u128);
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+
+    let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
+
+    assert!(matches!(err, ContractError::InvalidExchangeRate {}));
+}
+
+#[test]
+fn test_unbond_must_fail_if_invalid_recipient() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[]);
+
+    let recipient = Recipient::Zkgm {
+        address: sender.to_string(),
+        channel_id: 0,
+    };
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let mut state = mock_state();
+    state.exchange_rate = Decimal::one();
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+
+    let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
+
+    assert!(matches!(err, ContractError::InvalidChannelId {}));
+}
+
+#[test]
+fn test_unbond_must_fail_if_missing_allowance() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+
+    let sender = api.addr_make("sender");
+
+    let amount = Uint128::new(1000);
+    let info = message_info(&sender, &[]);
+
+    let recipient = Recipient::OnChain {
+        address: sender.clone(),
+    };
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let mut state = mock_state();
+    state.exchange_rate = Decimal::one();
+    STATE.save(deps.as_mut().storage, &state).unwrap();
+
+    let params = mock_parameters();
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+
+    let allowance = amount - Uint128::one();
+    deps.querier.update_wasm(move |_query| {
+        let res = to_json_binary(&AllowanceResponse {
+            allowance,
+            ..Default::default()
+        })
+        .unwrap();
+        cosmwasm_std::SystemResult::Ok(cosmwasm_std::ContractResult::Ok(res))
+    });
+
+    let err = unbond(deps.as_mut(), env, info, amount, recipient).unwrap_err();
+
+    let ContractError::InsufficientAllowance {
+        allowance: allowance_result,
+        required,
+    } = err
+    else {
+        panic!("wrong err, got {}", err)
+    };
+
+    assert_eq!(allowance_result, allowance);
+    assert_eq!(required, amount);
+}
+
+#[test]
+fn test_receive_must_fail_if_paused() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: true,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let err = receive(
+        deps.as_mut(),
+        env,
+        info,
+        cw20::Cw20ReceiveMsg {
+            sender: sender.to_string(),
+            amount: Uint128::one(),
+            msg: Binary::default(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::FunctionalityUnderMaintenance {}
+    ))
+}
+
+#[test]
+fn test_receive_must_fail_if_bad_sender() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    let status = Status {
+        bond_is_paused: false,
+        unbond_is_paused: false,
+    };
+    STATUS.save(deps.as_mut().storage, &status).unwrap();
+
+    let params = mock_parameters();
+    PARAMETERS.save(deps.as_mut().storage, &params).unwrap();
+
+    let err = receive(
+        deps.as_mut(),
+        env,
+        info,
+        cw20::Cw20ReceiveMsg {
+            sender: sender.to_string(),
+            amount: Uint128::one(),
+            msg: Binary::default(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(err, ContractError::Unauthorized {}))
+}
+
+#[test]
+fn test_submit_batch_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = submit_batch(deps.as_mut(), env, info).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_set_batch_received_amount_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = set_batch_received_amount(deps.as_mut(), env, info, 0, Uint128::one()).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_process_rewards_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = process_rewards(deps.as_mut(), env, info).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_update_ownership_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = update_ownership(
+        deps.as_mut(),
+        env,
+        info,
+        cw_ownable::Action::AcceptOwnership {},
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_set_parameters_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = set_parameters(
+        deps.as_mut(),
+        env,
+        info,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_process_batch_withdrawal_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = process_batch_withdrawal(deps.as_mut(), env, info, 0, vec![]).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_update_validators_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = update_validators(deps.as_mut(), env, info, vec![]).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_update_quote_token_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = update_quote_token(
+        deps.as_mut(),
+        env,
+        info,
+        0,
+        QuoteToken {
+            channel_id: 0,
+            quote_token: String::new(),
+            lst_quote_token: String::new(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_migrate_reward_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = migrate_reward(deps.as_mut(), env, info, 0).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_set_status_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = set_status(
+        deps.as_mut(),
+        info,
+        Status {
+            bond_is_paused: false,
+            unbond_is_paused: false,
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ))
+}
+
+#[test]
+fn test_set_or_remove_chain_must_fail_if_sender_not_owner() {
+    let mut deps = mock_dependencies();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(
+        deps.as_mut().storage,
+        &api,
+        Some(api.addr_make("owner").as_str()),
+    )
+    .unwrap();
+
+    let err = set_chain(
+        deps.as_mut(),
+        info.clone(),
+        crate::state::Chain {
+            name: String::new(),
+            chain_id: String::new(),
+            ucs03_channel_id: 0,
+            prefix: String::new(),
+        },
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
+    ));
+
+    let err = remove_chain(deps.as_mut(), info, 0).unwrap_err();
+
+    assert!(matches!(
+        err,
+        ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
     ));
 }
