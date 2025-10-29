@@ -85,8 +85,8 @@ nix build .#liquidstaking-babylon
 The built artifacts can be found in `result`. All rust packages will have the commit hash embeded at build time, via [`embed-commit`](https://github.com/unionlabs/union/tree/main/lib/embed-commit). This is handled transparently by the crane builders from the union repo; the only requirement is that the `embed-commit` crate is added as a dependency (and the builds will fail if it is not a dependency):
 
 ```sh
-$ nix build .#liquidstaking-solo.release
-$ ls -alhL result 
+$ nix build .#liquidstaking-babylon.release
+$ ls -alhL result
 -r-xr-xr-x 1 root root 553K Jan  1  1970 result
 $ nix run guthub:unionlabs/union#embed-commit-verifier -- extract result
 1ad4854a1e1d2cbce71c6b064a190ebf1662f947 # the commit has of the repo when this package was built
