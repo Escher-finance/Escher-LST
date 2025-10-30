@@ -125,7 +125,7 @@ fn test_validate_recipient_on_chain_recipient() {
         validation::validate_recipient(
             &deps.storage,
             &deps.api,
-            Some("invalid".to_string()),
+            Some(&"invalid".to_string()),
             None,
             None,
         )
@@ -138,7 +138,7 @@ fn test_validate_recipient_on_chain_recipient() {
     let on_chain_recipient = validation::validate_recipient(
         &deps.storage,
         &deps.api,
-        Some(recipient.to_string()),
+        Some(&recipient.to_string()),
         None,
         None,
     )
@@ -166,7 +166,7 @@ fn test_validate_recipient_channel_id() {
         validation::validate_recipient(
             &deps.storage,
             &deps.api,
-            Some(recipient.to_string()),
+            Some(&recipient.to_string()),
             Some(5),
             None,
         )
@@ -178,7 +178,7 @@ fn test_validate_recipient_channel_id() {
         validation::validate_recipient(
             &deps.storage,
             &deps.api,
-            Some(recipient.to_string()),
+            Some(&recipient.to_string()),
             Some(0),
             None,
         )
@@ -196,7 +196,7 @@ fn test_validate_recipient_channel_id() {
         validation::validate_recipient(
             &deps.storage,
             &deps.api,
-            Some("invalid".to_string()),
+            Some(&"invalid".to_string()),
             Some(channel_id),
             None,
         )
@@ -206,7 +206,7 @@ fn test_validate_recipient_channel_id() {
     let on_chain_recipient = validation::validate_recipient(
         &deps.storage,
         &deps.api,
-        Some(recipient.to_string()),
+        Some(&recipient.to_string()),
         Some(channel_id),
         None,
     )
@@ -223,18 +223,18 @@ fn test_validate_recipient_ibc_channel_id() {
         .save(
             &mut deps.storage,
             ibc_channel_id.clone(),
-            &"cosmwasm".to_string(),
+            &"osmo".to_string(),
         )
         .unwrap();
 
-    let recipient = "cosmwasmeeeeeeeeeeee";
+    let recipient = "osmo185fflsvwrz0cx46w6qada7mdy92m6kx4qm4l9k";
 
     // unknown channel_id
     assert!(
         validation::validate_recipient(
             &deps.storage,
             &deps.api,
-            Some(recipient.to_string()),
+            Some(&recipient.to_string()),
             None,
             Some("channel-2".to_string()),
         )
@@ -258,7 +258,7 @@ fn test_validate_recipient_ibc_channel_id() {
         validation::validate_recipient(
             &deps.storage,
             &deps.api,
-            Some("invalid".to_string()),
+            Some(&"invalid".to_string()),
             None,
             Some(ibc_channel_id.clone()),
         )
@@ -268,7 +268,7 @@ fn test_validate_recipient_ibc_channel_id() {
     let on_chain_recipient = validation::validate_recipient(
         &deps.storage,
         &deps.api,
-        Some(recipient.to_string()),
+        Some(&recipient.to_string()),
         None,
         Some(ibc_channel_id.clone()),
     )
@@ -319,7 +319,7 @@ fn test_split_and_validate_recipient_zkgm() {
 fn test_split_and_validate_recipient_ibc() {
     let mut deps = mock_dependencies();
     let ibc_channel_id = "channel-1".to_string();
-    let recipient_addr = "cosmwasmeeeeeeeeeeee".to_string();
+    let recipient_addr = "osmo185fflsvwrz0cx46w6qada7mdy92m6kx4qm4l9k".to_string();
     let recipient = Recipient::Ibc {
         address: recipient_addr.clone(),
         ibc_channel_id: ibc_channel_id.clone(),
@@ -329,7 +329,7 @@ fn test_split_and_validate_recipient_ibc() {
         .save(
             &mut deps.storage,
             ibc_channel_id.clone(),
-            &"cosmwasm".to_string(),
+            &"osmo".to_string(),
         )
         .unwrap();
 
@@ -409,4 +409,80 @@ fn test_validate_required_coin() {
         &Coin::new(coin.amount - Uint128::one(), coin.denom.clone()),
     )
     .unwrap();
+}
+
+#[test]
+fn test_is_valid_cosmos_address() {
+    // Valid addresses with correct prefix and length
+    assert!(validation::is_valid_cosmos_address(
+        "bbn1fju94gpxlcg5tqxp2sf0c9ns6gkxqcsd5cezm2",
+        "bbn"
+    ));
+
+    // Valid contract address with correct prefix and length
+    assert!(validation::is_valid_cosmos_address(
+        "bbn1l2um8k69h9sd2amtypp0c44d5zxgylp8z84lmfujjvejw5k6frfswwr3wp",
+        "bbn"
+    ));
+
+    // Valid addresses with correct prefix and length
+    assert!(validation::is_valid_cosmos_address(
+        "cosmos1syavy2npfyt9tcncdtsdzf7kny9lh777pahuux",
+        "cosmos"
+    ));
+
+    // Valid addresses with correct prefix and length
+    assert!(validation::is_valid_cosmos_address(
+        "osmo1qw6npqrhgt0k4wvjecyggsyy0u492sg26wwtgttrmwc2xxelghgqkykpf9",
+        "osmo"
+    ));
+
+    // Invalid: empty string
+    assert!(!validation::is_valid_cosmos_address("", "cosmos"));
+
+    // Invalid: wrong prefix
+    assert!(!validation::is_valid_cosmos_address(
+        "cosmos1syavy2npfyt9tcncdtsdzf7kny9lh777pahuux",
+        "osmo"
+    ));
+    assert!(!validation::is_valid_cosmos_address(
+        "osmo1syavy2npfyt9tcncdtsdzf7kny9lh777vsd4zx",
+        "cosmos"
+    ));
+
+    // Invalid: incorrect length (too short)
+    assert!(!validation::is_valid_cosmos_address(
+        "cosmos1syavy2npfyt9tcncdtsdzf",
+        "cosmos"
+    ));
+
+    // Invalid: incorrect length
+    assert!(!validation::is_valid_cosmos_address(
+        "cosmos1syavy2npfyt9tcncdtsdzf7kny9lh777pahuuxextralong",
+        "cosmos"
+    ));
+
+    // Invalid: not a bech32 encoded address
+    assert!(!validation::is_valid_cosmos_address(
+        "not_a_valid_address",
+        "cosmos"
+    ));
+
+    // Invalid: hex address instead of bech32
+    assert!(!validation::is_valid_cosmos_address(
+        "0xeeEEeeE98622c19Ea39Ea8827ae22Bbfc732671c",
+        "cosmos"
+    ));
+
+    // Invalid: contains invalid bech32 characters
+    assert!(!validation::is_valid_cosmos_address(
+        "cosmos1syavy2npfyt9tcncdtsdzf7kny9lh777pahuuB",
+        "cosmos"
+    ));
+
+    // Edge case: prefix only
+    assert!(!validation::is_valid_cosmos_address("cosmos", "cosmos"));
+
+    // Edge case: prefix with separator but no data
+    assert!(!validation::is_valid_cosmos_address("cosmos1", "cosmos"));
 }

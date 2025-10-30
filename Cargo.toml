@@ -49,6 +49,7 @@ sha2             = { version = "0.10.9" }
 thiserror        = { version = "1.0.58" }
 tiny-keccak      = { version = "2.0.2", features = ["keccak"] }
 vergen-git2      = { version = "1.0.7" }
+bech32           = { version = "0.11.0" }
 
 # unionlabs
 embed-commit         = { git = "https://github.com/unionlabs/union", default-features = false }

@@ -168,7 +168,7 @@ pub fn receive(
     validate_recipient(
         deps.storage,
         deps.api,
-        recipient.clone(),
+        recipient.as_ref(),
         recipient_channel_id,
         recipient_ibc_channel_id.clone(),
     )?;
@@ -717,7 +717,7 @@ pub fn process_batch_withdrawal(
             &undelegation.recipient_ibc_channel_id.clone(),
         );
 
-        let salt = validate_required_salt(&salt.get(i).map(|s| s.to_owned()))?;
+        let salt = validate_required_salt(&salt.get(i).map(std::borrow::ToOwned::to_owned))?;
 
         let Some(unstake_return_native_amount) = undelegation.unstake_return_native_amount else {
             return Err(ContractError::InvalidUnstakeReturnNativeAmount);
