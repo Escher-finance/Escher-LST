@@ -53,7 +53,7 @@ pub fn validate_quote_tokens(quote_tokens: &[QuoteToken]) -> Result<(), Contract
 pub fn validate_recipient(
     storage: &dyn Storage,
     api: &dyn Api,
-    recipient: Option<String>,
+    recipient: Option<&String>,
     recipient_channel_id: Option<u32>,
     recipient_ibc_channel_id: Option<String>,
 ) -> Result<bool, ContractError> {
@@ -100,15 +100,14 @@ pub fn validate_recipient(
 
         match recipient.as_ref() {
             Some(recipient) => {
-                if recipient.starts_with(&prefix) {
-                    Ok(())
-                } else {
-                    Err(ContractError::InvalidAddress {
+                if !is_valid_cosmos_address(recipient, &prefix) {
+                    return Err(ContractError::InvalidAddress {
                         kind: "recipient".into(),
-                        address: recipient.to_string(),
-                        reason: format!("missing {prefix} prefix"),
-                    })
+                        address: (*recipient).to_string(),
+                        reason: format!("invalid ibc recipient address: {recipient}"),
+                    });
                 }
+                Ok(())
             }
             None => Err(ContractError::Std(cosmwasm_std::StdError::generic_err(
                 "missing recipient",
@@ -135,7 +134,7 @@ pub fn split_and_validate_recipient(
         } => {
             let recipient = Some(address);
             let recipient_channel_id = Some(channel_id);
-            validate_recipient(storage, api, recipient.clone(), recipient_channel_id, None)?;
+            validate_recipient(storage, api, recipient.as_ref(), recipient_channel_id, None)?;
             (recipient, recipient_channel_id, None)
         }
         Recipient::Ibc {
@@ -147,7 +146,7 @@ pub fn split_and_validate_recipient(
             validate_recipient(
                 storage,
                 api,
-                recipient.clone(),
+                recipient.as_ref(),
                 None,
                 recipient_ibc_channel_id.clone(),
             )?;
@@ -239,4 +238,18 @@ pub fn validate_hex(
         }
     }
     Ok(())
+}
+
+#[must_use]
+pub fn is_valid_cosmos_address(address: &str, expected_prefix: &str) -> bool {
+    if address.is_empty() {
+        return false;
+    }
+
+    match bech32::decode(address) {
+        Ok((hrp, data)) => {
+            hrp.as_str() == expected_prefix && (data.len() == 32 || data.len() == 20)
+        }
+        Err(_) => false,
+    }
 }

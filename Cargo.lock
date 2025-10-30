@@ -2647,6 +2647,7 @@ name = "liquidstaking-babylon"
 version = "0.1.202"
 dependencies = [
  "alloy 0.15.11",
+ "bech32",
  "bincode",
  "cosmos-sdk-proto 0.27.0",
  "cosmwasm-schema",
