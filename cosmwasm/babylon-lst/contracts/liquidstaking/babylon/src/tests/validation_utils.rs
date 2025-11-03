@@ -3,7 +3,7 @@ use cosmwasm_std::{Coin, Uint128, testing::mock_dependencies};
 use crate::{
     ContractError,
     msg::Recipient,
-    state::{CHAINS, Chain, IBC_CHANNELS, QuoteToken, Validator},
+    state::{BOND_ZKGM_CHAINS, IBC_CHANNELS, QuoteToken, Validator, ZkgmChain},
     utils::validation::{self, *},
 };
 
@@ -128,12 +128,23 @@ fn test_validate_recipient_on_chain_recipient() {
             Some(&"invalid".to_string()),
             None,
             None,
+            &crate::msg::RecipientAction::Bond
         )
         .is_err()
     );
 
     // missing recipient
-    assert!(validation::validate_recipient(&deps.storage, &deps.api, None, None, None).is_err());
+    assert!(
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            None,
+            None,
+            None,
+            &crate::msg::RecipientAction::Bond
+        )
+        .is_err()
+    );
 
     let on_chain_recipient = validation::validate_recipient(
         &deps.storage,
@@ -141,6 +152,7 @@ fn test_validate_recipient_on_chain_recipient() {
         Some(&recipient.to_string()),
         None,
         None,
+        &crate::msg::RecipientAction::Unbond,
     )
     .unwrap();
     assert_eq!(on_chain_recipient, true);
@@ -151,13 +163,15 @@ fn test_validate_recipient_channel_id() {
     let mut deps = mock_dependencies();
     let channel_id = 1;
 
-    let chain = Chain {
+    let chain = ZkgmChain {
         prefix: "cosmwasm".to_string(),
         name: "chain".to_string(),
         chain_id: "chain-1".to_string(),
         ucs03_channel_id: channel_id,
     };
-    CHAINS.save(&mut deps.storage, channel_id, &chain).unwrap();
+    BOND_ZKGM_CHAINS
+        .save(&mut deps.storage, channel_id, &chain)
+        .unwrap();
 
     let recipient = "0xeeEEeeE98622c19Ea39Ea8827ae22Bbfc732671c";
 
@@ -169,6 +183,7 @@ fn test_validate_recipient_channel_id() {
             Some(&recipient.to_string()),
             Some(5),
             None,
+            &crate::msg::RecipientAction::Bond
         )
         .is_err()
     );
@@ -181,14 +196,22 @@ fn test_validate_recipient_channel_id() {
             Some(&recipient.to_string()),
             Some(0),
             None,
+            &crate::msg::RecipientAction::Bond
         )
         .is_err()
     );
 
     // missing recipient
     assert!(
-        validation::validate_recipient(&deps.storage, &deps.api, None, Some(channel_id), None,)
-            .is_err()
+        validation::validate_recipient(
+            &deps.storage,
+            &deps.api,
+            None,
+            Some(channel_id),
+            None,
+            &crate::msg::RecipientAction::Bond
+        )
+        .is_err()
     );
 
     // invalid recipient
@@ -199,6 +222,7 @@ fn test_validate_recipient_channel_id() {
             Some(&"invalid".to_string()),
             Some(channel_id),
             None,
+            &crate::msg::RecipientAction::Bond
         )
         .is_err()
     );
@@ -209,6 +233,7 @@ fn test_validate_recipient_channel_id() {
         Some(&recipient.to_string()),
         Some(channel_id),
         None,
+        &crate::msg::RecipientAction::Bond,
     )
     .unwrap();
     assert_eq!(on_chain_recipient, false);
@@ -237,6 +262,7 @@ fn test_validate_recipient_ibc_channel_id() {
             Some(&recipient.to_string()),
             None,
             Some("channel-2".to_string()),
+            &crate::msg::RecipientAction::Unbond
         )
         .is_err()
     );
@@ -249,6 +275,7 @@ fn test_validate_recipient_ibc_channel_id() {
             None,
             None,
             Some(ibc_channel_id.clone()),
+            &crate::msg::RecipientAction::Unbond
         )
         .is_err()
     );
@@ -261,6 +288,7 @@ fn test_validate_recipient_ibc_channel_id() {
             Some(&"invalid".to_string()),
             None,
             Some(ibc_channel_id.clone()),
+            &crate::msg::RecipientAction::Unbond
         )
         .is_err()
     );
@@ -271,6 +299,7 @@ fn test_validate_recipient_ibc_channel_id() {
         Some(&recipient.to_string()),
         None,
         Some(ibc_channel_id.clone()),
+        &crate::msg::RecipientAction::Unbond,
     )
     .unwrap();
     assert_eq!(on_chain_recipient, false);
@@ -283,8 +312,13 @@ fn test_split_and_validate_recipient_on_chain() {
     let recipient = Recipient::OnChain {
         address: recipient_addr.clone(),
     };
-    let result =
-        validation::split_and_validate_recipient(&deps.storage, &deps.api, recipient).unwrap();
+    let result = validation::split_and_validate_recipient(
+        &deps.storage,
+        &deps.api,
+        recipient,
+        &crate::msg::RecipientAction::Bond,
+    )
+    .unwrap();
     assert_eq!(result.0, Some(recipient_addr.to_string()));
     assert_eq!(result.1, None);
     assert_eq!(result.2, None);
@@ -300,16 +334,23 @@ fn test_split_and_validate_recipient_zkgm() {
         channel_id,
     };
 
-    let chain = Chain {
+    let chain = ZkgmChain {
         prefix: "cosmwasm".to_string(),
         name: "chain".to_string(),
         chain_id: "chain-1".to_string(),
         ucs03_channel_id: channel_id,
     };
-    CHAINS.save(&mut deps.storage, channel_id, &chain).unwrap();
+    BOND_ZKGM_CHAINS
+        .save(&mut deps.storage, channel_id, &chain)
+        .unwrap();
 
-    let result =
-        validation::split_and_validate_recipient(&deps.storage, &deps.api, recipient).unwrap();
+    let result = validation::split_and_validate_recipient(
+        &deps.storage,
+        &deps.api,
+        recipient,
+        &crate::msg::RecipientAction::Bond,
+    )
+    .unwrap();
     assert_eq!(result.0, Some(recipient_addr.to_string()));
     assert_eq!(result.1, Some(channel_id));
     assert_eq!(result.2, None);
@@ -333,9 +374,13 @@ fn test_split_and_validate_recipient_ibc() {
         )
         .unwrap();
 
-    let result =
-        validation::split_and_validate_recipient(&deps.storage, &deps.api, recipient.clone())
-            .unwrap();
+    let result = validation::split_and_validate_recipient(
+        &deps.storage,
+        &deps.api,
+        recipient.clone(),
+        &crate::msg::RecipientAction::Unbond,
+    )
+    .unwrap();
     assert_eq!(result.0, Some(recipient_addr.to_string()));
     assert_eq!(result.1, None);
     assert_eq!(result.2, Some(ibc_channel_id));

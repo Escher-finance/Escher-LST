@@ -181,4 +181,10 @@ pub enum ContractError {
 
     #[error(transparent)]
     Payment(#[from] PaymentError),
+
+    #[error("unsupported recipient type: {recipient_type} on {action}")]
+    InvalidRecipient {
+        recipient_type: String,
+        action: String,
+    },
 }

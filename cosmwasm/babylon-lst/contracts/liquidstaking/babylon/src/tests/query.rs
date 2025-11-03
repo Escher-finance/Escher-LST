@@ -112,25 +112,25 @@ fn test_query_chains() {
 
     for i in 1..10 {
         let chain_id = format!("chain-{i}");
-        let data = crate::state::Chain {
+        let data = crate::state::ZkgmChain {
             chain_id: chain_id.clone(),
             name: format!("chain{i}"),
             ucs03_channel_id: i,
             prefix: format!("b{i}"),
         };
-        crate::state::CHAINS
+        crate::state::BOND_ZKGM_CHAINS
             .save(&mut deps.storage, i, &data)
             .unwrap();
     }
 
-    let chains: Vec<crate::state::Chain> = crate::state::CHAINS
+    let chains: Vec<crate::state::ZkgmChain> = crate::state::BOND_ZKGM_CHAINS
         .range(&deps.storage, None, None, cosmwasm_std::Order::Ascending)
         .filter_map(|result| result.ok().map(|(_, chain)| chain))
         .collect();
 
-    let chain_1: &crate::state::Chain = chains.first().unwrap();
+    let chain_1: &crate::state::ZkgmChain = chains.first().unwrap();
     assert_eq!(chain_1.ucs03_channel_id, 1);
 
-    let chain_9: &crate::state::Chain = chains.get(8).unwrap();
+    let chain_9: &crate::state::ZkgmChain = chains.get(8).unwrap();
     assert_eq!(chain_9.name, "chain9");
 }

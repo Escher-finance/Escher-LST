@@ -92,6 +92,21 @@ pub enum Cw20PayloadMsg {
 }
 
 #[cw_serde]
+pub enum RecipientAction {
+    Bond,
+    Unbond,
+}
+
+impl std::fmt::Display for RecipientAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RecipientAction::Bond => write!(f, "Bond"),
+            RecipientAction::Unbond => write!(f, "Unbond"),
+        }
+    }
+}
+
+#[cw_serde]
 pub enum Recipient {
     OnChain {
         address: Addr,
@@ -179,7 +194,7 @@ pub enum ExecuteMsg {
     SplitReward {},
     SetStatus(Status),
     SetChain {
-        chain: crate::state::Chain,
+        chain: crate::state::ZkgmChain,
     },
     RemoveChain {
         channel_id: u32,
@@ -267,7 +282,7 @@ pub enum QueryMsg {
     Status {},
     #[returns(Vec<cosmwasm_std::FullDelegation>)]
     Delegations {},
-    #[returns(Vec<crate::state::Chain>)]
+    #[returns(Vec<crate::state::ZkgmChain>)]
     Chains {},
     #[returns(Vec<crate::state::WithdrawRewardQueue>)]
     RewardQueue {},

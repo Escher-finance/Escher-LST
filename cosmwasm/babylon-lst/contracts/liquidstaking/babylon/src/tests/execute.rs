@@ -1008,7 +1008,7 @@ fn test_set_or_remove_chain_must_fail_if_sender_not_owner() {
     let err = set_chain(
         deps.as_mut(),
         info.clone(),
-        crate::state::Chain {
+        crate::state::ZkgmChain {
             name: String::new(),
             chain_id: String::new(),
             ucs03_channel_id: 0,
