@@ -91,7 +91,7 @@ pub fn ibc_destination_callback(
     let payload: Result<crate::msg::IBCCallbackPayload, StdError> =
         from_json(packet_data.memo.as_bytes());
 
-    let channel_id: String = msg.packet.dest.channel_id;
+    let ibc_channel_id: String = msg.packet.dest.channel_id;
     let coin_denom = params.underlying_coin_denom.clone();
 
     let amount = packet_data
@@ -107,7 +107,7 @@ pub fn ibc_destination_callback(
                 env,
                 None,
                 packet_data.clone(),
-                channel_id,
+                ibc_channel_id,
                 amount,
                 coin_denom,
                 err.to_string(),
@@ -125,7 +125,7 @@ pub fn ibc_destination_callback(
             env,
             Some(payload),
             packet_data,
-            channel_id,
+            ibc_channel_id,
             amount,
             coin_denom,
             ibc_callback_error_message,
@@ -149,7 +149,7 @@ pub fn ibc_destination_callback(
                 env,
                 Some(payload.clone()),
                 packet_data,
-                channel_id,
+                ibc_channel_id,
                 amount,
                 coin_denom,
                 e.to_string(),
@@ -158,7 +158,12 @@ pub fn ibc_destination_callback(
     };
 
     let (the_recipient, recipient_channel_id, recipient_ibc_channel_id) =
-        match split_and_validate_recipient(deps.storage, deps.api, payload.recipient.clone()) {
+        match split_and_validate_recipient(
+            deps.storage,
+            deps.api,
+            payload.recipient.clone(),
+            &crate::msg::RecipientAction::Bond,
+        ) {
             Ok((the_recipient, recipient_channel_id, recipient_ibc_channel_id)) => (
                 the_recipient,
                 recipient_channel_id,
@@ -170,7 +175,7 @@ pub fn ibc_destination_callback(
                     env,
                     Some(payload),
                     packet_data,
-                    channel_id,
+                    ibc_channel_id,
                     amount,
                     coin_denom,
                     ibc_callback_error_message,
@@ -224,8 +229,14 @@ pub fn ibc_destination_callback(
             address: _,
             ibc_channel_id: _,
         } => {
-            return Err(StdError::generic_err(
-                "can not send liquid staking token via ibc".to_string(),
+            return Ok(failure_handler(
+                env,
+                Some(payload),
+                packet_data,
+                ibc_channel_id,
+                amount,
+                coin_denom,
+                "can not send liquid staking token to ibc recipient".to_string(),
             ));
         }
     }
@@ -244,7 +255,7 @@ pub fn ibc_destination_callback(
 
     let ibc_callback_event = IbcCallbackEvent(
         packet_data.sender,
-        channel_id.clone(),
+        ibc_channel_id.clone(),
         amount,
         payload.amount,
         the_recipient.unwrap_or_default(),

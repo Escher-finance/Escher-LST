@@ -4,7 +4,7 @@ use cosmwasm_std::{Api, Coin, Storage};
 
 use crate::{
     ContractError,
-    msg::Recipient,
+    msg::{Recipient, RecipientAction},
     state::{QuoteToken, Validator},
 };
 
@@ -56,9 +56,10 @@ pub fn validate_recipient(
     recipient: Option<&String>,
     recipient_channel_id: Option<u32>,
     recipient_ibc_channel_id: Option<String>,
+    action: &RecipientAction,
 ) -> Result<bool, ContractError> {
     let mut on_chain_recipient = false;
-    // if recipient is provided but channel id is none, need to validate the address as it is the same chain address as contract
+    // if recipient address is provided but channel id is none, need to validate the address as it is the same chain address as contract
     if recipient_channel_id.is_none() && recipient_ibc_channel_id.is_none() {
         match recipient.as_ref() {
             Some(recipient) => api.addr_validate(recipient.as_str())?,
@@ -76,7 +77,15 @@ pub fn validate_recipient(
         if recipient_channel_id == 0 {
             return Err(ContractError::InvalidChannelId {});
         }
-        let channel_id = crate::state::CHAINS.load(storage, recipient_channel_id);
+        let channel_id = match action {
+            RecipientAction::Bond => {
+                crate::state::BOND_ZKGM_CHAINS.load(storage, recipient_channel_id)
+            }
+            RecipientAction::Unbond => {
+                crate::state::UNBOND_ZKGM_CHAINS.load(storage, recipient_channel_id)
+            }
+        };
+
         if channel_id.is_err() {
             return Err(ContractError::InvalidChannelId {});
         }
@@ -90,6 +99,14 @@ pub fn validate_recipient(
     }
 
     if let Some(recipient_ibc_channel_id) = recipient_ibc_channel_id {
+        // bond doesn't support ibc recipient because ls token only can be sent via zkgm
+        if let RecipientAction::Bond = action {
+            return Err(ContractError::InvalidRecipient {
+                recipient_type: "ibc".into(),
+                action: "bond".into(),
+            });
+        }
+
         let ibc_channel_result: Result<String, cosmwasm_std::StdError> =
             crate::state::IBC_CHANNELS.load(storage, recipient_ibc_channel_id);
         if ibc_channel_result.is_err() {
@@ -119,12 +136,13 @@ pub fn validate_recipient(
 }
 
 /// Errors:
-/// - Returns contract error if zkgm channel id is 0
+/// - Returns contract error if recipient is invalid
 #[allow(clippy::type_complexity)]
 pub fn split_and_validate_recipient(
     storage: &dyn Storage,
     api: &dyn Api,
     recipient: Recipient,
+    action: &RecipientAction,
 ) -> Result<(Option<String>, Option<u32>, Option<String>), ContractError> {
     let (recipient_addr, recipient_channel_id, recipient_ibc_channel_id) = match recipient {
         Recipient::OnChain { address } => (Some(address.to_string()), None, None),
@@ -134,7 +152,14 @@ pub fn split_and_validate_recipient(
         } => {
             let recipient = Some(address);
             let recipient_channel_id = Some(channel_id);
-            validate_recipient(storage, api, recipient.as_ref(), recipient_channel_id, None)?;
+            validate_recipient(
+                storage,
+                api,
+                recipient.as_ref(),
+                recipient_channel_id,
+                None,
+                action,
+            )?;
             (recipient, recipient_channel_id, None)
         }
         Recipient::Ibc {
@@ -149,6 +174,7 @@ pub fn split_and_validate_recipient(
                 recipient.as_ref(),
                 None,
                 recipient_ibc_channel_id.clone(),
+                action,
             )?;
             (recipient, None, recipient_ibc_channel_id)
         }

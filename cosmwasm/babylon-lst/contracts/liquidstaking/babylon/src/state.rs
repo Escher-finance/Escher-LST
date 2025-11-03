@@ -23,15 +23,18 @@ pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 // Queue of validator reward for executing split reward
 pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
 
-// Map of supported ucs03 chains with channel_id as key
-pub const CHAINS: Map<u32, Chain> = Map::new("chains");
+// Map of supported ucs03 recipient chains with channel_id as key on bond action, only support zkgm recipient for cross chain
+pub const BOND_ZKGM_CHAINS: Map<u32, ZkgmChain> = Map::new("chains");
 
-// Map of supported ibc channels with channel_id as key and address prefix as value, like bbn, union, osmo
+// Map of supported unbond ibc channels with channel_id as key and address prefix as value, like bbn, union, osmo
 pub const IBC_CHANNELS: Map<String, String> = Map::new("ibc_channels");
 
 // Map of unbond record id and the recipient ibc channel id
 pub const UNBOND_RECIPIENT_IBC_CHANNEL: Map<u64, Option<String>> =
     Map::new("unbond_record_recipient_ibc_channel");
+
+// Map of supported ucs03 recipient chains with channel_id as key on unbond action
+pub const UNBOND_ZKGM_CHAINS: Map<u32, ZkgmChain> = Map::new("unbond_chains");
 
 #[cw_serde]
 pub struct Status {
@@ -312,7 +315,7 @@ pub struct SupplyQueue {
 }
 
 #[cw_serde]
-pub struct Chain {
+pub struct ZkgmChain {
     pub name: String,
     pub chain_id: String,
     pub ucs03_channel_id: u32,

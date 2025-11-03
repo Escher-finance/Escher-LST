@@ -19,14 +19,14 @@ use crate::{
     helpers,
     msg::{
         BatchReceivedAmount, BondRewardsPayload, Cw20PayloadMsg, ExecuteMsg, ExecuteRewardMsg,
-        Recipient, RewardMigrateMsg, ZkgmTransfer,
+        Recipient, RecipientAction, RewardMigrateMsg, ZkgmTransfer,
     },
     query::query_unreleased_unbond_record_from_batch,
     reply::PROCESS_WITHDRAW_REWARD_REPLY_ID,
     state::{
-        Chain, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE,
-        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator,
-        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
+        PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN, QuoteToken, REWARD_BALANCE, SPLIT_REWARD_QUEUE,
+        STATE, STATUS, SUPPLY_QUEUE, Status, VALIDATORS_REGISTRY, Validator, WITHDRAW_REWARD_QUEUE,
+        WithdrawReward, WithdrawRewardQueue, ZkgmChain,
     },
     types::ChannelId,
     utils::{
@@ -171,6 +171,7 @@ pub fn receive(
         recipient.as_ref(),
         recipient_channel_id,
         recipient_ibc_channel_id.clone(),
+        &RecipientAction::Unbond,
     )?;
 
     let unbond_amount = cw20_msg.amount;
@@ -1028,10 +1029,10 @@ pub fn set_status(
 pub fn set_chain(
     deps: DepsMut,
     info: MessageInfo,
-    chain: Chain,
+    chain: ZkgmChain,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    crate::state::CHAINS.save(deps.storage, chain.ucs03_channel_id, &chain)?;
+    crate::state::BOND_ZKGM_CHAINS.save(deps.storage, chain.ucs03_channel_id, &chain)?;
     Ok(Response::new())
 }
 
@@ -1047,7 +1048,7 @@ pub fn remove_chain(
     channel_id: u32,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
-    crate::state::CHAINS.remove(deps.storage, channel_id);
+    crate::state::BOND_ZKGM_CHAINS.remove(deps.storage, channel_id);
     Ok(Response::new())
 }
 
@@ -1239,7 +1240,7 @@ pub fn unbond(
     }
 
     let (recipient, recipient_channel_id, recipient_ibc_channel_id) =
-        split_and_validate_recipient(deps.storage, deps.api, recipient)?;
+        split_and_validate_recipient(deps.storage, deps.api, recipient, &RecipientAction::Unbond)?;
 
     let params = PARAMETERS.load(deps.storage)?;
 

@@ -340,8 +340,8 @@ pub fn query_delegations(deps: Deps, env: &Env) -> Result<Vec<FullDelegation>, C
 
 /// Errors:
 /// - Returns StdError on storage reads.
-pub fn query_chains(storage: &dyn Storage) -> Result<Vec<crate::state::Chain>, ContractError> {
-    let chains: Vec<crate::state::Chain> = crate::state::CHAINS
+pub fn query_chains(storage: &dyn Storage) -> Result<Vec<crate::state::ZkgmChain>, ContractError> {
+    let chains: Vec<crate::state::ZkgmChain> = crate::state::BOND_ZKGM_CHAINS
         .range(storage, None, None, cosmwasm_std::Order::Ascending)
         .filter_map(|result| result.ok().map(|(_, chain)| chain))
         .collect();
