@@ -250,7 +250,7 @@ pub fn ibc_destination_callback(
         time: env.block.time,
         recipient: the_recipient.clone(),
         recipient_channel_id,
-        ibc_channel_id: recipient_ibc_channel_id,
+        ibc_channel_id: Some(ibc_channel_id.clone()),
     });
 
     let ibc_callback_event = IbcCallbackEvent(
