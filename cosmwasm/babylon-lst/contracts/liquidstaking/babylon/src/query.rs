@@ -63,7 +63,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::SupplyQueue {} => to_json_binary(&query_supply_queue(deps.storage)?),
         QueryMsg::Status {} => to_json_binary(&query_status(deps.storage)?),
         QueryMsg::Delegations {} => to_json_binary(&query_delegations(deps, &env)?),
-        QueryMsg::Chains {} => to_json_binary(&query_chains(deps.storage)?),
+        QueryMsg::BondChains {} => to_json_binary(&query_bond_chains(deps.storage)?),
+        QueryMsg::UnbondChains {} => to_json_binary(&query_unbond_chains(deps.storage)?),
         QueryMsg::RewardQueue {} => to_json_binary(&query_reward_queue(deps.storage)?),
         QueryMsg::IbcChannels {} => to_json_binary(&query_ibc_channels(deps.storage)?),
         QueryMsg::RecipientIbcChannel { unbond_record_id } => to_json_binary(
@@ -340,8 +341,22 @@ pub fn query_delegations(deps: Deps, env: &Env) -> Result<Vec<FullDelegation>, C
 
 /// Errors:
 /// - Returns StdError on storage reads.
-pub fn query_chains(storage: &dyn Storage) -> Result<Vec<crate::state::ZkgmChain>, ContractError> {
+pub fn query_bond_chains(
+    storage: &dyn Storage,
+) -> Result<Vec<crate::state::ZkgmChain>, ContractError> {
     let chains: Vec<crate::state::ZkgmChain> = crate::state::BOND_ZKGM_CHAINS
+        .range(storage, None, None, cosmwasm_std::Order::Ascending)
+        .filter_map(|result| result.ok().map(|(_, chain)| chain))
+        .collect();
+    Ok(chains)
+}
+
+/// Errors:
+/// - Returns StdError on storage reads.
+pub fn query_unbond_chains(
+    storage: &dyn Storage,
+) -> Result<Vec<crate::state::ZkgmChain>, ContractError> {
+    let chains: Vec<crate::state::ZkgmChain> = crate::state::UNBOND_ZKGM_CHAINS
         .range(storage, None, None, cosmwasm_std::Order::Ascending)
         .filter_map(|result| result.ok().map(|(_, chain)| chain))
         .collect();

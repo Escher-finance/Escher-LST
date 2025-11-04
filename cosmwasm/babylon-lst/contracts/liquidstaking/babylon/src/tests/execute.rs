@@ -11,6 +11,7 @@ use crate::{
     ContractError,
     execute::*,
     msg::Recipient,
+    query::{query_bond_chains, query_unbond_chains},
     state::{PARAMETERS, QuoteToken, STATE, STATUS, Status},
     tests::{mock_parameters, mock_state},
     utils,
@@ -1005,7 +1006,7 @@ fn test_set_or_remove_chain_must_fail_if_sender_not_owner() {
     )
     .unwrap();
 
-    let err = set_chain(
+    let err = set_bond_chain(
         deps.as_mut(),
         info.clone(),
         crate::state::ZkgmChain {
@@ -1022,10 +1023,62 @@ fn test_set_or_remove_chain_must_fail_if_sender_not_owner() {
         ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
     ));
 
-    let err = remove_chain(deps.as_mut(), info, 0).unwrap_err();
+    let err = remove_bond_chain(deps.as_mut(), info, 0).unwrap_err();
 
     assert!(matches!(
         err,
         ContractError::Ownership(cw_ownable::OwnershipError::NotOwner)
     ));
+}
+
+#[test]
+fn test_set_bond_chain() {
+    let mut deps = mock_dependencies();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(deps.as_mut().storage, &api, Some(sender.as_str())).unwrap();
+
+    set_bond_chain(
+        deps.as_mut(),
+        info.clone(),
+        crate::state::ZkgmChain {
+            name: String::new(),
+            chain_id: String::new(),
+            ucs03_channel_id: 3,
+            prefix: "bbn".into(),
+        },
+    )
+    .unwrap();
+    let chains = query_bond_chains(&deps.storage).unwrap();
+
+    assert_eq!(chains.len(), 1);
+    assert_eq!(chains.first().unwrap().ucs03_channel_id, 3);
+}
+
+#[test]
+fn test_set_unbond_chain() {
+    let mut deps = mock_dependencies();
+    let api = deps.api.clone();
+    let sender = api.addr_make("sender");
+    let info = message_info(&sender, &[]);
+
+    cw_ownable::initialize_owner(deps.as_mut().storage, &api, Some(sender.as_str())).unwrap();
+
+    set_unbond_chain(
+        deps.as_mut(),
+        info.clone(),
+        crate::state::ZkgmChain {
+            name: String::new(),
+            chain_id: String::new(),
+            ucs03_channel_id: 2,
+            prefix: "bbn".into(),
+        },
+    )
+    .unwrap();
+    let chains = query_unbond_chains(&deps.storage).unwrap();
+
+    assert_eq!(chains.len(), 1);
+    assert_eq!(chains.first().unwrap().ucs03_channel_id, 2);
 }
