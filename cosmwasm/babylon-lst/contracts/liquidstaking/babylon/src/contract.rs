@@ -247,8 +247,14 @@ pub fn execute(
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::SplitReward {} => execute::split_reward(deps, env, info),
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
-        ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
-        ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
+        ExecuteMsg::SetBondChain { chain } => execute::set_bond_chain(deps, info, chain),
+        ExecuteMsg::SetUnbondChain { chain } => execute::set_unbond_chain(deps, info, chain),
+        ExecuteMsg::RemoveBondChain { channel_id } => {
+            execute::remove_bond_chain(deps, info, channel_id)
+        }
+        ExecuteMsg::RemoveUnbondChain { channel_id } => {
+            execute::remove_unbond_chain(deps, info, channel_id)
+        }
         ExecuteMsg::NormalizeReward {} => execute::normalize_reward(deps, env),
         ExecuteMsg::Inject { amount } => execute::inject(deps, env, info, amount),
         ExecuteMsg::AddIbcChannel {

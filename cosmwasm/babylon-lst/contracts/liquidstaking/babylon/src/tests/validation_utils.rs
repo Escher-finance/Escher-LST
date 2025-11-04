@@ -3,7 +3,7 @@ use cosmwasm_std::{Coin, Uint128, testing::mock_dependencies};
 use crate::{
     ContractError,
     msg::Recipient,
-    state::{BOND_ZKGM_CHAINS, IBC_CHANNELS, QuoteToken, Validator, ZkgmChain},
+    state::{BOND_ZKGM_CHAINS, IBC_CHANNELS, QuoteToken, UNBOND_ZKGM_CHAINS, Validator, ZkgmChain},
     utils::validation::{self, *},
 };
 
@@ -347,8 +347,47 @@ fn test_split_and_validate_recipient_zkgm() {
     let result = validation::split_and_validate_recipient(
         &deps.storage,
         &deps.api,
-        recipient,
+        recipient.clone(),
         &crate::msg::RecipientAction::Bond,
+    )
+    .unwrap();
+    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.1, Some(channel_id));
+    assert_eq!(result.2, None);
+
+    let chain = ZkgmChain {
+        prefix: "cosmwasm".to_string(),
+        name: "chain".to_string(),
+        chain_id: "chain-1".to_string(),
+        ucs03_channel_id: channel_id,
+    };
+    UNBOND_ZKGM_CHAINS
+        .save(&mut deps.storage, channel_id, &chain)
+        .unwrap();
+
+    let channel_id_2 = 2;
+    let recipient_2 = Recipient::Zkgm {
+        address: recipient_addr.clone(),
+        channel_id: channel_id_2,
+    };
+
+    let result = validation::split_and_validate_recipient(
+        &deps.storage,
+        &deps.api,
+        recipient_2,
+        &crate::msg::RecipientAction::Unbond,
+    );
+
+    assert_eq!(
+        "invalid recipient channel id",
+        result.unwrap_err().to_string()
+    );
+
+    let result = validation::split_and_validate_recipient(
+        &deps.storage,
+        &deps.api,
+        recipient,
+        &crate::msg::RecipientAction::Unbond,
     )
     .unwrap();
     assert_eq!(result.0, Some(recipient_addr.to_string()));
@@ -384,6 +423,15 @@ fn test_split_and_validate_recipient_ibc() {
     assert_eq!(result.0, Some(recipient_addr.to_string()));
     assert_eq!(result.1, None);
     assert_eq!(result.2, Some(ibc_channel_id));
+
+    let result = validation::split_and_validate_recipient(
+        &deps.storage,
+        &deps.api,
+        recipient.clone(),
+        &crate::msg::RecipientAction::Bond,
+    );
+    // ibc recipient is not supported as bond recipient
+    assert!(result.is_err());
 }
 
 #[test]

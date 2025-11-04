@@ -193,10 +193,16 @@ pub enum ExecuteMsg {
     },
     SplitReward {},
     SetStatus(Status),
-    SetChain {
+    SetBondChain {
         chain: crate::state::ZkgmChain,
     },
-    RemoveChain {
+    SetUnbondChain {
+        chain: crate::state::ZkgmChain,
+    },
+    RemoveBondChain {
+        channel_id: u32,
+    },
+    RemoveUnbondChain {
         channel_id: u32,
     },
     NormalizeReward {},
@@ -283,7 +289,9 @@ pub enum QueryMsg {
     #[returns(Vec<cosmwasm_std::FullDelegation>)]
     Delegations {},
     #[returns(Vec<crate::state::ZkgmChain>)]
-    Chains {},
+    BondChains {},
+    #[returns(Vec<crate::state::ZkgmChain>)]
+    UnbondChains {},
     #[returns(Vec<crate::state::WithdrawRewardQueue>)]
     RewardQueue {},
     #[returns(Vec<IBCChannel>)]

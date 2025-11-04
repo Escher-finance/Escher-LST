@@ -1020,13 +1020,13 @@ pub fn set_status(
     Ok(Response::new())
 }
 
-/// Set chain
+/// Set supported bond chain
 /// # Result
 /// Will return result of `cosmwasm_std::Response`
 /// # Errors
 /// Will return contract error
 #[allow(clippy::needless_pass_by_value)]
-pub fn set_chain(
+pub fn set_bond_chain(
     deps: DepsMut,
     info: MessageInfo,
     chain: ZkgmChain,
@@ -1036,19 +1036,51 @@ pub fn set_chain(
     Ok(Response::new())
 }
 
-/// Remove chain
+/// Set supported unbond chain
 /// # Result
 /// Will return result of `cosmwasm_std::Response`
 /// # Errors
 /// Will return contract error
 #[allow(clippy::needless_pass_by_value)]
-pub fn remove_chain(
+pub fn set_unbond_chain(
+    deps: DepsMut,
+    info: MessageInfo,
+    chain: ZkgmChain,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::UNBOND_ZKGM_CHAINS.save(deps.storage, chain.ucs03_channel_id, &chain)?;
+    Ok(Response::new())
+}
+
+/// Remove bond chain
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::needless_pass_by_value)]
+pub fn remove_bond_chain(
     deps: DepsMut,
     info: MessageInfo,
     channel_id: u32,
 ) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
     crate::state::BOND_ZKGM_CHAINS.remove(deps.storage, channel_id);
+    Ok(Response::new())
+}
+
+/// Remove unbond chain
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::needless_pass_by_value)]
+pub fn remove_unbond_chain(
+    deps: DepsMut,
+    info: MessageInfo,
+    channel_id: u32,
+) -> Result<Response, ContractError> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+    crate::state::UNBOND_ZKGM_CHAINS.remove(deps.storage, channel_id);
     Ok(Response::new())
 }
 

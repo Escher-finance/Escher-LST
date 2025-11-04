@@ -123,10 +123,35 @@ fn test_query_chains() {
             .unwrap();
     }
 
-    let chains: Vec<crate::state::ZkgmChain> = crate::state::BOND_ZKGM_CHAINS
-        .range(&deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .filter_map(|result| result.ok().map(|(_, chain)| chain))
-        .collect();
+    let chains = query_bond_chains(&deps.storage).unwrap();
+
+    let chain_1: &crate::state::ZkgmChain = chains.first().unwrap();
+    assert_eq!(chain_1.ucs03_channel_id, 1);
+
+    let chain_9: &crate::state::ZkgmChain = chains.get(8).unwrap();
+    assert_eq!(chain_9.name, "chain9");
+}
+
+#[test]
+fn test_query_unbond_chains() {
+    let mut deps = cosmwasm_std::testing::mock_dependencies();
+    let blank_chains = query_unbond_chains(&deps.storage).unwrap();
+    assert_eq!(blank_chains.len(), 0);
+
+    for i in 1..10 {
+        let chain_id = format!("chain-{i}");
+        let data = crate::state::ZkgmChain {
+            chain_id: chain_id.clone(),
+            name: format!("chain{i}"),
+            ucs03_channel_id: i,
+            prefix: format!("b{i}"),
+        };
+        crate::state::UNBOND_ZKGM_CHAINS
+            .save(&mut deps.storage, i, &data)
+            .unwrap();
+    }
+
+    let chains = query_unbond_chains(&deps.storage).unwrap();
 
     let chain_1: &crate::state::ZkgmChain = chains.first().unwrap();
     assert_eq!(chain_1.ucs03_channel_id, 1);
