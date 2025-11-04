@@ -157,7 +157,7 @@ pub fn ibc_destination_callback(
         }
     };
 
-    let (the_recipient, recipient_channel_id, recipient_ibc_channel_id) =
+    let (the_recipient, recipient_channel_id, _recipient_ibc_channel_id) =
         match split_and_validate_recipient(
             deps.storage,
             deps.api,
@@ -255,7 +255,7 @@ pub fn ibc_destination_callback(
 
     let ibc_callback_event = IbcCallbackEvent(
         packet_data.sender,
-        ibc_channel_id.clone(),
+        ibc_channel_id,
         amount,
         payload.amount,
         the_recipient.unwrap_or_default(),
