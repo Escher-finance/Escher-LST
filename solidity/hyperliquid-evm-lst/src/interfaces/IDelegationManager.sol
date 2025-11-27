@@ -2,6 +2,7 @@
 pragma solidity ^0.8.22;
 
 import {ValidatorWeight} from "../models/Delegation.sol";
+import {PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
 
 /// @dev Interface of the IValidatorManager that handle delegation and undelegation
 interface IDelegationManager {
@@ -11,7 +12,10 @@ interface IDelegationManager {
 
     function delegate() external payable;
 
-    function undelegate(uint256 amount) external;
+    function undelegate(uint64 amount) external;
 
-    function totalRewards() external view returns (uint256);
+    function delegationSummary()
+        external
+        view
+        returns (PrecompileLib.DelegatorSummary memory);
 }
