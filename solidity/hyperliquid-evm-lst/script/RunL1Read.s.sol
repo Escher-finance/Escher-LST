@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
-import {DepositToken} from "../src/tokens/DepositToken.sol";
 import {L1Read} from "../src/L1Read.sol";
 
 contract RunL1Read is Script {

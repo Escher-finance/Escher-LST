@@ -1,26 +1,95 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.28;
 
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IDelegationManager} from "./interfaces/IDelegationManager.sol";
-import {ValidatorWeight} from "./models/Delegation.sol";
+import {IValidatorSetManager} from "./interfaces/IValidatorSetManager.sol";
+import {Validator} from "./models/Delegation.sol";
 import {CoreWriterLib, HLConstants, HLConversions, PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract DelegationManager is IDelegationManager {
-    ValidatorWeight[] validators;
+contract DelegationManager is
+    IDelegationManager,
+    Initializable,
+    UUPSUpgradeable,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuard
+{
+    IValidatorSetManager validatorManager;
 
-    function add_validator(address validator, uint256 weight) external {
-        validators.push(
-            ValidatorWeight({validator: validator, weight: weight})
-        );
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
-    function get_validators() external view returns (ValidatorWeight[] memory) {
-        return validators;
+    function initialize(
+        address owner,
+        address _validatorManager
+    ) public initializer {
+        // Checks that the initialOwner address is not zero.
+        require(owner != address(0), "zero address");
+        __Ownable_init(owner);
+        __Pausable_init();
+
+        validatorManager = IValidatorSetManager(_validatorManager);
+    }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /**
+     * @notice Calculate stake distribution for a given amount
+     * @param _amount Total amount to distribute
+     * @return addresses Array of validator addresses
+     * @return amounts Array of amounts to stake to each validator
+     */
+    function calculateStakeDistribution(
+        uint64 _amount,
+        Validator[] memory validators
+    )
+        internal
+        view
+        returns (address[] memory addresses, uint64[] memory amounts)
+    {
+        uint64 totalWeight = validatorManager.getTotalWeight();
+        uint256 length = validators.length;
+        if (length == 0) revert EmptyValidatorSet();
+
+        addresses = new address[](length);
+        amounts = new uint64[](length);
+
+        uint64 distributed = 0;
+
+        for (uint64 i = 0; i < length; ) {
+            Validator memory v = validators[i];
+
+            addresses[i] = v.validator;
+
+            // Last validator gets remaining amount to handle rounding
+            if (i == length - 1) {
+                amounts[i] = _amount - distributed;
+            } else {
+                amounts[i] = (_amount * v.weight) / totalWeight;
+                distributed += amounts[i];
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function delegate() external payable {
+        // get validators
+        Validator[] memory validators = validatorManager.getAllValidators();
+        if (validators.length == 0) revert EmptyValidatorSet();
+
         uint256 evmAmount = msg.value;
         // Transfer HYPE tokens to core
         uint64 hypeTokenIndex = HLConstants.hypeTokenIndex();
@@ -31,19 +100,46 @@ contract DelegationManager is IDelegationManager {
         // transfer from core to staking balance
         CoreWriterLib.depositStake(coreAmount);
 
-        ValidatorWeight memory validator = validators[0];
-        CoreWriterLib.delegateToken(validator.validator, coreAmount, false);
-    }
+        // get validator addresses array and the amount to stake to that validator
+        (
+            address[] memory validatorAddresses,
+            uint64[] memory amounts
+        ) = calculateStakeDistribution(coreAmount, validators);
 
-    function firstvalidator() external view returns (address) {
-        return validators[0].validator;
+        uint256 totalValidators = validatorAddresses.length;
+
+        for (uint256 i = 0; i < totalValidators; i++) {
+            CoreWriterLib.delegateToken(
+                validatorAddresses[i],
+                amounts[i],
+                false
+            );
+        }
     }
 
     function undelegate(uint64 coreAmount) external {
-        // Undelegate tokens from the validator
-        CoreWriterLib.delegateToken(validators[0].validator, coreAmount, true);
+        // get validators
+        Validator[] memory validators = validatorManager.getAllValidators();
+        if (validators.length == 0) revert EmptyValidatorSet();
 
-        // Withdraw the tokens from staking
+        // get validator addresses array and the amount to stake to that validator
+        (
+            address[] memory validatorAddresses,
+            uint64[] memory amounts
+        ) = calculateStakeDistribution(coreAmount, validators);
+
+        uint256 totalValidators = validatorAddresses.length;
+
+        for (uint256 i = 0; i < totalValidators; i++) {
+            // Undelegate tokens from the validator
+            CoreWriterLib.delegateToken(
+                validators[0].validator,
+                amounts[i],
+                true
+            );
+        }
+
+        // Withdraw the tokens from staking balance to core balances
         CoreWriterLib.withdrawStake(coreAmount);
     }
 

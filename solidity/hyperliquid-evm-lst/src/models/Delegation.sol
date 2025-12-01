@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.28;
 
-struct ValidatorWeight {
+struct Validator {
     address validator;
-    uint256 weight;
+    uint64 weight;
 }
