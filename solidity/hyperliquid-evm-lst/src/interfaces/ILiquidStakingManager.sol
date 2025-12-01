@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+
 /// @dev Interface of the ILiquidStakingManager that handle liquid staking user interactions and operations.
 interface ILiquidStakingManager {
     /// @dev Emitted when user stakes some amount of native token
@@ -21,4 +23,6 @@ interface ILiquidStakingManager {
     function unbondRequest(uint256 _shares, address _recipient) external;
 
     function getDelegationManager() external returns (address);
+
+    function setDelegationManager(address _delegate) external;
 }
