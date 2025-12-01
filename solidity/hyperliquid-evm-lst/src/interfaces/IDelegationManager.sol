@@ -7,6 +7,10 @@ import {PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
 interface IDelegationManager {
     error EmptyValidatorSet();
 
+    // Events
+    event Delegated(address indexed sender, uint256 amount);
+    event Undelegated(address indexed sender, uint64 amount);
+
     /// @notice Delegates the sent value to validators
     function delegate() external payable;
 

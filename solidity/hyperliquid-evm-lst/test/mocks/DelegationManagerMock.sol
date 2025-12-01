@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.28;
+
+import {IDelegationManager} from "../../src/interfaces/IDelegationManager.sol";
+import {PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
+
+/// @title DelegationManagerMock
+/// @notice Mock implementation of IDelegationManager for testing purposes
+contract DelegationManagerMock is IDelegationManager {
+    uint64 public totalDelegated;
+    uint64 public totalUndelegated;
+    uint64 public totalPendingWithdrawal;
+    uint64 public nPendingWithdrawals;
+
+    // Track individual delegations for more detailed testing
+    mapping(address => uint64) public delegatedAmount;
+
+    /// @notice Delegates the sent value to validators
+    function delegate() external payable override {
+        uint64 amount = uint64(msg.value);
+        totalDelegated += amount;
+        delegatedAmount[msg.sender] += amount;
+        emit Delegated(msg.sender, msg.value);
+    }
+
+    /// @notice Undelegates the specified amount from validators
+    /// @param amount The amount to undelegate
+    function undelegate(uint64 amount) external override {
+        require(totalDelegated >= amount, "Insufficient delegated amount");
+        totalDelegated -= amount;
+        totalUndelegated += amount;
+        totalPendingWithdrawal += amount;
+        nPendingWithdrawals += 1;
+        emit Undelegated(msg.sender, amount);
+    }
+
+    /// @notice Returns the delegation summary for this contract
+    /// @return The delegator summary
+    function delegationSummary()
+        external
+        view
+        override
+        returns (PrecompileLib.DelegatorSummary memory)
+    {
+        return
+            PrecompileLib.DelegatorSummary({
+                delegated: totalDelegated,
+                undelegated: totalUndelegated,
+                totalPendingWithdrawal: totalPendingWithdrawal,
+                nPendingWithdrawals: nPendingWithdrawals
+            });
+    }
+
+    // ============ Mock Helper Functions ============
+
+    /// @notice Sets the delegation summary values for testing
+    /// @param _delegated The delegated amount
+    /// @param _undelegated The undelegated amount
+    /// @param _totalPendingWithdrawal The total pending withdrawal amount
+    /// @param _nPendingWithdrawals The number of pending withdrawals
+    function setDelegationSummary(
+        uint64 _delegated,
+        uint64 _undelegated,
+        uint64 _totalPendingWithdrawal,
+        uint64 _nPendingWithdrawals
+    ) external {
+        totalDelegated = _delegated;
+        totalUndelegated = _undelegated;
+        totalPendingWithdrawal = _totalPendingWithdrawal;
+        nPendingWithdrawals = _nPendingWithdrawals;
+    }
+
+    /// @notice Resets all mock state
+    function reset() external {
+        totalDelegated = 0;
+        totalUndelegated = 0;
+        totalPendingWithdrawal = 0;
+        nPendingWithdrawals = 0;
+    }
+
+    /// @notice Simulates completing a pending withdrawal
+    /// @param amount The amount to complete withdrawal for
+    function completePendingWithdrawal(uint64 amount) external {
+        require(
+            totalPendingWithdrawal >= amount,
+            "Insufficient pending withdrawal"
+        );
+        require(nPendingWithdrawals > 0, "No pending withdrawals");
+        totalPendingWithdrawal -= amount;
+        nPendingWithdrawals -= 1;
+    }
+
+    /// @notice Allows the mock to receive ETH
+    receive() external payable {}
+}

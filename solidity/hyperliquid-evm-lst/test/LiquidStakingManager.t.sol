@@ -6,10 +6,12 @@ import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
 import {Lst} from "../src/tokens/Lst.sol";
 import {DelegationManager} from "../src/DelegationManager.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {DelegationManagerMock} from "./mocks/DelegationManagerMock.sol";
 
 contract LiquidStakingManagerTest is Test {
     LiquidStakingManager public liquidStakingManager;
     Lst public lst;
+    DelegationManagerMock public delegationManager;
 
     address public bob = makeAddr("bob");
     address public alice = makeAddr("alice");
@@ -39,6 +41,8 @@ contract LiquidStakingManagerTest is Test {
 
         liquidStakingManager = LiquidStakingManager(address(lstManagerProxy));
 
+        delegationManager = new DelegationManagerMock();
+
         vm.deal(bob, STARTING_BALANCE);
         vm.deal(alice, STARTING_BALANCE);
     }
@@ -55,13 +59,6 @@ contract LiquidStakingManagerTest is Test {
         uint256 bond = liquidStakingManager.bondRate();
         console.log("bond rate", bond);
 
-        liquidStakingManager.bond(bondAmount, bob);
-
-        uint256 bobBalance = liquidStakingManager.getLst().balanceOf(
-            address(bob)
-        );
-        assertEq(bobBalance, bondAmount);
-
         address delegationManagerAddr = liquidStakingManager
             .getDelegationManager();
 
@@ -70,8 +67,17 @@ contract LiquidStakingManagerTest is Test {
             liquidStakingManager.bond(bondAmount, bob);
         }
 
-        // vm.expectRevert();
-        // // test below min bond amount
-        // liquidStakingManager.bond(bondAmount - 10, bob);
+        liquidStakingManager.setDelegationManager(address(delegationManager));
+
+        liquidStakingManager.bond(bondAmount, bob);
+
+        uint256 bobBalance = liquidStakingManager.getLst().balanceOf(
+            address(bob)
+        );
+        assertEq(bobBalance, bondAmount);
+
+        vm.expectRevert();
+        // test below min bond amount
+        liquidStakingManager.bond(bondAmount - 10, bob);
     }
 }

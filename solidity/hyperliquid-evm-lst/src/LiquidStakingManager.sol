@@ -55,7 +55,7 @@ contract LiquidStakingManager is
         share.acceptOwnership(); // Calls Ownable2Step's acceptOwnership
     }
 
-    function setdelegationManager(address _delegate) public onlyOwner {
+    function setDelegationManager(address _delegate) external onlyOwner {
         delegationManager = IDelegationManager(_delegate);
     }
 
