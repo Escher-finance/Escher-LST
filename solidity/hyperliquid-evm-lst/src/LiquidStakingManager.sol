@@ -83,8 +83,15 @@ contract LiquidStakingManager is
         // checks that the deposited amount is greater than zero.
         require(
             _assets > s_config.minBondAmount,
-            "bond should be more than min amount"
+            "bond amount should be more than min amount"
         );
+
+        // checks that the deposited amount is greater than zero.
+        require(
+            msg.value > s_config.minBondAmount,
+            "asset should be more than min amount"
+        );
+
         // Checks that the _receiver address is not zero.
         require(_recipient != address(0), "recipient zero address");
 
@@ -93,6 +100,9 @@ contract LiquidStakingManager is
             address(delegationManager) != address(0),
             "delegationManager zero address"
         );
+
+        // call delegate and send the required native asset
+        delegationManager.delegate{value: msg.value}();
 
         // calculate how much shares from the assets
         uint256 shares = _convertToShares(_assets);

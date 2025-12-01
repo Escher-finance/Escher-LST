@@ -69,7 +69,7 @@ contract LiquidStakingManagerTest is Test {
 
         liquidStakingManager.setDelegationManager(address(delegationManager));
 
-        liquidStakingManager.bond(bondAmount, bob);
+        liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
 
         uint256 bobBalance = liquidStakingManager.getLst().balanceOf(
             address(bob)
@@ -78,6 +78,6 @@ contract LiquidStakingManagerTest is Test {
 
         vm.expectRevert();
         // test below min bond amount
-        liquidStakingManager.bond(bondAmount - 10, bob);
+        liquidStakingManager.bond{value: bondAmount - 10}(bondAmount - 10, bob);
     }
 }
