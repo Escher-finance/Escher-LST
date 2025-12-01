@@ -1,15 +1,27 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.28;
 
 import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ILiquidStakingManager} from "./interfaces/ILiquidStakingManager.sol";
 import {IDelegationManager} from "./interfaces/IDelegationManager.sol";
 import {Lst} from "./tokens/Lst.sol";
 import {Config, Liquidity} from "./models/State.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract LiquidStakingManager is ILiquidStakingManager, Ownable {
-    IERC20 asset;
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract LiquidStakingManager is
+    ILiquidStakingManager,
+    Initializable,
+    UUPSUpgradeable,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuard
+{
     Lst share;
     IDelegationManager public delegationManager;
 
@@ -18,16 +30,29 @@ contract LiquidStakingManager is ILiquidStakingManager, Ownable {
 
     uint256 public constant SCALING_FACTOR = 10 ** 18;
 
-    constructor(
+    // Required by UUPSUpgradeable - only owner can upgrade
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address initialOwner,
-        address _asset_address,
-        string memory name,
-        string memory symbol
-    ) Ownable(initialOwner) {
-        asset = ERC20(_asset_address);
-        share = new Lst(name, symbol);
+        address lstAddress
+    ) public initializer {
+        // Checks that the initialOwner address is not zero.
+        require(initialOwner != address(0), "zero address");
+        __Ownable_init(initialOwner);
+        share = Lst(lstAddress);
         s_config = Config({minBondAmount: 1000, minUnbondAmount: 1000});
         s_liquidity = Liquidity({totalDelegated: 0, totalLst: 0});
+    }
+
+    function acceptOwnershipTransfer() external onlyOwner {
+        share.acceptOwnership(); // Calls Ownable2Step's acceptOwnership
     }
 
     function setdelegationManager(address _delegate) public onlyOwner {
@@ -46,21 +71,29 @@ contract LiquidStakingManager is ILiquidStakingManager, Ownable {
         return share;
     }
 
+    function getDelegationManager() external view returns (address) {
+        return address(delegationManager);
+    }
+
     /**
      * @notice function to stake assets and receive liquid staking tokens in exchange
      * @param _assets amount of the asset token
      */
-    function bond(uint256 _assets, address _recipient) external {
+    function bond(uint256 _assets, address _recipient) external payable {
         // checks that the deposited amount is greater than zero.
         require(
             _assets > s_config.minBondAmount,
             "bond should be more than min amount"
         );
         // Checks that the _receiver address is not zero.
-        require(_recipient != address(0), "zero address");
+        require(_recipient != address(0), "recipient zero address");
 
-        // transfer asset to this contract
-        asset.transferFrom(msg.sender, address(this), _assets);
+        // Checks that the delegationManager address is not zero.
+        require(
+            address(delegationManager) != address(0),
+            "delegationManager zero address"
+        );
+
         // calculate how much shares from the assets
         uint256 shares = _convertToShares(_assets);
 
@@ -115,7 +148,13 @@ contract LiquidStakingManager is ILiquidStakingManager, Ownable {
             "unbond should be more than min unbond amount"
         );
         // Checks that the _receiver address is not zero.
-        require(_recipient != address(0), "zero address");
+        require(_recipient != address(0), "recipient zero address");
+
+        // Checks that the delegationManager address is not zero.
+        require(
+            address(delegationManager) != address(0),
+            "delegation Manager zero address"
+        );
 
         // transfer asset to this contract
         share.transferFrom(msg.sender, address(this), _shares);

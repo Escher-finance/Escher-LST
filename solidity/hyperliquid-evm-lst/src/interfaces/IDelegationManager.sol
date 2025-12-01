@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.28;
 
-import {ValidatorWeight} from "../models/Delegation.sol";
 import {PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
 
-/// @dev Interface of the IValidatorManager that handle delegation and undelegation
+/// @dev Interface of the IDelegationManager that handles delegation and undelegation
 interface IDelegationManager {
-    //function set_validators(ValidatorWeight[] calldata _validators) external;
+    error EmptyValidatorSet();
 
-    function get_validators() external returns (ValidatorWeight[] memory);
-
+    /// @notice Delegates the sent value to validators
     function delegate() external payable;
 
+    /// @notice Undelegates the specified amount from validators
+    /// @param amount The amount to undelegate
     function undelegate(uint64 amount) external;
 
+    /// @notice Returns the delegation summary for this contract
+    /// @return The delegator summary from the precompile
     function delegationSummary()
         external
         view

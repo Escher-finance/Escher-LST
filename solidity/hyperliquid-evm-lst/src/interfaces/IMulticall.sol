@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.28;
 
 /**
  * @title Multicall
@@ -14,5 +14,7 @@ interface IMulticall {
      * @param data The encoded function data for each of the calls to make to this contract
      * @return results The results from each of the calls passed in via data
      */
-    function multicall(bytes[] calldata data) external returns (bytes[] memory results);
+    function multicall(
+        bytes[] calldata data
+    ) external returns (bytes[] memory results);
 }
