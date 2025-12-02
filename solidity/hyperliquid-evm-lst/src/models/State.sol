@@ -39,8 +39,6 @@ struct UnbondRequest {
     uint256 shares;
     // The batch ID this request belongs to
     uint256 batchId;
-    // Whether the request has been claimed
-    bool claimed;
 }
 
 // Batch of unbond requests

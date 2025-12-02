@@ -43,19 +43,28 @@ contract LiquidStakingManager is
     mapping(address => uint256[]) private s_userRequestIds;
 
     // Required by UUPSUpgradeable - only owner can upgrade
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address initialOwner, address lstAddress) public initializer {
+    function initialize(
+        address initialOwner,
+        address lstAddress
+    ) public initializer {
         // Checks that the initialOwner address is not zero.
         require(initialOwner != address(0), "zero address");
         __Ownable_init(initialOwner);
         share = Lst(lstAddress);
-        s_config =
-            Config({minBondAmount: 1000, minUnbondAmount: 1000, batchPeriodSeconds: 300, undelegatePeriodSeconds: 300});
+        s_config = Config({
+            minBondAmount: 1000,
+            minUnbondAmount: 1000,
+            batchPeriodSeconds: 300,
+            undelegatePeriodSeconds: 300
+        });
         s_liquidity = Liquidity({totalDelegated: 0, totalLst: 0});
 
         // Initialize batch management
@@ -105,16 +114,25 @@ contract LiquidStakingManager is
      */
     function bond(uint256 _assets, address _recipient) external payable {
         // checks that the deposited amount is greater than zero.
-        require(_assets > s_config.minBondAmount, "bond amount should be more than min amount");
+        require(
+            _assets > s_config.minBondAmount,
+            "bond amount should be more than min amount"
+        );
 
         // checks that the deposited amount is greater than zero.
-        require(msg.value > s_config.minBondAmount, "asset should be more than min amount");
+        require(
+            msg.value > s_config.minBondAmount,
+            "asset should be more than min amount"
+        );
 
         // Checks that the _receiver address is not zero.
         require(_recipient != address(0), "recipient zero address");
 
         // Checks that the delegationManager address is not zero.
-        require(address(delegationManager) != address(0), "delegationManager zero address");
+        require(
+            address(delegationManager) != address(0),
+            "delegationManager zero address"
+        );
 
         // call delegate and send the required native asset
         delegationManager.delegate{value: msg.value}();
@@ -178,12 +196,18 @@ contract LiquidStakingManager is
      */
     function unbondRequest(uint256 _shares, address _recipient) external {
         // checks that the deposited amount is greater than zero.
-        require(_shares > s_config.minUnbondAmount, "unbond should be more than min unbond amount");
+        require(
+            _shares > s_config.minUnbondAmount,
+            "unbond should be more than min unbond amount"
+        );
         // Checks that the _receiver address is not zero.
         require(_recipient != address(0), "recipient zero address");
 
         // Checks that the delegationManager address is not zero.
-        require(address(delegationManager) != address(0), "delegation Manager zero address");
+        require(
+            address(delegationManager) != address(0),
+            "delegation Manager zero address"
+        );
 
         // transfer asset to this contract
         share.transferFrom(msg.sender, address(this), _shares);
@@ -197,8 +221,7 @@ contract LiquidStakingManager is
             user: msg.sender,
             recipient: _recipient,
             shares: _shares,
-            batchId: s_pendingBatchId,
-            claimed: false
+            batchId: s_pendingBatchId
         });
 
         // Add request ID to user's list
@@ -209,7 +232,13 @@ contract LiquidStakingManager is
         currentBatch.requestIds.push(requestId);
         currentBatch.totalShares += _shares;
 
-        emit UnbondRequested(msg.sender, _shares, _recipient, requestId, s_pendingBatchId);
+        emit UnbondRequested(
+            msg.sender,
+            _shares,
+            _recipient,
+            requestId,
+            s_pendingBatchId
+        );
     }
 
     /**
@@ -220,7 +249,10 @@ contract LiquidStakingManager is
         UnbondBatch storage batch = s_batches[s_pendingBatchId];
 
         require(batch.batchId != 0, "batch does not exist");
-        require(batch.status == BatchStatus.Pending, "batch is not in pending status");
+        require(
+            batch.status == BatchStatus.Pending,
+            "batch is not in pending status"
+        );
         require(batch.totalShares > 0, "batch has no requests");
 
         uint256 submittedBatchId = s_pendingBatchId;
@@ -233,7 +265,9 @@ contract LiquidStakingManager is
         batch.status = BatchStatus.Submitted;
 
         // Set next action time (when tokens can be received)
-        batch.nextActionTime = block.timestamp + s_config.undelegatePeriodSeconds;
+        batch.nextActionTime =
+            block.timestamp +
+            s_config.undelegatePeriodSeconds;
 
         // Call undelegate on delegation manager
         delegationManager.undelegate(uint64(assetsToUndelegate));
@@ -257,7 +291,12 @@ contract LiquidStakingManager is
 
         emit BatchCreated(s_pendingBatchId);
 
-        emit BatchSubmitted(submittedBatchId, batch.totalShares, batch.totalAssets, batch.nextActionTime);
+        emit BatchSubmitted(
+            submittedBatchId,
+            batch.totalShares,
+            batch.totalAssets,
+            batch.nextActionTime
+        );
     }
 
     /**
@@ -268,13 +307,38 @@ contract LiquidStakingManager is
         UnbondBatch storage batch = s_batches[batchId];
 
         require(batch.batchId != 0, "batch does not exist");
-        require(batch.status == BatchStatus.Submitted, "batch is not in submitted status");
-        require(block.timestamp >= batch.nextActionTime, "undelegation period not yet passed");
+        require(
+            batch.status == BatchStatus.Submitted,
+            "batch is not in submitted status"
+        );
+        require(
+            block.timestamp >= batch.nextActionTime,
+            "undelegation period not yet passed"
+        );
 
         // Update batch status to received
         batch.status = BatchStatus.Received;
 
         emit BatchReceived(batchId, batch.totalAssets);
+    }
+
+    /**
+     * @notice Internal function to remove a request ID from user's array
+     * @param user The user address
+     * @param requestId The request ID to remove
+     */
+    function _removeUserRequest(address user, uint256 requestId) internal {
+        uint256[] storage userRequests = s_userRequestIds[user];
+        uint256 length = userRequests.length;
+
+        for (uint256 i = 0; i < length; i++) {
+            if (userRequests[i] == requestId) {
+                // Move the last element to this position and pop
+                userRequests[i] = userRequests[length - 1];
+                userRequests.pop();
+                break;
+            }
+        }
     }
 
     /**
@@ -284,17 +348,9 @@ contract LiquidStakingManager is
         uint256[] storage userRequests = s_userRequestIds[msg.sender];
         require(userRequests.length > 0, "no unbond requests found");
 
-        uint256 totalClaimedAssets = 0;
-        uint256 claimedCount = 0;
-
-        for (uint256 i = 0; i < userRequests.length; i++) {
-            uint256 requestId = userRequests[i];
+        for (uint256 i = userRequests.length; i > 0; i--) {
+            uint256 requestId = userRequests[i - 1];
             UnbondRequest storage request = s_unbondRequests[requestId];
-
-            // Skip already claimed requests
-            if (request.claimed) {
-                continue;
-            }
 
             UnbondBatch storage batch = s_batches[request.batchId];
 
@@ -303,22 +359,26 @@ contract LiquidStakingManager is
                 continue;
             }
 
-            // Mark as claimed
-            request.claimed = true;
-            claimedCount++;
-
             // Calculate the user's share of assets
-            uint256 userAssets = (request.shares * batch.totalAssets) / batch.totalShares;
-            totalClaimedAssets += userAssets;
+            uint256 userAssets = (request.shares * batch.totalAssets) /
+                batch.totalShares;
+
+            // Store recipient before deleting
+            address recipient = request.recipient;
+
+            // Remove from user's request array (swap and pop)
+            userRequests[i - 1] = userRequests[userRequests.length - 1];
+            userRequests.pop();
+
+            // Delete the request from storage
+            delete s_unbondRequests[requestId];
 
             // Transfer assets to recipient
-            (bool success,) = payable(request.recipient).call{value: userAssets}("");
+            (bool success, ) = payable(recipient).call{value: userAssets}("");
             require(success, "transfer failed");
 
-            emit UnbondClaimed(msg.sender, requestId, userAssets, request.recipient);
+            emit UnbondClaimed(msg.sender, requestId, userAssets, recipient);
         }
-
-        require(claimedCount > 0, "no claimable requests");
     }
 
     /**
@@ -330,22 +390,28 @@ contract LiquidStakingManager is
 
         require(request.user != address(0), "request does not exist");
         require(request.user == msg.sender, "not request owner");
-        require(!request.claimed, "request already claimed");
 
         UnbondBatch storage batch = s_batches[request.batchId];
         require(batch.status == BatchStatus.Received, "batch not yet received");
 
-        // Mark as claimed
-        request.claimed = true;
-
         // Calculate the user's share of assets
-        uint256 userAssets = (request.shares * batch.totalAssets) / batch.totalShares;
+        uint256 userAssets = (request.shares * batch.totalAssets) /
+            batch.totalShares;
+
+        // Store recipient before deleting
+        address recipient = request.recipient;
+
+        // Remove request from user's array
+        _removeUserRequest(msg.sender, requestId);
+
+        // Delete the request from storage
+        delete s_unbondRequests[requestId];
 
         // Transfer assets to recipient
-        (bool success,) = payable(request.recipient).call{value: userAssets}("");
+        (bool success, ) = payable(recipient).call{value: userAssets}("");
         require(success, "transfer failed");
 
-        emit UnbondClaimed(msg.sender, requestId, userAssets, request.recipient);
+        emit UnbondClaimed(msg.sender, requestId, userAssets, recipient);
     }
 
     /**
@@ -369,7 +435,9 @@ contract LiquidStakingManager is
      * @param batchId The batch ID to query
      * @return The batch information
      */
-    function getBatch(uint256 batchId) external view returns (UnbondBatch memory) {
+    function getBatch(
+        uint256 batchId
+    ) external view returns (UnbondBatch memory) {
         return s_batches[batchId];
     }
 
@@ -378,7 +446,9 @@ contract LiquidStakingManager is
      * @param requestId The request ID to query
      * @return The unbond request information
      */
-    function getUnbondRequest(uint256 requestId) external view returns (UnbondRequest memory) {
+    function getUnbondRequest(
+        uint256 requestId
+    ) external view returns (UnbondRequest memory) {
         return s_unbondRequests[requestId];
     }
 
@@ -387,7 +457,9 @@ contract LiquidStakingManager is
      * @param batchId The batch ID to query
      * @return Array of request IDs
      */
-    function getBatchRequestIds(uint256 batchId) external view returns (uint256[] memory) {
+    function getBatchRequestIds(
+        uint256 batchId
+    ) external view returns (uint256[] memory) {
         return s_batches[batchId].requestIds;
     }
 
@@ -396,7 +468,9 @@ contract LiquidStakingManager is
      * @param user The user address to query
      * @return Array of request IDs
      */
-    function getUserRequestIds(address user) external view returns (uint256[] memory) {
+    function getUserRequestIds(
+        address user
+    ) external view returns (uint256[] memory) {
         return s_userRequestIds[user];
     }
 
