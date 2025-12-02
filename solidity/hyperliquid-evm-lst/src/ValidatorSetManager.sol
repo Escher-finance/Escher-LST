@@ -27,9 +27,7 @@ contract ValidatorSetManager is
     uint64 public totalWeight;
 
     // Required by UUPSUpgradeable - only owner can upgrade
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     constructor() {
         _disableInitializers();
@@ -46,15 +44,12 @@ contract ValidatorSetManager is
      * @param _validators Array of validator addresses
      * @param _weights Array of corresponding weights
      */
-    function batchUpdateValidators(
-        address[] calldata _validators,
-        uint64[] calldata _weights
-    ) external {
+    function batchUpdateValidators(address[] calldata _validators, uint64[] calldata _weights) external {
         uint256 length = _validators.length;
         if (length != _weights.length) revert ArrayLengthMismatch();
 
         // Clear existing mappings
-        for (uint256 i = 0; i < validators.length; ) {
+        for (uint256 i = 0; i < validators.length;) {
             delete validatorIndex[validators[i].validator];
             unchecked {
                 ++i;
@@ -68,16 +63,14 @@ contract ValidatorSetManager is
         delete validators;
 
         // Add new validators
-        for (uint256 i = 0; i < length; ) {
+        for (uint256 i = 0; i < length;) {
             address validatorAddress = _validators[i];
             uint64 weight = _weights[i];
 
             if (validatorAddress == address(0)) revert InvalidAddress();
             if (weight == 0) revert InvalidWeight();
 
-            validators.push(
-                Validator({validator: validatorAddress, weight: weight})
-            );
+            validators.push(Validator({validator: validatorAddress, weight: weight}));
 
             validatorIndex[validatorAddress] = validators.length;
             totalWeight += weight;
@@ -96,9 +89,7 @@ contract ValidatorSetManager is
      * @return validatorAddress The validator address
      * @return weight The validator weight
      */
-    function getValidator(
-        address _validator
-    ) external view returns (address validatorAddress, uint64 weight) {
+    function getValidator(address _validator) external view returns (address validatorAddress, uint64 weight) {
         uint256 index = validatorIndex[_validator];
         require(index != 0, "Validator not found");
 

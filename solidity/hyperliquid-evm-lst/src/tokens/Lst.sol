@@ -28,4 +28,8 @@ contract Lst is Initializable, ERC20Upgradeable, Ownable2StepUpgradeable, ERC20P
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
+
+    function burn(address from, uint256 amount) external {
+        _burn(from, amount);
+    }
 }

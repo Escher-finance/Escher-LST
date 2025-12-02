@@ -29,10 +29,7 @@ contract DelegationManager is
         _disableInitializers();
     }
 
-    function initialize(
-        address owner,
-        address _validatorManager
-    ) public initializer {
+    function initialize(address owner, address _validatorManager) public initializer {
         // Checks that the initialOwner address is not zero.
         require(owner != address(0), "zero address");
         __Ownable_init(owner);
@@ -49,10 +46,7 @@ contract DelegationManager is
      * @return addresses Array of validator addresses
      * @return amounts Array of amounts to stake to each validator
      */
-    function calculateStakeDistribution(
-        uint64 _amount,
-        Validator[] memory validators
-    )
+    function calculateStakeDistribution(uint64 _amount, Validator[] memory validators)
         internal
         view
         returns (address[] memory addresses, uint64[] memory amounts)
@@ -66,7 +60,7 @@ contract DelegationManager is
 
         uint64 distributed = 0;
 
-        for (uint64 i = 0; i < length; ) {
+        for (uint64 i = 0; i < length;) {
             Validator memory v = validators[i];
 
             addresses[i] = v.validator;
@@ -101,19 +95,13 @@ contract DelegationManager is
         CoreWriterLib.depositStake(coreAmount);
 
         // get validator addresses array and the amount to stake to that validator
-        (
-            address[] memory validatorAddresses,
-            uint64[] memory amounts
-        ) = calculateStakeDistribution(coreAmount, validators);
+        (address[] memory validatorAddresses, uint64[] memory amounts) =
+            calculateStakeDistribution(coreAmount, validators);
 
         uint256 totalValidators = validatorAddresses.length;
 
         for (uint256 i = 0; i < totalValidators; i++) {
-            CoreWriterLib.delegateToken(
-                validatorAddresses[i],
-                amounts[i],
-                false
-            );
+            CoreWriterLib.delegateToken(validatorAddresses[i], amounts[i], false);
         }
     }
 
@@ -123,39 +111,27 @@ contract DelegationManager is
         if (validators.length == 0) revert EmptyValidatorSet();
 
         // get validator addresses array and the amount to stake to that validator
-        (
-            address[] memory validatorAddresses,
-            uint64[] memory amounts
-        ) = calculateStakeDistribution(coreAmount, validators);
+        (address[] memory validatorAddresses, uint64[] memory amounts) =
+            calculateStakeDistribution(coreAmount, validators);
 
         uint256 totalValidators = validatorAddresses.length;
 
         for (uint256 i = 0; i < totalValidators; i++) {
             // Undelegate tokens from the validator
-            CoreWriterLib.delegateToken(
-                validators[0].validator,
-                amounts[i],
-                true
-            );
+            CoreWriterLib.delegateToken(validators[0].validator, amounts[i], true);
         }
 
         // Withdraw the tokens from staking balance to core balances
         CoreWriterLib.withdrawStake(coreAmount);
     }
 
-    function delegationSummary()
-        external
-        view
-        returns (DelegatorSummary memory)
-    {
-        PrecompileLib.DelegatorSummary memory summary = PrecompileLib
-            .delegatorSummary(address(this));
-        return
-            DelegatorSummary({
-                delegated: summary.delegated,
-                undelegated: summary.undelegated,
-                totalPendingWithdrawal: summary.totalPendingWithdrawal,
-                nPendingWithdrawals: summary.nPendingWithdrawals
-            });
+    function delegationSummary() external view returns (DelegatorSummary memory) {
+        PrecompileLib.DelegatorSummary memory summary = PrecompileLib.delegatorSummary(address(this));
+        return DelegatorSummary({
+            delegated: summary.delegated,
+            undelegated: summary.undelegated,
+            totalPendingWithdrawal: summary.totalPendingWithdrawal,
+            nPendingWithdrawals: summary.nPendingWithdrawals
+        });
     }
 }

@@ -36,19 +36,13 @@ contract DelegationManagerMock is IDelegationManager {
 
     /// @notice Returns the delegation summary for this contract
     /// @return The delegator summary
-    function delegationSummary()
-        external
-        view
-        override
-        returns (DelegatorSummary memory)
-    {
-        return
-            DelegatorSummary({
-                delegated: totalDelegated,
-                undelegated: totalUndelegated,
-                totalPendingWithdrawal: totalPendingWithdrawal,
-                nPendingWithdrawals: nPendingWithdrawals
-            });
+    function delegationSummary() external view override returns (DelegatorSummary memory) {
+        return DelegatorSummary({
+            delegated: totalDelegated,
+            undelegated: totalUndelegated,
+            totalPendingWithdrawal: totalPendingWithdrawal,
+            nPendingWithdrawals: nPendingWithdrawals
+        });
     }
 
     // ============ Mock Helper Functions ============
@@ -81,10 +75,7 @@ contract DelegationManagerMock is IDelegationManager {
     /// @notice Simulates completing a pending withdrawal
     /// @param amount The amount to complete withdrawal for
     function completePendingWithdrawal(uint64 amount) external {
-        require(
-            totalPendingWithdrawal >= amount,
-            "Insufficient pending withdrawal"
-        );
+        require(totalPendingWithdrawal >= amount, "Insufficient pending withdrawal");
         require(nPendingWithdrawals > 0, "No pending withdrawals");
         totalPendingWithdrawal -= amount;
         nPendingWithdrawals -= 1;
