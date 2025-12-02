@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
+import {DelegatorSummary} from "../models/Type.sol";
 
 /// @dev Interface of the IDelegationManager that handles delegation and undelegation
 interface IDelegationManager {
@@ -23,5 +23,5 @@ interface IDelegationManager {
     function delegationSummary()
         external
         view
-        returns (PrecompileLib.DelegatorSummary memory);
+        returns (DelegatorSummary memory);
 }

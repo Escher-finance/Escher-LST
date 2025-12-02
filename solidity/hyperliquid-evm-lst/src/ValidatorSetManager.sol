@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Validator} from "./models/Delegation.sol";
+import {Validator} from "./models/Type.sol";
 import {IValidatorSetManager} from "./interfaces/IValidatorSetManager.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";

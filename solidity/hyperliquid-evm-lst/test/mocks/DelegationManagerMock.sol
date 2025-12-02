@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {IDelegationManager} from "../../src/interfaces/IDelegationManager.sol";
-import {PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
+import {DelegatorSummary} from "../../src/models/Type.sol";
 
 /// @title DelegationManagerMock
 /// @notice Mock implementation of IDelegationManager for testing purposes
@@ -40,10 +40,10 @@ contract DelegationManagerMock is IDelegationManager {
         external
         view
         override
-        returns (PrecompileLib.DelegatorSummary memory)
+        returns (DelegatorSummary memory)
     {
         return
-            PrecompileLib.DelegatorSummary({
+            DelegatorSummary({
                 delegated: totalDelegated,
                 undelegated: totalUndelegated,
                 totalPendingWithdrawal: totalPendingWithdrawal,

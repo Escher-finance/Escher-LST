@@ -1,6 +1,6 @@
 pragma solidity ^0.8.28;
 
-import {Validator} from "../models/Delegation.sol";
+import {Validator} from "../models/Type.sol";
 
 interface IValidatorSetManager {
     // Errors
@@ -14,9 +14,14 @@ interface IValidatorSetManager {
     /// @param validatorCount The total count of validators that are updated
     event ValidatorSetBatchUpdated(uint256 validatorCount);
 
-    function batchUpdateValidators(address[] calldata _validators, uint64[] calldata _weights) external;
+    function batchUpdateValidators(
+        address[] calldata _validators,
+        uint64[] calldata _weights
+    ) external;
 
-    function getValidator(address _validator) external view returns (address validatorAddress, uint64 weight);
+    function getValidator(
+        address _validator
+    ) external view returns (address validatorAddress, uint64 weight);
 
     function getAllValidators() external view returns (Validator[] memory);
 

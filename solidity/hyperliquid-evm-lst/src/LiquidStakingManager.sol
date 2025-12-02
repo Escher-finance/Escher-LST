@@ -6,6 +6,7 @@ import {ILiquidStakingManager} from "./interfaces/ILiquidStakingManager.sol";
 import {IDelegationManager} from "./interfaces/IDelegationManager.sol";
 import {Lst} from "./tokens/Lst.sol";
 import {Config, Liquidity} from "./models/State.sol";
+import {DelegatorSummary} from "./models/Type.sol";
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
@@ -24,10 +25,8 @@ contract LiquidStakingManager is
 {
     Lst share;
     IDelegationManager public delegationManager;
-
     Config private s_config;
     Liquidity private s_liquidity;
-
     uint256 public constant SCALING_FACTOR = 10 ** 18;
 
     // Required by UUPSUpgradeable - only owner can upgrade
@@ -47,7 +46,11 @@ contract LiquidStakingManager is
         require(initialOwner != address(0), "zero address");
         __Ownable_init(initialOwner);
         share = Lst(lstAddress);
-        s_config = Config({minBondAmount: 1000, minUnbondAmount: 1000});
+        s_config = Config({
+            minBondAmount: 1000,
+            minUnbondAmount: 1000,
+            undelegatePeriodSeconds: 300
+        });
         s_liquidity = Liquidity({totalDelegated: 0, totalLst: 0});
     }
 
@@ -122,8 +125,8 @@ contract LiquidStakingManager is
     }
 
     function totalAssets() public view returns (uint256) {
-        uint256 totalReward = 0; // TODO: Replace with query to chain
-        return s_liquidity.totalDelegated + totalReward;
+        DelegatorSummary memory summary = delegationManager.delegationSummary();
+        return summary.delegated;
     }
 
     /**
