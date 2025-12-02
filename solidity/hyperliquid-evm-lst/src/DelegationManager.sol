@@ -5,7 +5,7 @@ import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.so
 import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IDelegationManager} from "./interfaces/IDelegationManager.sol";
 import {IValidatorSetManager} from "./interfaces/IValidatorSetManager.sol";
-import {Validator} from "./models/Delegation.sol";
+import {Validator, DelegatorSummary} from "./models/Type.sol";
 import {CoreWriterLib, HLConstants, HLConversions, PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
@@ -146,8 +146,16 @@ contract DelegationManager is
     function delegationSummary()
         external
         view
-        returns (PrecompileLib.DelegatorSummary memory)
+        returns (DelegatorSummary memory)
     {
-        return PrecompileLib.delegatorSummary(address(this));
+        PrecompileLib.DelegatorSummary memory summary = PrecompileLib
+            .delegatorSummary(address(this));
+        return
+            DelegatorSummary({
+                delegated: summary.delegated,
+                undelegated: summary.undelegated,
+                totalPendingWithdrawal: summary.totalPendingWithdrawal,
+                nPendingWithdrawals: summary.nPendingWithdrawals
+            });
     }
 }

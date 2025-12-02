@@ -5,3 +5,15 @@ struct InitializePayload {
     address initialOwner;
     address lstAddress;
 }
+
+struct Validator {
+    address validator;
+    uint64 weight;
+}
+
+struct DelegatorSummary {
+    uint64 delegated;
+    uint64 undelegated;
+    uint64 totalPendingWithdrawal;
+    uint64 nPendingWithdrawals;
+}
