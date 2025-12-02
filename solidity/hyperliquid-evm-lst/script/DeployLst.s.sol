@@ -19,12 +19,7 @@ contract DeployLst is Script {
 
         string memory lstName = "eHype";
         string memory lstSymbol = "eHP";
-        bytes memory initializeData = abi.encodeWithSelector(
-            lst.initialize.selector,
-            msg.sender,
-            lstName,
-            lstSymbol
-        );
+        bytes memory initializeData = abi.encodeWithSelector(lst.initialize.selector, msg.sender, lstName, lstSymbol);
         ERC1967Proxy proxy = new ERC1967Proxy(implementation, initializeData);
 
         lst = Lst(address(proxy));

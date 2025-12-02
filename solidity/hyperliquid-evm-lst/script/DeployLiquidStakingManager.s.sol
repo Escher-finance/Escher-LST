@@ -22,12 +22,7 @@ contract DeployLiquidStakingManager is Script {
 
         string memory lstName = "eHype";
         string memory lstSymbol = "eHP";
-        bytes memory initializeData = abi.encodeWithSelector(
-            lst.initialize.selector,
-            msg.sender,
-            lstName,
-            lstSymbol
-        );
+        bytes memory initializeData = abi.encodeWithSelector(lst.initialize.selector, msg.sender, lstName, lstSymbol);
         ERC1967Proxy proxy = new ERC1967Proxy(implementation, initializeData);
 
         lst = Lst(address(proxy));
@@ -35,26 +30,16 @@ contract DeployLiquidStakingManager is Script {
         console.log("eHype address", address(lst));
 
         address lstManagerImplementation = address(new LiquidStakingManager());
-        console.log(
-            "LiquidStakingManager implementation deployed @",
-            lstManagerImplementation
-        );
+        console.log("LiquidStakingManager implementation deployed @", lstManagerImplementation);
 
-        InitializePayload memory payload = InitializePayload({
-            initialOwner: msg.sender,
-            lstAddress: address(lst)
-        });
+        InitializePayload memory payload = InitializePayload({initialOwner: msg.sender, lstAddress: address(lst)});
 
         ERC1967Proxy lstProxy = new ERC1967Proxy(
-            lstManagerImplementation,
-            abi.encodeWithSelector(
-                LiquidStakingManager.initialize.selector,
-                payload
-            )
+            lstManagerImplementation, abi.encodeWithSelector(LiquidStakingManager.initialize.selector, payload)
         );
         console.log("LST Manager Proxy deployed @", address(lstProxy));
 
-        lstManager = LiquidStakingManager(address(lstProxy));
+        lstManager = LiquidStakingManager(payable(address(lstProxy)));
 
         // transfer Liquid staking token (eU) ownership to Liquid stakign contract
         lst.transferOwnership(address(lstProxy));

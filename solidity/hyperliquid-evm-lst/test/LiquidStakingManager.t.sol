@@ -20,26 +20,17 @@ contract LiquidStakingManagerTest is Test {
     function setUp() public {
         vm.startPrank(bob);
         Lst lstImpl = new Lst();
-        bytes memory initData = abi.encodeCall(
-            Lst.initialize,
-            (bob, "eHYPE", "eHP")
-        );
+        bytes memory initData = abi.encodeCall(Lst.initialize, (bob, "eHYPE", "eHP"));
         ERC1967Proxy proxy = new ERC1967Proxy(address(lstImpl), initData);
 
         lst = Lst(address(proxy));
 
         LiquidStakingManager liquidStakingManagerImpl = new LiquidStakingManager();
 
-        bytes memory initLstManagerData = abi.encodeCall(
-            LiquidStakingManager.initialize,
-            (bob, address(lst))
-        );
-        ERC1967Proxy lstManagerProxy = new ERC1967Proxy(
-            address(liquidStakingManagerImpl),
-            initLstManagerData
-        );
+        bytes memory initLstManagerData = abi.encodeCall(LiquidStakingManager.initialize, (bob, address(lst)));
+        ERC1967Proxy lstManagerProxy = new ERC1967Proxy(address(liquidStakingManagerImpl), initLstManagerData);
 
-        liquidStakingManager = LiquidStakingManager(address(lstManagerProxy));
+        liquidStakingManager = LiquidStakingManager(payable(address(lstManagerProxy)));
 
         delegationManager = new DelegationManagerMock();
 
@@ -59,8 +50,7 @@ contract LiquidStakingManagerTest is Test {
         uint256 bond = liquidStakingManager.bondRate();
         console.log("bond rate", bond);
 
-        address delegationManagerAddr = liquidStakingManager
-            .getDelegationManager();
+        address delegationManagerAddr = liquidStakingManager.getDelegationManager();
 
         if (delegationManagerAddr == address(0)) {
             vm.expectRevert();
@@ -71,9 +61,7 @@ contract LiquidStakingManagerTest is Test {
 
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
 
-        uint256 bobBalance = liquidStakingManager.getLst().balanceOf(
-            address(bob)
-        );
+        uint256 bobBalance = liquidStakingManager.getLst().balanceOf(address(bob));
         assertEq(bobBalance, bondAmount);
 
         vm.expectRevert();

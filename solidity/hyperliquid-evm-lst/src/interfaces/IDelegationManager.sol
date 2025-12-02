@@ -20,8 +20,5 @@ interface IDelegationManager {
 
     /// @notice Returns the delegation summary for this contract
     /// @return The delegator summary from the precompile
-    function delegationSummary()
-        external
-        view
-        returns (DelegatorSummary memory);
+    function delegationSummary() external view returns (DelegatorSummary memory);
 }
