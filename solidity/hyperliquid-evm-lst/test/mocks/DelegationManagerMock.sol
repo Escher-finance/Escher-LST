@@ -45,6 +45,14 @@ contract DelegationManagerMock is IDelegationManager {
         });
     }
 
+    /// @notice Mock implementation of updateValidators
+    /// @param _validators Array of validator addresses
+    /// @param _weights Array of weights for each validator
+    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external override {
+        // Mock implementation - does nothing in tests
+        // In a real scenario, this would redelegate tokens
+    }
+
     // ============ Mock Helper Functions ============
 
     /// @notice Sets the delegation summary values for testing
