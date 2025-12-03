@@ -14,7 +14,7 @@ interface IValidatorSetManager {
     /// @param validatorCount The total count of validators that are updated
     event ValidatorSetBatchUpdated(uint256 validatorCount);
 
-    function batchUpdateValidators(address[] calldata _validators, uint64[] calldata _weights) external;
+    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external;
 
     function getValidator(address _validator) external view returns (address validatorAddress, uint64 weight);
 
