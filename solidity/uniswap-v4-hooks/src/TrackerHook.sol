@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {BaseHook} from "univ4-periphery/utils/BaseHook.sol";
-import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
-import {Hooks} from "univ4-core/libraries/Hooks.sol";
+import {BaseHook, Hooks, IPoolManager} from "univ4-periphery/utils/BaseHook.sol";
 
 contract TrackerHook is BaseHook {
     constructor(IPoolManager _poolManager) BaseHook(_poolManager) {}
