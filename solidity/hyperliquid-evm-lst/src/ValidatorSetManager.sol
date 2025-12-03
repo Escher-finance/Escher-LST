@@ -6,9 +6,8 @@ import {IValidatorSetManager} from "./interfaces/IValidatorSetManager.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 /**
  * @title ValidatorSetManager
@@ -19,12 +18,13 @@ contract ValidatorSetManager is
     Initializable,
     UUPSUpgradeable,
     Ownable2StepUpgradeable,
-    PausableUpgradeable,
-    ReentrancyGuard
+    ReentrancyGuard,
+    AccessControlUpgradeable
 {
     Validator[] private validators;
     mapping(address => uint256) private validatorIndex; // validator address => array index + 1
     uint64 public totalWeight;
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     // Required by UUPSUpgradeable - only owner can upgrade
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -33,18 +33,21 @@ contract ValidatorSetManager is
         _disableInitializers();
     }
 
-    function initialize(address initialOwner) public initializer {
+    function initialize(address initialOwner, address manager) public initializer {
         // Checks that the initialOwner address is not zero.
         require(initialOwner != address(0), "zero address");
         __Ownable_init(initialOwner);
+        _grantRole(MANAGER_ROLE, manager);
     }
 
     /**
-     * @notice Batch update validator set
+     * @notice Update validator set
      * @param _validators Array of validator addresses
      * @param _weights Array of corresponding weights
      */
-    function batchUpdateValidators(address[] calldata _validators, uint64[] calldata _weights) external {
+    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external {
+        require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
+
         uint256 length = _validators.length;
         if (length != _weights.length) revert ArrayLengthMismatch();
 
