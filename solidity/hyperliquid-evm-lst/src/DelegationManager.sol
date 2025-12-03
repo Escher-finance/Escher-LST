@@ -13,29 +13,33 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 contract DelegationManager is
     IDelegationManager,
     Initializable,
     UUPSUpgradeable,
     Ownable2StepUpgradeable,
+    AccessControlUpgradeable,
     PausableUpgradeable,
     ReentrancyGuard
 {
     IValidatorSetManager validatorManager;
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address owner, address _validatorManager) public initializer {
+    function initialize(address owner, address _validatorManager, address _liquidStakingManager) public initializer {
         // Checks that the initialOwner address is not zero.
         require(owner != address(0), "zero address");
         __Ownable_init(owner);
         __Pausable_init();
 
         validatorManager = IValidatorSetManager(_validatorManager);
+        _grantRole(MANAGER_ROLE, _liquidStakingManager);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -80,6 +84,7 @@ contract DelegationManager is
     }
 
     function delegate() external payable {
+        require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
         if (validators.length == 0) revert EmptyValidatorSet();
@@ -106,6 +111,7 @@ contract DelegationManager is
     }
 
     function undelegate(uint64 coreAmount) external {
+        require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
         if (validators.length == 0) revert EmptyValidatorSet();
@@ -133,5 +139,96 @@ contract DelegationManager is
             totalPendingWithdrawal: summary.totalPendingWithdrawal,
             nPendingWithdrawals: summary.nPendingWithdrawals
         });
+    }
+
+    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external onlyOwner {
+        // update validators with new weights
+        validatorManager.updateValidators(_validators, _weights);
+
+        // redelegate to new validators set
+        _redelegate();
+    }
+
+    /**
+     * @notice Redelegates tokens according to the new validator set distribution
+     * @dev This function adjusts delegations to match the new weight distribution
+     */
+    function _redelegate() internal {
+        // Get total delegated amount
+        PrecompileLib.DelegatorSummary memory summary = PrecompileLib.delegatorSummary(address(this));
+        uint64 totalDelegated = summary.delegated;
+
+        if (totalDelegated == 0) return; // Nothing to redelegate
+
+        // Get current delegations
+        PrecompileLib.Delegation[] memory currentDelegations = PrecompileLib.delegations(address(this));
+
+        // Get new validators
+        Validator[] memory newValidators = validatorManager.getAllValidators();
+        if (newValidators.length == 0) revert EmptyValidatorSet();
+
+        uint64 newTotalWeight = validatorManager.getTotalWeight();
+
+        // Calculate target amounts for each new validator
+        uint64[] memory targetAmounts = new uint64[](newValidators.length);
+        uint64 distributed = 0;
+
+        for (uint256 i = 0; i < newValidators.length; i++) {
+            if (i == newValidators.length - 1) {
+                // Last validator gets remaining amount to handle rounding
+                targetAmounts[i] = totalDelegated - distributed;
+            } else {
+                targetAmounts[i] = (totalDelegated * newValidators[i].weight) / newTotalWeight;
+                distributed += targetAmounts[i];
+            }
+        }
+
+        // First pass: undelegate from validators not in new set or with excess
+        for (uint256 i = 0; i < currentDelegations.length; i++) {
+            address validator = currentDelegations[i].validator;
+            uint64 currentAmount = currentDelegations[i].amount;
+
+            // Find if this validator is in the new set and get its target
+            uint64 targetAmount = 0;
+            bool isInNewSet = false;
+
+            for (uint256 j = 0; j < newValidators.length; j++) {
+                if (newValidators[j].validator == validator) {
+                    isInNewSet = true;
+                    targetAmount = targetAmounts[j];
+                    break;
+                }
+            }
+
+            if (!isInNewSet) {
+                // Undelegate everything from this validator
+                if (currentAmount > 0) {
+                    CoreWriterLib.delegateToken(validator, currentAmount, true);
+                }
+            } else if (currentAmount > targetAmount) {
+                // Undelegate the excess
+                CoreWriterLib.delegateToken(validator, currentAmount - targetAmount, true);
+            }
+        }
+
+        // Second pass: delegate to validators that need more
+        for (uint256 i = 0; i < newValidators.length; i++) {
+            address validator = newValidators[i].validator;
+            uint64 targetAmount = targetAmounts[i];
+
+            // Find current amount for this validator
+            uint64 currentAmount = 0;
+            for (uint256 j = 0; j < currentDelegations.length; j++) {
+                if (currentDelegations[j].validator == validator) {
+                    currentAmount = currentDelegations[j].amount;
+                    break;
+                }
+            }
+
+            if (currentAmount < targetAmount) {
+                // Delegate the difference
+                CoreWriterLib.delegateToken(validator, targetAmount - currentAmount, false);
+            }
+        }
     }
 }
