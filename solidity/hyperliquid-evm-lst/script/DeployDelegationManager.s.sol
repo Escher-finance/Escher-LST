@@ -16,7 +16,9 @@ contract DeployDelegationManager is Script {
         ValidatorSetManager validatorManager = new ValidatorSetManager();
 
         DelegationManager delegationManager = new DelegationManager();
-        delegationManager.initialize(msg.sender, address(validatorManager));
+
+        address liquidStaking = 0xCAc44d624c08879ef96C59fff2f2187Bc014f415;
+        delegationManager.initialize(msg.sender, address(validatorManager), liquidStaking);
 
         console.log("delegationManager address", address(delegationManager));
         vm.stopBroadcast();
