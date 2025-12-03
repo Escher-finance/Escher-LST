@@ -40,12 +40,21 @@ interface ILiquidStakingManager {
     /// @param recipient The address that received the assets.
     event UnbondClaimed(address indexed user, uint256 requestId, uint256 assets, address recipient);
 
+    /// @notice Bond native token and get the share/liquid staking token to recipient according to the rate
+    /// @param _assets amount of native token that is staked
+    /// @param _recipient recipient address of the liquid staking token
     function bond(uint256 _assets, address _recipient) external payable;
 
+    /// @notice Create unbond request of liquid staking token to receive native token back according to the rate
+    /// @param _shares amount of shares/liquid staking token that will be unbonded
+    /// @param _recipient recipient address of native token as unbonding result
     function unbondRequest(uint256 _shares, address _recipient) external;
 
+    /// @notice Get delegation manager contract address
+    /// @return address of delegation manager contract
     function getDelegationManager() external returns (address);
 
+    /// @notice Set delegation manager contract address
     function setDelegationManager(address _delegate) external;
 
     /// @notice Submit the current pending batch for undelegation

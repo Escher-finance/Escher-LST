@@ -21,4 +21,9 @@ interface IDelegationManager {
     /// @notice Returns the delegation summary for this contract
     /// @return The delegator summary from the precompile
     function delegationSummary() external view returns (DelegatorSummary memory);
+
+    /// @notice Update validators and redelegate accordingly with new validator weight distribution
+    /// @param _validators Array of validator addresses
+    /// @param _weights Array of weights for each validator
+    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external;
 }
