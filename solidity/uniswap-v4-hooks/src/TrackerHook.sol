@@ -29,6 +29,11 @@ contract TrackerHook is BaseHook {
         }
     }
 
+    function toggleRouter(IMsgSender router) public {
+        address routerAddr = address(router);
+        s_verifiedRouters[routerAddr] = !s_verifiedRouters[routerAddr];
+    }
+
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
             beforeInitialize: false,
