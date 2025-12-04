@@ -27,6 +27,8 @@ contract TrackerHook is BaseHook, Ownable2Step {
             } catch {
                 revert("router missing msgSender()");
             }
+        } else {
+            return sender;
         }
     }
 
