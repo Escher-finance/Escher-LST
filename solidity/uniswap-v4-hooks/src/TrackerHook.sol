@@ -10,6 +10,19 @@ import {
     ModifyLiquidityParams
 } from "univ4-periphery/utils/BaseHook.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {PoolId, PoolIdLibrary} from "univ4-core/types/PoolId.sol";
+
+/// @dev Original event from `IPoolManager` with changed name
+/// @notice Emitted when a liquidity position is modified
+/// @param id The abi encoded hash of the pool key struct for the pool that was modified
+/// @param sender The address that modified the pool
+/// @param tickLower The lower tick of the position
+/// @param tickUpper The upper tick of the position
+/// @param liquidityDelta The amount of liquidity that was added or removed
+/// @param salt The extra data to make positions unique
+event TrackedModifyLiquidity(
+    PoolId indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt
+);
 
 interface IMsgSender {
     function msgSender() external view returns (address);
@@ -64,6 +77,10 @@ contract TrackerHook is BaseHook, Ownable2Step {
         BalanceDelta feesAccrued,
         bytes calldata hookData
     ) internal override returns (bytes4, BalanceDelta) {
+        address _sender = _getRealSender(sender);
+        emit TrackedModifyLiquidity(
+            PoolIdLibrary.toId(key), _sender, params.tickLower, params.tickUpper, params.liquidityDelta, params.salt
+        );
         return (BaseHook.afterAddLiquidity.selector, delta);
     }
 
@@ -75,6 +92,10 @@ contract TrackerHook is BaseHook, Ownable2Step {
         BalanceDelta feesAccrued,
         bytes calldata hookData
     ) internal override returns (bytes4, BalanceDelta) {
+        address _sender = _getRealSender(sender);
+        emit TrackedModifyLiquidity(
+            PoolIdLibrary.toId(key), _sender, params.tickLower, params.tickUpper, params.liquidityDelta, params.salt
+        );
         return (BaseHook.afterRemoveLiquidity.selector, delta);
     }
 }
