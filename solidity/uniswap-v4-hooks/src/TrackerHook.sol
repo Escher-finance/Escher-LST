@@ -11,18 +11,6 @@ import {
 } from "univ4-periphery/utils/BaseHook.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-/// @dev Original event from `IPoolManager` with changed name
-/// @notice Emitted when a liquidity position is modified
-/// @param id The abi encoded hash of the pool key struct for the pool that was modified
-/// @param sender The address that modified the pool
-/// @param tickLower The lower tick of the position
-/// @param tickUpper The upper tick of the position
-/// @param liquidityDelta The amount of liquidity that was added or removed
-/// @param salt The extra data to make positions unique
-event TrackedModifyLiquidity(
-    bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt
-);
-
 interface IMsgSender {
     function msgSender() external view returns (address);
 }
@@ -31,6 +19,25 @@ contract TrackerHook is BaseHook, Ownable2Step {
     constructor(address _owner, IPoolManager _poolManager) BaseHook(_poolManager) Ownable(_owner) {}
 
     mapping(address => bool) public s_verifiedRouters;
+
+    error TrackerHook_verifiedRouterMissingMsgSender(address router);
+
+    /// @dev Original event from `IPoolManager` with changed name
+    /// @notice Emitted when a liquidity position is modified
+    /// @param id The abi encoded hash of the pool key struct for the pool that was modified
+    /// @param sender The address that modified the pool
+    /// @param tickLower The lower tick of the position
+    /// @param tickUpper The upper tick of the position
+    /// @param liquidityDelta The amount of liquidity that was added or removed
+    /// @param salt The extra data to make positions unique
+    event TrackedModifyLiquidity(
+        bytes32 indexed id,
+        address indexed sender,
+        int24 tickLower,
+        int24 tickUpper,
+        int256 liquidityDelta,
+        bytes32 salt
+    );
 
     /// @dev Equivalent to PoolId.sol from v4-core
     function _getPoolId(PoolKey calldata key) internal returns (bytes32) {
@@ -42,7 +49,7 @@ contract TrackerHook is BaseHook, Ownable2Step {
             try IMsgSender(sender).msgSender() returns (address s) {
                 return s;
             } catch {
-                revert("router missing msgSender()");
+                revert TrackerHook_verifiedRouterMissingMsgSender(sender);
             }
         } else {
             return sender;
