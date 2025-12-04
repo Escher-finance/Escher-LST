@@ -10,8 +10,24 @@ import {
     ModifyLiquidityParams
 } from "univ4-periphery/utils/BaseHook.sol";
 
+interface IMsgSender {
+    function msgSender() external view returns (address);
+}
+
 contract TrackerHook is BaseHook {
     constructor(IPoolManager _poolManager) BaseHook(_poolManager) {}
+
+    mapping(address => bool) public s_verifiedRouters;
+
+    function _getRealSender(address sender) internal returns (address) {
+        if (s_verifiedRouters[sender]) {
+            try IMsgSender(sender).msgSender() returns (address s) {
+                return s;
+            } catch {
+                revert("router missing msgSender()");
+            }
+        }
+    }
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
