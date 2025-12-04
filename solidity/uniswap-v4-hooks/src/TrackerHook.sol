@@ -29,7 +29,7 @@ contract TrackerHook is BaseHook {
         }
     }
 
-    function toggleRouter(IMsgSender router) public {
+    function toggleVerifiedRouter(IMsgSender router) public {
         address routerAddr = address(router);
         s_verifiedRouters[routerAddr] = !s_verifiedRouters[routerAddr];
     }
