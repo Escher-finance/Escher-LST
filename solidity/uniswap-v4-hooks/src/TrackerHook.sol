@@ -9,13 +9,14 @@ import {
     BalanceDelta,
     ModifyLiquidityParams
 } from "univ4-periphery/utils/BaseHook.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 interface IMsgSender {
     function msgSender() external view returns (address);
 }
 
-contract TrackerHook is BaseHook {
-    constructor(IPoolManager _poolManager) BaseHook(_poolManager) {}
+contract TrackerHook is BaseHook, Ownable2Step {
+    constructor(address _owner, IPoolManager _poolManager) BaseHook(_poolManager) Ownable(_owner) {}
 
     mapping(address => bool) public s_verifiedRouters;
 
@@ -29,7 +30,7 @@ contract TrackerHook is BaseHook {
         }
     }
 
-    function toggleVerifiedRouter(IMsgSender router) public {
+    function toggleVerifiedRouter(IMsgSender router) public onlyOwner {
         address routerAddr = address(router);
         s_verifiedRouters[routerAddr] = !s_verifiedRouters[routerAddr];
     }
