@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {BaseHook, Hooks, IPoolManager} from "univ4-periphery/utils/BaseHook.sol";
+import {
+    BaseHook,
+    Hooks,
+    IPoolManager,
+    PoolKey,
+    BalanceDelta,
+    ModifyLiquidityParams
+} from "univ4-periphery/utils/BaseHook.sol";
 
 contract TrackerHook is BaseHook {
     constructor(IPoolManager _poolManager) BaseHook(_poolManager) {}
@@ -11,9 +18,9 @@ contract TrackerHook is BaseHook {
             beforeInitialize: false,
             afterInitialize: false,
             beforeAddLiquidity: false,
-            afterAddLiquidity: false,
+            afterAddLiquidity: true,
             beforeRemoveLiquidity: false,
-            afterRemoveLiquidity: false,
+            afterRemoveLiquidity: true,
             beforeSwap: false,
             afterSwap: false,
             beforeDonate: false,
@@ -23,5 +30,27 @@ contract TrackerHook is BaseHook {
             afterAddLiquidityReturnDelta: false,
             afterRemoveLiquidityReturnDelta: false
         });
+    }
+
+    function _afterAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        BalanceDelta feesAccrued,
+        bytes calldata hookData
+    ) internal override returns (bytes4, BalanceDelta) {
+        return (BaseHook.afterAddLiquidity.selector, delta);
+    }
+
+    function _afterRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        BalanceDelta feesAccrued,
+        bytes calldata hookData
+    ) internal override returns (bytes4, BalanceDelta) {
+        return (BaseHook.afterRemoveLiquidity.selector, delta);
     }
 }
