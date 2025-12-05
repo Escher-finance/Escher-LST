@@ -430,13 +430,13 @@ contract DelegationManagerTest is Test {
         validators[1] = validator2;
         validators[2] = validator3;
 
-        uint64[] memory weights = new uint64[](3);
-        weights[0] = 100;
-        weights[1] = 100;
-        weights[2] = 100;
+        uint64[] memory validatorWeights = new uint64[](3);
+        validatorWeights[0] = 100;
+        validatorWeights[1] = 100;
+        validatorWeights[2] = 100;
 
         vm.prank(owner);
-        validatorManager.updateValidators(validators, weights);
+        validatorManager.updateValidators(validators, validatorWeights);
 
         // Verify equal distribution
         assertEq(validatorManager.getTotalWeight(), 300);
@@ -463,11 +463,11 @@ contract DelegationManagerTest is Test {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
-        uint64[] memory weights = new uint64[](1);
-        weights[0] = 100;
+        uint64[] memory validatorWeights = new uint64[](1);
+        validatorWeights[0] = 100;
 
         vm.prank(owner);
-        validatorManager.updateValidators(validators, weights);
+        validatorManager.updateValidators(validators, validatorWeights);
 
         assertEq(validatorManager.getValidatorCount(), 1);
         assertEq(validatorManager.getTotalWeight(), 100);
@@ -506,8 +506,8 @@ contract DelegationManagerTest is Test {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
-        uint64[] memory weights = new uint64[](1);
-        weights[0] = type(uint64).max;
+        uint64[] memory validatorWeights = new uint64[](1);
+        validatorWeights[0] = type(uint64).max;
 
         vm.prank(owner);
         delegationManager.updateValidators(validators, weights);
@@ -523,13 +523,13 @@ contract DelegationManagerTest is Test {
         vm.assume(baseWeight > 0 && baseWeight < type(uint64).max / validatorCount);
 
         address[] memory validators = new address[](validatorCount);
-        uint64[] memory weights = new uint64[](validatorCount);
+        uint64[] memory validatorWeights = new uint64[](validatorCount);
         uint64 expectedTotal = 0;
 
         for (uint256 i = 0; i < validatorCount; i++) {
             validators[i] = makeAddr(string(abi.encodePacked("validator", i)));
             weights[i] = baseWeight + uint64(i);
-            expectedTotal += weights[i];
+            expectedTotal += validatorWeights[i];
         }
 
         vm.prank(owner);

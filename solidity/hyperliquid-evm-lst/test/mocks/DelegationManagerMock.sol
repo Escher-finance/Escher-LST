@@ -89,6 +89,9 @@ contract DelegationManagerMock is IDelegationManager {
         nPendingWithdrawals -= 1;
     }
 
+    /// @notice Transfer received unbonded/undelegated assets from validators to liquid staking manager
+    function receiveBatch(uint256 amount) external {}
+
     /// @notice Allows the mock to receive ETH
     receive() external payable {}
 }

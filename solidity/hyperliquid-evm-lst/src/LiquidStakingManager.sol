@@ -271,6 +271,9 @@ contract LiquidStakingManager is
         // Update batch status to received
         batch.status = BatchStatus.Received;
 
+        // get the unbonded assets from delegation Manager
+        delegationManager.receiveBatch(batch.totalAssets);
+
         emit BatchReceived(batchId, batch.totalAssets);
     }
 
