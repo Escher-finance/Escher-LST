@@ -231,4 +231,12 @@ contract DelegationManager is
             }
         }
     }
+
+    function receiveBatch(uint256 batchAssets) external {
+        require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
+
+        // Transfer unbonded assets to liquid staking manager
+        (bool success,) = payable(msg.sender).call{value: batchAssets}("");
+        require(success, "transfer failed");
+    }
 }
