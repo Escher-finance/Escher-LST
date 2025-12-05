@@ -81,10 +81,7 @@ contract DelegationManagerTest is Test {
             owner,
             owner // owner is also manager for testing
         );
-        ERC1967Proxy validatorProxy = new ERC1967Proxy(
-            address(validatorImpl),
-            validatorInitData
-        );
+        ERC1967Proxy validatorProxy = new ERC1967Proxy(address(validatorImpl), validatorInitData);
         validatorManager = ValidatorSetManager(address(validatorProxy));
 
         // Setup initial validators
@@ -104,15 +101,9 @@ contract DelegationManagerTest is Test {
         // Deploy DelegationManager
         implementation = new DelegationManager();
         bytes memory initData = abi.encodeWithSelector(
-            DelegationManager.initialize.selector,
-            owner,
-            address(validatorManager),
-            liquidStakingManager
+            DelegationManager.initialize.selector, owner, address(validatorManager), liquidStakingManager
         );
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(implementation),
-            initData
-        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
         delegationManager = DelegationManager(payable(address(proxy)));
         // activate delegation Manager
         hyperCore.forceAccountActivation(address(delegationManager));
@@ -136,20 +127,14 @@ contract DelegationManagerTest is Test {
             "LiquidStakingManager should have MANAGER_ROLE"
         );
         bytes32 defaultAdminRole = delegationManager.DEFAULT_ADMIN_ROLE();
-        assertTrue(
-            delegationManager.hasRole(defaultAdminRole, owner),
-            "Owner should have DEFAULT_ADMIN_ROLE"
-        );
+        assertTrue(delegationManager.hasRole(defaultAdminRole, owner), "Owner should have DEFAULT_ADMIN_ROLE");
     }
 
     function test_Initialize_RevertsOnZeroAddress() public {
         DelegationManager newImpl = new DelegationManager();
 
         bytes memory initData = abi.encodeWithSelector(
-            DelegationManager.initialize.selector,
-            address(0),
-            address(validatorManager),
-            liquidStakingManager
+            DelegationManager.initialize.selector, address(0), address(validatorManager), liquidStakingManager
         );
 
         vm.expectRevert("zero address");
@@ -158,11 +143,7 @@ contract DelegationManagerTest is Test {
 
     function test_Initialize_CannotReinitialize() public {
         vm.expectRevert();
-        delegationManager.initialize(
-            owner,
-            address(validatorManager),
-            liquidStakingManager
-        );
+        delegationManager.initialize(owner, address(validatorManager), liquidStakingManager);
     }
 
     /* ============ Access Control Tests ============ */
@@ -183,9 +164,7 @@ contract DelegationManagerTest is Test {
         vm.prank(owner);
         delegationManager.revokeRole(managerRole, liquidStakingManager);
 
-        assertFalse(
-            delegationManager.hasRole(managerRole, liquidStakingManager)
-        );
+        assertFalse(delegationManager.hasRole(managerRole, liquidStakingManager));
     }
 
     function test_NonOwnerCannotGrantManagerRole() public {
@@ -209,26 +188,13 @@ contract DelegationManagerTest is Test {
     function test_Delegate_RevertsWithEmptyValidatorSet() public {
         // Deploy new DelegationManager with empty validator set
         ValidatorSetManager emptyValidatorManager = new ValidatorSetManager();
-        bytes memory validatorInitData = abi.encodeWithSelector(
-            ValidatorSetManager.initialize.selector,
-            owner,
-            owner
-        );
-        ERC1967Proxy validatorProxy = new ERC1967Proxy(
-            address(emptyValidatorManager),
-            validatorInitData
-        );
-        ValidatorSetManager emptyVM = ValidatorSetManager(
-            address(validatorProxy)
-        );
+        bytes memory validatorInitData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, owner, owner);
+        ERC1967Proxy validatorProxy = new ERC1967Proxy(address(emptyValidatorManager), validatorInitData);
+        ValidatorSetManager emptyVM = ValidatorSetManager(address(validatorProxy));
 
         DelegationManager newImpl = new DelegationManager();
-        bytes memory initData = abi.encodeWithSelector(
-            DelegationManager.initialize.selector,
-            owner,
-            address(emptyVM),
-            liquidStakingManager
-        );
+        bytes memory initData =
+            abi.encodeWithSelector(DelegationManager.initialize.selector, owner, address(emptyVM), liquidStakingManager);
         ERC1967Proxy proxy = new ERC1967Proxy(address(newImpl), initData);
         DelegationManager newDM = DelegationManager(payable(address(proxy)));
 
@@ -250,26 +216,13 @@ contract DelegationManagerTest is Test {
     function test_Undelegate_RevertsWithEmptyValidatorSet() public {
         // Deploy new DelegationManager with empty validator set
         ValidatorSetManager emptyValidatorManager = new ValidatorSetManager();
-        bytes memory validatorInitData = abi.encodeWithSelector(
-            ValidatorSetManager.initialize.selector,
-            owner,
-            owner
-        );
-        ERC1967Proxy validatorProxy = new ERC1967Proxy(
-            address(emptyValidatorManager),
-            validatorInitData
-        );
-        ValidatorSetManager emptyVM = ValidatorSetManager(
-            address(validatorProxy)
-        );
+        bytes memory validatorInitData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, owner, owner);
+        ERC1967Proxy validatorProxy = new ERC1967Proxy(address(emptyValidatorManager), validatorInitData);
+        ValidatorSetManager emptyVM = ValidatorSetManager(address(validatorProxy));
 
         DelegationManager newImpl = new DelegationManager();
-        bytes memory initData = abi.encodeWithSelector(
-            DelegationManager.initialize.selector,
-            owner,
-            address(emptyVM),
-            liquidStakingManager
-        );
+        bytes memory initData =
+            abi.encodeWithSelector(DelegationManager.initialize.selector, owner, address(emptyVM), liquidStakingManager);
         ERC1967Proxy proxy = new ERC1967Proxy(address(newImpl), initData);
         DelegationManager newDM = DelegationManager(payable(address(proxy)));
 
@@ -280,8 +233,7 @@ contract DelegationManagerTest is Test {
 
     function test_Delegate_Success() public {
         CoreSimulatorLib.nextBlock();
-        DelegatorSummary memory initialSummary = delegationManager
-            .delegationSummary();
+        DelegatorSummary memory initialSummary = delegationManager.delegationSummary();
 
         // Arrange: Prank as the liquidStakingManager (who has MANAGER_ROLE)
         vm.prank(liquidStakingManager);
@@ -290,13 +242,8 @@ contract DelegationManagerTest is Test {
 
         CoreSimulatorLib.nextBlock();
 
-        PrecompileLib.Delegation[] memory currentDelegations = PrecompileLib
-            .delegations(address(delegationManager));
-        uint64[3] memory expectedAmount = [
-            uint64(20000000),
-            uint64(30000000),
-            uint64(50000000)
-        ];
+        PrecompileLib.Delegation[] memory currentDelegations = PrecompileLib.delegations(address(delegationManager));
+        uint64[3] memory expectedAmount = [uint64(20000000), uint64(30000000), uint64(50000000)];
 
         for (uint256 i = 0; i < currentDelegations.length; i++) {
             PrecompileLib.Delegation memory delegate = currentDelegations[i];
@@ -464,17 +411,13 @@ contract DelegationManagerTest is Test {
         delegationManager.grantRole(managerRole, newLSM);
 
         assertTrue(delegationManager.hasRole(managerRole, newLSM));
-        assertTrue(
-            delegationManager.hasRole(managerRole, liquidStakingManager)
-        );
+        assertTrue(delegationManager.hasRole(managerRole, liquidStakingManager));
 
         // Revoke role from old LSM
         vm.prank(owner);
         delegationManager.revokeRole(managerRole, liquidStakingManager);
 
-        assertFalse(
-            delegationManager.hasRole(managerRole, liquidStakingManager)
-        );
+        assertFalse(delegationManager.hasRole(managerRole, liquidStakingManager));
         assertTrue(delegationManager.hasRole(managerRole, newLSM));
     }
 
@@ -503,21 +446,15 @@ contract DelegationManagerTest is Test {
         // Already set up in setUp with weights 100, 200, 300
         assertEq(validatorManager.getTotalWeight(), totalWeight);
 
-        (address addr1, uint64 weight1) = validatorManager.getValidator(
-            validator1
-        );
+        (address addr1, uint64 weight1) = validatorManager.getValidator(validator1);
         assertEq(addr1, validator1);
         assertEq(weight1, weights[0]);
 
-        (address addr2, uint64 weight2) = validatorManager.getValidator(
-            validator2
-        );
+        (address addr2, uint64 weight2) = validatorManager.getValidator(validator2);
         assertEq(addr2, validator2);
         assertEq(weight2, weights[1]);
 
-        (address addr3, uint64 weight3) = validatorManager.getValidator(
-            validator3
-        );
+        (address addr3, uint64 weight3) = validatorManager.getValidator(validator3);
         assertEq(addr3, validator3);
         assertEq(weight3, weights[2]);
     }
@@ -581,14 +518,9 @@ contract DelegationManagerTest is Test {
     /* ============ Fuzz Tests ============ */
 
     // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skip_testFuzz_UpdateValidators(
-        uint8 validatorCount,
-        uint64 baseWeight
-    ) public {
+    function skip_testFuzz_UpdateValidators(uint8 validatorCount, uint64 baseWeight) public {
         vm.assume(validatorCount > 0 && validatorCount <= 20);
-        vm.assume(
-            baseWeight > 0 && baseWeight < type(uint64).max / validatorCount
-        );
+        vm.assume(baseWeight > 0 && baseWeight < type(uint64).max / validatorCount);
 
         address[] memory validators = new address[](validatorCount);
         uint64[] memory weights = new uint64[](validatorCount);
@@ -665,9 +597,7 @@ contract DelegationManagerTest is Test {
 
     function test_CanCheckManagerRole() public view {
         bytes32 managerRole = delegationManager.MANAGER_ROLE();
-        assertTrue(
-            delegationManager.hasRole(managerRole, liquidStakingManager)
-        );
+        assertTrue(delegationManager.hasRole(managerRole, liquidStakingManager));
         assertFalse(delegationManager.hasRole(managerRole, user));
     }
 
@@ -675,9 +605,7 @@ contract DelegationManagerTest is Test {
         bytes32 defaultAdminRole = delegationManager.DEFAULT_ADMIN_ROLE();
         assertTrue(delegationManager.hasRole(defaultAdminRole, owner));
         assertFalse(delegationManager.hasRole(defaultAdminRole, user));
-        assertFalse(
-            delegationManager.hasRole(defaultAdminRole, liquidStakingManager)
-        );
+        assertFalse(delegationManager.hasRole(defaultAdminRole, liquidStakingManager));
     }
 
     function test_OwnerCanTransferOwnership() public {
@@ -724,9 +652,7 @@ contract DelegationManagerTest is Test {
         delegationManager.grantRole(managerRole, manager3);
         vm.stopPrank();
 
-        assertTrue(
-            delegationManager.hasRole(managerRole, liquidStakingManager)
-        );
+        assertTrue(delegationManager.hasRole(managerRole, liquidStakingManager));
         assertTrue(delegationManager.hasRole(managerRole, manager2));
         assertTrue(delegationManager.hasRole(managerRole, manager3));
     }
@@ -737,8 +663,6 @@ contract DelegationManagerTest is Test {
         vm.prank(liquidStakingManager);
         delegationManager.renounceRole(managerRole, liquidStakingManager);
 
-        assertFalse(
-            delegationManager.hasRole(managerRole, liquidStakingManager)
-        );
+        assertFalse(delegationManager.hasRole(managerRole, liquidStakingManager));
     }
 }
