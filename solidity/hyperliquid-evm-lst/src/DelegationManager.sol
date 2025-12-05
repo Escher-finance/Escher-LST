@@ -19,8 +19,8 @@ contract DelegationManager is
     IDelegationManager,
     Initializable,
     UUPSUpgradeable,
-    Ownable2StepUpgradeable,
     AccessControlUpgradeable,
+    Ownable2StepUpgradeable,
     PausableUpgradeable,
     ReentrancyGuard
 {
@@ -36,10 +36,11 @@ contract DelegationManager is
         // Checks that the initialOwner address is not zero.
         require(owner != address(0), "zero address");
         __Ownable_init(owner);
-        __Pausable_init();
+        __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, owner);
+        _grantRole(MANAGER_ROLE, _liquidStakingManager);
 
         validatorManager = IValidatorSetManager(_validatorManager);
-        _grantRole(MANAGER_ROLE, _liquidStakingManager);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -124,11 +125,10 @@ contract DelegationManager is
 
         for (uint256 i = 0; i < totalValidators; i++) {
             // Undelegate tokens from the validator
-            CoreWriterLib.delegateToken(validators[0].validator, amounts[i], true);
+            CoreWriterLib.delegateToken(validators[i].validator, amounts[i], true);
+            // Withdraw the tokens from staking balance to core balances
+            CoreWriterLib.withdrawStake(amounts[i]);
         }
-
-        // Withdraw the tokens from staking balance to core balances
-        CoreWriterLib.withdrawStake(coreAmount);
     }
 
     function delegationSummary() external view returns (DelegatorSummary memory) {

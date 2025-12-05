@@ -17,9 +17,9 @@ contract ValidatorSetManager is
     IValidatorSetManager,
     Initializable,
     UUPSUpgradeable,
+    AccessControlUpgradeable,
     Ownable2StepUpgradeable,
-    ReentrancyGuard,
-    AccessControlUpgradeable
+    ReentrancyGuard
 {
     Validator[] private validators;
     mapping(address => uint256) private validatorIndex; // validator address => array index + 1
@@ -35,20 +35,22 @@ contract ValidatorSetManager is
 
     function initialize(address initialOwner, address manager) public initializer {
         // Checks that the initialOwner address is not zero.
-        require(initialOwner != address(0), "zero address");
+        if (initialOwner == address(0)) revert InvalidAddress();
         __Ownable_init(initialOwner);
+        __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
         _grantRole(MANAGER_ROLE, manager);
     }
 
     /**
-     * @notice Update validator set
+     * @notice Update validator set, requires minimum 1 validator and weight pair
      * @param _validators Array of validator addresses
      * @param _weights Array of corresponding weights
      */
     function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
-
         uint256 length = _validators.length;
+        require(length > 0, "Requires minimum 1 validator");
         if (length != _weights.length) revert ArrayLengthMismatch();
 
         // Clear existing mappings
