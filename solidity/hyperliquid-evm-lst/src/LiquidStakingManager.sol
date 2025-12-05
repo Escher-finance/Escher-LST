@@ -176,7 +176,7 @@ contract LiquidStakingManager is
      * @param _shares amount of shares the user wants to convert
      * @param _recipient address of the user who will receive the assets
      */
-    function unbondRequest(uint256 _shares, address _recipient) external {
+    function unbondRequest(uint256 _shares, address _recipient) external returns (uint256) {
         // checks that the deposited amount is greater than zero.
         require(_shares > s_config.minUnbondAmount, "unbond should be more than min unbond amount");
         // Checks that the _receiver address is not zero.
@@ -205,6 +205,8 @@ contract LiquidStakingManager is
         currentBatch.totalShares += _shares;
 
         emit UnbondRequested(msg.sender, _shares, _recipient, requestId, s_pendingBatchId);
+
+        return requestId;
     }
 
     /**

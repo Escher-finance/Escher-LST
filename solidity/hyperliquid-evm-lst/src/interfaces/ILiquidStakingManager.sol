@@ -48,7 +48,7 @@ interface ILiquidStakingManager {
     /// @notice Create unbond request of liquid staking token to receive native token back according to the rate
     /// @param _shares amount of shares/liquid staking token that will be unbonded
     /// @param _recipient recipient address of native token as unbonding result
-    function unbondRequest(uint256 _shares, address _recipient) external;
+    function unbondRequest(uint256 _shares, address _recipient) external returns (uint256);
 
     /// @notice Get delegation manager contract address
     /// @return address of delegation manager contract
