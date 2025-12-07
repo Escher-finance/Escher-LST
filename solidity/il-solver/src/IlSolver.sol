@@ -93,4 +93,18 @@ contract IlSolver is Ownable2Step {
         uint256 deadline = block.timestamp;
         s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
     }
+
+    function univ4LiquidityAdd(
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 liquidity,
+        uint128 amount0Max,
+        uint128 amount1Max
+    ) public onlyOwner {
+        if (s_positionTokenId == 0) {
+            _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+        } else {
+            _univ4LiquidityAdd(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+        }
+    }
 }
