@@ -22,7 +22,7 @@ contract IlSolver is Ownable2Step {
         s_ethLiquidityPosition = _poolKey.currency0.isAddressZero();
     }
 
-    function _mintUniv4Position(
+    function _univ4LiquidityMint(
         int24 tickLower,
         int24 tickUpper,
         uint256 liquidity,
@@ -56,5 +56,41 @@ contract IlSolver is Ownable2Step {
         uint256 positionId = s_posm.nextTokenId();
         s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
         s_positionTokenId = positionId;
+    }
+
+    function _univ4LiquidityAdd(
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 liquidity,
+        uint128 amount0Max,
+        uint128 amount1Max
+    ) private {
+        bool ethLiquidityPosition = s_ethLiquidityPosition;
+        bytes memory actions;
+        address _this = address(this);
+        if (ethLiquidityPosition) {
+            actions =
+                abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
+        } else {
+            actions = abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR));
+        }
+        uint256 _tokenId = s_positionTokenId;
+        PoolKey memory _key = s_poolKey;
+        bytes memory params0 =
+            abi.encode(_tokenId, tickLower, tickUpper, liquidity, amount0Max, amount1Max, _this, bytes(""));
+        bytes memory params1 = abi.encode(_key.currency0, _key.currency1);
+        bytes[] memory params;
+        if (ethLiquidityPosition) {
+            params = new bytes[](3);
+            params[0] = params0;
+            params[1] = params1;
+            params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, _this);
+        } else {
+            params = new bytes[](2);
+            params[0] = params0;
+            params[1] = params1;
+        }
+        uint256 deadline = block.timestamp;
+        s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
     }
 }
