@@ -3,14 +3,22 @@ pragma solidity ^0.8.28;
 
 import {IDelegationManager} from "../../src/interfaces/IDelegationManager.sol";
 import {DelegatorSummary} from "../../src/models/Type.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title DelegationManagerMock
 /// @notice Mock implementation of IDelegationManager for testing purposes
-contract DelegationManagerMock is IDelegationManager {
+contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
     uint64 public totalDelegated;
     uint64 public totalUndelegated;
     uint64 public totalPendingWithdrawal;
     uint64 public nPendingWithdrawals;
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+
+    constructor(address _liquidStakingManager) Ownable(msg.sender) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MANAGER_ROLE, _liquidStakingManager);
+    }
 
     // Track individual delegations for more detailed testing
     mapping(address => uint64) public delegatedAmount;
@@ -36,19 +44,28 @@ contract DelegationManagerMock is IDelegationManager {
 
     /// @notice Returns the delegation summary for this contract
     /// @return The delegator summary
-    function delegationSummary() external view override returns (DelegatorSummary memory) {
-        return DelegatorSummary({
-            delegated: totalDelegated,
-            undelegated: totalUndelegated,
-            totalPendingWithdrawal: totalPendingWithdrawal,
-            nPendingWithdrawals: nPendingWithdrawals
-        });
+    function delegationSummary()
+        external
+        view
+        override
+        returns (DelegatorSummary memory)
+    {
+        return
+            DelegatorSummary({
+                delegated: totalDelegated,
+                undelegated: totalUndelegated,
+                totalPendingWithdrawal: totalPendingWithdrawal,
+                nPendingWithdrawals: nPendingWithdrawals
+            });
     }
 
     /// @notice Mock implementation of updateValidators
     /// @param _validators Array of validator addresses
     /// @param _weights Array of weights for each validator
-    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external override {
+    function updateValidators(
+        address[] calldata _validators,
+        uint64[] calldata _weights
+    ) external override {
         // Mock implementation - does nothing in tests
         // In a real scenario, this would redelegate tokens
     }
@@ -83,14 +100,23 @@ contract DelegationManagerMock is IDelegationManager {
     /// @notice Simulates completing a pending withdrawal
     /// @param amount The amount to complete withdrawal for
     function completePendingWithdrawal(uint64 amount) external {
-        require(totalPendingWithdrawal >= amount, "Insufficient pending withdrawal");
+        require(
+            totalPendingWithdrawal >= amount,
+            "Insufficient pending withdrawal"
+        );
         require(nPendingWithdrawals > 0, "No pending withdrawals");
         totalPendingWithdrawal -= amount;
         nPendingWithdrawals -= 1;
     }
 
     /// @notice Transfer received unbonded/undelegated assets from validators to liquid staking manager
-    function receiveBatch(uint256 amount) external {}
+    function receiveBatch(uint256 batchAssets) external {
+        require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
+
+        // Transfer assets to recipient
+        (bool success, ) = payable(msg.sender).call{value: batchAssets}("");
+        require(success, "transfer failed");
+    }
 
     /// @notice Allows the mock to receive ETH
     receive() external payable {}
