@@ -17,6 +17,14 @@ interface IPositionManager is IPositionManagerOriginal {
     function permit2() external view returns (address);
 }
 
+interface IPermit2 {
+    function allowance(address user, address token, address spender)
+        external
+        view
+        returns (uint160 amount, uint48 expiration, uint48 nonce);
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
+}
+
 contract IlSolver is Ownable2Step {
     IPositionManager public s_posm;
     PoolKey public s_poolKey;
@@ -41,7 +49,9 @@ contract IlSolver is Ownable2Step {
         PoolKey memory key = s_poolKey;
         address _this = address(this);
         address sender = msg.sender;
-        address permit2 = s_posm.permit2();
+        address _permit2 = s_posm.permit2();
+        IPermit2 permit2 = IPermit2(_permit2);
+        address _posm = address(s_posm);
 
         uint256 b0Before = key.currency0.balanceOfSelf();
         uint256 b1Before = key.currency1.balanceOfSelf();
@@ -54,14 +64,23 @@ contract IlSolver is Ownable2Step {
             IERC20 t0 = IERC20(Currency.unwrap(key.currency0));
             t0.safeTransferFrom(sender, _this, amount0Max);
 
-            if (t0.allowance(_this, permit2) < amount0Max) {
-                t0.approve(permit2, type(uint128).max);
+            // permit2
+            if (t0.allowance(_this, _permit2) < amount0Max) {
+                t0.approve(_permit2, type(uint128).max);
+            }
+            (uint160 p2Allowance,,) = permit2.allowance(_this, address(t0), _posm);
+            if (p2Allowance < amount0Max) {
+                permit2.approve(address(t0), _posm, type(uint128).max, type(uint48).max);
             }
         }
         IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
         t1.safeTransferFrom(sender, _this, amount1Max);
-        if (t1.allowance(_this, permit2) < amount1Max) {
-            t1.approve(permit2, type(uint128).max);
+        if (t1.allowance(_this, _permit2) < amount1Max) {
+            t1.approve(_permit2, type(uint128).max);
+        }
+        (uint160 p2Allowance,,) = permit2.allowance(_this, address(t1), _posm);
+        if (p2Allowance < amount1Max) {
+            permit2.approve(address(t1), _posm, type(uint128).max, type(uint48).max);
         }
 
         _;
