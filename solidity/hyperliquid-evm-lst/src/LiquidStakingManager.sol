@@ -212,7 +212,7 @@ contract LiquidStakingManager is
     /**
      * @notice Submit the current pending batch for undelegation
      */
-    function submitBatch() external onlyOwner {
+    function submitBatch() external {
         // get pending batch
         UnbondBatch storage batch = s_batches[s_pendingBatchId];
 
@@ -261,7 +261,7 @@ contract LiquidStakingManager is
      * @notice Mark a submitted batch as received after undelegation period
      * @param batchId The ID of the batch to mark as received
      */
-    function receiveBatch(uint256 batchId) external onlyOwner {
+    function receiveBatch(uint256 batchId) external {
         UnbondBatch storage batch = s_batches[batchId];
 
         require(batch.batchId != 0, "batch does not exist");
