@@ -6,8 +6,11 @@ import {IPositionManager} from "univ4-periphery/interfaces/IPositionManager.sol"
 import {Actions} from "univ4-periphery/libraries/Actions.sol";
 import {PoolKey} from "univ4-core/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 using CurrencyLibrary for Currency;
+using SafeERC20 for IERC20;
 
 contract IlSolver is Ownable2Step {
     IPositionManager public s_posm;
@@ -15,11 +18,54 @@ contract IlSolver is Ownable2Step {
     uint256 public s_positionTokenId;
     bool public s_ethLiquidityPosition;
 
+    error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
+    error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
+
     constructor(address _owner, IPositionManager _posm, PoolKey memory _poolKey) Ownable(_owner) {
         s_posm = _posm;
         s_poolKey = _poolKey;
         // Since it uses numerical sorting of addresses only the `currency0` can be ETH
         s_ethLiquidityPosition = _poolKey.currency0.isAddressZero();
+    }
+
+    modifier univ4AttachAndRefund(uint128 _amount0Max, uint128 _amount1Max) {
+        uint256 amount0Max = uint256(_amount0Max);
+        uint256 amount1Max = uint256(_amount1Max);
+        PoolKey memory key = s_poolKey;
+        address _this = address(this);
+        address sender = msg.sender;
+
+        uint256 b0Before = key.currency0.balanceOfSelf();
+        uint256 b1Before = key.currency1.balanceOfSelf();
+
+        if (s_ethLiquidityPosition) {
+            if (msg.value < amount0Max) {
+                revert IlSolver_wrongETHValueSent(amount0Max, msg.value);
+            }
+        } else {
+            IERC20 t0 = IERC20(Currency.unwrap(key.currency0));
+            t0.safeTransferFrom(sender, _this, amount0Max);
+        }
+        IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
+        t1.safeTransferFrom(sender, _this, amount1Max);
+
+        _;
+
+        uint256 b0After = key.currency0.balanceOfSelf();
+        uint256 b1After = key.currency1.balanceOfSelf();
+
+        uint256 used0 = b0Before + amount0Max - b0After;
+        uint256 used1 = b1Before + amount1Max - b1After;
+        require(used0 <= amount0Max);
+        require(used1 <= amount1Max);
+        uint256 refund0 = amount0Max - used0;
+        uint256 refund1 = amount1Max - used1;
+        if (refund0 > 0) {
+            key.currency0.transfer(sender, refund0);
+        }
+        if (refund1 > 0) {
+            key.currency1.transfer(sender, refund1);
+        }
     }
 
     function _univ4LiquidityMint(
@@ -100,7 +146,7 @@ contract IlSolver is Ownable2Step {
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) public onlyOwner {
+    ) public payable onlyOwner univ4AttachAndRefund(amount0Max, amount1Max) {
         if (s_positionTokenId == 0) {
             _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
         } else {
