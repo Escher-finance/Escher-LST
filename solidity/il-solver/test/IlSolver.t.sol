@@ -25,7 +25,7 @@ contract IlSolverTest is Test {
 
         // https://docs.uniswap.org/contracts/v4/deployments
         IPositionManager posm = IPositionManager(0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e);
-        poolManager = IPoolManager(0x000000000004444c5dc75cB358380D2e3dE08A90);
+        poolManager = IPoolManager(address(posm.poolManager()));
         stateView = IStateView(0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227);
 
         key = PoolKey({
