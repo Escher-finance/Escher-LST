@@ -6,6 +6,8 @@ import {IlSolver, IPositionManager, PoolKey, Currency, CurrencyLibrary} from "..
 import {IHooks} from "univ4-core/interfaces/IHooks.sol";
 import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
 import {IStateView, PoolId} from "univ4-periphery/interfaces/IStateView.sol";
+import {LiquidityAmounts} from "univ4-core/../test/utils/LiquidityAmounts.sol";
+import {TickMath} from "univ4-core/libraries/TickMath.sol";
 
 using CurrencyLibrary for Currency;
 
@@ -13,6 +15,7 @@ contract IlSolverTest is Test {
     IlSolver c;
     address owner;
     PoolKey key;
+    PoolId id;
     IPoolManager poolManager;
     IStateView stateView;
 
@@ -32,8 +35,9 @@ contract IlSolverTest is Test {
             tickSpacing: 60,
             hooks: IHooks(address(0))
         });
-        bytes32 id = bytes32(0xdce6394339af00981949f5f3baf27e3610c76326a700af57e4b3e3ae4977f78d);
-        assertEq(keccak256(abi.encode(key)), id);
+        bytes32 rawId = bytes32(0xdce6394339af00981949f5f3baf27e3610c76326a700af57e4b3e3ae4977f78d);
+        assertEq(keccak256(abi.encode(key)), rawId);
+        id = PoolId.wrap(rawId);
 
         c = new IlSolver(owner, posm, key);
         assertEq(c.owner(), owner);
@@ -44,11 +48,31 @@ contract IlSolverTest is Test {
 
         assertGt(key.currency0.balanceOf(owner), 0);
         assertGt(key.currency1.balanceOf(owner), 0);
-        uint128 liquidity = stateView.getLiquidity(PoolId.wrap(id));
+        uint128 liquidity = stateView.getLiquidity(id);
         assertGt(liquidity, 0);
+
+        vm.startPrank(owner);
     }
 
-    function testUniV4Mint() public pure {
-        assert(true);
+    function testUniV4Mint() public {
+        assertEq(c.s_positionTokenId(), 0);
+        uint256 input0 = 1 ether;
+        int24 delta = 488; // 5% in ticks
+
+        (uint160 sqrtPriceX96, int24 tick, uint24 _protocolFee, uint24 _lpFee) = stateView.getSlot0(id);
+        int24 tickSpacing = key.tickSpacing;
+        int24 tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
+        int24 tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
+
+        uint160 sqrtPriceAX96 = TickMath.getSqrtPriceAtTick(tickLower);
+        uint160 sqrtPriceBX96 = TickMath.getSqrtPriceAtTick(tickUpper);
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmount0(sqrtPriceAX96, sqrtPriceBX96, input0);
+
+        (uint256 required0, uint256 required1) =
+            LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtPriceAX96, sqrtPriceBX96, liquidity);
+
+        c.univ4LiquidityAdd(tickLower, tickUpper, liquidity, uint128(required0), uint128(required1));
+
+        assertGt(c.s_positionTokenId(), 0);
     }
 }
