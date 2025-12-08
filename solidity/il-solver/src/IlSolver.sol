@@ -11,9 +11,9 @@ using CurrencyLibrary for Currency;
 
 contract IlSolver is Ownable2Step {
     IPositionManager public s_posm;
-    PoolKey s_poolKey;
-    uint256 s_positionTokenId;
-    bool s_ethLiquidityPosition;
+    PoolKey public s_poolKey;
+    uint256 public s_positionTokenId;
+    bool public s_ethLiquidityPosition;
 
     constructor(address _owner, IPositionManager _posm, PoolKey memory _poolKey) Ownable(_owner) {
         s_posm = _posm;
