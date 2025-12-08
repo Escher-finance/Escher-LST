@@ -54,9 +54,6 @@ interface ILiquidStakingManager {
     /// @return address of delegation manager contract
     function getDelegationManager() external returns (address);
 
-    /// @notice Set delegation manager contract address
-    function setDelegationManager(address _delegate) external;
-
     /// @notice Submit the current pending batch for undelegation
     function submitBatch() external;
 

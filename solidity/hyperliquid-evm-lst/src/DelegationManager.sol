@@ -32,18 +32,20 @@ contract DelegationManager is
         _disableInitializers();
     }
 
-    function initialize(address owner, address _validatorManager, address _liquidStakingManager) public initializer {
+    function initialize(address owner, address _validatorManager) public initializer {
         // Checks that the initialOwner address is not zero.
         require(owner != address(0), "zero address");
         __Ownable_init(owner);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
-        _grantRole(MANAGER_ROLE, _liquidStakingManager);
-
         validatorManager = IValidatorSetManager(_validatorManager);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    function setLiquidStakingManager(address _manager) external onlyOwner {
+        _grantRole(MANAGER_ROLE, _manager);
+    }
 
     /**
      * @notice Calculate stake distribution for a given amount

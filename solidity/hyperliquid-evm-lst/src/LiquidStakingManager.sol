@@ -49,11 +49,13 @@ contract LiquidStakingManager is
         _disableInitializers();
     }
 
-    function initialize(address initialOwner, address lstAddress) public initializer {
+    function initialize(address initialOwner, address lstAddress, address _delegationManager) public initializer {
         // Checks that the initialOwner address is not zero.
         require(initialOwner != address(0), "zero address");
         __Ownable_init(initialOwner);
         share = Lst(lstAddress);
+        delegationManager = IDelegationManager(_delegationManager);
+
         s_config =
             Config({minBondAmount: 1000, minUnbondAmount: 1000, batchPeriodSeconds: 300, undelegatePeriodSeconds: 300});
         s_liquidity = Liquidity({totalDelegated: 0, totalLst: 0});
@@ -77,10 +79,6 @@ contract LiquidStakingManager is
 
     function acceptOwnershipTransfer() external onlyOwner {
         share.acceptOwnership(); // Calls Ownable2Step's acceptOwnership
-    }
-
-    function setDelegationManager(address _delegate) external onlyOwner {
-        delegationManager = IDelegationManager(_delegate);
     }
 
     function getConfig() external view returns (Config memory) {

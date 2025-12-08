@@ -33,13 +33,16 @@ contract ValidatorSetManager is
         _disableInitializers();
     }
 
-    function initialize(address initialOwner, address manager) public initializer {
+    function initialize(address initialOwner) public initializer {
         // Checks that the initialOwner address is not zero.
         if (initialOwner == address(0)) revert InvalidAddress();
         __Ownable_init(initialOwner);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
-        _grantRole(MANAGER_ROLE, manager);
+    }
+
+    function setDelegationManager(address _manager) external onlyOwner {
+        _grantRole(MANAGER_ROLE, _manager);
     }
 
     /**
