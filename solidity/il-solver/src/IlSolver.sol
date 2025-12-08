@@ -2,24 +2,104 @@
 pragma solidity ^0.8.24;
 
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {IPositionManager} from "univ4-periphery/interfaces/IPositionManager.sol";
+import {IPositionManager as IPositionManagerOriginal} from "univ4-periphery/interfaces/IPositionManager.sol";
 import {Actions} from "univ4-periphery/libraries/Actions.sol";
 import {PoolKey} from "univ4-core/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
+import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 using CurrencyLibrary for Currency;
+using SafeERC20 for IERC20;
+
+interface IPositionManager is IPositionManagerOriginal {
+    function permit2() external view returns (address);
+}
+
+interface IPermit2 {
+    function allowance(address user, address token, address spender)
+        external
+        view
+        returns (uint160 amount, uint48 expiration, uint48 nonce);
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
+}
 
 contract IlSolver is Ownable2Step {
     IPositionManager public s_posm;
-    PoolKey s_poolKey;
-    uint256 s_positionTokenId;
-    bool s_ethLiquidityPosition;
+    PoolKey public s_poolKey;
+    uint256 public s_positionTokenId;
+    bool public s_ethLiquidityPosition;
+
+    error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
+    error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
 
     constructor(address _owner, IPositionManager _posm, PoolKey memory _poolKey) Ownable(_owner) {
+        _posm.permit2();
+        _posm.poolManager();
         s_posm = _posm;
         s_poolKey = _poolKey;
         // Since it uses numerical sorting of addresses only the `currency0` can be ETH
         s_ethLiquidityPosition = _poolKey.currency0.isAddressZero();
+    }
+
+    receive() external payable {}
+
+    modifier univ4AttachAndRefund(uint128 _amount0Max, uint128 _amount1Max) {
+        uint256 amount0Max = uint256(_amount0Max);
+        uint256 amount1Max = uint256(_amount1Max);
+        PoolKey memory key = s_poolKey;
+        address _this = address(this);
+        address sender = msg.sender;
+        address _permit2 = s_posm.permit2();
+        IPermit2 permit2 = IPermit2(_permit2);
+        address _posm = address(s_posm);
+
+        uint256 b0Before = key.currency0.balanceOfSelf();
+        uint256 b1Before = key.currency1.balanceOfSelf();
+
+        if (s_ethLiquidityPosition) {
+            if (msg.value < amount0Max) {
+                revert IlSolver_wrongETHValueSent(amount0Max, msg.value);
+            }
+        } else {
+            IERC20 t0 = IERC20(Currency.unwrap(key.currency0));
+            t0.safeTransferFrom(sender, _this, amount0Max);
+
+            // permit2
+            if (t0.allowance(_this, _permit2) < amount0Max) {
+                t0.approve(_permit2, type(uint128).max);
+            }
+            (uint160 p2Allowance,,) = permit2.allowance(_this, address(t0), _posm);
+            if (p2Allowance < amount0Max) {
+                permit2.approve(address(t0), _posm, type(uint128).max, type(uint48).max);
+            }
+        }
+        IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
+        t1.safeTransferFrom(sender, _this, amount1Max);
+        if (t1.allowance(_this, _permit2) < amount1Max) {
+            t1.approve(_permit2, type(uint128).max);
+        }
+        (uint160 p2Allowance,,) = permit2.allowance(_this, address(t1), _posm);
+        if (p2Allowance < amount1Max) {
+            permit2.approve(address(t1), _posm, type(uint128).max, type(uint48).max);
+        }
+
+        _;
+
+        uint256 b0After = key.currency0.balanceOfSelf();
+        uint256 b1After = key.currency1.balanceOfSelf();
+
+        uint256 used0 = b0Before + amount0Max - b0After;
+        uint256 used1 = b1Before + amount1Max - b1After;
+        uint256 refund0 = used0 < amount0Max ? amount0Max - used0 : 0;
+        uint256 refund1 = used1 < amount1Max ? amount1Max - used1 : 0;
+        if (refund0 > 0) {
+            key.currency0.transfer(sender, refund0);
+        }
+        if (refund1 > 0) {
+            key.currency1.transfer(sender, refund1);
+        }
     }
 
     function _univ4LiquidityMint(
@@ -54,6 +134,11 @@ contract IlSolver is Ownable2Step {
         }
         uint256 deadline = block.timestamp;
         uint256 positionId = s_posm.nextTokenId();
+        address posm = address(s_posm);
+        if (!ethLiquidityPosition) {
+            IERC20(Currency.unwrap(_key.currency0)).approve(posm, amount0Max);
+        }
+        IERC20(Currency.unwrap(_key.currency1)).approve(posm, amount1Max);
         s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
         s_positionTokenId = positionId;
     }
@@ -91,6 +176,11 @@ contract IlSolver is Ownable2Step {
             params[1] = params1;
         }
         uint256 deadline = block.timestamp;
+        address posm = address(s_posm);
+        if (!ethLiquidityPosition) {
+            IERC20(Currency.unwrap(_key.currency0)).approve(posm, amount0Max);
+        }
+        IERC20(Currency.unwrap(_key.currency1)).approve(posm, amount1Max);
         s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
     }
 
@@ -100,7 +190,7 @@ contract IlSolver is Ownable2Step {
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) public onlyOwner {
+    ) public payable onlyOwner univ4AttachAndRefund(amount0Max, amount1Max) {
         if (s_positionTokenId == 0) {
             _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
         } else {
