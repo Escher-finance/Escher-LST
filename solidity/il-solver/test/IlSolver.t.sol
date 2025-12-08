@@ -58,6 +58,7 @@ contract IlSolverTest is Test {
         assertEq(c.s_positionTokenId(), 0);
         uint256 input0 = 1 ether;
         int24 delta = 488; // 5% in ticks
+        uint256 slippage = 10; // 10%
 
         (uint160 sqrtPriceX96, int24 tick,,) = stateView.getSlot0(id);
         int24 tickSpacing = key.tickSpacing;
@@ -71,9 +72,14 @@ contract IlSolverTest is Test {
         (uint256 required0, uint256 required1) =
             LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtPriceAX96, sqrtPriceBX96, liquidity);
 
+        uint256 amount0Max = required0 * (100 + slippage) / 100;
+        uint256 amount1Max = required1 * (100 + slippage) / 100;
+
         IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
-        t1.approve(address(c), required1);
-        c.univ4LiquidityAdd{value: required0}(tickLower, tickUpper, liquidity, uint128(required0), uint128(required1));
+        t1.approve(address(c), amount1Max);
+        c.univ4LiquidityAdd{value: amount0Max}(
+            tickLower, tickUpper, liquidity, uint128(amount0Max), uint128(amount1Max)
+        );
 
         assertGt(c.s_positionTokenId(), 0);
     }
