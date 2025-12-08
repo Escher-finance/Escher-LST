@@ -15,9 +15,8 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
     uint64 public nPendingWithdrawals;
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
-    constructor(address _liquidStakingManager) Ownable(msg.sender) {
+    constructor() Ownable(msg.sender) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(MANAGER_ROLE, _liquidStakingManager);
     }
 
     // Track individual delegations for more detailed testing
@@ -29,6 +28,10 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
         totalDelegated += amount;
         delegatedAmount[msg.sender] += amount;
         emit Delegated(msg.sender, msg.value);
+    }
+
+    function setLiquidStakingManager(address _manager) external onlyOwner {
+        _grantRole(MANAGER_ROLE, _manager);
     }
 
     /// @notice Undelegates the specified amount from validators
@@ -44,28 +47,19 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
 
     /// @notice Returns the delegation summary for this contract
     /// @return The delegator summary
-    function delegationSummary()
-        external
-        view
-        override
-        returns (DelegatorSummary memory)
-    {
-        return
-            DelegatorSummary({
-                delegated: totalDelegated,
-                undelegated: totalUndelegated,
-                totalPendingWithdrawal: totalPendingWithdrawal,
-                nPendingWithdrawals: nPendingWithdrawals
-            });
+    function delegationSummary() external view override returns (DelegatorSummary memory) {
+        return DelegatorSummary({
+            delegated: totalDelegated,
+            undelegated: totalUndelegated,
+            totalPendingWithdrawal: totalPendingWithdrawal,
+            nPendingWithdrawals: nPendingWithdrawals
+        });
     }
 
     /// @notice Mock implementation of updateValidators
     /// @param _validators Array of validator addresses
     /// @param _weights Array of weights for each validator
-    function updateValidators(
-        address[] calldata _validators,
-        uint64[] calldata _weights
-    ) external override {
+    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external override {
         // Mock implementation - does nothing in tests
         // In a real scenario, this would redelegate tokens
     }
@@ -100,10 +94,7 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
     /// @notice Simulates completing a pending withdrawal
     /// @param amount The amount to complete withdrawal for
     function completePendingWithdrawal(uint64 amount) external {
-        require(
-            totalPendingWithdrawal >= amount,
-            "Insufficient pending withdrawal"
-        );
+        require(totalPendingWithdrawal >= amount, "Insufficient pending withdrawal");
         require(nPendingWithdrawals > 0, "No pending withdrawals");
         totalPendingWithdrawal -= amount;
         nPendingWithdrawals -= 1;
@@ -114,7 +105,7 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
 
         // Transfer assets to recipient
-        (bool success, ) = payable(msg.sender).call{value: batchAssets}("");
+        (bool success,) = payable(msg.sender).call{value: batchAssets}("");
         require(success, "transfer failed");
     }
 

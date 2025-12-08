@@ -27,13 +27,17 @@ contract LiquidStakingManagerTest is Test {
         lst = Lst(address(proxy));
 
         LiquidStakingManager liquidStakingManagerImpl = new LiquidStakingManager();
+        delegationManager = new DelegationManagerMock();
 
-        bytes memory initLstManagerData = abi.encodeCall(LiquidStakingManager.initialize, (bob, address(lst)));
+        address _delegationManager = address(delegationManager);
+
+        bytes memory initLstManagerData =
+            abi.encodeCall(LiquidStakingManager.initialize, (bob, address(lst), _delegationManager));
         ERC1967Proxy lstManagerProxy = new ERC1967Proxy(address(liquidStakingManagerImpl), initLstManagerData);
 
         liquidStakingManager = LiquidStakingManager(payable(address(lstManagerProxy)));
 
-        delegationManager = new DelegationManagerMock(address(liquidStakingManager));
+        delegationManager.setLiquidStakingManager(address(liquidStakingManager));
 
         vm.deal(bob, STARTING_BALANCE);
         vm.deal(alice, STARTING_BALANCE);
@@ -55,8 +59,6 @@ contract LiquidStakingManagerTest is Test {
             liquidStakingManager.bond(bondAmount, bob);
         }
 
-        liquidStakingManager.setDelegationManager(address(delegationManager));
-
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
 
         uint256 bobBalance = liquidStakingManager.getLst().balanceOf(address(bob));
@@ -68,7 +70,6 @@ contract LiquidStakingManagerTest is Test {
     }
 
     function testUnbondRequest() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
@@ -86,7 +87,6 @@ contract LiquidStakingManagerTest is Test {
     }
 
     function testSubmitBatchAndReceiveBatch() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         uint256 batchId = 1; // initial batchId
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
@@ -115,7 +115,6 @@ contract LiquidStakingManagerTest is Test {
     }
 
     function testMultipleUsersStakeUnbondClaim() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
         vm.startPrank(bob);
@@ -158,7 +157,6 @@ contract LiquidStakingManagerTest is Test {
     }
 
     function testDoubleUnbondReverts() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
@@ -170,7 +168,6 @@ contract LiquidStakingManagerTest is Test {
     }
 
     function testUnbondRequestReverts() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
@@ -186,14 +183,12 @@ contract LiquidStakingManagerTest is Test {
     }
 
     function testSubmitBatchWithEmptyRequests() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         // No requests in batch
         vm.expectRevert();
         liquidStakingManager.submitBatch();
     }
 
     function testReceiveBatchReverts() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
@@ -209,7 +204,6 @@ contract LiquidStakingManagerTest is Test {
     }
 
     function testBatchAndRequestGetters() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
@@ -232,7 +226,6 @@ contract LiquidStakingManagerTest is Test {
     }
 
     function testStateAfterOperations() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
@@ -250,7 +243,6 @@ contract LiquidStakingManagerTest is Test {
     }
 
     function testBatchLifecycleMultipleRequests() public {
-        liquidStakingManager.setDelegationManager(address(delegationManager));
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
         // Bob bonds and unbonds

@@ -36,6 +36,9 @@ contract ValidatorSetManagerTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
 
         validatorSetManager = ValidatorSetManager(address(proxy));
+
+        vm.prank(owner);
+        validatorSetManager.setDelegationManager(manager);
     }
 
     /* ============ Initialization Tests ============ */
@@ -62,7 +65,7 @@ contract ValidatorSetManagerTest is Test {
 
     function test_Initialize_CannotReinitialize() public {
         vm.expectRevert();
-        validatorSetManager.initialize(owner, manager);
+        validatorSetManager.initialize(owner);
     }
 
     /* ============ Update Validators Tests ============ */
