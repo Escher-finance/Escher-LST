@@ -43,6 +43,8 @@ contract IlSolver is Ownable2Step {
         s_ethLiquidityPosition = _poolKey.currency0.isAddressZero();
     }
 
+    receive() external payable {}
+
     modifier univ4AttachAndRefund(uint128 _amount0Max, uint128 _amount1Max) {
         uint256 amount0Max = uint256(_amount0Max);
         uint256 amount1Max = uint256(_amount1Max);
@@ -90,10 +92,8 @@ contract IlSolver is Ownable2Step {
 
         uint256 used0 = b0Before + amount0Max - b0After;
         uint256 used1 = b1Before + amount1Max - b1After;
-        require(used0 <= amount0Max);
-        require(used1 <= amount1Max);
-        uint256 refund0 = amount0Max - used0;
-        uint256 refund1 = amount1Max - used1;
+        uint256 refund0 = used0 < amount0Max ? amount0Max - used0 : 0;
+        uint256 refund1 = used1 < amount1Max ? amount1Max - used1 : 0;
         if (refund0 > 0) {
             key.currency0.transfer(sender, refund0);
         }
