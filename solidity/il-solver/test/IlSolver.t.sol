@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
-import {IlSolver, IPositionManager, PoolKey, Currency, CurrencyLibrary} from "../src/IlSolver.sol";
+import {IlSolver, IPositionManager, PoolKey, Currency, CurrencyLibrary, IERC20} from "../src/IlSolver.sol";
 import {IHooks} from "univ4-core/interfaces/IHooks.sol";
 import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
 import {IStateView, PoolId} from "univ4-periphery/interfaces/IStateView.sol";
@@ -44,7 +44,7 @@ contract IlSolverTest is Test {
         assertEq(address(c.s_posm()), address(posm));
 
         deal(owner, 1 ether);
-        deal(Currency.unwrap(key.currency1), owner, 1000e6);
+        deal(Currency.unwrap(key.currency1), owner, 10000e6);
 
         assertGt(key.currency0.balanceOf(owner), 0);
         assertGt(key.currency1.balanceOf(owner), 0);
@@ -59,7 +59,7 @@ contract IlSolverTest is Test {
         uint256 input0 = 1 ether;
         int24 delta = 488; // 5% in ticks
 
-        (uint160 sqrtPriceX96, int24 tick, uint24 _protocolFee, uint24 _lpFee) = stateView.getSlot0(id);
+        (uint160 sqrtPriceX96, int24 tick,,) = stateView.getSlot0(id);
         int24 tickSpacing = key.tickSpacing;
         int24 tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
         int24 tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
@@ -71,7 +71,9 @@ contract IlSolverTest is Test {
         (uint256 required0, uint256 required1) =
             LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtPriceAX96, sqrtPriceBX96, liquidity);
 
-        c.univ4LiquidityAdd(tickLower, tickUpper, liquidity, uint128(required0), uint128(required1));
+        IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
+        t1.approve(address(c), required1);
+        c.univ4LiquidityAdd{value: required0}(tickLower, tickUpper, liquidity, uint128(required0), uint128(required1));
 
         assertGt(c.s_positionTokenId(), 0);
     }
