@@ -74,7 +74,7 @@ contract IlSolverTest is Test {
         amount1Max = uint128(required1 * (100 + slippage) / 100);
     }
 
-    function _incUniV4Pos(uint256 amount0, int24 delta, uint256 slippage) private {
+    function _mintUniV4Pos(uint256 amount0, int24 delta, uint256 slippage) private {
         (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) =
             _calculateInputs(amount0, delta, slippage);
 
@@ -87,10 +87,20 @@ contract IlSolverTest is Test {
 
     function testUniV4Mint() public {
         assertEq(c.s_positionTokenId(), 0);
-        uint256 amount0 = 1 ether;
         int24 delta = 488; // 5% in ticks
         uint256 slippage = 10; // 10%
-        _incUniV4Pos(amount0, delta, slippage);
+        _mintUniV4Pos(1 ether, delta, slippage);
         assertGt(c.s_positionTokenId(), 0);
+    }
+
+    function testUniV4Increase() public {
+        int24 delta = 488; // 5% in ticks
+        uint256 slippage = 10; // 10%
+        _mintUniV4Pos(1 ether, delta, slippage);
+
+        (,, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) = _calculateInputs(0.5 ether, delta, slippage);
+        IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
+        t1.approve(address(c), amount1Max);
+        c.univ4LiquidityAdd{value: amount0Max}(0, 0, liquidity, amount0Max, amount1Max);
     }
 }
