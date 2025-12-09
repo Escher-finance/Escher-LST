@@ -24,7 +24,7 @@ contract IlSolverTest is Test {
     IStateView stateView;
 
     function setUp() public {
-        vm.createSelectFork("base");
+        vm.createSelectFork("base", 39260000);
         owner = makeAddr("owner");
 
         // https://docs.uniswap.org/contracts/v4/deployments
