@@ -2,7 +2,16 @@
 pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
-import {IlSolver, IPositionManager, PoolKey, Currency, CurrencyLibrary, IERC20} from "../src/IlSolver.sol";
+import {
+    IlSolver,
+    IPositionManager,
+    PoolKey,
+    Currency,
+    CurrencyLibrary,
+    IERC20,
+    IL2Pool,
+    L2Encoder
+} from "../src/IlSolver.sol";
 import {IHooks} from "univ4-core/interfaces/IHooks.sol";
 import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
 import {IStateView, PoolId} from "univ4-periphery/interfaces/IStateView.sol";
@@ -10,8 +19,11 @@ import {LiquidityAmounts} from "univ4-core/../test/utils/LiquidityAmounts.sol";
 import {TickMath} from "univ4-core/libraries/TickMath.sol";
 import {PositionInfo, PositionInfoLibrary} from "univ4-periphery/libraries/PositionInfoLibrary.sol";
 import {Position} from "univ4-core/libraries/Position.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 using CurrencyLibrary for Currency;
+using SafeERC20 for IERC20;
 using PositionInfoLibrary for PositionInfo;
 
 contract IlSolverTest is Test {
@@ -22,19 +34,27 @@ contract IlSolverTest is Test {
     IPositionManager posm;
     IPoolManager poolManager;
     IStateView stateView;
+    IL2Pool l2Pool;
+    L2Encoder l2Encoder;
+    IERC20 l2Underlying;
 
     function setUp() public {
         vm.createSelectFork("base", 39260000);
         owner = makeAddr("owner");
 
+        address usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+
         // https://docs.uniswap.org/contracts/v4/deployments
         posm = IPositionManager(0x7C5f5A4bBd8fD63184577525326123B519429bDc);
         poolManager = IPoolManager(address(posm.poolManager()));
         stateView = IStateView(0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71);
+        l2Pool = IL2Pool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
+        l2Encoder = L2Encoder(0x39e97c588B2907Fb67F44fea256Ae3BA064207C5);
+        l2Underlying = IERC20(usdc);
 
         key = PoolKey({
             currency0: CurrencyLibrary.ADDRESS_ZERO,
-            currency1: Currency.wrap(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913),
+            currency1: Currency.wrap(usdc),
             fee: 500,
             tickSpacing: 10,
             hooks: IHooks(address(0))
@@ -43,7 +63,7 @@ contract IlSolverTest is Test {
         assertEq(keccak256(abi.encode(key)), rawId);
         id = PoolId.wrap(rawId);
 
-        c = new IlSolver(owner, posm, key);
+        c = new IlSolver(owner, posm, key, l2Pool, l2Encoder, l2Underlying);
         assertEq(c.owner(), owner);
         assertEq(address(c.s_posm()), address(posm));
 
