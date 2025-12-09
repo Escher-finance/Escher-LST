@@ -37,6 +37,7 @@ contract IlSolverTest is Test {
     IL2Pool l2Pool;
     L2Encoder l2Encoder;
     IERC20 l2Underlying;
+    IERC20 l2Reserve;
 
     function setUp() public {
         vm.createSelectFork("base", 39260000);
@@ -51,6 +52,7 @@ contract IlSolverTest is Test {
         l2Pool = IL2Pool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
         l2Encoder = L2Encoder(0x39e97c588B2907Fb67F44fea256Ae3BA064207C5);
         l2Underlying = IERC20(usdc);
+        l2Reserve = IERC20(l2Pool.getReserveAToken(usdc));
 
         key = PoolKey({
             currency0: CurrencyLibrary.ADDRESS_ZERO,
@@ -137,8 +139,10 @@ contract IlSolverTest is Test {
     }
 
     function testAaveV3Supply() public {
+        assertEq(l2Reserve.balanceOf(address(c)), 0);
         uint256 amount = 1000e6;
         l2Underlying.approve(address(c), amount);
         c.aavev3Supply(amount);
+        assertGt(l2Reserve.balanceOf(address(c)), 0);
     }
 }

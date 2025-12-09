@@ -7,7 +7,8 @@ import {Actions} from "univ4-periphery/libraries/Actions.sol";
 import {PoolKey} from "univ4-core/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
 import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
-import {IL2Pool} from "aavev3/interfaces/IL2Pool.sol";
+import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
+import {IPool} from "aavev3/interfaces/IPool.sol";
 import {L2Encoder} from "aavev3/helpers/L2Encoder.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -18,6 +19,8 @@ using SafeERC20 for IERC20;
 interface IPositionManager is IPositionManagerOriginal {
     function permit2() external view returns (address);
 }
+
+interface IL2Pool is IL2PoolOriginal, IPool {}
 
 interface IPermit2 {
     function allowance(address user, address token, address spender)
