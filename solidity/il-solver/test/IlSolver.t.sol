@@ -80,6 +80,7 @@ contract IlSolverTest is Test {
 
     function _calculateInputs(uint256 amount0, int24 delta, uint256 slippage)
         private
+        view
         returns (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max)
     {
         (uint160 sqrtPriceX96, int24 tick,,) = stateView.getSlot0(id);
