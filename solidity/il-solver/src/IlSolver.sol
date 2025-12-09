@@ -143,13 +143,7 @@ contract IlSolver is Ownable2Step {
         s_positionTokenId = positionId;
     }
 
-    function _univ4LiquidityAdd(
-        int24 tickLower,
-        int24 tickUpper,
-        uint256 liquidity,
-        uint128 amount0Max,
-        uint128 amount1Max
-    ) private {
+    function _univ4LiquidityAdd(uint256 liquidity, uint128 amount0Max, uint128 amount1Max) private {
         bool ethLiquidityPosition = s_ethLiquidityPosition;
         bytes memory actions;
         address _this = address(this);
@@ -161,8 +155,7 @@ contract IlSolver is Ownable2Step {
         }
         uint256 _tokenId = s_positionTokenId;
         PoolKey memory _key = s_poolKey;
-        bytes memory params0 =
-            abi.encode(_tokenId, tickLower, tickUpper, liquidity, amount0Max, amount1Max, _this, bytes(""));
+        bytes memory params0 = abi.encode(_tokenId, liquidity, amount0Max, amount1Max, bytes(""));
         bytes memory params1 = abi.encode(_key.currency0, _key.currency1);
         bytes[] memory params;
         if (ethLiquidityPosition) {
@@ -194,7 +187,7 @@ contract IlSolver is Ownable2Step {
         if (s_positionTokenId == 0) {
             _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
         } else {
-            _univ4LiquidityAdd(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+            _univ4LiquidityAdd(liquidity, amount0Max, amount1Max);
         }
     }
 }
