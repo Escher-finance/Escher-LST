@@ -268,8 +268,6 @@ contract ValidatorSetManagerTest is Test {
     }
 
     function test_OwnerCanRevokeManagerRole() public {
-        address theOwner = validatorSetManager.owner();
-
         bytes32 managerRole = validatorSetManager.MANAGER_ROLE();
         vm.prank(owner);
         validatorSetManager.revokeRole(managerRole, manager);
