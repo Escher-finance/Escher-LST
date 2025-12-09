@@ -9,7 +9,6 @@ import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
 import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
 import {IL2Pool} from "aavev3/interfaces/IL2Pool.sol";
 import {L2Encoder} from "aavev3/helpers/L2Encoder.sol";
-
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -37,14 +36,20 @@ contract IlSolver is Ownable2Step {
 
     // Aave V3
     IL2Pool s_l2Pool;
+    L2Encoder s_l2Encoder;
     IERC20 s_l2Underlying;
 
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
     error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
 
-    constructor(address _owner, IPositionManager _posm, PoolKey memory _poolKey, IL2Pool _l2Pool, IERC20 _l2Underlying)
-        Ownable(_owner)
-    {
+    constructor(
+        address _owner,
+        IPositionManager _posm,
+        PoolKey memory _poolKey,
+        IL2Pool _l2Pool,
+        L2Encoder _l2Encoder,
+        IERC20 _l2Underlying
+    ) Ownable(_owner) {
         _posm.permit2();
         _posm.poolManager();
         s_posm = _posm;
@@ -53,6 +58,7 @@ contract IlSolver is Ownable2Step {
         s_ethLiquidityPosition = _poolKey.currency0.isAddressZero();
 
         s_l2Pool = _l2Pool;
+        s_l2Encoder = _l2Encoder;
         s_l2Underlying = _l2Underlying;
     }
 
@@ -209,7 +215,7 @@ contract IlSolver is Ownable2Step {
         if (s_l2Underlying.allowance(address(this), address(s_l2Pool)) < amount) {
             s_l2Underlying.approve(address(s_l2Pool), type(uint128).max);
         }
-        bytes32 params = L2Encoder.encodeSupplyParams(address(s_l2Underlying), amount, 0);
+        bytes32 params = s_l2Encoder.encodeSupplyParams(address(s_l2Underlying), amount, 0);
         s_l2Pool.supply(params);
     }
 }
