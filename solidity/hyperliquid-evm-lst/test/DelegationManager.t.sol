@@ -239,7 +239,6 @@ contract DelegationManagerTest is Test {
 
     function test_Delegate_Success() public {
         CoreSimulatorLib.nextBlock();
-        DelegatorSummary memory initialSummary = delegationManager.delegationSummary();
 
         // Arrange: Prank as the liquidStakingManager (who has MANAGER_ROLE)
         vm.prank(liquidStakingManager);
@@ -253,14 +252,14 @@ contract DelegationManagerTest is Test {
 
         assertEq(currentDelegations.length, 3);
 
-        // for (uint256 i = 0; i < currentDelegations.length; i++) {
-        //     PrecompileLib.Delegation memory delegate = currentDelegations[i];
-        //     assertEq(delegate.amount, expectedAmount[i]);
-        // }
+        for (uint256 i = 0; i < currentDelegations.length; i++) {
+            PrecompileLib.Delegation memory delegate = currentDelegations[i];
+            assertEq(delegate.amount, expectedAmount[i]);
+        }
 
-        // DelegatorSummary memory summary = delegationManager.delegationSummary();
+        DelegatorSummary memory summary = delegationManager.delegationSummary();
 
-        // assertEq(summary.delegated, 100000000);
+        assertEq(summary.delegated, 100000000);
     }
 
     /* ============ UpdateValidators Tests ============ */
