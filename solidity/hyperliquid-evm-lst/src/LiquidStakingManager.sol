@@ -101,7 +101,7 @@ contract LiquidStakingManager is
      * @notice function to stake assets and receive liquid staking tokens in exchange
      * @param _assets amount of the asset token
      */
-    function bond(uint256 _assets, address _recipient) external payable {
+    function bond(uint256 _assets, address _recipient) external payable nonReentrant {
         // checks that the deposited amount is greater than zero.
         require(_assets > s_config.minBondAmount, "bond amount should be more than min amount");
 
@@ -174,7 +174,7 @@ contract LiquidStakingManager is
      * @param _shares amount of shares the user wants to convert
      * @param _recipient address of the user who will receive the assets
      */
-    function unbondRequest(uint256 _shares, address _recipient) external returns (uint256) {
+    function unbondRequest(uint256 _shares, address _recipient) external nonReentrant returns (uint256) {
         // checks that the deposited amount is greater than zero.
         require(_shares > s_config.minUnbondAmount, "unbond should be more than min unbond amount");
         // Checks that the _receiver address is not zero.
@@ -210,7 +210,7 @@ contract LiquidStakingManager is
     /**
      * @notice Submit the current pending batch for undelegation
      */
-    function submitBatch() external {
+    function submitBatch() external nonReentrant {
         // get pending batch
         UnbondBatch storage batch = s_batches[s_pendingBatchId];
 
@@ -259,7 +259,7 @@ contract LiquidStakingManager is
      * @notice Mark a submitted batch as received after undelegation period
      * @param batchId The ID of the batch to mark as received
      */
-    function receiveBatch(uint256 batchId) external {
+    function receiveBatch(uint256 batchId) external nonReentrant {
         UnbondBatch storage batch = s_batches[batchId];
 
         require(batch.batchId != 0, "batch does not exist");
