@@ -86,7 +86,7 @@ contract DelegationManager is
         }
     }
 
-    function delegate() external payable {
+    function delegate() external payable nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
@@ -113,7 +113,7 @@ contract DelegationManager is
         }
     }
 
-    function undelegate(uint64 coreAmount) external {
+    function undelegate(uint64 coreAmount) external nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
@@ -143,7 +143,11 @@ contract DelegationManager is
         });
     }
 
-    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external onlyOwner {
+    function updateValidators(address[] calldata _validators, uint64[] calldata _weights)
+        external
+        nonReentrant
+        onlyOwner
+    {
         // update validators with new weights
         validatorManager.updateValidators(_validators, _weights);
 
@@ -234,7 +238,7 @@ contract DelegationManager is
         }
     }
 
-    function receiveBatch(uint256 batchAssets) external {
+    function receiveBatch(uint256 batchAssets) external nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
 
         // Transfer unbonded assets to liquid staking manager

@@ -50,7 +50,7 @@ contract ValidatorSetManager is
      * @param _validators Array of validator addresses
      * @param _weights Array of corresponding weights
      */
-    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external {
+    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
         uint256 length = _validators.length;
         require(length > 0, "Requires minimum 1 validator");
