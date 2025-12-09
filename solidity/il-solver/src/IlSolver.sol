@@ -7,6 +7,9 @@ import {Actions} from "univ4-periphery/libraries/Actions.sol";
 import {PoolKey} from "univ4-core/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
 import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
+import {IL2Pool} from "aavev3/interfaces/IL2Pool.sol";
+import {L2Encoder} from "aavev3/helpers/L2Encoder.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -26,21 +29,31 @@ interface IPermit2 {
 }
 
 contract IlSolver is Ownable2Step {
+    // Uniswap V4
     IPositionManager public s_posm;
     PoolKey public s_poolKey;
     uint256 public s_positionTokenId;
     bool public s_ethLiquidityPosition;
 
+    // Aave V3
+    IL2Pool s_l2Pool;
+    IERC20 s_l2Underlying;
+
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
     error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
 
-    constructor(address _owner, IPositionManager _posm, PoolKey memory _poolKey) Ownable(_owner) {
+    constructor(address _owner, IPositionManager _posm, PoolKey memory _poolKey, IL2Pool _l2Pool, IERC20 _l2Underlying)
+        Ownable(_owner)
+    {
         _posm.permit2();
         _posm.poolManager();
         s_posm = _posm;
         s_poolKey = _poolKey;
         // Since it uses numerical sorting of addresses only the `currency0` can be ETH
         s_ethLiquidityPosition = _poolKey.currency0.isAddressZero();
+
+        s_l2Pool = _l2Pool;
+        s_l2Underlying = _l2Underlying;
     }
 
     receive() external payable {}
@@ -189,5 +202,14 @@ contract IlSolver is Ownable2Step {
         } else {
             _univ4LiquidityAdd(liquidity, amount0Max, amount1Max);
         }
+    }
+
+    function aavev3Supply(uint256 amount) public onlyOwner {
+        s_l2Underlying.safeTransferFrom(msg.sender, address(this), amount);
+        if (s_l2Underlying.allowance(address(this), address(s_l2Pool)) < amount) {
+            s_l2Underlying.approve(address(s_l2Pool), type(uint128).max);
+        }
+        bytes32 params = L2Encoder.encodeSupplyParams(address(s_l2Underlying), amount, 0);
+        s_l2Pool.supply(params);
     }
 }
