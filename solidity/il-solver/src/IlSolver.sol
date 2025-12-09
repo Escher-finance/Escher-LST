@@ -83,8 +83,8 @@ contract IlSolver is Ownable2Step {
             if (t0.allowance(_this, _permit2) < amount0Max) {
                 t0.approve(_permit2, type(uint128).max);
             }
-            (uint160 p2Allowance,,) = permit2.allowance(_this, address(t0), _posm);
-            if (p2Allowance < amount0Max) {
+            (uint160 p2Allowance0,,) = permit2.allowance(_this, address(t0), _posm);
+            if (p2Allowance0 < amount0Max) {
                 permit2.approve(address(t0), _posm, type(uint128).max, type(uint48).max);
             }
         }
@@ -93,8 +93,8 @@ contract IlSolver is Ownable2Step {
         if (t1.allowance(_this, _permit2) < amount1Max) {
             t1.approve(_permit2, type(uint128).max);
         }
-        (uint160 p2Allowance,,) = permit2.allowance(_this, address(t1), _posm);
-        if (p2Allowance < amount1Max) {
+        (uint160 p2Allowance1,,) = permit2.allowance(_this, address(t1), _posm);
+        if (p2Allowance1 < amount1Max) {
             permit2.approve(address(t1), _posm, type(uint128).max, type(uint48).max);
         }
 
