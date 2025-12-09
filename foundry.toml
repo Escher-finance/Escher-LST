@@ -11,6 +11,7 @@ src            = "solidity"
 via_ir         = true
 
 [rpc_endpoints]
+base    = "https://base-rpc.publicnode.com"
 holesky = "https://ethereum-holesky-rpc.publicnode.com"
 mainnet = "https://ethereum-rpc.publicnode.com"
 sepolia = "https://ethereum-sepolia-rpc.publicnode.com"

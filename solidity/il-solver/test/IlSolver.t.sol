@@ -24,22 +24,22 @@ contract IlSolverTest is Test {
     IStateView stateView;
 
     function setUp() public {
-        vm.createSelectFork("mainnet", 23968000);
+        vm.createSelectFork("base");
         owner = makeAddr("owner");
 
         // https://docs.uniswap.org/contracts/v4/deployments
-        posm = IPositionManager(0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e);
+        posm = IPositionManager(0x7C5f5A4bBd8fD63184577525326123B519429bDc);
         poolManager = IPoolManager(address(posm.poolManager()));
-        stateView = IStateView(0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227);
+        stateView = IStateView(0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71);
 
         key = PoolKey({
             currency0: CurrencyLibrary.ADDRESS_ZERO,
-            currency1: Currency.wrap(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48),
-            fee: 3000,
-            tickSpacing: 60,
+            currency1: Currency.wrap(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913),
+            fee: 500,
+            tickSpacing: 10,
             hooks: IHooks(address(0))
         });
-        bytes32 rawId = bytes32(0xdce6394339af00981949f5f3baf27e3610c76326a700af57e4b3e3ae4977f78d);
+        bytes32 rawId = bytes32(0x96d4b53a38337a5733179751781178a2613306063c511b78cd02684739288c0a);
         assertEq(keccak256(abi.encode(key)), rawId);
         id = PoolId.wrap(rawId);
 
