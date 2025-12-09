@@ -2,18 +2,34 @@
 pragma solidity ^0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {console} from "forge-std/console.sol";
+
 library IlSolverMath {
     error MAX_LOOP_ITERATIONS_REACHED();
     error INVALID_INPUT();
     uint256 public constant MAX_LOOP_ITERATIONS = 8;
     uint256 public constant LTV_SAFTY_FACTOR = 2e16;
 
+    modifier validInput(
+        uint256 collateralAmount,
+        uint256 borrowedAmountNeeded,
+        uint256 borrowAmountUSDPrice,
+        uint256 ltv
+    ) {
+        if (borrowAmountUSDPrice == 0 || borrowedAmountNeeded == 0 || ltv == 0 || collateralAmount == 0) {
+            revert INVALID_INPUT();
+        }
+        if (ltv <= LTV_SAFTY_FACTOR) revert INVALID_INPUT();
+        _;
+    }
+
     function sqrt(uint256 x) internal pure returns (uint256) {
         return Math.sqrt(x);
     }
+
     function log10(uint256 x) internal pure returns (uint256) {
         return Math.log10(x);
     }
+
     /**
      * @dev This function is used to calculate the number of iterations needed to reach the borrowed amount needed.
      * @param collateralAmount The amount of collateral to be used in token decimals (1e18).
@@ -22,15 +38,21 @@ library IlSolverMath {
      * @param ltv The LTV of the collateral in 1e16.
      * @return iterations The number of iterations needed to reach the borrowed amount needed.
      *  After n loops starting with L_0 collateral:
-    H_n = (L_0 * LTV / P_0) * (1 - LTV^n) / (1 - LTV)
+     * LTV / P_0) * (1 - LTV^n) / (1 - LTV)
      */
-    function hedgingLoop(uint256 collateralAmount, uint256 borrowedAmountNeeded, uint256 borrowAmountUSDPrice, uint256 ltv) internal pure returns (uint256 iterations) {
-        if (borrowAmountUSDPrice == 0 || borrowedAmountNeeded == 0 || ltv == 0 || collateralAmount == 0) {
-            revert INVALID_INPUT();
-        }
-        // Reduce target LTV by the safety factor to avoid exceeding the limit.
-        if (ltv <= LTV_SAFTY_FACTOR) revert INVALID_INPUT();
-        uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
+    function hedgingLoop(
+        uint256 collateralAmount,
+        uint256 borrowedAmountNeeded,
+        uint256 borrowAmountUSDPrice,
+        uint256 ltv
+    )
+        internal
+        pure
+        validInput(collateralAmount, borrowedAmountNeeded, borrowAmountUSDPrice, ltv)
+        returns (uint256 iterations)
+    {
+        uint256 ltvMax =
+            ltv - LTV_SAFTY_FACTOR;
 
         // Track total collateral and borrow amounts in USD (1e18 scale) and tokens.
         uint256 collateralUSD = collateralAmount;
@@ -69,7 +91,11 @@ library IlSolverMath {
     * @param ltv The LTV of the collateral in 1e16.
     * @return collateralAmount The amount of collateral needed to reach the borrowed amount needed.
     */
-    function calculateCollateralAmount(uint256 borrowedAmountNeeded, uint256 borrowAmountUSDPrice, uint256 ltv) internal pure returns (uint256 collateralAmount) {
+    function calculateCollateralAmount(uint256 borrowedAmountNeeded, uint256 borrowAmountUSDPrice, uint256 ltv)
+        internal
+        pure
+        returns (uint256 collateralAmount)
+    {
         return borrowedAmountNeeded / borrowAmountUSDPrice * ltv;
     }
 }

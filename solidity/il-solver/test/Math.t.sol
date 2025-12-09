@@ -40,34 +40,5 @@ contract IlSolverMathTest is Test {
         // Expect a single loop is sufficient
         assertEq(iterations, 2);
     }
-
-    // function test_hedgingLoop_reverts_whenNotEnoughBorrowCapacity() public {
-    //     uint256 collateralAmount = 1;
-    //     uint256 borrowedAmount = 0;
-    //     uint256 targetBorrowUsd = type(uint256).max; // impossible to reach
-    //     uint256 ltv = 90e16; // 0.90 * 1e18
-
-    //     vm.expectRevert(IlSolverMath.MAX_LOOP_ITERATIONS_REACHED.selector);
-    //     IlSolverMath.hedgingLoop(
-    //         collateralAmount,
-    //         borrowedAmount,
-    //         targetBorrowUsd,
-    //         ltv
-    //     );
-    // }
-
-    // function test_hedgingLoop_reverts_ifLtvTooLow() public {
-    //     uint256 collateralAmount = 100;
-    //     uint256 borrowedAmount = 1;
-    //     uint256 targetBorrowUsd = 100;
-    //     uint256 ltvTooLow = IlSolverMath.LTV_SAFTY_FACTOR(); // or hardcode if not public
-
-    //     vm.expectRevert(); // generic revert because library uses a string
-    //     IlSolverMath.hedgingLoop(
-    //         collateralAmount,
-    //         borrowedAmount,
-    //         targetBorrowUsd,
-    //         ltvTooLow
-    //     );
-    // }
+    // need to do test on the LTV(safety factor), test on maximum loops, test on invalid input
 }
