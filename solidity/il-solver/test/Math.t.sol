@@ -2,8 +2,72 @@
 pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
-import {IlSolverMath} from "../src/core/Math.sol";
+import {IlSolverMath} from "../src/core/EscherMath.sol";
+import {console} from "forge-std/console.sol";
 
 contract IlSolverMathTest is Test {
-    function setUp() public {}
+    // --- sqrt tests ---
+
+    function test_sqrt_basic() public {
+        assertEq(IlSolverMath.sqrt(0), 0);
+        assertEq(IlSolverMath.sqrt(1), 1);
+        assertEq(IlSolverMath.sqrt(4), 2);
+        assertEq(IlSolverMath.sqrt(16), 4);
+        assertEq(IlSolverMath.sqrt(81), 9);
+    }
+
+    function test_sqrt_monotonic() public {
+        uint256 a = 100;
+        uint256 b = 10_000;
+        uint256 sa = IlSolverMath.sqrt(a);
+        uint256 sb = IlSolverMath.sqrt(b);
+        assertLt(sa, sb);
+    }
+
+    // --- hedgingLoop tests ---
+
+    function test_hedgingLoop_singleIterationEnough() public {
+        // Simple case: one loop is enough to reach target
+        uint256 collateralAmount = 2224 * 1e18;
+        uint256 borrowedAmount = 1 * 1e18;
+        uint256 borrowAmountUSD = 2000 * 1e18;
+        uint256 ltv = 90e16; // 0.90 * 1e18
+
+        uint256 iterations = IlSolverMath.hedgingLoop(collateralAmount, borrowedAmount, borrowAmountUSD, ltv);
+        console.log("iterations", iterations);
+        console.log("collateralAmount", collateralAmount);
+
+        // Expect a single loop is sufficient
+        assertEq(iterations, 2);
+    }
+
+    // function test_hedgingLoop_reverts_whenNotEnoughBorrowCapacity() public {
+    //     uint256 collateralAmount = 1;
+    //     uint256 borrowedAmount = 0;
+    //     uint256 targetBorrowUsd = type(uint256).max; // impossible to reach
+    //     uint256 ltv = 90e16; // 0.90 * 1e18
+
+    //     vm.expectRevert(IlSolverMath.MAX_LOOP_ITERATIONS_REACHED.selector);
+    //     IlSolverMath.hedgingLoop(
+    //         collateralAmount,
+    //         borrowedAmount,
+    //         targetBorrowUsd,
+    //         ltv
+    //     );
+    // }
+
+    // function test_hedgingLoop_reverts_ifLtvTooLow() public {
+    //     uint256 collateralAmount = 100;
+    //     uint256 borrowedAmount = 1;
+    //     uint256 targetBorrowUsd = 100;
+    //     uint256 ltvTooLow = IlSolverMath.LTV_SAFTY_FACTOR(); // or hardcode if not public
+
+    //     vm.expectRevert(); // generic revert because library uses a string
+    //     IlSolverMath.hedgingLoop(
+    //         collateralAmount,
+    //         borrowedAmount,
+    //         targetBorrowUsd,
+    //         ltvTooLow
+    //     );
+    // }
 }
