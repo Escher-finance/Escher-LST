@@ -54,33 +54,43 @@ contract IlSolverTest is Test {
         vm.startPrank(owner);
     }
 
-    function testUniV4Mint() public {
-        assertEq(c.s_positionTokenId(), 0);
-        uint256 input0 = 1 ether;
-        int24 delta = 488; // 5% in ticks
-        uint256 slippage = 10; // 10%
-
+    function _calculateInputs(uint256 amount0, int24 delta, uint256 slippage)
+        private
+        returns (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max)
+    {
         (uint160 sqrtPriceX96, int24 tick,,) = stateView.getSlot0(id);
         int24 tickSpacing = key.tickSpacing;
-        int24 tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
-        int24 tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
+        tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
+        tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
 
         uint160 sqrtPriceAX96 = TickMath.getSqrtPriceAtTick(tickLower);
         uint160 sqrtPriceBX96 = TickMath.getSqrtPriceAtTick(tickUpper);
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmount0(sqrtPriceAX96, sqrtPriceBX96, input0);
+        liquidity = LiquidityAmounts.getLiquidityForAmount0(sqrtPriceAX96, sqrtPriceBX96, amount0);
 
         (uint256 required0, uint256 required1) =
             LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtPriceAX96, sqrtPriceBX96, liquidity);
 
-        uint256 amount0Max = required0 * (100 + slippage) / 100;
-        uint256 amount1Max = required1 * (100 + slippage) / 100;
+        amount0Max = uint128(required0 * (100 + slippage) / 100);
+        amount1Max = uint128(required1 * (100 + slippage) / 100);
+    }
+
+    function _incUniV4Pos(uint256 amount0, int24 delta, uint256 slippage) private {
+        (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) =
+            _calculateInputs(amount0, delta, slippage);
 
         IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
         t1.approve(address(c), amount1Max);
         c.univ4LiquidityAdd{value: amount0Max}(
             tickLower, tickUpper, liquidity, uint128(amount0Max), uint128(amount1Max)
         );
+    }
 
+    function testUniV4Mint() public {
+        assertEq(c.s_positionTokenId(), 0);
+        uint256 amount0 = 1 ether;
+        int24 delta = 488; // 5% in ticks
+        uint256 slippage = 10; // 10%
+        _incUniV4Pos(amount0, delta, slippage);
         assertGt(c.s_positionTokenId(), 0);
     }
 }
