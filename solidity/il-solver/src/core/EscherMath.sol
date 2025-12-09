@@ -61,4 +61,15 @@ library IlSolverMath {
         if (iterations == MAX_LOOP_ITERATIONS) revert MAX_LOOP_ITERATIONS_REACHED();
         return iterations;
     }
+
+    /*
+    * @dev This function is used to calculate the amount of collateral needed to reach the borrowed amount needed.
+    * @param borrowedAmountNeeded The amount of borrowed tokens needed token decimals (1e18).
+    * @param borrowAmountUSDPrice The price of the borrowed tokens in USD token decimals (1e18).
+    * @param ltv The LTV of the collateral in 1e16.
+    * @return collateralAmount The amount of collateral needed to reach the borrowed amount needed.
+    */
+    function calculateCollateralAmount(uint256 borrowedAmountNeeded, uint256 borrowAmountUSDPrice, uint256 ltv) internal pure returns (uint256 collateralAmount) {
+        return borrowedAmountNeeded / borrowAmountUSDPrice * ltv;
+    }
 }
