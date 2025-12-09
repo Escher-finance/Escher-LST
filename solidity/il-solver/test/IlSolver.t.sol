@@ -8,14 +8,18 @@ import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
 import {IStateView, PoolId} from "univ4-periphery/interfaces/IStateView.sol";
 import {LiquidityAmounts} from "univ4-core/../test/utils/LiquidityAmounts.sol";
 import {TickMath} from "univ4-core/libraries/TickMath.sol";
+import {PositionInfo, PositionInfoLibrary} from "univ4-periphery/libraries/PositionInfoLibrary.sol";
+import {Position} from "univ4-core/libraries/Position.sol";
 
 using CurrencyLibrary for Currency;
+using PositionInfoLibrary for PositionInfo;
 
 contract IlSolverTest is Test {
     IlSolver c;
     address owner;
     PoolKey key;
     PoolId id;
+    IPositionManager posm;
     IPoolManager poolManager;
     IStateView stateView;
 
@@ -24,7 +28,7 @@ contract IlSolverTest is Test {
         owner = makeAddr("owner");
 
         // https://docs.uniswap.org/contracts/v4/deployments
-        IPositionManager posm = IPositionManager(0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e);
+        posm = IPositionManager(0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e);
         poolManager = IPoolManager(address(posm.poolManager()));
         stateView = IStateView(0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227);
 
@@ -83,6 +87,8 @@ contract IlSolverTest is Test {
         c.univ4LiquidityAdd{value: amount0Max}(
             tickLower, tickUpper, liquidity, uint128(amount0Max), uint128(amount1Max)
         );
+
+        assertGt(posm.getPositionLiquidity(c.s_positionTokenId()), 0);
     }
 
     function testUniV4Mint() public {
@@ -98,9 +104,14 @@ contract IlSolverTest is Test {
         uint256 slippage = 10; // 10%
         _mintUniV4Pos(1 ether, delta, slippage);
 
+        uint128 oldLiquidity = posm.getPositionLiquidity(c.s_positionTokenId());
+
         (,, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) = _calculateInputs(0.5 ether, delta, slippage);
         IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
         t1.approve(address(c), amount1Max);
         c.univ4LiquidityAdd{value: amount0Max}(0, 0, liquidity, amount0Max, amount1Max);
+
+        uint128 newLiquidity = posm.getPositionLiquidity(c.s_positionTokenId());
+        assertGt(newLiquidity, oldLiquidity);
     }
 }
