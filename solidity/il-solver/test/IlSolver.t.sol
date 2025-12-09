@@ -134,4 +134,10 @@ contract IlSolverTest is Test {
         uint128 newLiquidity = posm.getPositionLiquidity(c.s_positionTokenId());
         assertGt(newLiquidity, oldLiquidity);
     }
+
+    function testAaveV3Supply() public {
+        uint256 amount = 1000e6;
+        l2Underlying.approve(address(c), amount);
+        c.aavev3Supply(amount);
+    }
 }
