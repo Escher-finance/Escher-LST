@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Test, console} from "forge-std/Test.sol";
 import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
 import {Lst} from "../src/tokens/Lst.sol";
-import {DelegationManager} from "../src/DelegationManager.sol";
+import {HyperliquidDelegationManager} from "../src/contracts/HyperliquidDelegationManager.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {DelegationManagerMock} from "./mocks/DelegationManagerMock.sol";
 import {Config, Liquidity, BatchStatus, UnbondRequest, UnbondBatch} from "../src/models/State.sol";

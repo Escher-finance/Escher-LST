@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {UnbondBatch, UnbondRequest, BatchStatus} from "../models/State.sol";
+import {UnbondBatch, UnbondRequest} from "../models/State.sol";
 
 /// @dev Interface of the ILiquidStakingManager that handle liquid staking user interactions and operations.
 interface ILiquidStakingManager {

@@ -26,7 +26,6 @@ enum BatchStatus {
     Pending, // Batch is accepting new unbond requests
     Submitted, // Batch has been submitted for undelegation
     Received // Batch has received the undelegated/unbonded tokens
-
 }
 
 // Individual unbond request from a user
