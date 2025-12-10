@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import "../src/DelegationManager.sol";
+import "../src/contracts/HyperliquidDelegationManager.sol";
 import "../src/ValidatorSetManager.sol";
 import {Validator, DelegatorSummary} from "../src/models/Type.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -23,9 +23,9 @@ import {HyperCore} from "@hyper-evm-lib/test/simulation/HyperCore.sol";
  *
  * For complete testing of delegation functionality, deploy to Hyperliquid testnet.
  */
-contract DelegationManagerTest is Test {
-    DelegationManager public delegationManager;
-    DelegationManager public implementation;
+contract HyperliquidDelegationManagerTest is Test {
+    HyperliquidDelegationManager public delegationManager;
+    HyperliquidDelegationManager public implementation;
     ValidatorSetManager public validatorManager;
     ValidatorSetManager public validatorImpl;
 
@@ -96,13 +96,13 @@ contract DelegationManagerTest is Test {
         totalWeight = weights[0] + weights[1] + weights[2];
 
         // Deploy DelegationManager
-        implementation = new DelegationManager();
+        implementation = new HyperliquidDelegationManager();
         bytes memory initData = abi.encodeWithSelector(
-            DelegationManager.initialize.selector, owner, address(validatorManager), liquidStakingManager
+            HyperliquidDelegationManager.initialize.selector, owner, address(validatorManager), liquidStakingManager
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
         // activate delegation Manager
-        delegationManager = DelegationManager(payable(address(proxy)));
+        delegationManager = HyperliquidDelegationManager(payable(address(proxy)));
         hyperCore.forceAccountActivation(address(delegationManager));
 
         vm.prank(owner);
@@ -133,10 +133,13 @@ contract DelegationManagerTest is Test {
     }
 
     function test_Initialize_RevertsOnZeroAddress() public {
-        DelegationManager newImpl = new DelegationManager();
+        HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
 
         bytes memory initData = abi.encodeWithSelector(
-            DelegationManager.initialize.selector, address(0), address(validatorManager), liquidStakingManager
+            HyperliquidDelegationManager.initialize.selector,
+            address(0),
+            address(validatorManager),
+            liquidStakingManager
         );
 
         vm.expectRevert("zero address");
@@ -194,10 +197,11 @@ contract DelegationManagerTest is Test {
         ERC1967Proxy validatorProxy = new ERC1967Proxy(address(emptyValidatorManager), validatorInitData);
         ValidatorSetManager emptyVM = ValidatorSetManager(address(validatorProxy));
 
-        DelegationManager newImpl = new DelegationManager();
-        bytes memory initData = abi.encodeWithSelector(DelegationManager.initialize.selector, owner, address(emptyVM));
+        HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
+        bytes memory initData =
+            abi.encodeWithSelector(HyperliquidDelegationManager.initialize.selector, owner, address(emptyVM));
         ERC1967Proxy proxy = new ERC1967Proxy(address(newImpl), initData);
-        DelegationManager newDM = DelegationManager(payable(address(proxy)));
+        HyperliquidDelegationManager newDM = HyperliquidDelegationManager(payable(address(proxy)));
         vm.prank(owner);
         newDM.setLiquidStakingManager(liquidStakingManager);
         vm.deal(liquidStakingManager, 1 ether);
@@ -223,11 +227,12 @@ contract DelegationManagerTest is Test {
         ERC1967Proxy validatorProxy = new ERC1967Proxy(address(emptyValidatorManager), validatorInitData);
         ValidatorSetManager emptyVM = ValidatorSetManager(address(validatorProxy));
 
-        DelegationManager newImpl = new DelegationManager();
-        bytes memory initData =
-            abi.encodeWithSelector(DelegationManager.initialize.selector, owner, address(emptyVM), liquidStakingManager);
+        HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
+        bytes memory initData = abi.encodeWithSelector(
+            HyperliquidDelegationManager.initialize.selector, owner, address(emptyVM), liquidStakingManager
+        );
         ERC1967Proxy proxy = new ERC1967Proxy(address(newImpl), initData);
-        DelegationManager newDM = DelegationManager(payable(address(proxy)));
+        HyperliquidDelegationManager newDM = HyperliquidDelegationManager(payable(address(proxy)));
 
         vm.prank(owner);
         newDM.setLiquidStakingManager(liquidStakingManager);
@@ -357,7 +362,7 @@ contract DelegationManagerTest is Test {
     /* ============ UUPS Upgrade Tests ============ */
 
     function test_OwnerCanUpgrade() public {
-        DelegationManager newImpl = new DelegationManager();
+        HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
 
         vm.prank(owner);
         delegationManager.upgradeToAndCall(address(newImpl), "");
@@ -367,7 +372,7 @@ contract DelegationManagerTest is Test {
     }
 
     function test_NonOwnerCannotUpgrade() public {
-        DelegationManager newImpl = new DelegationManager();
+        HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
 
         vm.prank(user);
         vm.expectRevert();

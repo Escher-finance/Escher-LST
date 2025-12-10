@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ILiquidStakingManager} from "./interfaces/ILiquidStakingManager.sol";
 import {IDelegationManager} from "./interfaces/IDelegationManager.sol";
 import {Lst} from "./tokens/Lst.sol";

@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
-import {DelegationManager} from "../src/DelegationManager.sol";
 import {InitializePayload} from "../src/models/Type.sol";
 import {Lst} from "../src/tokens/Lst.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -18,6 +17,9 @@ contract DeployLiquidStakingManager is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
+        address delegationManager = address(0); //TODO: Replace This
+
+        // Deploying Lst (ERC20)
         address implementation = address(new Lst());
 
         string memory lstName = "eHype";
@@ -29,22 +31,26 @@ contract DeployLiquidStakingManager is Script {
 
         console.log("eHype address", address(lst));
 
+        // Deploying Lst Manager
         address lstManagerImplementation = address(new LiquidStakingManager());
         console.log("LiquidStakingManager implementation deployed @", lstManagerImplementation);
 
-        InitializePayload memory payload = InitializePayload({initialOwner: msg.sender, lstAddress: address(lst)});
-
         ERC1967Proxy lstProxy = new ERC1967Proxy(
-            lstManagerImplementation, abi.encodeWithSelector(LiquidStakingManager.initialize.selector, payload)
+            lstManagerImplementation,
+            abi.encodeWithSelector(
+                LiquidStakingManager.initialize.selector, msg.sender, address(lst), delegationManager
+            )
         );
         console.log("LST Manager Proxy deployed @", address(lstProxy));
 
         lstManager = LiquidStakingManager(payable(address(lstProxy)));
 
-        // transfer Liquid staking token (eU) ownership to Liquid stakign contract
+        // transfer Liquid staking token (eU) ownership to Liquid staking contract
         lst.transferOwnership(address(lstProxy));
 
         console.log("lstManager address", address(lstManager));
+
+        lstManager.acceptOwnershipTransfer();
 
         vm.stopBroadcast();
         return lstManager;
