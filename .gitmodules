@@ -26,3 +26,6 @@
 [submodule "lib/aave-v3-origin"]
 	path = lib/aave-v3-origin
 	url = https://github.com/aave-dao/aave-v3-origin
+[submodule "lib/hyper-evm-lib"]
+	path = lib/hyper-evm-lib
+	url = https://github.com/hyperliquid-dev/hyper-evm-lib
