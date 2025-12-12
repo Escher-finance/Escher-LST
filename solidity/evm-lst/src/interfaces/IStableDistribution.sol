@@ -49,77 +49,46 @@ interface IStableDistribution {
     }
 
     // Methods
-    function setWithdrawAddress(
-        address delegatorAddress,
-        address withdrawerAddress
-    ) external returns (bool success);
+    function setWithdrawAddress(address delegatorAddress, address withdrawerAddress) external returns (bool success);
 
-    function withdrawDelegatorRewards(
-        address delegatorAddress,
-        address validatorAddress
-    ) external returns (Coin[] memory amount);
+    function withdrawDelegatorRewards(address delegatorAddress, address validatorAddress)
+        external
+        returns (Coin[] memory amount);
 
-    function withdrawValidatorCommission(
-        address validatorAddress
-    ) external returns (Coin[] memory amount);
+    function withdrawValidatorCommission(address validatorAddress) external returns (Coin[] memory amount);
 
-    function validatorDistributionInfo(
-        address validatorAddress
-    ) external view returns (ValidatorDistributionInfo memory distributionInfo);
+    function validatorDistributionInfo(address validatorAddress)
+        external
+        view
+        returns (ValidatorDistributionInfo memory distributionInfo);
 
-    function validatorOutstandingRewards(
-        address validatorAddress
-    ) external view returns (DecCoin[] memory rewards);
+    function validatorOutstandingRewards(address validatorAddress) external view returns (DecCoin[] memory rewards);
 
-    function validatorCommission(
-        address validatorAddress
-    ) external view returns (DecCoin[] memory commission);
+    function validatorCommission(address validatorAddress) external view returns (DecCoin[] memory commission);
 
     function validatorSlashes(
         address validatorAddress,
         uint64 startingHeight,
         uint64 endingHeight,
         PageReq calldata pageRequest
-    )
+    ) external view returns (ValidatorSlashEvent[] memory slashes, PageResp memory pagination);
+
+    function delegationRewards(address delegatorAddress, address validatorAddress)
         external
         view
-        returns (
-            ValidatorSlashEvent[] memory slashes,
-            PageResp memory pagination
-        );
+        returns (DecCoin[] memory rewards);
 
-    function delegationRewards(
-        address delegatorAddress,
-        address validatorAddress
-    ) external view returns (DecCoin[] memory rewards);
-
-    function delegationTotalRewards(
-        address delegatorAddress
-    )
+    function delegationTotalRewards(address delegatorAddress)
         external
         view
-        returns (
-            DelegationDelegatorReward[] memory rewards,
-            DecCoin[] memory total
-        );
+        returns (DelegationDelegatorReward[] memory rewards, DecCoin[] memory total);
 
-    function delegatorValidators(
-        address delegatorAddress
-    ) external view returns (string[] memory validators);
+    function delegatorValidators(address delegatorAddress) external view returns (string[] memory validators);
 
-    function delegatorWithdrawAddress(
-        address delegatorAddress
-    ) external view returns (address withdrawAddress);
+    function delegatorWithdrawAddress(address delegatorAddress) external view returns (address withdrawAddress);
 
     // Events
     event SetWithdrawAddress(address indexed caller, address withdrawAddress);
-    event WithdrawDelegatorRewards(
-        address indexed delegatorAddress,
-        address indexed validatorAddress,
-        uint256 amount
-    );
-    event WithdrawValidatorCommission(
-        address indexed validatorAddress,
-        uint256 commission
-    );
+    event WithdrawDelegatorRewards(address indexed delegatorAddress, address indexed validatorAddress, uint256 amount);
+    event WithdrawValidatorCommission(address indexed validatorAddress, uint256 commission);
 }

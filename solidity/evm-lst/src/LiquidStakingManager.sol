@@ -7,10 +7,10 @@ import {Lst} from "./tokens/Lst.sol";
 import {Config, Liquidity, BatchStatus, UnbondRequest, UnbondBatch} from "./models/State.sol";
 import {DelegatorSummary} from "./models/Type.sol";
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
