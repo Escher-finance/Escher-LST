@@ -7,13 +7,13 @@ import {IDelegationManager} from "../interfaces/IDelegationManager.sol";
 import {IValidatorSetManager} from "../interfaces/IValidatorSetManager.sol";
 import {Validator, DelegatorSummary} from "../models/Type.sol";
 import {CoreWriterLib, HLConstants, HLConversions, PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 contract HyperliquidDelegationManager is
     IDelegationManager,
@@ -139,7 +139,8 @@ contract HyperliquidDelegationManager is
             delegated: summary.delegated,
             undelegated: summary.undelegated,
             totalPendingWithdrawal: summary.totalPendingWithdrawal,
-            nPendingWithdrawals: summary.nPendingWithdrawals
+            nPendingWithdrawals: summary.nPendingWithdrawals,
+            rewards: 0
         });
     }
 

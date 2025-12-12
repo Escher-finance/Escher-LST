@@ -9,13 +9,13 @@ import {IStableStaking} from "../interfaces/IStableStaking.sol";
 import {IStableDistribution} from "../interfaces/IStableDistribution.sol";
 import {Validator, DelegatorSummary} from "../models/Type.sol";
 import {CoreWriterLib, HLConstants, HLConversions, PrecompileLib} from "@hyper-evm-lib/src/CoreWriterLib.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 contract StablechainDelegationManager is
     IDelegationManager,
@@ -29,10 +29,8 @@ contract StablechainDelegationManager is
     IValidatorSetManager validatorManager;
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
-    address constant PRECOMPILED_STAKING =
-        0x0000000000000000000000000000000000000800;
-    address constant PRECOMPILED_DISTRIBUTION =
-        0x0000000000000000000000000000000000000801;
+    address constant PRECOMPILED_STAKING = 0x0000000000000000000000000000000000000800;
+    address constant PRECOMPILED_DISTRIBUTION = 0x0000000000000000000000000000000000000801;
 
     IStableStaking staking;
     IStableDistribution distribution;
@@ -42,10 +40,7 @@ contract StablechainDelegationManager is
         _disableInitializers();
     }
 
-    function initialize(
-        address owner,
-        address _validatorManager
-    ) public initializer {
+    function initialize(address owner, address _validatorManager) public initializer {
         // Checks that the initialOwner address is not zero.
         require(owner != address(0), "zero address");
         __Ownable_init(owner);
@@ -68,24 +63,21 @@ contract StablechainDelegationManager is
      * @return addresses Array of validator addresses
      * @return amounts Array of amounts to stake to each validator
      */
-    function calculateStakeDistribution(
-        uint64 _amount,
-        Validator[] memory validators
-    )
+    function calculateStakeDistribution(uint256 _amount, Validator[] memory validators)
         internal
         view
-        returns (address[] memory addresses, uint64[] memory amounts)
+        returns (address[] memory addresses, uint256[] memory amounts)
     {
         uint64 totalWeight = validatorManager.getTotalWeight();
         uint256 length = validators.length;
         if (length == 0) revert EmptyValidatorSet();
 
         addresses = new address[](length);
-        amounts = new uint64[](length);
+        amounts = new uint256[](length);
 
-        uint64 distributed = 0;
+        uint256 distributed = 0;
 
-        for (uint64 i = 0; i < length; ) {
+        for (uint64 i = 0; i < length;) {
             Validator memory v = validators[i];
 
             addresses[i] = v.validator;
@@ -110,18 +102,18 @@ contract StablechainDelegationManager is
         Validator[] memory validators = validatorManager.getAllValidators();
         if (validators.length == 0) revert EmptyValidatorSet();
 
-        uint256 evmAmount = msg.value;
+        uint256 coinAmount = msg.value;
+        address delegatorAddress = address(this);
 
         // get validator addresses array and the amount to stake to that validator
-        (
-            address[] memory validatorAddresses,
-            uint64[] memory amounts
-        ) = calculateStakeDistribution(uint64(evmAmount), validators);
+        (address[] memory validatorAddresses, uint256[] memory amounts) =
+            calculateStakeDistribution(coinAmount, validators);
 
         uint256 totalValidators = validatorAddresses.length;
 
         for (uint256 i = 0; i < totalValidators; i++) {
             //delegate to validator according to weight
+            staking.delegate(delegatorAddress, validatorAddresses[i], amounts[i]);
         }
     }
 
@@ -132,36 +124,50 @@ contract StablechainDelegationManager is
         if (validators.length == 0) revert EmptyValidatorSet();
 
         // get validator addresses array and the amount to stake to that validator
-        (
-            address[] memory validatorAddresses,
-            uint64[] memory amounts
-        ) = calculateStakeDistribution(coreAmount, validators);
+        (address[] memory validatorAddresses, uint256[] memory amounts) =
+            calculateStakeDistribution(uint256(coreAmount), validators);
 
         uint256 totalValidators = validatorAddresses.length;
-
+        address delegatorAddress = address(this);
         for (uint256 i = 0; i < totalValidators; i++) {
             // undelegate from validator according to weight
+            staking.undelegate(delegatorAddress, validatorAddresses[i], amounts[i]);
         }
     }
 
-    function delegationSummary()
-        external
-        view
-        returns (DelegatorSummary memory)
-    {
-        return
-            DelegatorSummary({
-                delegated: 0,
-                undelegated: 0,
-                totalPendingWithdrawal: 0,
-                nPendingWithdrawals: 0
-            });
+    function delegationSummary() external view returns (DelegatorSummary memory) {
+        address delegatorAddress = address(this);
+
+        Validator[] memory validators = validatorManager.getAllValidators();
+        uint256 totalValidators = validators.length;
+
+        // get total delegated from this contract
+        uint256 delegated = 0;
+        for (uint256 i = 0; i < totalValidators; i++) {
+            (uint256 shares, IStableStaking.Coin memory balance) =
+                staking.delegation(delegatorAddress, validators[i].validator);
+            delegated += balance.amount;
+        }
+
+        (IStableDistribution.DelegationDelegatorReward[] memory rewards, IStableDistribution.DecCoin[] memory total) =
+            distribution.delegationTotalRewards(delegatorAddress);
+
+        uint256 _rewards = total[0].amount;
+
+        return DelegatorSummary({
+            delegated: uint64(delegated),
+            undelegated: 0,
+            totalPendingWithdrawal: 0,
+            nPendingWithdrawals: 0,
+            rewards: uint64(_rewards)
+        });
     }
 
-    function updateValidators(
-        address[] calldata _validators,
-        uint64[] calldata _weights
-    ) external nonReentrant onlyOwner {
+    function updateValidators(address[] calldata _validators, uint64[] calldata _weights)
+        external
+        nonReentrant
+        onlyOwner
+    {
         // update validators with new weights
         validatorManager.updateValidators(_validators, _weights);
 
@@ -180,8 +186,7 @@ contract StablechainDelegationManager is
         if (totalDelegated == 0) return; // Nothing to redelegate
 
         // Get current delegations
-        PrecompileLib.Delegation[] memory currentDelegations = PrecompileLib
-            .delegations(address(this));
+        PrecompileLib.Delegation[] memory currentDelegations = PrecompileLib.delegations(address(this));
 
         // Get new validators
         Validator[] memory newValidators = validatorManager.getAllValidators();
@@ -198,9 +203,7 @@ contract StablechainDelegationManager is
                 // Last validator gets remaining amount to handle rounding
                 targetAmounts[i] = totalDelegated - distributed;
             } else {
-                targetAmounts[i] =
-                    (totalDelegated * newValidators[i].weight) /
-                    newTotalWeight;
+                targetAmounts[i] = (totalDelegated * newValidators[i].weight) / newTotalWeight;
                 distributed += targetAmounts[i];
             }
         }
@@ -229,11 +232,7 @@ contract StablechainDelegationManager is
                 }
             } else if (currentAmount > targetAmount) {
                 // Undelegate the excess
-                CoreWriterLib.delegateToken(
-                    validator,
-                    currentAmount - targetAmount,
-                    true
-                );
+                CoreWriterLib.delegateToken(validator, currentAmount - targetAmount, true);
             }
         }
 
@@ -253,11 +252,7 @@ contract StablechainDelegationManager is
 
             if (currentAmount < targetAmount) {
                 // Delegate the difference
-                CoreWriterLib.delegateToken(
-                    validator,
-                    targetAmount - currentAmount,
-                    false
-                );
+                CoreWriterLib.delegateToken(validator, targetAmount - currentAmount, false);
             }
         }
     }
@@ -266,7 +261,7 @@ contract StablechainDelegationManager is
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
 
         // Transfer unbonded assets to liquid staking manager
-        (bool success, ) = payable(msg.sender).call{value: batchAssets}("");
+        (bool success,) = payable(msg.sender).call{value: batchAssets}("");
         require(success, "transfer failed");
     }
 }

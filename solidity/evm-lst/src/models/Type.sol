@@ -16,4 +16,5 @@ struct DelegatorSummary {
     uint64 undelegated;
     uint64 totalPendingWithdrawal;
     uint64 nPendingWithdrawals;
+    uint64 rewards;
 }

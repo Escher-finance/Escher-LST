@@ -52,7 +52,8 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
             delegated: totalDelegated,
             undelegated: totalUndelegated,
             totalPendingWithdrawal: totalPendingWithdrawal,
-            nPendingWithdrawals: nPendingWithdrawals
+            nPendingWithdrawals: nPendingWithdrawals,
+            rewards: 0
         });
     }
 
