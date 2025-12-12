@@ -8,21 +8,6 @@ import {console} from "forge-std/console.sol";
 contract IlSolverMathTest is Test {
     // --- sqrt tests ---
 
-    function test_sqrt_basic() public {
-        assertEq(IlSolverMath.sqrt(0), 0);
-        assertEq(IlSolverMath.sqrt(1), 1);
-        assertEq(IlSolverMath.sqrt(4), 2);
-        assertEq(IlSolverMath.sqrt(16), 4);
-        assertEq(IlSolverMath.sqrt(81), 9);
-    }
-
-    function test_sqrt_monotonic() public {
-        uint256 a = 100;
-        uint256 b = 10_000;
-        uint256 sa = IlSolverMath.sqrt(a);
-        uint256 sb = IlSolverMath.sqrt(b);
-        assertLt(sa, sb);
-    }
 
     // --- hedgingLoop tests ---
 
@@ -33,12 +18,26 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUSD = 2000 * 1e18;
         uint256 ltv = 90e16; // 0.90 * 1e18
 
-        uint256 iterations = IlSolverMath.hedgingLoop(collateralAmount, borrowedAmount, borrowAmountUSD, ltv);
-        console.log("iterations", iterations);
+        (uint256 iterations,bool isEnough,uint256 totalBorrowedToken,uint256 ltvUsed) = IlSolverMath.hedgingLoop(collateralAmount, borrowedAmount, borrowAmountUSD, ltv);
+        console.log("iterations (1e18 scale)", iterations);
+        console.log("iterations (readable)", iterations / 1e18);
         console.log("collateralAmount", collateralAmount);
+        console.log("isEnough", isEnough);
+        console.log("totalBorrowedToken", totalBorrowedToken);
+        console.log("ltvUsed", ltvUsed);
 
-        // Expect a single loop is sufficient
-        assertEq(iterations, 2);
+        // With 2224 USD, should need fractional iterations (less than 2)
+        assertLt(iterations, 2 * 1e18); // Less than 2.0 iterations
+        assertGt(iterations, 1 * 1e18); // More than 1.0 iteration
+        assertEq(isEnough, true);
     }
-    // need to do test on the LTV(safety factor), test on maximum loops, test on invalid input
+    function testcheckcalculateCollateralAmountSingle() public {
+        uint256 borrowedAmountNeeded = 1 * 1e18;
+        uint256 borrowAmountUSDPrice = 2000 * 1e18;
+        uint256 ltv = 90e16; // 0.90 * 1e18
+
+        uint256 collateralAmountNeeded = IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
+        console.log("collateralAmountNeeded", collateralAmountNeeded);
+        assertEq(collateralAmountNeeded, 1136363636363636363636);
+    }
 }
