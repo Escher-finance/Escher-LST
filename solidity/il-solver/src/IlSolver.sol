@@ -231,7 +231,7 @@ contract IlSolver is Ownable2Step {
         s_l2Pool.supply(params);
 
         if (!s_collateralSet) {
-            s_l2Pool.setUserUseReserveAsCollateral(s_l2Pool.getReserveAToken(address(s_l2Underlying)), true);
+            s_l2Pool.setUserUseReserveAsCollateral(address(s_l2Underlying), true);
             s_collateralSet = true;
         }
     }
