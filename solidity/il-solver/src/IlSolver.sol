@@ -10,11 +10,14 @@ import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
 import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
 import {IPool} from "aavev3/interfaces/IPool.sol";
 import {L2Encoder} from "aavev3/helpers/L2Encoder.sol";
+import {DataTypes} from "aavev3/protocol/libraries/types/DataTypes.sol";
+import {ReserveConfiguration} from "aavev3/protocol/libraries/configuration/ReserveConfiguration.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 using CurrencyLibrary for Currency;
 using SafeERC20 for IERC20;
+using ReserveConfiguration for DataTypes.ReserveConfigurationMap;
 
 interface IPositionManager is IPositionManagerOriginal {
     function permit2() external view returns (address);
@@ -40,7 +43,10 @@ contract IlSolver is Ownable2Step {
     // Aave V3
     IL2Pool s_l2Pool;
     L2Encoder s_l2Encoder;
+    // Supplied token
     IERC20 s_l2Underlying;
+    // Borrow token
+    IERC20 s_l2Borrow;
 
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
     error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
@@ -51,7 +57,8 @@ contract IlSolver is Ownable2Step {
         PoolKey memory _poolKey,
         IL2Pool _l2Pool,
         L2Encoder _l2Encoder,
-        IERC20 _l2Underlying
+        IERC20 _l2Underlying,
+        IERC20 _l2Borrow
     ) Ownable(_owner) {
         _posm.permit2();
         _posm.poolManager();
@@ -63,6 +70,9 @@ contract IlSolver is Ownable2Step {
         s_l2Pool = _l2Pool;
         s_l2Encoder = _l2Encoder;
         s_l2Underlying = _l2Underlying;
+        s_l2Borrow = _l2Borrow;
+
+        s_l2Pool.setUserUseReserveAsCollateral(address(_l2Underlying), true);
     }
 
     receive() external payable {}
@@ -220,5 +230,14 @@ contract IlSolver is Ownable2Step {
         }
         bytes32 params = s_l2Encoder.encodeSupplyParams(address(s_l2Underlying), amount, 0);
         s_l2Pool.supply(params);
+    }
+
+    function aavev3Ltv() public view returns (uint256 ltv) {
+        DataTypes.ReserveConfigurationMap memory map = s_l2Pool.getConfiguration(address(s_l2Underlying));
+        ltv = map.getLtv();
+    }
+
+    function aavev3Borrow(uint256 amount) public onlyOwner {
+        s_l2Pool.borrow(address(s_l2Borrow), amount, 2, 0, address(this));
     }
 }
