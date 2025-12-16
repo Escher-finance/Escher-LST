@@ -72,7 +72,7 @@ contract IlSolver is Ownable2Step {
         s_l2Underlying = _l2Underlying;
         s_l2Borrow = _l2Borrow;
 
-        s_l2Pool.setUserUseReserveAsCollateral(l2Pool.getReserveAToken(address(_l2Underlying)), true);
+        s_l2Pool.setUserUseReserveAsCollateral(_l2Pool.getReserveAToken(address(_l2Underlying)), true);
     }
 
     receive() external payable {}
