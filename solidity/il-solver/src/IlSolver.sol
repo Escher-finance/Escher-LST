@@ -47,6 +47,7 @@ contract IlSolver is Ownable2Step {
     IERC20 s_l2Underlying;
     // Borrow token
     address s_l2Borrow;
+    bool s_collateralSet;
 
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
     error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
@@ -71,8 +72,6 @@ contract IlSolver is Ownable2Step {
         s_l2Encoder = _l2Encoder;
         s_l2Underlying = _l2Underlying;
         s_l2Borrow = _l2Borrow;
-
-        s_l2Pool.setUserUseReserveAsCollateral(_l2Pool.getReserveAToken(address(_l2Underlying)), true);
     }
 
     receive() external payable {}
@@ -230,6 +229,11 @@ contract IlSolver is Ownable2Step {
         }
         bytes32 params = s_l2Encoder.encodeSupplyParams(address(s_l2Underlying), amount, 0);
         s_l2Pool.supply(params);
+
+        if (!s_collateralSet) {
+            s_l2Pool.setUserUseReserveAsCollateral(_l2Pool.getReserveAToken(address(_l2Underlying)), true);
+            s_collateralSet = true;
+        }
     }
 
     function aavev3Ltv() public view returns (uint256 ltv) {
