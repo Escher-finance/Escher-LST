@@ -156,6 +156,10 @@ contract IlSolverTest is Test {
         c.aavev3Supply(amount);
 
         // then borrow
-        c.aavev3Borrow(0.1 ether);
+        uint256 wethBalanceOld = l2Borrow.balanceOf(address(c));
+        uint256 borrowAmount = 0.1 ether;
+        c.aavev3Borrow(borrowAmount);
+        uint256 wethBalanceNew = l2Borrow.balanceOf(address(c));
+        assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
     }
 }
