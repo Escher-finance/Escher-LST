@@ -37,6 +37,7 @@ contract IlSolverTest is Test {
     IL2Pool l2Pool;
     L2Encoder l2Encoder;
     IERC20 l2Underlying;
+    address l2Borrow;
     IERC20 l2Reserve;
 
     function setUp() public {
@@ -52,6 +53,7 @@ contract IlSolverTest is Test {
         l2Pool = IL2Pool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
         l2Encoder = L2Encoder(0x39e97c588B2907Fb67F44fea256Ae3BA064207C5);
         l2Underlying = IERC20(usdc);
+        l2Borrow = address(0);
         l2Reserve = IERC20(l2Pool.getReserveAToken(usdc));
 
         key = PoolKey({
@@ -65,7 +67,7 @@ contract IlSolverTest is Test {
         assertEq(keccak256(abi.encode(key)), rawId);
         id = PoolId.wrap(rawId);
 
-        c = new IlSolver(owner, posm, key, l2Pool, l2Encoder, l2Underlying);
+        c = new IlSolver(owner, posm, key, l2Pool, l2Encoder, l2Underlying, l2Borrow);
         assertEq(c.owner(), owner);
         assertEq(address(c.s_posm()), address(posm));
 
