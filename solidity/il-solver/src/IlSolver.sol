@@ -46,7 +46,8 @@ contract IlSolver is Ownable2Step {
     // Supplied token
     IERC20 s_l2Underlying;
     // Borrow token
-    address s_l2Borrow;
+    IERC20 s_l2Borrow;
+    // Whether collateral has been set for the supplied token
     bool s_collateralSet;
 
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
@@ -59,7 +60,7 @@ contract IlSolver is Ownable2Step {
         IL2Pool _l2Pool,
         L2Encoder _l2Encoder,
         IERC20 _l2Underlying,
-        address _l2Borrow
+        IERC20 _l2Borrow
     ) Ownable(_owner) {
         _posm.permit2();
         _posm.poolManager();
@@ -242,6 +243,6 @@ contract IlSolver is Ownable2Step {
     }
 
     function aavev3Borrow(uint256 amount) public onlyOwner {
-        s_l2Pool.borrow(s_l2Borrow, amount, 2, 0, address(this));
+        s_l2Pool.borrow(address(s_l2Borrow), amount, 2, 0, address(this));
     }
 }
