@@ -16,6 +16,8 @@ contract DeployHyperliquidValidatorDelegationManager is Script {
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
+        // Get the address associated with the private key
+        address userAddress = vm.addr(deployerPrivateKey);
 
         // Start deploy Validator set Manager
         address validatorManagerImpl = address(new ValidatorSetManager());

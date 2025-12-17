@@ -33,7 +33,11 @@ contract DeployHyperliquidValidatorDelegationManager is Script {
         address stableToken = 0x0000000000000000000000000000000000001003;
         address liquidToken = 0x0000000000000000000000000000000000001003;
         bytes memory initializeDelegationManagerData = abi.encodeWithSelector(
-            StablechainDelegationManager.initialize.selector, msg.sender, address(validatorManager), stableToken, liquidToken
+            StablechainDelegationManager.initialize.selector,
+            msg.sender,
+            address(validatorManager),
+            stableToken,
+            liquidToken
         );
 
         ERC1967Proxy delegationManagerProxy = new ERC1967Proxy(delegationManagerImpl, initializeDelegationManagerData);

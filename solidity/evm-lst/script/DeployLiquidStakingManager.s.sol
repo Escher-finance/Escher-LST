@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
+import {HyperliquidDelegationManager} from "../src/contracts/HyperliquidDelegationManager.sol";
 import {InitializePayload} from "../src/models/Type.sol";
 import {Lst} from "../src/tokens/Lst.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -10,6 +11,7 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 contract DeployLiquidStakingManager is Script {
     LiquidStakingManager public lstManager;
     Lst public lst;
+    HyperliquidDelegationManager public delegationManager;
 
     function setUp() public {}
 
@@ -17,7 +19,8 @@ contract DeployLiquidStakingManager is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        address delegationManager = address(0); //TODO: Replace This
+        address delegationManagerAddress = 0xD076481EF09255d243C58C65c119C377009Fda31; //TODO: Replace This
+        delegationManager = HyperliquidDelegationManager(delegationManagerAddress);
 
         // Deploying Lst (ERC20)
         address implementation = address(new Lst());
@@ -38,12 +41,14 @@ contract DeployLiquidStakingManager is Script {
         ERC1967Proxy lstProxy = new ERC1967Proxy(
             lstManagerImplementation,
             abi.encodeWithSelector(
-                LiquidStakingManager.initialize.selector, msg.sender, address(lst), delegationManager
+                LiquidStakingManager.initialize.selector, msg.sender, address(lst), delegationManagerAddress
             )
         );
         console.log("LST Manager Proxy deployed @", address(lstProxy));
 
         lstManager = LiquidStakingManager(payable(address(lstProxy)));
+
+        delegationManager.setLiquidStakingManager(address(lstManager));
 
         // transfer Liquid staking token (eU) ownership to Liquid staking contract
         lst.transferOwnership(address(lstProxy));
