@@ -1,0 +1,158 @@
+"use client";
+
+import {
+    useAccount,
+    useWriteContract,
+    useWaitForTransactionReceipt,
+} from "wagmi";
+import { useState, useMemo, useEffect } from "react";
+import { parseUnits } from "viem";
+import contractABI from "@/contracts/staking.json";
+
+type StakingUIProps = {
+    activeValidatorAddresses: `0x${string}`[];
+};
+
+export function StakingUI({ activeValidatorAddresses }: StakingUIProps) {
+    const [isClient, setIsClient] = useState(false);
+    const { address: delegatorAddress, isConnected } = useAccount();
+    const [amount, setAmount] = useState("0.0000001");
+    const [validatorAddress, setValidatorAddress] = useState<
+        `0x${string}` | ""
+    >("");
+
+    const writeContract = useWriteContract();
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    // Automatically select the first validator when the list is loaded
+    useEffect(() => {
+        if (activeValidatorAddresses.length > 0 && validatorAddress === "") {
+            setValidatorAddress(activeValidatorAddresses[0]);
+        }
+    }, [activeValidatorAddresses, validatorAddress]);
+
+    const amountBigInt = useMemo(() => {
+        try {
+            if (amount) return parseUnits(amount, 18);
+        } catch {
+            return BigInt(0);
+        }
+        return BigInt(0);
+    }, [amount]);
+
+    if (!isClient) {
+        return <p>Loading...</p>; // Static fallback for SSR
+    }
+
+    const handleDelegate = (e: React.FormEvent) => {
+        e.preventDefault();
+        console.log("delegatorAddress", delegatorAddress);
+        console.log("validatorAddress", validatorAddress);
+        console.log("amountBigInt", amountBigInt.toString());
+
+        if (
+            !delegatorAddress ||
+            !validatorAddress ||
+            amountBigInt === BigInt(0)
+        ) {
+            console.error(
+                "Invalid input: Missing delegatorAddress, validatorAddress, or amount.",
+            );
+            return;
+        }
+
+        alert(
+            delegatorAddress +
+                " is delegating " +
+                amount +
+                " gUSDT to validator " +
+                validatorAddress,
+        );
+
+        try {
+            writeContract.mutate(
+                {
+                    abi: contractABI,
+                    address:
+                        "0x0000000000000000000000000000000000000800" as const, // Staking contract address
+                    functionName: "delegate",
+                    args: [delegatorAddress, validatorAddress, amountBigInt],
+                    value: amountBigInt,
+                },
+                {
+                    onSuccess: (data) => {
+                        console.log("Transaction successful:", data);
+                        alert(`Transaction successful! Hash: ${data}`); // Updated to use data directly
+                    },
+                    onError: (error) => {
+                        console.error("Transaction failed:", error);
+                        alert(`Transaction failed: ${error.message}`);
+                    },
+                },
+            );
+            console.log("writeContract called successfully.");
+        } catch (error) {
+            console.error("Error calling writeContract:", error);
+        }
+    };
+
+    if (!isConnected) return null;
+
+    return (
+        <div
+            style={{
+                margin: "20px 0",
+                padding: "15px",
+                border: "1px solid blue",
+            }}
+        >
+            <h2>💰 Delegate / Stake</h2>
+            {activeValidatorAddresses.length === 0 ? (
+                <p>Loading validators or none available for delegation...</p>
+            ) : (
+                <form onSubmit={handleDelegate}>
+                    <div style={{ marginBottom: "10px" }}>
+                        <label>
+                            Amount (gUSDT):
+                            <input
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                required
+                                style={{ marginLeft: "10px" }}
+                            />
+                        </label>
+                    </div>
+                    <div style={{ marginBottom: "10px" }}>
+                        <label>
+                            Validator Address:
+                            <select
+                                value={validatorAddress}
+                                onChange={(e) =>
+                                    setValidatorAddress(
+                                        e.target.value as `0x${string}`,
+                                    )
+                                }
+                                required
+                                style={{ marginLeft: "10px", width: "250px" }}
+                            >
+                                <option value="" disabled>
+                                    Select a Validator
+                                </option>
+                                {activeValidatorAddresses.map((addr) => (
+                                    <option key={addr} value={addr}>
+                                        {addr.substring(0, 10)}...
+                                        {addr.slice(-4)}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
+                    <button type="submit">Delegate</button>
+                </form>
+            )}
+        </div>
+    );
+}
