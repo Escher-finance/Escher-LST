@@ -114,7 +114,7 @@ contract LiquidStakingManager is
         require(address(delegationManager) != address(0), "delegationManager zero address");
 
         // call delegate and send the required native asset
-        delegationManager.delegate{value: msg.value}();
+        delegationManager.delegate{value: msg.value}(_assets);
 
         // calculate how much shares from the assets
         uint256 shares = _convertToShares(_assets);

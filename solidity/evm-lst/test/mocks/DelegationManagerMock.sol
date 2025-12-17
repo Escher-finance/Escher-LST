@@ -23,10 +23,10 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
     mapping(address => uint64) public delegatedAmount;
 
     /// @notice Delegates the sent value to validators
-    function delegate() external payable override {
-        uint64 amount = uint64(msg.value);
-        totalDelegated += amount;
-        delegatedAmount[msg.sender] += amount;
+    function delegate(uint256 amount) external payable override {
+        uint64 delegateAmount = uint64(msg.value);
+        totalDelegated += delegateAmount;
+        delegatedAmount[msg.sender] += delegateAmount;
         emit Delegated(msg.sender, msg.value);
     }
 
@@ -36,11 +36,12 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
 
     /// @notice Undelegates the specified amount from validators
     /// @param amount The amount to undelegate
-    function undelegate(uint64 amount) external override {
+    function undelegate(uint256 amount) external override {
         require(totalDelegated >= amount, "Insufficient delegated amount");
-        totalDelegated -= amount;
-        totalUndelegated += amount;
-        totalPendingWithdrawal += amount;
+        uint64 undelegateAmount = uint64(amount);
+        totalDelegated -= undelegateAmount;
+        totalUndelegated += undelegateAmount;
+        totalPendingWithdrawal += undelegateAmount;
         nPendingWithdrawals += 1;
         emit Undelegated(msg.sender, amount);
     }

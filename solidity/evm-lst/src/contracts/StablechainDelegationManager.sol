@@ -35,12 +35,18 @@ contract StablechainDelegationManager is
     IStableStaking staking;
     IStableDistribution distribution;
 
+    uint256 delegateCount;
+    uint256 undelegateCount;
+
+    IERC20 asset;
+    ERC20 share;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address owner, address _validatorManager) public initializer {
+    function initialize(address owner, address _validatorManager, address _asset, address _share) public initializer {
         // Checks that the initialOwner address is not zero.
         require(owner != address(0), "zero address");
         __Ownable_init(owner);
@@ -49,6 +55,8 @@ contract StablechainDelegationManager is
         validatorManager = IValidatorSetManager(_validatorManager);
         staking = IStableStaking(PRECOMPILED_STAKING);
         distribution = IStableDistribution(PRECOMPILED_DISTRIBUTION);
+        asset = IERC20(_asset);
+        share = ERC20(_share);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -96,8 +104,12 @@ contract StablechainDelegationManager is
         }
     }
 
-    function delegate() external payable nonReentrant {
+    function delegate(uint256 amount) external payable nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
+
+        // transfer required asset to delegate
+        asset.transfer(address(this), amount);
+
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
         if (validators.length == 0) revert EmptyValidatorSet();
@@ -117,15 +129,19 @@ contract StablechainDelegationManager is
         }
     }
 
-    function undelegate(uint64 coreAmount) external nonReentrant {
+    function undelegate(uint256 amount) external nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
+
+        // transfer required share/liquid staking token to undelegate
+        share.transfer(address(this), amount);
+
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
         if (validators.length == 0) revert EmptyValidatorSet();
 
         // get validator addresses array and the amount to stake to that validator
         (address[] memory validatorAddresses, uint256[] memory amounts) =
-            calculateStakeDistribution(uint256(coreAmount), validators);
+            calculateStakeDistribution(uint256(amount), validators);
 
         uint256 totalValidators = validatorAddresses.length;
         address delegatorAddress = address(this);
@@ -133,6 +149,9 @@ contract StablechainDelegationManager is
             // undelegate from validator according to weight
             staking.undelegate(delegatorAddress, validatorAddresses[i], amounts[i]);
         }
+
+        // burn after it is undelegated
+        // share.burn(amount);
     }
 
     function delegationSummary() external view returns (DelegatorSummary memory) {

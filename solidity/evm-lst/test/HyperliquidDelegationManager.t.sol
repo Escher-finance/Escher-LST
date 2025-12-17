@@ -121,7 +121,7 @@ contract HyperliquidDelegationManagerTest is Test {
 
     /* ============ Initialization Tests ============ */
 
-    function test_Initialize() public view {
+    function testInitialize() public view {
         assertEq(delegationManager.owner(), owner);
         bytes32 managerRole = delegationManager.MANAGER_ROLE();
         assertTrue(
@@ -132,7 +132,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertTrue(delegationManager.hasRole(defaultAdminRole, owner), "Owner should have DEFAULT_ADMIN_ROLE");
     }
 
-    function test_Initialize_RevertsOnZeroAddress() public {
+    function testInitializeRevertsOnZeroAddress() public {
         HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
 
         bytes memory initData = abi.encodeWithSelector(
@@ -146,14 +146,14 @@ contract HyperliquidDelegationManagerTest is Test {
         new ERC1967Proxy(address(newImpl), initData);
     }
 
-    function test_Initialize_CannotReinitialize() public {
+    function testInitializeCannotReinitialize() public {
         vm.expectRevert();
         delegationManager.initialize(owner, liquidStakingManager);
     }
 
     /* ============ Access Control Tests ============ */
 
-    function test_OwnerCanGrantManagerRole() public {
+    function testOwnerCanGrantManagerRole() public {
         address newManager = makeAddr("newManager");
 
         bytes32 managerRole = delegationManager.MANAGER_ROLE();
@@ -163,7 +163,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertTrue(delegationManager.hasRole(managerRole, newManager));
     }
 
-    function test_OwnerCanRevokeManagerRole() public {
+    function testOwnerCanRevokeManagerRole() public {
         bytes32 managerRole = delegationManager.MANAGER_ROLE();
 
         vm.prank(owner);
@@ -172,7 +172,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertFalse(delegationManager.hasRole(managerRole, liquidStakingManager));
     }
 
-    function test_NonOwnerCannotGrantManagerRole() public {
+    function testNonOwnerCannotGrantManagerRole() public {
         address newManager = makeAddr("newManager");
 
         bytes32 managerRole = delegationManager.MANAGER_ROLE();
@@ -183,14 +183,15 @@ contract HyperliquidDelegationManagerTest is Test {
 
     /* ============ Delegate Tests ============ */
 
-    function test_Delegate_RevertsWhenNotManager() public {
+    function testDelegateRevertsWhenNotManager() public {
+        uint256 amount = 1 gwei;
         vm.deal(user, 1 ether);
         vm.prank(user);
         vm.expectRevert("Caller is not a manager");
-        delegationManager.delegate{value: 1 ether}();
+        delegationManager.delegate{value: amount}(amount);
     }
 
-    function test_Delegate_RevertsWithEmptyValidatorSet() public {
+    function testDelegateRevertsWithEmptyValidatorSet() public {
         // Deploy new DelegationManager with empty validator set
         ValidatorSetManager emptyValidatorManager = new ValidatorSetManager();
         bytes memory validatorInitData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, owner, owner);
@@ -208,19 +209,21 @@ contract HyperliquidDelegationManagerTest is Test {
 
         vm.startPrank(liquidStakingManager);
         vm.expectRevert(IDelegationManager.EmptyValidatorSet.selector);
-        newDM.delegate{value: 1 ether}();
+
+        uint256 amount = 1 gwei;
+        newDM.delegate{value: amount}(amount);
         vm.stopPrank();
     }
 
     /* ============ Undelegate Tests ============ */
 
-    function test_Undelegate_RevertsWhenNotManager() public {
+    function testUndelegateRevertsWhenNotManager() public {
         vm.prank(user);
         vm.expectRevert("Caller is not a manager");
         delegationManager.undelegate(1000);
     }
 
-    function test_Undelegate_RevertsWithEmptyValidatorSet() public {
+    function testUndelegateRevertsWithEmptyValidatorSet() public {
         // Deploy new DelegationManager with empty validator set
         ValidatorSetManager emptyValidatorManager = new ValidatorSetManager();
         bytes memory validatorInitData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, owner, owner);
@@ -242,13 +245,13 @@ contract HyperliquidDelegationManagerTest is Test {
         newDM.undelegate(1000);
     }
 
-    function test_Delegate_Success() public {
+    function testDelegateSuccess() public {
         CoreSimulatorLib.nextBlock();
 
         // Arrange: Prank as the liquidStakingManager (who has MANAGER_ROLE)
         vm.prank(liquidStakingManager);
         // Act: Call delegate with a value
-        delegationManager.delegate{value: DELEGATE_AMOUNT_EVM}();
+        delegationManager.delegate{value: DELEGATE_AMOUNT_EVM}(DELEGATE_AMOUNT_EVM);
 
         CoreSimulatorLib.nextBlock();
 
@@ -274,7 +277,7 @@ contract HyperliquidDelegationManagerTest is Test {
      * The following tests verify access control and input validation at the ValidatorSetManager level.
      */
 
-    function test_UpdateValidators_OnlyOwnerCanUpdate() public {
+    function testUpdateValidatorsOnlyOwnerCanUpdate() public {
         address[] memory newValidators = new address[](2);
         newValidators[0] = validator1;
         newValidators[1] = validator2;
@@ -292,7 +295,7 @@ contract HyperliquidDelegationManagerTest is Test {
     // that are not available in the test environment. These would need to be tested on Hyperliquid testnet
     // or with a mock DelegationManager that overrides _redelegate().
 
-    function skip_test_UpdateValidators_Success() public {
+    function skipTestUpdateValidators_Success() public {
         address[] memory newValidators = new address[](2);
         newValidators[0] = validator1;
         newValidators[1] = validator2;
@@ -309,7 +312,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(validatorManager.getTotalWeight(), 400);
     }
 
-    function test_UpdateValidators_RevertsWithEmptyArray() public {
+    function testUpdateValidators_RevertsWithEmptyArray() public {
         address[] memory newValidators = new address[](0);
         uint64[] memory newWeights = new uint64[](0);
 
@@ -318,7 +321,7 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.updateValidators(newValidators, newWeights);
     }
 
-    function test_UpdateValidators_RevertsWithMismatchedArrays() public {
+    function testUpdateValidators_RevertsWithMismatchedArrays() public {
         address[] memory newValidators = new address[](2);
         newValidators[0] = validator1;
         newValidators[1] = validator2;
@@ -331,7 +334,7 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.updateValidators(newValidators, newWeights);
     }
 
-    function test_UpdateValidators_RevertsWithZeroAddress() public {
+    function testUpdateValidators_RevertsWithZeroAddress() public {
         address[] memory newValidators = new address[](2);
         newValidators[0] = validator1;
         newValidators[1] = address(0);
@@ -345,7 +348,7 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.updateValidators(newValidators, newWeights);
     }
 
-    function test_UpdateValidators_RevertsWithZeroWeight() public {
+    function testUpdateValidators_RevertsWithZeroWeight() public {
         address[] memory newValidators = new address[](2);
         newValidators[0] = validator1;
         newValidators[1] = validator2;
@@ -361,7 +364,7 @@ contract HyperliquidDelegationManagerTest is Test {
 
     /* ============ UUPS Upgrade Tests ============ */
 
-    function test_OwnerCanUpgrade() public {
+    function testOwnerCanUpgrade() public {
         HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
 
         vm.prank(owner);
@@ -371,7 +374,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(delegationManager.owner(), owner);
     }
 
-    function test_NonOwnerCannotUpgrade() public {
+    function testNonOwnerCannotUpgrade() public {
         HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
 
         vm.prank(user);
@@ -382,7 +385,7 @@ contract HyperliquidDelegationManagerTest is Test {
     /* ============ Integration Tests ============ */
 
     // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skip_test_CompleteFlow_UpdateValidatorsMultipleTimes() public {
+    function skipTestCompleteFlow_UpdateValidatorsMultipleTimes() public {
         // First update
         address[] memory validators1 = new address[](2);
         validators1[0] = validator1;
@@ -414,7 +417,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(validatorManager.getTotalWeight(), 300);
     }
 
-    function test_ManagerRoleCanBeTransferred() public {
+    function testManagerRoleCanBeTransferred() public {
         address newLSM = makeAddr("newLSM");
         bytes32 managerRole = delegationManager.MANAGER_ROLE();
 
@@ -435,7 +438,7 @@ contract HyperliquidDelegationManagerTest is Test {
 
     /* ============ Validator Distribution Calculation Tests ============ */
 
-    function test_ValidatorDistribution_EqualWeights() public {
+    function testValidatorDistribution_EqualWeights() public {
         // Setup validators with equal weights
         address[] memory validators = new address[](3);
         validators[0] = validator1;
@@ -454,7 +457,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(validatorManager.getTotalWeight(), 300);
     }
 
-    function test_ValidatorDistribution_UnequalWeights() public view {
+    function testValidatorDistribution_UnequalWeights() public view {
         // Already set up in setUp with weights 100, 200, 300
         assertEq(validatorManager.getTotalWeight(), totalWeight);
 
@@ -471,7 +474,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(weight3, weights[2]);
     }
 
-    function test_ValidatorDistribution_SingleValidator() public {
+    function testValidatorDistribution_SingleValidator() public {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
@@ -488,7 +491,7 @@ contract HyperliquidDelegationManagerTest is Test {
     /* ============ Edge Case Tests ============ */
 
     // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skip_test_UpdateValidators_ReplaceAllValidators() public {
+    function skipTestUpdateValidators_ReplaceAllValidators() public {
         address newValidator1 = makeAddr("newValidator1");
         address newValidator2 = makeAddr("newValidator2");
 
@@ -514,7 +517,7 @@ contract HyperliquidDelegationManagerTest is Test {
     }
 
     // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skip_test_UpdateValidators_MaxWeight() public {
+    function skipTestUpdateValidators_MaxWeight() public {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
@@ -538,9 +541,9 @@ contract HyperliquidDelegationManagerTest is Test {
         uint64[] memory validatorWeights = new uint64[](validatorCount);
         uint64 expectedTotal = 0;
 
-        for (uint256 i = 0; i < validatorCount; i++) {
+        for (uint64 i = 0; i < validatorCount; i++) {
             validators[i] = makeAddr(string(abi.encodePacked("validator", i)));
-            weights[i] = baseWeight + uint64(i);
+            weights[i] = baseWeight + i;
             expectedTotal += validatorWeights[i];
         }
 
@@ -554,7 +557,7 @@ contract HyperliquidDelegationManagerTest is Test {
     /* ============ State Consistency Tests ============ */
 
     // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skip_test_StateConsistency_AfterMultipleUpdates() public {
+    function skipTestStateConsistencyAfterMultipleUpdates() public {
         // First update
         address[] memory validators1 = new address[](2);
         validators1[0] = validator1;
@@ -607,20 +610,20 @@ contract HyperliquidDelegationManagerTest is Test {
 
     /* ============ Additional Utility Tests ============ */
 
-    function test_CanCheckManagerRole() public view {
+    function testCanCheckManagerRole() public view {
         bytes32 managerRole = delegationManager.MANAGER_ROLE();
         assertTrue(delegationManager.hasRole(managerRole, liquidStakingManager));
         assertFalse(delegationManager.hasRole(managerRole, user));
     }
 
-    function test_CanCheckDefaultAdminRole() public view {
+    function testCanCheckDefaultAdminRole() public view {
         bytes32 defaultAdminRole = delegationManager.DEFAULT_ADMIN_ROLE();
         assertTrue(delegationManager.hasRole(defaultAdminRole, owner));
         assertFalse(delegationManager.hasRole(defaultAdminRole, user));
         assertFalse(delegationManager.hasRole(defaultAdminRole, liquidStakingManager));
     }
 
-    function test_OwnerCanTransferOwnership() public {
+    function testOwnerCanTransferOwnership() public {
         address newOwner = makeAddr("newOwner");
 
         vm.prank(owner);
@@ -636,7 +639,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(delegationManager.owner(), newOwner);
     }
 
-    function test_NonOwnerCannotTransferOwnership() public {
+    function testNonOwnerCannotTransferOwnership() public {
         address newOwner = makeAddr("newOwner");
 
         vm.prank(user);
@@ -644,7 +647,7 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.transferOwnership(newOwner);
     }
 
-    function test_ValidatorSetManagerIntegration() public view {
+    function testValidatorSetManagerIntegration() public view {
         // Verify DelegationManager can read from ValidatorSetManager
         Validator[] memory validators = validatorManager.getAllValidators();
         assertEq(validators.length, 3);
@@ -653,7 +656,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(validators[2].validator, validator3);
     }
 
-    function test_MultipleManagersCanBeGrantedRole() public {
+    function testMultipleManagersCanBeGrantedRole() public {
         address manager2 = makeAddr("manager2");
         address manager3 = makeAddr("manager3");
 
@@ -669,7 +672,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertTrue(delegationManager.hasRole(managerRole, manager3));
     }
 
-    function test_RoleCanBeRenounced() public {
+    function testRoleCanBeRenounced() public {
         bytes32 managerRole = delegationManager.MANAGER_ROLE();
 
         vm.prank(liquidStakingManager);

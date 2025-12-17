@@ -86,8 +86,10 @@ contract HyperliquidDelegationManager is
         }
     }
 
-    function delegate() external payable nonReentrant {
+    function delegate(uint256 amount) external payable nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
+        require(amount == msg.value, "amount should be same as the fund");
+
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
         if (validators.length == 0) revert EmptyValidatorSet();
@@ -113,7 +115,7 @@ contract HyperliquidDelegationManager is
         }
     }
 
-    function undelegate(uint64 coreAmount) external nonReentrant {
+    function undelegate(uint256 coreAmount) external nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
@@ -121,7 +123,7 @@ contract HyperliquidDelegationManager is
 
         // get validator addresses array and the amount to stake to that validator
         (address[] memory validatorAddresses, uint64[] memory amounts) =
-            calculateStakeDistribution(coreAmount, validators);
+            calculateStakeDistribution(uint64(coreAmount), validators);
 
         uint256 totalValidators = validatorAddresses.length;
 
