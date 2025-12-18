@@ -16,24 +16,23 @@ contract IlSolverMathWrapper {
         return IlSolverMath.hedgingLoop(collateralAmount, borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
     }
 
-    function calculateCollateralAmount(
-        uint256 borrowedAmountNeeded,
-        uint256 borrowAmountUSDPrice,
-        uint256 ltv
-    ) public pure returns (uint256) {
+    function calculateCollateralAmount(uint256 borrowedAmountNeeded, uint256 borrowAmountUSDPrice, uint256 ltv)
+        public
+        pure
+        returns (uint256)
+    {
         return IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
     }
 }
 
 contract IlSolverMathTest is Test {
     IlSolverMathWrapper wrapper;
-    
+
     function setUp() public {
         wrapper = new IlSolverMathWrapper();
     }
 
     // --- sqrt tests ---
-
 
     // --- hedgingLoop tests ---
 
@@ -44,7 +43,8 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUSD = 2000 * 1e18;
         uint256 ltv = 90e16; // 0.90 * 1e18
 
-        (uint256 iterations,bool isEnough,uint256 totalBorrowedToken,uint256 ltvUsed) = IlSolverMath.hedgingLoop(collateralAmount, borrowedAmount, borrowAmountUSD, ltv);
+        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken, uint256 ltvUsed) =
+            IlSolverMath.hedgingLoop(collateralAmount, borrowedAmount, borrowAmountUSD, ltv);
         console.log("iterations (1e18 scale)", iterations);
         console.log("iterations (readable)", iterations / 1e18);
         console.log("collateralAmount", collateralAmount);
@@ -57,18 +57,20 @@ contract IlSolverMathTest is Test {
         assertGt(iterations, 1 * 1e18); // More than 1.0 iteration
         assertEq(isEnough, true);
     }
+
     function testcheckcalculateCollateralAmountSingle() public {
         uint256 borrowedAmountNeeded = 1 * 1e18;
         uint256 borrowAmountUSDPrice = 2000 * 1e18;
         uint256 ltv = 90e16; // 0.90 * 1e18
 
-        uint256 collateralAmountNeeded = IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
+        uint256 collateralAmountNeeded =
+            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
         console.log("collateralAmountNeeded", collateralAmountNeeded);
         assertEq(collateralAmountNeeded, 1136363636363636363636);
     }
 
     // --- Tests with different LTV values ---
-    
+
     function test_hedgingLoop_highLTV() public {
         // Higher LTV (95%) - more leverage, fewer iterations needed
         uint256 collateralAmount = 1500 * 1e18;
@@ -76,14 +78,14 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUSD = 1000 * 1e18;
         uint256 ltv = 95e16; // 0.95 (93% after safety factor)
 
-        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken,) = 
+        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken,) =
             IlSolverMath.hedgingLoop(collateralAmount, borrowedAmount, borrowAmountUSD, ltv);
-        
+
         console.log("High LTV Test:");
         console.log("  iterations:", iterations / 1e16); // 2 decimals
         console.log("  isEnough:", isEnough);
         console.log("  totalBorrowed:", totalBorrowedToken / 1e18);
-        
+
         assertTrue(isEnough);
         assertGe(totalBorrowedToken, borrowedAmount);
     }
@@ -95,14 +97,14 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUSD = 2000 * 1e18;
         uint256 ltv = 70e16; // 0.70 (68% after safety factor)
 
-        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken,) = 
+        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken,) =
             IlSolverMath.hedgingLoop(collateralAmount, borrowedAmount, borrowAmountUSD, ltv);
-        
+
         console.log("Low LTV Test:");
         console.log("  iterations:", iterations / 1e16);
         console.log("  isEnough:", isEnough);
         console.log("  totalBorrowed:", totalBorrowedToken / 1e18);
-        
+
         assertTrue(isEnough);
         assertGe(totalBorrowedToken, borrowedAmount);
     }
@@ -115,15 +117,12 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUSDPrice = 10000 * 1e18;
         uint256 ltv = 90e16;
 
-        uint256 collateralNeeded = IlSolverMath.calculateCollateralAmount(
-            borrowedAmountNeeded, 
-            borrowAmountUSDPrice, 
-            ltv
-        );
-        
+        uint256 collateralNeeded =
+            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
+
         console.log("High Price Test:");
         console.log("  collateral needed:", collateralNeeded / 1e18, "USD");
-        
+
         // Should need more collateral for expensive tokens
         assertGt(collateralNeeded, 5000 * 1e18);
     }
@@ -134,15 +133,12 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUSDPrice = 1 * 1e18;
         uint256 ltv = 90e16;
 
-        uint256 collateralNeeded = IlSolverMath.calculateCollateralAmount(
-            borrowedAmountNeeded, 
-            borrowAmountUSDPrice, 
-            ltv
-        );
-        
+        uint256 collateralNeeded =
+            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
+
         console.log("Low Price Test:");
         console.log("  collateral needed:", collateralNeeded / 1e18, "USD");
-        
+
         // Should need reasonable collateral for cheap tokens
         assertGt(collateralNeeded, 500 * 1e18);
         assertLt(collateralNeeded, 1500 * 1e18);
@@ -156,24 +152,17 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUSDPrice = 2000 * 1e18;
         uint256 ltv = 85e16;
 
-        uint256 collateralNeeded = IlSolverMath.calculateCollateralAmount(
-            borrowedAmountNeeded, 
-            borrowAmountUSDPrice, 
-            ltv
-        );
-        
+        uint256 collateralNeeded =
+            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
+
         console.log("Large Amount Test:");
         console.log("  need to borrow:", borrowedAmountNeeded / 1e18, "tokens");
         console.log("  collateral needed:", collateralNeeded / 1e18, "USD");
-        
+
         // Verify it works with the found collateral
-        (, bool isEnough, uint256 totalBorrowed,) = IlSolverMath.hedgingLoop(
-            collateralNeeded,
-            borrowedAmountNeeded,
-            borrowAmountUSDPrice,
-            ltv
-        );
-        
+        (, bool isEnough, uint256 totalBorrowed,) =
+            IlSolverMath.hedgingLoop(collateralNeeded, borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
+
         assertTrue(isEnough);
         assertGe(totalBorrowed, borrowedAmountNeeded);
     }
@@ -186,20 +175,16 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUSDPrice = 2000 * 1e18;
         uint256 ltv = 90e16;
 
-        uint256 minCollateral = IlSolverMath.calculateCollateralAmount(
-            borrowedAmountNeeded,
-            borrowAmountUSDPrice,
-            ltv
-        );
+        uint256 minCollateral = IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
 
-        (uint256 iterations, bool isEnough, uint256 totalBorrowed,) = 
+        (uint256 iterations, bool isEnough, uint256 totalBorrowed,) =
             IlSolverMath.hedgingLoop(minCollateral, borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
-        
+
         console.log("Exact Minimum Test:");
         console.log("  minCollateral:", minCollateral / 1e18);
         console.log("  iterations:", iterations / 1e16); // 2 decimals
         console.log("  totalBorrowed:", totalBorrowed / 1e18);
-        
+
         assertTrue(isEnough);
         // With minimum, should use fractional iterations
         assertGt(iterations, 1e18); // More than 1.0
@@ -214,15 +199,11 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUSDPrice = 1500 * 1e18;
         uint256 ltv = 80e16;
 
-        uint256 collateral = IlSolverMath.calculateCollateralAmount(
-            borrowedAmountNeeded,
-            borrowAmountUSDPrice,
-            ltv
-        );
+        uint256 collateral = IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
 
-        (, bool isEnough, uint256 totalBorrowed,) = 
+        (, bool isEnough, uint256 totalBorrowed,) =
             IlSolverMath.hedgingLoop(collateral, borrowedAmountNeeded, borrowAmountUSDPrice, ltv);
-        
+
         assertTrue(isEnough);
         // Should borrow AT LEAST what's needed
         assertGe(totalBorrowed, borrowedAmountNeeded);
@@ -263,7 +244,7 @@ contract IlSolverMathTest is Test {
         vm.expectRevert(IlSolverMath.MAX_LOOP_ITERATIONS_REACHED.selector);
         wrapper.hedgingLoop(collateralAmount, borrowedAmount, borrowAmountUSD, ltv);
     }
-    
+
     function test_revert_zeroCollateral() public {
         vm.expectRevert(IlSolverMath.INVALID_INPUT.selector);
         wrapper.hedgingLoop(0, 1 * 1e18, 2000 * 1e18, 90e16);
@@ -284,17 +265,14 @@ contract IlSolverMathTest is Test {
 
         console.log("LTV Comparison:");
         uint256 previousCollateral = type(uint256).max;
-        
+
         for (uint256 i = 0; i < ltvValues.length; i++) {
-            uint256 collateral = IlSolverMath.calculateCollateralAmount(
-                borrowedAmountNeeded,
-                borrowAmountUSDPrice,
-                ltvValues[i]
-            );
-            
+            uint256 collateral =
+                IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUSDPrice, ltvValues[i]);
+
             console.log("  LTV %:", ltvValues[i] / 1e16);
             console.log("    collateral USD:", collateral / 1e18);
-            
+
             // Higher LTV should need LESS collateral (more leverage)
             if (i > 0) {
                 assertLt(collateral, previousCollateral);

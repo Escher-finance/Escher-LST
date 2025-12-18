@@ -13,7 +13,7 @@ contract InvariantsTest is StdInvariant, Test {
         handler = new Handler();
         targetContract(address(handler));
     }
-    
+
     // Invariant: Iterations should never exceed MAX_LOOP_ITERATIONS
     function invariant_iterationsWithinBounds() public view {
         if (handler.lastIsEnough()) {
@@ -22,7 +22,7 @@ contract InvariantsTest is StdInvariant, Test {
             assertLe(handler.lastIterations(), 8 * 1e18);
         }
     }
-    
+
     // Invariant: Total borrowed should never be less than 0
     function invariant_borrowedAmountPositive() public view {
         if (handler.lastIsEnough() && handler.lastTotalBorrowed() > 0) {
@@ -30,7 +30,7 @@ contract InvariantsTest is StdInvariant, Test {
             assertGt(handler.lastTotalBorrowed(), 0);
         }
     }
-    
+
     // Invariant: Fractional iterations should be properly scaled (in 1e18)
     function invariant_fractionalIterationsScaling() public view {
         if (handler.lastIsEnough()) {
@@ -40,7 +40,7 @@ contract InvariantsTest is StdInvariant, Test {
             assertLe(iterations, 8 * 1e18 + 1); // +1 for rounding
         }
     }
-    
+
     // Invariant: Should have some successful calls (if any calls made)
     function invariant_callSuccessRate() public view {
         if (handler.callCount() > 100) {

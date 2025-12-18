@@ -41,11 +41,10 @@ library IlSolverMath {
         internal
         pure
         validInput(collateralAmount, borrowedAmountNeeded, borrowAmountUSDPrice, ltv)
-        returns (uint256 iterations,bool isEnough,uint256 totalBorrowedToken,uint256 ltvUsed)
+        returns (uint256 iterations, bool isEnough, uint256 totalBorrowedToken, uint256 ltvUsed)
     {
         isEnough = false;
-        uint256 ltvMax =
-            ltv - LTV_SAFTY_FACTOR;
+        uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
 
         // Track total collateral and borrow amounts in USD (1e18 scale) and tokens.
         uint256 collateralUSD = collateralAmount;
@@ -60,11 +59,11 @@ library IlSolverMath {
             }
 
             uint256 remainingCapacityUSD = maxBorrowableUSD - totalBorrowedUSD;
-            
+
             // Calculate how much more we need to borrow (in tokens)
             uint256 tokensStillNeeded = borrowedAmountNeeded - totalBorrowedToken;
             uint256 usdStillNeeded = Math.mulDiv(tokensStillNeeded, borrowAmountUSDPrice, 1e18);
-            
+
             // Borrow the MINIMUM of: what we need vs what we can borrow
             // This simulates a "partial/fractional" iteration
             uint256 borrowThisLoopUSD = Math.min(remainingCapacityUSD, usdStillNeeded);
@@ -80,15 +79,15 @@ library IlSolverMath {
                 // iterations = completed full iterations + (partial amount borrowed / max could borrow)
                 uint256 fractionOfIteration = Math.mulDiv(borrowThisLoopUSD, 1e18, remainingCapacityUSD);
                 iterations = (i * 1e18) + fractionOfIteration;
-                return (iterations,isEnough,totalBorrowedToken,ltvUsed);
+                return (iterations, isEnough, totalBorrowedToken, ltvUsed);
             }
-            
+
             // This was a full iteration, continue
             iterations = (i + 1) * 1e18;
         }
 
         if (iterations == MAX_LOOP_ITERATIONS * 1e18) revert MAX_LOOP_ITERATIONS_REACHED();
-        return (iterations,isEnough,totalBorrowedToken,0);
+        return (iterations, isEnough, totalBorrowedToken, 0);
     }
 
     /*
@@ -111,15 +110,15 @@ library IlSolverMath {
 
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
 
-        // Binary search bounds  
+        // Binary search bounds
         uint256 borrowedUSD = Math.mulDiv(borrowedAmountNeeded, borrowAmountUSDPrice, 1e18);
-        
+
         // Lower bound: We're limited to MAX_LOOP_ITERATIONS, so can't reach theoretical infinite minimum
         // Use a more realistic lower bound: ~half of what we'd need with just one iteration
         // This ensures we don't start too low and hit MAX_LOOP_ITERATIONS error
         uint256 high = Math.mulDiv(borrowedUSD, 1e18, ltvMax); // Single iteration need
         uint256 low = high / 2; // Conservative lower bound
-        
+
         // The binary search will find the actual minimum between these bounds
 
         uint256 result = high; // Default to high if we don't find better
