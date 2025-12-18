@@ -15,6 +15,7 @@ import {DataTypes} from "aavev3/protocol/libraries/types/DataTypes.sol";
 import {ReserveConfiguration} from "aavev3/protocol/libraries/configuration/ReserveConfiguration.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IlSolverMath} from "./core/EscherMath.sol";
 
 using CurrencyLibrary for Currency;
 using SafeERC20 for IERC20;
@@ -291,7 +292,7 @@ contract IlSolver is Ownable2Step {
         price = s_oracle.getAssetPrice(asset);
     }
 
-    function openPosition(
+    function openHedgedPosition(
         uint128 amount0,
         uint128 amount1,
         uint128 amount0Max,
@@ -300,8 +301,28 @@ contract IlSolver is Ownable2Step {
         int24 tickUpper,
         uint256 liquidity
     ) public onlyOwner {
+        // FIXME make sure internal functions are using contracts balance and not caller's allowance
         // TODO allowances + wrap eth
 
-        _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+        (uint256 used0,) = _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+
+        uint256 borrowedAmountNeeded = used0;
+
+        uint256 ltv = aavev3Ltv();
+        uint256 priceUsd = oraclePrice(address(s_l2Borrow));
+
+        uint256 collateralNeeded = IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, priceUsd, ltv);
+
+        aavev3Supply(collateralNeeded);
+
+        (uint256 iterations, bool isEnough, uint256 totalBorrowed,) =
+            IlSolverMath.hedgingLoop(collateralNeeded, borrowedAmountNeeded, priceUsd, ltv);
+
+        require(isEnough, "insufficient collateral");
+
+        uint256 borrowPerIter = totalBorrowed / iterations;
+        for (uint256 i = 0; i < iterations; i++) {
+            _aavev3Borrow(borrowPerIter);
+        }
     }
 }
