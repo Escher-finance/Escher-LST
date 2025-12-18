@@ -28,6 +28,9 @@ using SafeERC20 for IERC20;
 using PositionInfoLibrary for PositionInfo;
 
 contract IlSolverTest is Test {
+    address usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address weth = 0x4200000000000000000000000000000000000006;
+
     IlSolver c;
     address owner;
     PoolKey key;
@@ -45,9 +48,6 @@ contract IlSolverTest is Test {
     function setUp() public {
         vm.createSelectFork("base", 39260000);
         owner = makeAddr("owner");
-
-        address usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
-        address weth = 0x4200000000000000000000000000000000000006;
 
         // https://docs.uniswap.org/contracts/v4/deployments
         posm = IPositionManager(0x7C5f5A4bBd8fD63184577525326123B519429bDc);
@@ -165,7 +165,9 @@ contract IlSolverTest is Test {
         uint256 wethBalanceNew = l2Borrow.balanceOf(address(c));
         assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
     }
-    //
-    // function testAaveOraclePrice() public {
-    // }
+
+    function testAaveOraclePrice() public {
+        uint256 usdc_p = c.oraclePrice(usdc);
+        assertApproxEqRel(usdc_p, 1e8, 5e16);
+    }
 }
