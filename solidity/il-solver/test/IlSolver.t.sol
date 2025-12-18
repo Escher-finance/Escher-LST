@@ -10,7 +10,8 @@ import {
     CurrencyLibrary,
     IERC20,
     IL2Pool,
-    L2Encoder
+    L2Encoder,
+    IAaveOracle
 } from "../src/IlSolver.sol";
 import {IHooks} from "univ4-core/interfaces/IHooks.sol";
 import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
@@ -39,6 +40,7 @@ contract IlSolverTest is Test {
     IERC20 l2Underlying;
     IERC20 l2Borrow;
     IERC20 l2Reserve;
+    IAaveOracle oracle;
 
     function setUp() public {
         vm.createSelectFork("base", 39260000);
@@ -53,6 +55,7 @@ contract IlSolverTest is Test {
         stateView = IStateView(0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71);
         l2Pool = IL2Pool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
         l2Encoder = L2Encoder(0x39e97c588B2907Fb67F44fea256Ae3BA064207C5);
+        oracle = IAaveOracle(0x2Cc0Fc26eD4563A5ce5e8bdcfe1A2878676Ae156);
         l2Underlying = IERC20(usdc);
         l2Borrow = IERC20(weth);
         l2Reserve = IERC20(l2Pool.getReserveAToken(usdc));
@@ -68,7 +71,7 @@ contract IlSolverTest is Test {
         assertEq(keccak256(abi.encode(key)), rawId);
         id = PoolId.wrap(rawId);
 
-        c = new IlSolver(owner, posm, key, l2Pool, l2Encoder, l2Underlying, l2Borrow);
+        c = new IlSolver(owner, posm, key, l2Pool, l2Encoder, l2Underlying, l2Borrow, oracle);
         assertEq(c.owner(), owner);
         assertEq(address(c.s_posm()), address(posm));
 
@@ -162,4 +165,7 @@ contract IlSolverTest is Test {
         uint256 wethBalanceNew = l2Borrow.balanceOf(address(c));
         assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
     }
+    //
+    // function testAaveOraclePrice() public {
+    // }
 }
