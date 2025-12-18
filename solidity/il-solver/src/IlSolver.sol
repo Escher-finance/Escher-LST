@@ -8,6 +8,7 @@ import {PoolKey} from "univ4-core/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
 import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
 import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
+import {IAaveOracle} from "aavev3/interfaces/IAaveOracle.sol";
 import {IPool} from "aavev3/interfaces/IPool.sol";
 import {L2Encoder} from "aavev3/helpers/L2Encoder.sol";
 import {DataTypes} from "aavev3/protocol/libraries/types/DataTypes.sol";
@@ -50,6 +51,8 @@ contract IlSolver is Ownable2Step {
     // Whether collateral has been set for the supplied token
     bool s_collateralSet;
 
+    IAaveOracle s_oracle;
+
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
     error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
 
@@ -60,7 +63,8 @@ contract IlSolver is Ownable2Step {
         IL2Pool _l2Pool,
         L2Encoder _l2Encoder,
         IERC20 _l2Underlying,
-        IERC20 _l2Borrow
+        IERC20 _l2Borrow,
+        IAaveOracle _oracle
     ) Ownable(_owner) {
         _posm.permit2();
         _posm.poolManager();
@@ -73,6 +77,7 @@ contract IlSolver is Ownable2Step {
         s_l2Encoder = _l2Encoder;
         s_l2Underlying = _l2Underlying;
         s_l2Borrow = _l2Borrow;
+        s_oracle = _oracle;
     }
 
     receive() external payable {}
@@ -262,5 +267,9 @@ contract IlSolver is Ownable2Step {
     function aavev3Ltv() public view returns (uint256 ltv) {
         DataTypes.ReserveConfigurationMap memory map = s_l2Pool.getConfiguration(address(s_l2Underlying));
         ltv = map.getLtv();
+    }
+
+    function oraclePrice(address asset) public returns (uint256 price) {
+        price = s_oracle.getAssetPrice(asset);
     }
 }
