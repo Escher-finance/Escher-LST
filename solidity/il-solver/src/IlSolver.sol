@@ -8,6 +8,7 @@ import {PoolKey} from "univ4-core/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
 import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
 import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
+import {IAaveOracle} from "aavev3/interfaces/IAaveOracle.sol";
 import {IPool} from "aavev3/interfaces/IPool.sol";
 import {L2Encoder} from "aavev3/helpers/L2Encoder.sol";
 import {DataTypes} from "aavev3/protocol/libraries/types/DataTypes.sol";
@@ -50,6 +51,8 @@ contract IlSolver is Ownable2Step {
     // Whether collateral has been set for the supplied token
     bool s_collateralSet;
 
+    IAaveOracle s_oracle;
+
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
     error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
 
@@ -60,7 +63,8 @@ contract IlSolver is Ownable2Step {
         IL2Pool _l2Pool,
         L2Encoder _l2Encoder,
         IERC20 _l2Underlying,
-        IERC20 _l2Borrow
+        IERC20 _l2Borrow,
+        IAaveOracle _oracle
     ) Ownable(_owner) {
         _posm.permit2();
         _posm.poolManager();
@@ -73,6 +77,7 @@ contract IlSolver is Ownable2Step {
         s_l2Encoder = _l2Encoder;
         s_l2Underlying = _l2Underlying;
         s_l2Borrow = _l2Borrow;
+        s_oracle = _oracle;
     }
 
     receive() external payable {}
@@ -175,7 +180,7 @@ contract IlSolver is Ownable2Step {
         s_positionTokenId = positionId;
     }
 
-    function _univ4LiquidityAdd(uint256 liquidity, uint128 amount0Max, uint128 amount1Max) private {
+    function _univ4LiquidityIncrement(uint256 liquidity, uint128 amount0Max, uint128 amount1Max) private {
         bool ethLiquidityPosition = s_ethLiquidityPosition;
         bytes memory actions;
         address _this = address(this);
@@ -209,21 +214,31 @@ contract IlSolver is Ownable2Step {
         s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
     }
 
+    function _univ4LiquidityAdd(
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 liquidity,
+        uint128 amount0Max,
+        uint128 amount1Max
+    ) private univ4AttachAndRefund(amount0Max, amount1Max) {
+        if (s_positionTokenId == 0) {
+            _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+        } else {
+            _univ4LiquidityIncrement(liquidity, amount0Max, amount1Max);
+        }
+    }
+
     function univ4LiquidityAdd(
         int24 tickLower,
         int24 tickUpper,
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) public payable onlyOwner univ4AttachAndRefund(amount0Max, amount1Max) {
-        if (s_positionTokenId == 0) {
-            _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
-        } else {
-            _univ4LiquidityAdd(liquidity, amount0Max, amount1Max);
-        }
+    ) public payable onlyOwner {
+        _univ4LiquidityAdd(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
     }
 
-    function aavev3Supply(uint256 amount) public onlyOwner {
+    function _aavev3Supply(uint256 amount) private {
         s_l2Underlying.safeTransferFrom(msg.sender, address(this), amount);
         if (s_l2Underlying.allowance(address(this), address(s_l2Pool)) < amount) {
             s_l2Underlying.approve(address(s_l2Pool), type(uint128).max);
@@ -237,12 +252,24 @@ contract IlSolver is Ownable2Step {
         }
     }
 
+    function aavev3Supply(uint256 amount) public onlyOwner {
+        _aavev3Supply(amount);
+    }
+
+    function _aavev3Borrow(uint256 amount) private {
+        s_l2Pool.borrow(address(s_l2Borrow), amount, 2, 0, address(this));
+    }
+
+    function aavev3Borrow(uint256 amount) public onlyOwner {
+        _aavev3Borrow(amount);
+    }
+
     function aavev3Ltv() public view returns (uint256 ltv) {
         DataTypes.ReserveConfigurationMap memory map = s_l2Pool.getConfiguration(address(s_l2Underlying));
         ltv = map.getLtv();
     }
 
-    function aavev3Borrow(uint256 amount) public onlyOwner {
-        s_l2Pool.borrow(address(s_l2Borrow), amount, 2, 0, address(this));
+    function oraclePrice(address asset) public returns (uint256 price) {
+        price = s_oracle.getAssetPrice(asset);
     }
 }
