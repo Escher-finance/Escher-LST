@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {UnbondBatch, UnbondRequest} from "../models/State.sol";
+import {UnbondBatch, UnbondRequest, Liquidity} from "../models/State.sol";
 
 /// @dev Interface of the ILiquidStakingManager that handle liquid staking user interactions and operations.
 interface ILiquidStakingManager {
+    error TokenTransferFailure();
+
     /// @dev Emitted when user stakes some amount of native token
     event Bond(address indexed staker, uint256 value, address recipient);
 
@@ -68,10 +70,6 @@ interface ILiquidStakingManager {
     /// @param requestId The ID of the unbond request to claim
     function claimUnbondRequest(uint256 requestId) external;
 
-    /// @notice Get the current pending batch ID
-    /// @return The current pending batch ID
-    function getPendingBatchId() external view returns (uint256);
-
     /// @notice Get the current pending batch ID (alias for compatibility)
     /// @return The current pending batch ID
     function getCurrentBatchId() external view returns (uint256);
@@ -90,4 +88,10 @@ interface ILiquidStakingManager {
     /// @param user The user address to query
     /// @return Array of request IDs
     function getUserRequestIds(address user) external view returns (uint256[] memory);
+
+    function getLiquidity() external view returns (Liquidity memory);
+
+    function bondRate() external view returns (uint256);
+
+    function unbondRate() external view returns (uint256);
 }
