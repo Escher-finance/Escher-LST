@@ -24,6 +24,7 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
 
     /// @notice Delegates the sent value to validators
     function delegate(uint256 amount) external payable override {
+        require(msg.value == amount, "Wrong delegated amount");
         uint64 delegateAmount = uint64(msg.value);
         totalDelegated += delegateAmount;
         delegatedAmount[msg.sender] += delegateAmount;

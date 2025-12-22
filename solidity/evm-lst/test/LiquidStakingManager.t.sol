@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {Test, console} from "forge-std/Test.sol";
 import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
 import {Lst} from "../src/tokens/Lst.sol";
+import {DelegatorSummary} from "../src/models/Type.sol";
 import {HyperliquidDelegationManager} from "../src/contracts/HyperliquidDelegationManager.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {DelegationManagerMock} from "./mocks/DelegationManagerMock.sol";
@@ -64,6 +65,13 @@ contract LiquidStakingManagerTest is Test {
         uint256 bobBalance = liquidStakingManager.getLst().balanceOf(address(bob));
         assertEq(bobBalance, bondAmount);
 
+        Liquidity memory summary = liquidStakingManager.getLiquidity();
+        assertEq(summary.totalDelegated, bondAmount);
+        assertEq(summary.totalLst, bobBalance);
+
+        console.log("summary.totalDelegated", summary.totalDelegated);
+        console.log("summary.totalLst", summary.totalLst);
+
         // test below min bond amount
         vm.expectRevert();
         liquidStakingManager.bond{value: bondAmount - 10}(bondAmount - 10, bob);
@@ -74,7 +82,7 @@ contract LiquidStakingManagerTest is Test {
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
 
-        uint256 batchId = liquidStakingManager.getPendingBatchId();
+        uint256 batchId = liquidStakingManager.getCurrentBatchId();
 
         uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
         uint256 unbondAmount = minUnbondAmount + 10;
@@ -211,7 +219,7 @@ contract LiquidStakingManagerTest is Test {
         uint256 unbondAmount = minUnbondAmount + 10;
         lst.approve(address(liquidStakingManager), unbondAmount);
         liquidStakingManager.unbondRequest(unbondAmount, bob);
-        uint256 batchId = liquidStakingManager.getPendingBatchId();
+        uint256 batchId = liquidStakingManager.getCurrentBatchId();
         uint256[] memory reqIds = liquidStakingManager.getBatchRequestIds(batchId);
         assertGt(reqIds.length, 0);
         uint256[] memory userReqIds = liquidStakingManager.getUserRequestIds(bob);
@@ -270,5 +278,44 @@ contract LiquidStakingManagerTest is Test {
         UnbondBatch memory receivedBatch = liquidStakingManager.getBatch(batchId);
         assertTrue(receivedBatch.status == BatchStatus.Received);
         assertEq(receivedBatch.requestIds.length, 2);
+    }
+
+    function testUnbondTransfersShares() public {
+        uint256 minBond = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 bondAmount = minBond + 200;
+
+        uint256 minUnbond = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 unbondAmount = minUnbond + 50;
+
+        // Bob bonds and receives LST
+        liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
+        assertEq(lst.balanceOf(bob), bondAmount);
+
+        // Approve manager to transfer shares and unbond
+        lst.approve(address(liquidStakingManager), unbondAmount);
+        uint256 reqId = liquidStakingManager.unbondRequest(unbondAmount, bob);
+
+        // Verify balances: bob decreased, contract increased
+        assertEq(lst.balanceOf(bob), bondAmount - unbondAmount);
+        assertEq(lst.balanceOf(address(liquidStakingManager)), unbondAmount);
+
+        // Verify request stored correctly
+        UnbondRequest memory req = liquidStakingManager.getUnbondRequest(reqId);
+        assertEq(req.shares, unbondAmount);
+        assertEq(req.user, bob);
+    }
+
+    function testUnbondWithoutApprovalReverts() public {
+        uint256 minBond = liquidStakingManager.getConfig().minBondAmount;
+        uint256 bondAmount = minBond + 100;
+        uint256 unbondAmount = 10;
+
+        // Bob bonds
+        liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
+        assertEq(lst.balanceOf(bob), bondAmount);
+
+        // Do NOT approve: expect revert when trying to unbond
+        vm.expectRevert();
+        liquidStakingManager.unbondRequest(unbondAmount, bob);
     }
 }
