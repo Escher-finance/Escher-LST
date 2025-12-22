@@ -13,9 +13,11 @@ import {IPool} from "aavev3/interfaces/IPool.sol";
 import {L2Encoder} from "aavev3/helpers/L2Encoder.sol";
 import {DataTypes} from "aavev3/protocol/libraries/types/DataTypes.sol";
 import {ReserveConfiguration} from "aavev3/protocol/libraries/configuration/ReserveConfiguration.sol";
+import {IPoolDataProvider} from "aavev3/interfaces/IPoolDataProvider.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IlSolverMath} from "./core/EscherMath.sol";
+import {IWETH} from "@common/IWETH.sol";
 
 using CurrencyLibrary for Currency;
 using SafeERC20 for IERC20;
@@ -37,53 +39,64 @@ interface IPermit2 {
 
 contract IlSolver is Ownable2Step {
     // Uniswap V4
-    IPositionManager public s_posm;
-    PoolKey public s_poolKey;
-    uint256 public s_positionTokenId;
-    bool public s_ethLiquidityPosition;
+    IPositionManager public uniPosm;
+    PoolKey public uniPoolKey;
+    uint256 public uniPositionTokenId;
+    // bool public s_ethLiquidityPosition;
+
+    IWETH public immutable WETH;
+    IERC20 public immutable collateral;
 
     // Aave V3
-    IL2Pool s_l2Pool;
-    L2Encoder s_l2Encoder;
-    // Supplied token
-    IERC20 s_l2Underlying;
-    // Borrow token
-    IERC20 s_l2Borrow;
+    IL2Pool public aavePool;
+    L2Encoder public aaveEncoder;
+    IPoolDataProvider public aaveDataProvider;
+    // // Supplied token
+    // IERC20 s_l2Underlying;
+    // // Borrow token
+    // IERC20 s_l2Borrow;
     // Whether collateral has been set for the supplied token
-    bool s_collateralSet;
+    bool public aaveCollateralSet;
 
-    IAaveOracle s_oracle;
+    IAaveOracle aaveOracle;
 
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
     error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
 
     constructor(
         address _owner,
-        IPositionManager _posm,
-        PoolKey memory _poolKey,
-        IL2Pool _l2Pool,
-        L2Encoder _l2Encoder,
-        IERC20 _l2Underlying,
-        IERC20 _l2Borrow,
-        IAaveOracle _oracle
+        IWETH _weth,
+        IERC20 _collateral,
+        IPositionManager _uniPosm,
+        PoolKey memory _uniPoolKey,
+        IL2Pool _aavePool,
+        L2Encoder _aaveEncoder,
+        IPoolDataProvider _aaveDataProvider,
+        IAaveOracle _aaveOracle
     ) Ownable(_owner) {
+        WETH = _weth;
+
         _posm.permit2();
         _posm.poolManager();
-        s_posm = _posm;
-        s_poolKey = _poolKey;
-        // Since it uses numerical sorting of addresses only the `currency0` can be ETH
-        s_ethLiquidityPosition = _poolKey.currency0.isAddressZero();
+        uniPosm = _posm;
 
-        s_l2Pool = _l2Pool;
-        s_l2Encoder = _l2Encoder;
-        s_l2Underlying = _l2Underlying;
-        s_l2Borrow = _l2Borrow;
-        s_oracle = _oracle;
+        require(_poolKey.currency0.isAddressZero());
+        require(Currency.unwrap(_poolKey.currency1) == address(_collateral));
+
+        uniPoolKey = _poolKey;
+
+        (,,,,, bool usageAsCollateralEnabled,,,,) = _aaveDataProvider.getReserveConfigurationData(_collateral);
+        require(usageAsCollateralEnabled);
+        aaveDataProvider = _aaveDataProvider;
+        collateral = _collateral;
+        aavePool = _aavePool;
+        aaveEncoder = _aaveEncoder;
+        aaveOracle = _aaveEncoder;
     }
 
     receive() external payable {}
 
-    modifier univ4Attach(uint128 _amount0Max, uint128 _amount1Max) {
+    modifier univ4AttachFunds(uint128 _amount0Max, uint128 _amount1Max) {
         uint256 amount0Max = uint256(_amount0Max);
         uint256 amount1Max = uint256(_amount1Max);
         PoolKey memory key = s_poolKey;
@@ -239,7 +252,7 @@ contract IlSolver is Ownable2Step {
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) private univ4Attach(amount0Max, amount1Max) {
+    ) private univ4AttachFunds(amount0Max, amount1Max) {
         if (s_positionTokenId == 0) {
             _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
         } else {
