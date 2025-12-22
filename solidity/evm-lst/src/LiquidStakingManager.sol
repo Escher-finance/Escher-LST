@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import {ILiquidStakingManager} from "./interfaces/ILiquidStakingManager.sol";
 import {IDelegationManager} from "./interfaces/IDelegationManager.sol";
@@ -113,16 +113,18 @@ contract LiquidStakingManager is
         // Checks that the delegationManager address is not zero.
         require(address(delegationManager) != address(0), "delegationManager zero address");
 
+        // calculate how much shares from the assets using current pool state (before delegating)
+        uint256 shares = _convertToShares(_assets);
+
         // call delegate and send the required native asset
         delegationManager.delegate{value: msg.value}(_assets);
-
-        // calculate how much shares from the assets
-        uint256 shares = _convertToShares(_assets);
 
         // mint the liquid staking token and send to recipient
         share.mint(_recipient, shares);
         // increase the total minted liquid staking token
         s_liquidity.totalLst += shares;
+        // increase the total delegated assets tracked by the manager
+        s_liquidity.totalDelegated += _assets;
 
         emit Bond(msg.sender, _assets, _recipient);
     }
@@ -132,7 +134,7 @@ contract LiquidStakingManager is
      * @param assets amount of the asset token
      */
     function _convertToShares(uint256 assets) internal view returns (uint256) {
-        return (bondRate() * assets) / SCALING_FACTOR;
+        return (purchaseRate() * assets) / SCALING_FACTOR;
     }
 
     /**
@@ -140,7 +142,7 @@ contract LiquidStakingManager is
      * @param shares amount of shares/LST
      */
     function _convertToAssets(uint256 shares) internal view returns (uint256) {
-        return (unbondRate() * shares) / SCALING_FACTOR;
+        return (redeemRate() * shares) / SCALING_FACTOR;
     }
 
     function totalAssets() public view returns (uint256) {
@@ -151,21 +153,29 @@ contract LiquidStakingManager is
     /**
      * @notice function to calculate the rate to get shares token/lst from assets token
      */
-    function bondRate() public view returns (uint256) {
+    function bondRate() external view returns (uint256) {
+        return purchaseRate();
+    }
+
+    function purchaseRate() internal view returns (uint256) {
         if ((s_liquidity.totalLst == 0) || (s_liquidity.totalDelegated == 0)) {
             return 1 * SCALING_FACTOR;
         }
         return (totalAssets() * SCALING_FACTOR) / s_liquidity.totalLst;
     }
 
-    /**
-     * @notice function to calculate the rate to get assets token from shares token/lst
-     */
-    function unbondRate() public view returns (uint256) {
+    function redeemRate() internal view returns (uint256) {
         if ((s_liquidity.totalLst == 0) || (s_liquidity.totalDelegated == 0)) {
             return 1 * SCALING_FACTOR;
         }
         return (s_liquidity.totalLst * SCALING_FACTOR) / totalAssets();
+    }
+
+    /**
+     * @notice function to calculate the rate to get assets token from shares token/lst
+     */
+    function unbondRate() external view returns (uint256) {
+        return redeemRate();
     }
 
     /**
@@ -183,7 +193,10 @@ contract LiquidStakingManager is
         require(address(delegationManager) != address(0), "delegation Manager zero address");
 
         // transfer asset to this contract
-        share.transferFrom(msg.sender, address(this), _shares);
+        bool transferStatus = share.transferFrom(msg.sender, address(this), _shares);
+        if (!transferStatus) {
+            revert TokenTransferFailure();
+        }
 
         // Get current request ID and increment
         uint256 requestId = s_nextRequestId;
@@ -231,6 +244,9 @@ contract LiquidStakingManager is
 
         // Call undelegate on delegation manager
         delegationManager.undelegate(uint64(assetsToUndelegate));
+
+        // Decrease the total delegated assets tracked by the manager
+        s_liquidity.totalDelegated -= assetsToUndelegate;
 
         // Burn the LST tokens held by this contract for this batch
         share.burn(address(this), batch.totalShares);
@@ -362,14 +378,6 @@ contract LiquidStakingManager is
         require(success, "transfer failed");
 
         emit UnbondClaimed(msg.sender, requestId, userAssets, recipient);
-    }
-
-    /**
-     * @notice Get the current pending batch ID
-     * @return The current pending batch ID
-     */
-    function getPendingBatchId() external view returns (uint256) {
-        return s_pendingBatchId;
     }
 
     /**
