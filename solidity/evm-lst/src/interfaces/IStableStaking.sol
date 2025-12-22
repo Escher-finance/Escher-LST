@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.28;
 
 /// @title IStaking - Stable Staking Precompile Interface
 /// @notice Contract address: 0x0000000000000000000000000000000000000800
