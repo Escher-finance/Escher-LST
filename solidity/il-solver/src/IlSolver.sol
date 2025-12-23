@@ -214,8 +214,8 @@ contract IlSolver is Ownable2Step {
 
     function _aavev3Supply(uint256 amount) private {
         collateral.safeTransferFrom(msg.sender, address(this), amount);
-        if (collateral.allowance(address(this), address(s_l2Pool)) < amount) {
-            collateral.approve(address(s_l2Pool), type(uint128).max);
+        if (collateral.allowance(address(this), address(aavePool)) < amount) {
+            collateral.approve(address(aavePool), type(uint128).max);
         }
         bytes32 params = aaveEncoder.encodeSupplyParams(address(collateral), amount, 0);
         aavePool.supply(params);
@@ -227,7 +227,7 @@ contract IlSolver is Ownable2Step {
     }
 
     function _aavev3Borrow(uint256 amount) private {
-        uniPool.borrow(address(WETH), amount, 2, 0, address(this));
+        aavePool.borrow(address(WETH), amount, 2, 0, address(this));
     }
 
     function aavev3Ltv() public view returns (uint256 ltv) {
