@@ -165,14 +165,14 @@ contract IlSolverTest is Test {
     // function testAaveV3Borrow() public {
     //     // first supply to set collateral
     //     uint256 amount = 1000e6;
-    //     l2Underlying.approve(address(c), amount);
-    //     c.aavev3Supply(amount);
+    //     // l2Underlying.approve(address(c), amount);
+    //     c._aavev3Supply(amount);
     //
     //     // then borrow
-    //     uint256 wethBalanceOld = l2Borrow.balanceOf(address(c));
+    //     uint256 wethBalanceOld = WETH.balanceOf(address(c));
     //     uint256 borrowAmount = 0.1 ether;
     //     c.aavev3Borrow(borrowAmount);
-    //     uint256 wethBalanceNew = l2Borrow.balanceOf(address(c));
+    //     uint256 wethBalanceNew = WETH.balanceOf(address(c));
     //     assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
     // }
 

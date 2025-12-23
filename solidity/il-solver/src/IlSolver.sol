@@ -259,6 +259,36 @@ contract IlSolver is Ownable2Step {
     }
 
     /**
+     * @dev Mints or increments the Uniswap V4 position depending on whether `uniPositionTokenId` is set
+     * @dev See internal helper {_univ4LiquidityAdd}
+     */
+    function univ4LiquidityAdd(
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 liquidity,
+        uint128 amount0Max,
+        uint128 amount1Max
+    ) public onlyOwner returns (uint256 used0, uint256 used1) {
+        return _univ4LiquidityAdd(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+    }
+
+    /**
+     * @dev Supplies `collateral` token to Aave V3
+     * @dev See internal helper {_aavev3Supply}
+     */
+    function aavev3Supply(uint256 amount) public onlyOwner {
+        _aavev3Supply(amount);
+    }
+
+    /**
+     * @dev Borrows `WETH` from Aave V3 using supplied `collateral`
+     * @dev See internal helper {_aavev3Borrow}
+     */
+    function aavev3Borrow(uint256 amount) public onlyOwner {
+        _aavev3Borrow(amount);
+    }
+
+    /**
      * @return ltv Loan-to-value ratio of the `collateral` asset
      */
     function aavev3Ltv() public view returns (uint256 ltv) {
