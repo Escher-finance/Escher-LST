@@ -123,13 +123,18 @@ contract IlSolver is Ownable2Step {
         _;
     }
 
+    /// @dev Mints a new Uniswap V4 position given the tick range and `liquidity`
+    /// @notice Creates a position NFT and stores its token ID in `uniPositionTokenId`
+    /// @notice Uses contract's funds
+    /// @returns `used0`: Amount used out of `amount0Max`
+    /// @returns `used1`: Amount used out of `amount1Max`
     function _univ4LiquidityMint(
         int24 tickLower,
         int24 tickUpper,
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) private returns (uint256 used0, uint256 used1) {
+    ) private univ4AttachFunds(amount0Max, amount1Max) returns (uint256 used0, uint256 used1) {
         address _this = address(this);
         PoolKey memory _key = uniPoolKey;
 
@@ -160,8 +165,13 @@ contract IlSolver is Ownable2Step {
         used1 = b1Before + amount1Max - b1After;
     }
 
+    /// @dev Increments the Uniswap V4 position with ID `uniPositionTokenId` with the given `liquidity`
+    /// @notice Uses contract's funds
+    /// @returns `used0`: Amount used out of `amount0Max`
+    /// @returns `used1`: Amount used out of `amount1Max`
     function _univ4LiquidityIncrement(uint256 liquidity, uint128 amount0Max, uint128 amount1Max)
         private
+        univ4AttachFunds(amount0Max, amount1Max)
         returns (uint256 used0, uint256 used1)
     {
         address _this = address(this);
@@ -192,22 +202,28 @@ contract IlSolver is Ownable2Step {
         used1 = b1Before + amount1Max - b1After;
     }
 
+    /// @dev Mints or increments the Uniswap V4 position depending on whether `uniPositionTokenId` is set
+    /// @notice Uses contract's funds
+    /// @returns `used0`: Amount used out of `amount0Max`
+    /// @returns `used1`: Amount used out of `amount1Max`
     function _univ4LiquidityAdd(
         int24 tickLower,
         int24 tickUpper,
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) private univ4AttachFunds(amount0Max, amount1Max) {
+    ) private returns (uint256 used0, uint256 used1) {
         if (uniPositionTokenId == 0) {
-            _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+            return _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
         } else {
-            _univ4LiquidityIncrement(liquidity, amount0Max, amount1Max);
+            return _univ4LiquidityIncrement(liquidity, amount0Max, amount1Max);
         }
     }
 
+    /// @dev Supplies `collateral` token to Aave V3
+    /// @notice Uses contract's funds
+    /// @notice If it's the first deposit it sets the collateral as the reserve token
     function _aavev3Supply(uint256 amount) private {
-        collateral.safeTransferFrom(msg.sender, address(this), amount);
         if (collateral.allowance(address(this), address(aavePool)) < amount) {
             collateral.approve(address(aavePool), type(uint128).max);
         }
@@ -220,15 +236,18 @@ contract IlSolver is Ownable2Step {
         }
     }
 
+    /// @dev Borrows `WETH` from Aave V3 using supplied `collateral`
     function _aavev3Borrow(uint256 amount) private {
         aavePool.borrow(address(WETH), amount, 2, 0, address(this));
     }
 
+    /// @returns `ltv`: Loan-to-value ratio of the `collateral` asset
     function aavev3Ltv() public view returns (uint256 ltv) {
         DataTypes.ReserveConfigurationMap memory map = aavePool.getConfiguration(address(collateral));
         ltv = map.getLtv();
     }
 
+    /// @returns `price`: Current price of a given `asset` from the Aave Oracle
     function aaveOraclePrice(address asset) public returns (uint256 price) {
         price = aaveOracle.getAssetPrice(asset);
     }
