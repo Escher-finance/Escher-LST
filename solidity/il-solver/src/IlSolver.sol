@@ -38,27 +38,21 @@ interface IPermit2 {
 }
 
 contract IlSolver is Ownable2Step {
+    IWETH public immutable WETH;
+    IERC20 public immutable collateral;
+
     // Uniswap V4
     IPositionManager public uniPosm;
     PoolKey public uniPoolKey;
     uint256 public uniPositionTokenId;
-    // bool public s_ethLiquidityPosition;
-
-    IWETH public immutable WETH;
-    IERC20 public immutable collateral;
 
     // Aave V3
     IL2Pool public aavePool;
     L2Encoder public aaveEncoder;
     IPoolDataProvider public aaveDataProvider;
-    // // Supplied token
-    // IERC20 collateral;
-    // // Borrow token
-    // IERC20 s_l2Borrow;
+    IAaveOracle aaveOracle;
     // Whether collateral has been set for the supplied token
     bool public aaveCollateralSet;
-
-    IAaveOracle aaveOracle;
 
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
     error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
