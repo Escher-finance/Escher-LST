@@ -156,43 +156,28 @@ contract IlSolver is Ownable2Step {
         uint128 amount0Max,
         uint128 amount1Max
     ) private returns (uint256 used0, uint256 used1) {
-        bool ethLiquidityPosition = s_ethLiquidityPosition;
-        bytes memory actions;
         address _this = address(this);
-        if (ethLiquidityPosition) {
-            actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
-        } else {
-            actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR));
-        }
-        PoolKey memory _key = s_poolKey;
-        bytes memory params0 =
-            abi.encode(_key, tickLower, tickUpper, liquidity, amount0Max, amount1Max, _this, bytes(""));
-        bytes memory params1 = abi.encode(_key.currency0, _key.currency1);
-        bytes[] memory params;
-        if (ethLiquidityPosition) {
-            params = new bytes[](3);
-            params[0] = params0;
-            params[1] = params1;
-            params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, _this);
-        } else {
-            params = new bytes[](2);
-            params[0] = params0;
-            params[1] = params1;
-        }
+        PoolKey memory _key = uniPoolKey;
+
+        bytes memory actions =
+            abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
+
+        bytes[] memory params = new bytes[](3);
+        params[0] = abi.encode(_key, tickLower, tickUpper, liquidity, amount0Max, amount1Max, _this, bytes(""));
+        params[1] = abi.encode(_key.currency0, _key.currency1);
+        params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, _this);
+
         uint256 deadline = block.timestamp;
-        uint256 positionId = s_posm.nextTokenId();
-        address posm = address(s_posm);
-        if (!ethLiquidityPosition) {
-            IERC20(Currency.unwrap(_key.currency0)).approve(posm, amount0Max);
-        }
+        uint256 positionId = uniPosm.nextTokenId();
+        address posm = address(uniPosm);
         IERC20(Currency.unwrap(_key.currency1)).approve(posm, amount1Max);
 
         uint256 b0Before = _key.currency0.balanceOfSelf();
         uint256 b1Before = _key.currency1.balanceOfSelf();
 
-        s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
+        uniPosm.modifyLiquidities{value: amount0Max}(abi.encode(actions, params), deadline);
 
-        s_positionTokenId = positionId;
+        uniPositionTokenId = positionId;
         (used0, used1,,) = _univ4Refund(amount0Max, amount1Max, b0Before, b1Before);
     }
 
