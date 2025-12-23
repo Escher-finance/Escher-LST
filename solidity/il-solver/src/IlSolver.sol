@@ -212,16 +212,6 @@ contract IlSolver is Ownable2Step {
         }
     }
 
-    function univ4LiquidityAdd(
-        int24 tickLower,
-        int24 tickUpper,
-        uint256 liquidity,
-        uint128 amount0Max,
-        uint128 amount1Max
-    ) public payable onlyOwner {
-        _univ4LiquidityAdd(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
-    }
-
     function _aavev3Supply(uint256 amount) private {
         s_l2Underlying.safeTransferFrom(msg.sender, address(this), amount);
         if (s_l2Underlying.allowance(address(this), address(s_l2Pool)) < amount) {
@@ -236,16 +226,8 @@ contract IlSolver is Ownable2Step {
         }
     }
 
-    function aavev3Supply(uint256 amount) public onlyOwner {
-        _aavev3Supply(amount);
-    }
-
     function _aavev3Borrow(uint256 amount) private {
         s_l2Pool.borrow(address(s_l2Borrow), amount, 2, 0, address(this));
-    }
-
-    function aavev3Borrow(uint256 amount) public onlyOwner {
-        _aavev3Borrow(amount);
     }
 
     function aavev3Ltv() public view returns (uint256 ltv) {
