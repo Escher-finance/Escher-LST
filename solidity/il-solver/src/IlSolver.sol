@@ -227,7 +227,7 @@ contract IlSolver is Ownable2Step {
     }
 
     function _aavev3Borrow(uint256 amount) private {
-        s_l2Pool.borrow(address(s_l2Borrow), amount, 2, 0, address(this));
+        uniPool.borrow(address(WETH), amount, 2, 0, address(this));
     }
 
     function aavev3Ltv() public view returns (uint256 ltv) {
@@ -235,8 +235,8 @@ contract IlSolver is Ownable2Step {
         ltv = map.getLtv();
     }
 
-    function oraclePrice(address asset) public returns (uint256 price) {
-        price = s_oracle.getAssetPrice(asset);
+    function aaveOraclePrice(address asset) public returns (uint256 price) {
+        price = aaveOracle.getAssetPrice(asset);
     }
 
     function openHedgedPosition(
