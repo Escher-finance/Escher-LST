@@ -238,38 +238,4 @@ contract IlSolver is Ownable2Step {
     function aaveOraclePrice(address asset) public returns (uint256 price) {
         price = aaveOracle.getAssetPrice(asset);
     }
-
-    function openHedgedPosition(
-        uint128 amount0,
-        uint128 amount1,
-        uint128 amount0Max,
-        uint128 amount1Max,
-        int24 tickLower,
-        int24 tickUpper,
-        uint256 liquidity
-    ) public onlyOwner {
-        // FIXME make sure internal functions are using contracts balance and not caller's allowance
-        // TODO allowances + wrap eth
-
-        (uint256 used0,) = _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
-
-        uint256 borrowedAmountNeeded = used0;
-
-        uint256 ltv = aavev3Ltv();
-        uint256 priceUsd = oraclePrice(address(s_l2Borrow));
-
-        uint256 collateralNeeded = IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, priceUsd, ltv);
-
-        aavev3Supply(collateralNeeded);
-
-        (uint256 iterations, bool isEnough, uint256 totalBorrowed,) =
-            IlSolverMath.hedgingLoop(collateralNeeded, borrowedAmountNeeded, priceUsd, ltv);
-
-        require(isEnough, "insufficient collateral");
-
-        uint256 borrowPerIter = totalBorrowed / iterations;
-        for (uint256 i = 0; i < iterations; i++) {
-            _aavev3Borrow(borrowPerIter);
-        }
-    }
 }
