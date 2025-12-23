@@ -231,7 +231,7 @@ contract IlSolver is Ownable2Step {
     }
 
     function aavev3Ltv() public view returns (uint256 ltv) {
-        DataTypes.ReserveConfigurationMap memory map = s_l2Pool.getConfiguration(address(collateral));
+        DataTypes.ReserveConfigurationMap memory map = aavePool.getConfiguration(address(collateral));
         ltv = map.getLtv();
     }
 
