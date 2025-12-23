@@ -175,9 +175,9 @@ contract IlSolverTest is Test {
     //     uint256 wethBalanceNew = l2Borrow.balanceOf(address(c));
     //     assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
     // }
-    //
-    // function testAaveOraclePrice() public {
-    //     uint256 usdc_p = c.oraclePrice(usdc);
-    //     assertApproxEqRel(usdc_p, 1e8, 5e16);
-    // }
+
+    function testAaveOraclePrice() public {
+        uint256 usdc_p = c.aaveOraclePrice(usdc);
+        assertApproxEqRel(usdc_p, 1e8, 5e16);
+    }
 }
