@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {UnbondBatch, UnbondRequest, Liquidity} from "../models/State.sol";
+import {Rate} from "../models/Type.sol";
 
 /// @dev Interface of the ILiquidStakingManager that handle liquid staking user interactions and operations.
 interface ILiquidStakingManager {
@@ -91,7 +92,5 @@ interface ILiquidStakingManager {
 
     function getLiquidity() external view returns (Liquidity memory);
 
-    function bondRate() external view returns (uint256);
-
-    function unbondRate() external view returns (uint256);
+    function rate() external view returns (Rate memory);
 }

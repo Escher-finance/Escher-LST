@@ -18,3 +18,8 @@ struct DelegatorSummary {
     uint64 nPendingWithdrawals;
     uint64 rewards;
 }
+
+struct Rate {
+    uint256 bondRate;
+    uint256 unbondRate;
+}

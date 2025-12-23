@@ -5,7 +5,7 @@ import {ILiquidStakingManager} from "./interfaces/ILiquidStakingManager.sol";
 import {IDelegationManager} from "./interfaces/IDelegationManager.sol";
 import {Lst} from "./tokens/Lst.sol";
 import {Config, Liquidity, BatchStatus, UnbondRequest, UnbondBatch} from "./models/State.sol";
-import {DelegatorSummary} from "./models/Type.sol";
+import {DelegatorSummary, Rate} from "./models/Type.sol";
 
 import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
@@ -27,6 +27,7 @@ contract LiquidStakingManager is
     Config private s_config;
     Liquidity private s_liquidity;
     uint256 public constant SCALING_FACTOR = 10 ** 18;
+    uint256 public constant CORE_TO_EVM = 10 ** 12;
 
     // Batch management storage
     uint256 private s_pendingBatchId;
@@ -134,7 +135,7 @@ contract LiquidStakingManager is
      * @param assets amount of the asset token
      */
     function _convertToShares(uint256 assets) internal view returns (uint256) {
-        return (purchaseRate() * assets) / SCALING_FACTOR;
+        return (depositRate() * assets) / SCALING_FACTOR;
     }
 
     /**
@@ -151,31 +152,24 @@ contract LiquidStakingManager is
     }
 
     /**
-     * @notice function to calculate the rate to get shares token/lst from assets token
+     * @notice function to calculate the rate to bond and unbond
      */
-    function bondRate() external view returns (uint256) {
-        return purchaseRate();
+    function rate() external view returns (Rate memory) {
+        return Rate({bondRate: depositRate(), unbondRate: redeemRate()});
     }
 
-    function purchaseRate() internal view returns (uint256) {
+    function depositRate() internal view returns (uint256) {
         if ((s_liquidity.totalLst == 0) || (s_liquidity.totalDelegated == 0)) {
             return 1 * SCALING_FACTOR;
         }
-        return (totalAssets() * SCALING_FACTOR) / s_liquidity.totalLst;
+        return (totalAssets() * CORE_TO_EVM * SCALING_FACTOR) / s_liquidity.totalLst;
     }
 
     function redeemRate() internal view returns (uint256) {
         if ((s_liquidity.totalLst == 0) || (s_liquidity.totalDelegated == 0)) {
             return 1 * SCALING_FACTOR;
         }
-        return (s_liquidity.totalLst * SCALING_FACTOR) / totalAssets();
-    }
-
-    /**
-     * @notice function to calculate the rate to get assets token from shares token/lst
-     */
-    function unbondRate() external view returns (uint256) {
-        return redeemRate();
+        return (s_liquidity.totalLst * SCALING_FACTOR) / (totalAssets() * CORE_TO_EVM);
     }
 
     /**

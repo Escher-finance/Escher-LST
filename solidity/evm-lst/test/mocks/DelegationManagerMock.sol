@@ -14,6 +14,7 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
     uint64 public totalPendingWithdrawal;
     uint64 public nPendingWithdrawals;
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    uint256 public constant CORE_TO_EVM = 10 ** 12;
 
     constructor() Ownable(msg.sender) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -25,7 +26,7 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
     /// @notice Delegates the sent value to validators
     function delegate(uint256 amount) external payable override {
         require(msg.value == amount, "Wrong delegated amount");
-        uint64 delegateAmount = uint64(msg.value);
+        uint64 delegateAmount = uint64(msg.value) / uint64(CORE_TO_EVM);
         totalDelegated += delegateAmount;
         delegatedAmount[msg.sender] += delegateAmount;
         emit Delegated(msg.sender, msg.value);
@@ -38,8 +39,8 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
     /// @notice Undelegates the specified amount from validators
     /// @param amount The amount to undelegate
     function undelegate(uint256 amount) external override {
-        require(totalDelegated >= amount, "Insufficient delegated amount");
-        uint64 undelegateAmount = uint64(amount);
+        uint64 undelegateAmount = uint64(amount) / uint64(CORE_TO_EVM);
+        require(totalDelegated >= undelegateAmount, "Insufficient delegated amount");
         totalDelegated -= undelegateAmount;
         totalUndelegated += undelegateAmount;
         totalPendingWithdrawal += undelegateAmount;
