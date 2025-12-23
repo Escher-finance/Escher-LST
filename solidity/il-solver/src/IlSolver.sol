@@ -56,7 +56,7 @@ contract IlSolver is Ownable2Step {
     L2Encoder public aaveEncoder;
     IPoolDataProvider public aaveDataProvider;
     IAaveOracle aaveOracle;
-    // Whether collateral has been set for the supplied token
+    // Whether collateral has been set
     bool public aaveCollateralSet;
 
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
