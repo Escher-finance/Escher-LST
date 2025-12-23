@@ -153,28 +153,25 @@ contract IlSolverTest is Test {
     //     uint128 newLiquidity = posm.getPositionLiquidity(c.s_positionTokenId());
     //     assertGt(newLiquidity, oldLiquidity);
     // }
-    //
-    // function testAaveV3Supply() public {
-    //     assertEq(l2Reserve.balanceOf(address(c)), 0);
-    //     uint256 amount = 1000e6;
-    //     l2Underlying.approve(address(c), amount);
-    //     c.aavev3Supply(amount);
-    //     assertGt(l2Reserve.balanceOf(address(c)), 0);
-    // }
-    //
-    // function testAaveV3Borrow() public {
-    //     // first supply to set collateral
-    //     uint256 amount = 1000e6;
-    //     // l2Underlying.approve(address(c), amount);
-    //     c._aavev3Supply(amount);
-    //
-    //     // then borrow
-    //     uint256 wethBalanceOld = WETH.balanceOf(address(c));
-    //     uint256 borrowAmount = 0.1 ether;
-    //     c.aavev3Borrow(borrowAmount);
-    //     uint256 wethBalanceNew = WETH.balanceOf(address(c));
-    //     assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
-    // }
+
+    function testAaveV3Supply() public {
+        assertEq(reserve.balanceOf(address(c)), 0);
+        uint256 amount = 1000e6;
+        c.aavev3Supply(amount);
+        assertGt(reserve.balanceOf(address(c)), 0);
+    }
+
+    function testAaveV3Borrow() public {
+        uint256 amount = 1000e6;
+        c.aavev3Supply(amount);
+
+        // then borrow
+        uint256 wethBalanceOld = WETH.balanceOf(address(c));
+        uint256 borrowAmount = 0.1 ether;
+        c.aavev3Borrow(borrowAmount);
+        uint256 wethBalanceNew = WETH.balanceOf(address(c));
+        assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
+    }
 
     function testAaveOraclePrice() public {
         uint256 usdc_p = c.aaveOraclePrice(usdc);
