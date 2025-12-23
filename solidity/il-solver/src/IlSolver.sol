@@ -52,7 +52,7 @@ contract IlSolver is Ownable2Step {
     L2Encoder public aaveEncoder;
     IPoolDataProvider public aaveDataProvider;
     // // Supplied token
-    // IERC20 s_l2Underlying;
+    // IERC20 collateral;
     // // Borrow token
     // IERC20 s_l2Borrow;
     // Whether collateral has been set for the supplied token
@@ -213,16 +213,16 @@ contract IlSolver is Ownable2Step {
     }
 
     function _aavev3Supply(uint256 amount) private {
-        s_l2Underlying.safeTransferFrom(msg.sender, address(this), amount);
-        if (s_l2Underlying.allowance(address(this), address(s_l2Pool)) < amount) {
-            s_l2Underlying.approve(address(s_l2Pool), type(uint128).max);
+        collateral.safeTransferFrom(msg.sender, address(this), amount);
+        if (collateral.allowance(address(this), address(s_l2Pool)) < amount) {
+            collateral.approve(address(s_l2Pool), type(uint128).max);
         }
-        bytes32 params = s_l2Encoder.encodeSupplyParams(address(s_l2Underlying), amount, 0);
-        s_l2Pool.supply(params);
+        bytes32 params = aaveEncoder.encodeSupplyParams(address(collateral), amount, 0);
+        aavePool.supply(params);
 
-        if (!s_collateralSet) {
-            s_l2Pool.setUserUseReserveAsCollateral(address(s_l2Underlying), true);
-            s_collateralSet = true;
+        if (!aaveCollateralSet) {
+            aavePool.setUserUseReserveAsCollateral(address(collateral), true);
+            aaveCollateralSet = true;
         }
     }
 
@@ -231,7 +231,7 @@ contract IlSolver is Ownable2Step {
     }
 
     function aavev3Ltv() public view returns (uint256 ltv) {
-        DataTypes.ReserveConfigurationMap memory map = s_l2Pool.getConfiguration(address(s_l2Underlying));
+        DataTypes.ReserveConfigurationMap memory map = s_l2Pool.getConfiguration(address(collateral));
         ltv = map.getLtv();
     }
 
