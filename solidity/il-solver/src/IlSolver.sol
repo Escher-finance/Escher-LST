@@ -85,13 +85,13 @@ contract IlSolver is Ownable2Step {
 
         uniPoolKey = _uniPoolKey;
 
-        (,,,,, bool usageAsCollateralEnabled,,,,) = _aaveDataProvider.getReserveConfigurationData(_collateral);
+        (,,,,, bool usageAsCollateralEnabled,,,,) = _aaveDataProvider.getReserveConfigurationData(address(_collateral));
         require(usageAsCollateralEnabled);
         aaveDataProvider = _aaveDataProvider;
         collateral = _collateral;
         aavePool = _aavePool;
         aaveEncoder = _aaveEncoder;
-        aaveOracle = _aaveEncoder;
+        aaveOracle = _aaveOracle;
     }
 
     receive() external payable {}
