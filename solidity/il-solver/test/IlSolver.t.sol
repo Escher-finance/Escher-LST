@@ -96,63 +96,55 @@ contract IlSolverTest is Test {
         vm.startPrank(owner);
     }
 
-    // function _calculateInputs(uint256 amount0, int24 delta, uint256 slippage)
-    //     private
-    //     view
-    //     returns (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max)
-    // {
-    //     (uint160 sqrtPriceX96, int24 tick,,) = stateView.getSlot0(id);
-    //     int24 tickSpacing = key.tickSpacing;
-    //     tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
-    //     tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
-    //
-    //     uint160 sqrtPriceAX96 = TickMath.getSqrtPriceAtTick(tickLower);
-    //     uint160 sqrtPriceBX96 = TickMath.getSqrtPriceAtTick(tickUpper);
-    //     liquidity = LiquidityAmounts.getLiquidityForAmount0(sqrtPriceAX96, sqrtPriceBX96, amount0);
-    //
-    //     (uint256 required0, uint256 required1) =
-    //         LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtPriceAX96, sqrtPriceBX96, liquidity);
-    //
-    //     amount0Max = uint128(required0 * (100 + slippage) / 100);
-    //     amount1Max = uint128(required1 * (100 + slippage) / 100);
-    // }
-    //
-    // function _mintUniV4Pos(uint256 amount0, int24 delta, uint256 slippage) private {
-    //     (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) =
-    //         _calculateInputs(amount0, delta, slippage);
-    //
-    //     IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
-    //     t1.approve(address(c), amount1Max);
-    //     c.univ4LiquidityAdd{value: amount0Max}(
-    //         tickLower, tickUpper, liquidity, uint128(amount0Max), uint128(amount1Max)
-    //     );
-    //
-    //     assertGt(posm.getPositionLiquidity(c.s_positionTokenId()), 0);
-    // }
-    //
-    // function testUniV4Mint() public {
-    //     assertEq(c.s_positionTokenId(), 0);
-    //     int24 delta = 488; // 5% in ticks
-    //     uint256 slippage = 10; // 10%
-    //     _mintUniV4Pos(1 ether, delta, slippage);
-    //     assertGt(c.s_positionTokenId(), 0);
-    // }
-    //
-    // function testUniV4Increase() public {
-    //     int24 delta = 488; // 5% in ticks
-    //     uint256 slippage = 10; // 10%
-    //     _mintUniV4Pos(1 ether, delta, slippage);
-    //
-    //     uint128 oldLiquidity = posm.getPositionLiquidity(c.s_positionTokenId());
-    //
-    //     (,, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) = _calculateInputs(0.5 ether, delta, slippage);
-    //     IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
-    //     t1.approve(address(c), amount1Max);
-    //     c.univ4LiquidityAdd{value: amount0Max}(0, 0, liquidity, amount0Max, amount1Max);
-    //
-    //     uint128 newLiquidity = posm.getPositionLiquidity(c.s_positionTokenId());
-    //     assertGt(newLiquidity, oldLiquidity);
-    // }
+    function _calculateInputs(uint256 amount0, int24 delta, uint256 slippage)
+        private
+        view
+        returns (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max)
+    {
+        (uint160 sqrtPriceX96, int24 tick,,) = uniStateView.getSlot0(id);
+        int24 tickSpacing = key.tickSpacing;
+        tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
+        tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
+
+        uint160 sqrtPriceAX96 = TickMath.getSqrtPriceAtTick(tickLower);
+        uint160 sqrtPriceBX96 = TickMath.getSqrtPriceAtTick(tickUpper);
+        liquidity = LiquidityAmounts.getLiquidityForAmount0(sqrtPriceAX96, sqrtPriceBX96, amount0);
+
+        (uint256 required0, uint256 required1) =
+            LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtPriceAX96, sqrtPriceBX96, liquidity);
+
+        amount0Max = uint128(required0 * (100 + slippage) / 100);
+        amount1Max = uint128(required1 * (100 + slippage) / 100);
+    }
+
+    function _mintUniV4Pos(uint256 amount0, int24 delta, uint256 slippage) private {
+        (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) =
+            _calculateInputs(amount0, delta, slippage);
+        c.univ4LiquidityAdd(tickLower, tickUpper, liquidity, uint128(amount0Max), uint128(amount1Max));
+        assertGt(uniPosm.getPositionLiquidity(c.uniPositionTokenId()), 0);
+    }
+
+    function testUniV4Mint() public {
+        assertEq(c.uniPositionTokenId(), 0);
+        int24 delta = 488; // 5% in ticks
+        uint256 slippage = 10; // 10%
+        _mintUniV4Pos(1 ether, delta, slippage);
+        assertGt(c.uniPositionTokenId(), 0);
+    }
+
+    function testUniV4Increase() public {
+        int24 delta = 488; // 5% in ticks
+        uint256 slippage = 10; // 10%
+        _mintUniV4Pos(1 ether, delta, slippage);
+
+        uint128 oldLiquidity = uniPosm.getPositionLiquidity(c.uniPositionTokenId());
+
+        (,, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) = _calculateInputs(0.5 ether, delta, slippage);
+        c.univ4LiquidityAdd(0, 0, liquidity, amount0Max, amount1Max);
+
+        uint128 newLiquidity = uniPosm.getPositionLiquidity(c.uniPositionTokenId());
+        assertGt(newLiquidity, oldLiquidity);
+    }
 
     function testAaveV3Supply() public {
         assertEq(reserve.balanceOf(address(c)), 0);
