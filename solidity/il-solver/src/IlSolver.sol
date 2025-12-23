@@ -129,26 +129,6 @@ contract IlSolver is Ownable2Step {
         _;
     }
 
-    function _univ4Refund(uint256 amount0Max, uint256 amount1Max, uint256 b0Before, uint256 b1Before)
-        private
-        returns (uint256 used0, uint256 used1, uint256 refund0, uint256 refund1)
-    {
-        PoolKey memory key = uniPoolKey;
-        uint256 b0After = key.currency0.balanceOfSelf();
-        uint256 b1After = key.currency1.balanceOfSelf();
-
-        used0 = b0Before + amount0Max - b0After;
-        used1 = b1Before + amount1Max - b1After;
-        refund0 = used0 < amount0Max ? amount0Max - used0 : 0;
-        refund1 = used1 < amount1Max ? amount1Max - used1 : 0;
-        if (refund0 > 0) {
-            key.currency0.transfer(address(this), refund0);
-        }
-        if (refund1 > 0) {
-            key.currency1.transfer(address(this), refund1);
-        }
-    }
-
     function _univ4LiquidityMint(
         int24 tickLower,
         int24 tickUpper,
@@ -178,50 +158,44 @@ contract IlSolver is Ownable2Step {
         uniPosm.modifyLiquidities{value: amount0Max}(abi.encode(actions, params), deadline);
 
         uniPositionTokenId = positionId;
-        (used0, used1,,) = _univ4Refund(amount0Max, amount1Max, b0Before, b1Before);
+
+        uint256 b0After = _key.currency0.balanceOfSelf();
+        uint256 b1After = _key.currency1.balanceOfSelf();
+
+        used0 = b0Before + amount0Max - b0After;
+        used1 = b1Before + amount1Max - b1After;
     }
 
     function _univ4LiquidityIncrement(uint256 liquidity, uint128 amount0Max, uint128 amount1Max)
         private
         returns (uint256 used0, uint256 used1)
     {
-        bool ethLiquidityPosition = s_ethLiquidityPosition;
-        bytes memory actions;
         address _this = address(this);
-        if (ethLiquidityPosition) {
-            actions =
-                abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
-        } else {
-            actions = abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR));
-        }
-        uint256 _tokenId = s_positionTokenId;
-        PoolKey memory _key = s_poolKey;
-        bytes memory params0 = abi.encode(_tokenId, liquidity, amount0Max, amount1Max, bytes(""));
-        bytes memory params1 = abi.encode(_key.currency0, _key.currency1);
-        bytes[] memory params;
-        if (ethLiquidityPosition) {
-            params = new bytes[](3);
-            params[0] = params0;
-            params[1] = params1;
-            params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, _this);
-        } else {
-            params = new bytes[](2);
-            params[0] = params0;
-            params[1] = params1;
-        }
+        uint256 _tokenId = uniPositionTokenId;
+        PoolKey memory _key = uniPoolKey;
+
+        bytes memory actions =
+            abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
+
+        bytes[] memory params = new bytes[](3);
+        params[0] = abi.encode(_tokenId, liquidity, amount0Max, amount1Max, bytes(""));
+        params[1] = abi.encode(_key.currency0, _key.currency1);
+        params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, _this);
+
         uint256 deadline = block.timestamp;
-        address posm = address(s_posm);
-        if (!ethLiquidityPosition) {
-            IERC20(Currency.unwrap(_key.currency0)).approve(posm, amount0Max);
-        }
+        address posm = address(uniPosm);
         IERC20(Currency.unwrap(_key.currency1)).approve(posm, amount1Max);
 
         uint256 b0Before = _key.currency0.balanceOfSelf();
         uint256 b1Before = _key.currency1.balanceOfSelf();
 
-        s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
+        uniPosm.modifyLiquidities{value: amount0Max}(abi.encode(actions, params), deadline);
 
-        (used0, used1,,) = _univ4Refund(amount0Max, amount1Max, b0Before, b1Before);
+        uint256 b0After = _key.currency0.balanceOfSelf();
+        uint256 b1After = _key.currency1.balanceOfSelf();
+
+        used0 = b0Before + amount0Max - b0After;
+        used1 = b1Before + amount1Max - b1After;
     }
 
     function _univ4LiquidityAdd(
@@ -231,7 +205,7 @@ contract IlSolver is Ownable2Step {
         uint128 amount0Max,
         uint128 amount1Max
     ) private univ4AttachFunds(amount0Max, amount1Max) {
-        if (s_positionTokenId == 0) {
+        if (uniPositionTokenId == 0) {
             _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
         } else {
             _univ4LiquidityIncrement(liquidity, amount0Max, amount1Max);
