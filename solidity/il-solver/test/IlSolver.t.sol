@@ -11,7 +11,9 @@ import {
     IERC20,
     IL2Pool,
     L2Encoder,
-    IAaveOracle
+    IAaveOracle,
+    IPoolDataProvider,
+    IWETH
 } from "../src/IlSolver.sol";
 import {IHooks} from "univ4-core/interfaces/IHooks.sol";
 import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
@@ -31,34 +33,40 @@ contract IlSolverTest is Test {
     address usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address weth = 0x4200000000000000000000000000000000000006;
 
+    IWETH WETH;
+    IERC20 collateral;
+    IERC20 reserve;
+
     IlSolver c;
     address owner;
+
     PoolKey key;
     PoolId id;
-    IPositionManager posm;
-    IPoolManager poolManager;
-    IStateView stateView;
-    IL2Pool l2Pool;
-    L2Encoder l2Encoder;
-    IERC20 l2Underlying;
-    IERC20 l2Borrow;
-    IERC20 l2Reserve;
-    IAaveOracle oracle;
+    IPositionManager uniPosm;
+    IPoolManager uniPoolManager;
+    IStateView uniStateView;
+
+    IL2Pool aavePool;
+    L2Encoder aaveEncoder;
+    IPoolDataProvider aaveDataProvider;
+    IAaveOracle aaveOracle;
 
     function setUp() public {
         vm.createSelectFork("base", 39260000);
         owner = makeAddr("owner");
 
         // https://docs.uniswap.org/contracts/v4/deployments
-        posm = IPositionManager(0x7C5f5A4bBd8fD63184577525326123B519429bDc);
-        poolManager = IPoolManager(address(posm.poolManager()));
-        stateView = IStateView(0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71);
-        l2Pool = IL2Pool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
-        l2Encoder = L2Encoder(0x39e97c588B2907Fb67F44fea256Ae3BA064207C5);
-        oracle = IAaveOracle(0x2Cc0Fc26eD4563A5ce5e8bdcfe1A2878676Ae156);
-        l2Underlying = IERC20(usdc);
-        l2Borrow = IERC20(weth);
-        l2Reserve = IERC20(l2Pool.getReserveAToken(usdc));
+        uniPosm = IPositionManager(0x7C5f5A4bBd8fD63184577525326123B519429bDc);
+        uniPoolManager = IPoolManager(address(uniPosm.poolManager()));
+        uniStateView = IStateView(0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71);
+        aavePool = IL2Pool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
+        aaveEncoder = L2Encoder(0x39e97c588B2907Fb67F44fea256Ae3BA064207C5);
+        aaveOracle = IAaveOracle(0x2Cc0Fc26eD4563A5ce5e8bdcfe1A2878676Ae156);
+        aaveDataProvider = IPoolDataProvider(0x0F43731EB8d45A581f4a36DD74F5f358bc90C73A);
+
+        WETH = IWETH(weth);
+        collateral = IERC20(usdc);
+        reserve = IERC20(aavePool.getReserveAToken(usdc));
 
         key = PoolKey({
             currency0: CurrencyLibrary.ADDRESS_ZERO,
@@ -67,20 +75,22 @@ contract IlSolverTest is Test {
             tickSpacing: 10,
             hooks: IHooks(address(0))
         });
+
         bytes32 rawId = bytes32(0x96d4b53a38337a5733179751781178a2613306063c511b78cd02684739288c0a);
         assertEq(keccak256(abi.encode(key)), rawId);
         id = PoolId.wrap(rawId);
 
-        c = new IlSolver(owner, posm, key, l2Pool, l2Encoder, l2Underlying, l2Borrow, oracle);
+        c = new IlSolver(owner, WETH, collateral, uniPosm, key, aavePool, aaveEncoder, aaveDataProvider, aaveOracle);
         assertEq(c.owner(), owner);
-        assertEq(address(c.s_posm()), address(posm));
+        assertEq(address(c.uniPosm()), address(uniPosm));
 
-        deal(owner, 1 ether);
-        deal(Currency.unwrap(key.currency1), owner, 10000e6);
+        // fund contract
+        deal(address(c), 1 ether);
+        deal(Currency.unwrap(key.currency1), address(c), 10000e6);
 
-        assertGt(key.currency0.balanceOf(owner), 0);
-        assertGt(key.currency1.balanceOf(owner), 0);
-        uint128 liquidity = stateView.getLiquidity(id);
+        assertGt(key.currency0.balanceOf(address(c)), 0);
+        assertGt(key.currency1.balanceOf(address(c)), 0);
+        uint128 liquidity = uniStateView.getLiquidity(id);
         assertGt(liquidity, 0);
 
         vm.startPrank(owner);
@@ -91,7 +101,7 @@ contract IlSolverTest is Test {
         view
         returns (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max)
     {
-        (uint160 sqrtPriceX96, int24 tick,,) = stateView.getSlot0(id);
+        (uint160 sqrtPriceX96, int24 tick,,) = uniStateView.getSlot0(id);
         int24 tickSpacing = key.tickSpacing;
         tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
         tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
@@ -110,22 +120,16 @@ contract IlSolverTest is Test {
     function _mintUniV4Pos(uint256 amount0, int24 delta, uint256 slippage) private {
         (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) =
             _calculateInputs(amount0, delta, slippage);
-
-        IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
-        t1.approve(address(c), amount1Max);
-        c.univ4LiquidityAdd{value: amount0Max}(
-            tickLower, tickUpper, liquidity, uint128(amount0Max), uint128(amount1Max)
-        );
-
-        assertGt(posm.getPositionLiquidity(c.s_positionTokenId()), 0);
+        c.univ4LiquidityAdd(tickLower, tickUpper, liquidity, uint128(amount0Max), uint128(amount1Max));
+        assertGt(uniPosm.getPositionLiquidity(c.uniPositionTokenId()), 0);
     }
 
     function testUniV4Mint() public {
-        assertEq(c.s_positionTokenId(), 0);
+        assertEq(c.uniPositionTokenId(), 0);
         int24 delta = 488; // 5% in ticks
         uint256 slippage = 10; // 10%
         _mintUniV4Pos(1 ether, delta, slippage);
-        assertGt(c.s_positionTokenId(), 0);
+        assertGt(c.uniPositionTokenId(), 0);
     }
 
     function testUniV4Increase() public {
@@ -133,41 +137,36 @@ contract IlSolverTest is Test {
         uint256 slippage = 10; // 10%
         _mintUniV4Pos(1 ether, delta, slippage);
 
-        uint128 oldLiquidity = posm.getPositionLiquidity(c.s_positionTokenId());
+        uint128 oldLiquidity = uniPosm.getPositionLiquidity(c.uniPositionTokenId());
 
         (,, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) = _calculateInputs(0.5 ether, delta, slippage);
-        IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
-        t1.approve(address(c), amount1Max);
-        c.univ4LiquidityAdd{value: amount0Max}(0, 0, liquidity, amount0Max, amount1Max);
+        c.univ4LiquidityAdd(0, 0, liquidity, amount0Max, amount1Max);
 
-        uint128 newLiquidity = posm.getPositionLiquidity(c.s_positionTokenId());
+        uint128 newLiquidity = uniPosm.getPositionLiquidity(c.uniPositionTokenId());
         assertGt(newLiquidity, oldLiquidity);
     }
 
     function testAaveV3Supply() public {
-        assertEq(l2Reserve.balanceOf(address(c)), 0);
+        assertEq(reserve.balanceOf(address(c)), 0);
         uint256 amount = 1000e6;
-        l2Underlying.approve(address(c), amount);
         c.aavev3Supply(amount);
-        assertGt(l2Reserve.balanceOf(address(c)), 0);
+        assertGt(reserve.balanceOf(address(c)), 0);
     }
 
     function testAaveV3Borrow() public {
-        // first supply to set collateral
         uint256 amount = 1000e6;
-        l2Underlying.approve(address(c), amount);
         c.aavev3Supply(amount);
 
         // then borrow
-        uint256 wethBalanceOld = l2Borrow.balanceOf(address(c));
+        uint256 wethBalanceOld = WETH.balanceOf(address(c));
         uint256 borrowAmount = 0.1 ether;
         c.aavev3Borrow(borrowAmount);
-        uint256 wethBalanceNew = l2Borrow.balanceOf(address(c));
+        uint256 wethBalanceNew = WETH.balanceOf(address(c));
         assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
     }
 
     function testAaveOraclePrice() public {
-        uint256 usdc_p = c.oraclePrice(usdc);
+        uint256 usdc_p = c.aaveOraclePrice(usdc);
         assertApproxEqRel(usdc_p, 1e8, 5e16);
     }
 }

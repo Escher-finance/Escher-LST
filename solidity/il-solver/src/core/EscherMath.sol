@@ -31,7 +31,8 @@ library IlSolverMath {
      * @return iterations The number of iterations needed to reach the borrowed amount needed.
      *  After n loops starting with L_0 collateral:
      * LTV / P_0) * (1 - LTV^n) / (1 - LTV)
-     **/
+     *
+     */
     function hedgingLoop(
         uint256 collateralAmount,
         uint256 borrowedAmountNeeded,
@@ -90,13 +91,14 @@ library IlSolverMath {
         return (iterations, isEnough, totalBorrowedToken, 0);
     }
 
-    /** 
-    * @dev This function uses binary search to find the minimum collateral needed to reach the borrowed amount needed.
-    * @param borrowedAmountNeeded The amount of borrowed tokens needed token decimals (1e18).
-    * @param borrowAmountUSDPrice The price of the borrowed tokens in USD token decimals (1e18).
-    * @param ltv The LTV of the collateral in 1e16.
-    * @return collateralAmountNeeded The minimum amount of collateral needed to reach the borrowed amount needed.
-    **/
+    /**
+     * @dev This function uses binary search to find the minimum collateral needed to reach the borrowed amount needed.
+     * @param borrowedAmountNeeded The amount of borrowed tokens needed token decimals (1e18).
+     * @param borrowAmountUSDPrice The price of the borrowed tokens in USD token decimals (1e18).
+     * @param ltv The LTV of the collateral in 1e16.
+     * @return collateralAmountNeeded The minimum amount of collateral needed to reach the borrowed amount needed.
+     *
+     */
     function calculateCollateralAmount(uint256 borrowedAmountNeeded, uint256 borrowAmountUSDPrice, uint256 ltv)
         internal
         pure
