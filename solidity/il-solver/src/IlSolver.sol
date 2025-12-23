@@ -133,7 +133,7 @@ contract IlSolver is Ownable2Step {
         private
         returns (uint256 used0, uint256 used1, uint256 refund0, uint256 refund1)
     {
-        PoolKey memory key = s_poolKey;
+        PoolKey memory key = uniPoolKey;
         uint256 b0After = key.currency0.balanceOfSelf();
         uint256 b1After = key.currency1.balanceOfSelf();
 
