@@ -38,15 +38,20 @@ interface IPermit2 {
 }
 
 contract IlSolver is Ownable2Step {
+    // The borrowed asset
     IWETH public immutable WETH;
+    // The collateral asset (e.g. USDC)
     IERC20 public immutable collateral;
 
     // Uniswap V4
+
     IPositionManager public uniPosm;
+    // Must have `currency0` set to ETH and `currency1` set to `collateral`
     PoolKey public uniPoolKey;
     uint256 public uniPositionTokenId;
 
     // Aave V3
+
     IL2Pool public aavePool;
     L2Encoder public aaveEncoder;
     IPoolDataProvider public aaveDataProvider;
