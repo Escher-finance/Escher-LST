@@ -76,14 +76,14 @@ contract IlSolver is Ownable2Step {
     ) Ownable(_owner) {
         WETH = _weth;
 
-        _posm.permit2();
-        _posm.poolManager();
-        uniPosm = _posm;
+        _uniPosm.permit2();
+        _uniPosm.poolManager();
+        uniPosm = _uniPosm;
 
-        require(_poolKey.currency0.isAddressZero());
-        require(Currency.unwrap(_poolKey.currency1) == address(_collateral));
+        require(_uniPoolKey.currency0.isAddressZero());
+        require(Currency.unwrap(_uniPoolKey.currency1) == address(_collateral));
 
-        uniPoolKey = _poolKey;
+        uniPoolKey = _uniPoolKey;
 
         (,,,,, bool usageAsCollateralEnabled,,,,) = _aaveDataProvider.getReserveConfigurationData(_collateral);
         require(usageAsCollateralEnabled);
@@ -96,35 +96,28 @@ contract IlSolver is Ownable2Step {
 
     receive() external payable {}
 
+    /// @dev Sets allowances and validates contract's funds to use in Uniswap V4
+    /// @notice In the case there's not enough ETH (`_amount0Max`), it will attempt to unwrap the right amount of WETH
     modifier univ4AttachFunds(uint128 _amount0Max, uint128 _amount1Max) {
         uint256 amount0Max = uint256(_amount0Max);
         uint256 amount1Max = uint256(_amount1Max);
-        PoolKey memory key = s_poolKey;
+        PoolKey memory key = uniPoolKey;
         address _this = address(this);
-        address sender = msg.sender;
-        address _permit2 = s_posm.permit2();
+        address _permit2 = uniPosm.permit2();
         IPermit2 permit2 = IPermit2(_permit2);
-        address _posm = address(s_posm);
+        address _posm = address(uniPosm);
 
-        if (s_ethLiquidityPosition) {
-            if (msg.value < amount0Max) {
-                revert IlSolver_wrongETHValueSent(amount0Max, msg.value);
-            }
-        } else {
-            IERC20 t0 = IERC20(Currency.unwrap(key.currency0));
-            t0.safeTransferFrom(sender, _this, amount0Max);
+        // Handle ETH
 
-            // permit2
-            if (t0.allowance(_this, _permit2) < amount0Max) {
-                t0.approve(_permit2, type(uint128).max);
-            }
-            (uint160 p2Allowance0,,) = permit2.allowance(_this, address(t0), _posm);
-            if (p2Allowance0 < amount0Max) {
-                permit2.approve(address(t0), _posm, type(uint128).max, type(uint48).max);
-            }
+        uint256 ethBalance = _this.balance;
+        uint256 ethNeeded = (ethBalance < amount0Max) ? amount0Max - ethBalance : 0;
+        if (ethNeeded > 0) {
+            WETH.withdraw(ethNeeded);
         }
+
+        // Handle collateral
+
         IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
-        t1.safeTransferFrom(sender, _this, amount1Max);
         if (t1.allowance(_this, _permit2) < amount1Max) {
             t1.approve(_permit2, type(uint128).max);
         }
