@@ -6,21 +6,20 @@ export const config = createConfig(
     getDefaultConfig({
         chains: [
             {
-                ...mainnet,
-                id: 1337, // Replace with StableChain's chainId if known
-                name: 'StableChain Testnet',
+                id: 998, // Replace with StableChain's chainId if known
+                name: 'Hyperliquid Testnet',
                 rpcUrls: {
                     default: {
-                        http: ['https://rpc.testnet.stable.xyz'],
+                        http: ['https://rpc.hyperliquid-testnet.xyz/evm'],
                     },
                 },
                 nativeCurrency: {
-                    name: 'STC',
-                    symbol: 'STC',
+                    name: 'Hype',
+                    symbol: 'HYPE',
                     decimals: 18,
                 },
                 blockExplorers: {
-                    default: { name: 'StableScan', url: 'https://explorer.stable.xyz' },
+                    default: { name: 'StableScan', url: 'https://testnet.purrsec.com' },
                 },
                 testnet: true,
             },

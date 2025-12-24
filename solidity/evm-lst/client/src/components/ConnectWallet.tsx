@@ -25,6 +25,7 @@ export function ConnectWallet() {
                     padding: "10px",
                     border: "1px solid green",
                     margin: "10px 0",
+                    flexBasis: "30%",
                 }}
             >
                 <p>Connected to: **{address}**</p>

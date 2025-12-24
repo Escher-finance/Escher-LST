@@ -1,0 +1,144 @@
+[
+    {
+        "type": "function",
+        "name": "delegate",
+        "inputs": [],
+        "outputs": [],
+        "stateMutability": "payable"
+    },
+    {
+        "type": "function",
+        "name": "delegationSummary",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "tuple",
+                "internalType": "struct DelegatorSummary",
+                "components": [
+                    {
+                        "name": "delegated",
+                        "type": "uint64",
+                        "internalType": "uint64"
+                    },
+                    {
+                        "name": "undelegated",
+                        "type": "uint64",
+                        "internalType": "uint64"
+                    },
+                    {
+                        "name": "totalPendingWithdrawal",
+                        "type": "uint64",
+                        "internalType": "uint64"
+                    },
+                    {
+                        "name": "nPendingWithdrawals",
+                        "type": "uint64",
+                        "internalType": "uint64"
+                    }
+                ]
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "receiveBatch",
+        "inputs": [
+            {
+                "name": "batchAssets",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "setLiquidStakingManager",
+        "inputs": [
+            {
+                "name": "_manager",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "undelegate",
+        "inputs": [
+            {
+                "name": "amount",
+                "type": "uint64",
+                "internalType": "uint64"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "updateValidators",
+        "inputs": [
+            {
+                "name": "_validators",
+                "type": "address[]",
+                "internalType": "address[]"
+            },
+            {
+                "name": "_weights",
+                "type": "uint64[]",
+                "internalType": "uint64[]"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "event",
+        "name": "Delegated",
+        "inputs": [
+            {
+                "name": "sender",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "Undelegated",
+        "inputs": [
+            {
+                "name": "sender",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
+                "name": "amount",
+                "type": "uint64",
+                "indexed": false,
+                "internalType": "uint64"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "error",
+        "name": "EmptyValidatorSet",
+        "inputs": []
+    }
+]

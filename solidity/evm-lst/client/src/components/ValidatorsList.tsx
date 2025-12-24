@@ -2,12 +2,9 @@
 
 import { STAKING_CONTRACT } from "@/hooks/useStablechain";
 import { useReadContract } from "wagmi";
-import { useAccount, useBalance } from "wagmi";
-import { stableTestnet } from "@/hooks/useStablechain";
-import { useEffect, useState } from "react";
 import contractABI from "@/contracts/staking.json";
 import { formatUnits } from "viem";
-import { useMemo, Suspense } from "react";
+import { useMemo } from "react";
 
 type Validator = {
     operatorAddress: string;

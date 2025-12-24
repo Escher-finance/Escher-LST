@@ -108,10 +108,26 @@
     },
     {
         "type": "function",
-        "name": "getPendingBatchId",
+        "name": "getLiquidity",
         "inputs": [],
         "outputs": [
-            { "name": "", "type": "uint256", "internalType": "uint256" }
+            {
+                "name": "",
+                "type": "tuple",
+                "internalType": "struct Liquidity",
+                "components": [
+                    {
+                        "name": "totalDelegated",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "name": "totalLst",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    }
+                ]
+            }
         ],
         "stateMutability": "view"
     },
@@ -164,6 +180,31 @@
         ],
         "outputs": [
             { "name": "", "type": "uint256[]", "internalType": "uint256[]" }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "rate",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "tuple",
+                "internalType": "struct Rate",
+                "components": [
+                    {
+                        "name": "bondRate",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "name": "unbondRate",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    }
+                ]
+            }
         ],
         "stateMutability": "view"
     },
@@ -362,5 +403,6 @@
             }
         ],
         "anonymous": false
-    }
+    },
+    { "type": "error", "name": "TokenTransferFailure", "inputs": [] }
 ]

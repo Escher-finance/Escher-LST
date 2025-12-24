@@ -2,7 +2,7 @@
 
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { wagmiConfig } from "@/hooks/useStablechain";
+import { wagmiConfig } from "@/hooks/useHyperliquidChain";
 import React from "react";
 
 const queryClient = new QueryClient();

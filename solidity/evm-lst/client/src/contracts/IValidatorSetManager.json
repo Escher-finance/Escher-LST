@@ -1,0 +1,155 @@
+[
+    {
+        "type": "function",
+        "name": "getAllValidators",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "tuple[]",
+                "internalType": "struct Validator[]",
+                "components": [
+                    {
+                        "name": "validator",
+                        "type": "address",
+                        "internalType": "address"
+                    },
+                    {
+                        "name": "weight",
+                        "type": "uint64",
+                        "internalType": "uint64"
+                    }
+                ]
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getTotalWeight",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint64",
+                "internalType": "uint64"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getValidator",
+        "inputs": [
+            {
+                "name": "_validator",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "validatorAddress",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "weight",
+                "type": "uint64",
+                "internalType": "uint64"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "getValidatorCount",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "setDelegationManager",
+        "inputs": [
+            {
+                "name": "_manager",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "updateValidators",
+        "inputs": [
+            {
+                "name": "_validators",
+                "type": "address[]",
+                "internalType": "address[]"
+            },
+            {
+                "name": "_weights",
+                "type": "uint64[]",
+                "internalType": "uint64[]"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "validatorExists",
+        "inputs": [
+            {
+                "name": "_validator",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bool",
+                "internalType": "bool"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "event",
+        "name": "ValidatorSetBatchUpdated",
+        "inputs": [
+            {
+                "name": "validatorCount",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "error",
+        "name": "ArrayLengthMismatch",
+        "inputs": []
+    },
+    {
+        "type": "error",
+        "name": "InvalidAddress",
+        "inputs": []
+    },
+    {
+        "type": "error",
+        "name": "InvalidWeight",
+        "inputs": []
+    }
+]
