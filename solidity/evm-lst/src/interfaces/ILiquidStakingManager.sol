@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {UnbondBatch, UnbondRequest, Liquidity} from "../models/State.sol";
 import {Rate} from "../models/Type.sol";
 

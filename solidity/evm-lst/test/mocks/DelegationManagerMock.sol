@@ -14,7 +14,7 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
     uint64 public totalPendingWithdrawal;
     uint64 public nPendingWithdrawals;
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
-    uint256 public constant CORE_TO_EVM = 10 ** 12;
+    uint256 public constant CORE_TO_EVM = 10 ** 10;
 
     constructor() Ownable(msg.sender) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);

@@ -18,7 +18,7 @@ contract LiquidStakingManagerTest is Test {
     address public bob = makeAddr("bob");
     address public alice = makeAddr("alice");
 
-    uint256 public constant CORE_TO_EVM = 10 ** 12;
+    uint256 public constant CORE_TO_EVM = 10 ** 10;
     uint256 public STARTING_BALANCE = 10000 * CORE_TO_EVM;
 
     function setUp() public {

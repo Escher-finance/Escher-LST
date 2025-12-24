@@ -27,7 +27,7 @@ contract LiquidStakingManager is
     Config private s_config;
     Liquidity private s_liquidity;
     uint256 public constant SCALING_FACTOR = 10 ** 18;
-    uint256 public constant CORE_TO_EVM = 10 ** 12;
+    uint256 public constant CORE_TO_EVM = 10 ** 10;
 
     // Batch management storage
     uint256 private s_pendingBatchId;
@@ -237,10 +237,11 @@ contract LiquidStakingManager is
         batch.nextActionTime = block.timestamp + s_config.undelegatePeriodSeconds;
 
         // Call undelegate on delegation manager
-        delegationManager.undelegate(uint64(assetsToUndelegate));
+        uint64 undelegateAmount = uint64(assetsToUndelegate / uint256(CORE_TO_EVM));
+        delegationManager.undelegate(undelegateAmount);
 
         // Decrease the total delegated assets tracked by the manager
-        s_liquidity.totalDelegated -= assetsToUndelegate;
+        s_liquidity.totalDelegated -= undelegateAmount;
 
         // Burn the LST tokens held by this contract for this batch
         share.burn(address(this), batch.totalShares);
