@@ -23,11 +23,11 @@ export function Validators() {
     return (
         <div
             style={{
-                padding: "10px",
-                margin: "5px",
+                padding: "5px 5px 5px 10px",
+                margin: "0px",
             }}
         >
-            <h3>Validators</h3>
+            <h4>Validators</h4>
             {isLoading ? (
                 <p>Loading validators...</p>
             ) : isError ? (
@@ -39,8 +39,8 @@ export function Validators() {
                             key={index}
                             style={{
                                 border: "1px solid #eee",
-                                padding: "10px",
-                                margin: "5px 0",
+                                padding: "0px",
+                                margin: "0px",
                             }}
                         >
                             <strong>Address:</strong> {v.validator}

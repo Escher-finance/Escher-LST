@@ -1,6 +1,6 @@
 "use client";
 
-import { useConnection, useWriteContract } from "wagmi";
+import { useConnection, useWriteContract, useReadContract } from "wagmi";
 import { useState, useMemo, useEffect } from "react";
 import { parseUnits } from "viem";
 import {
@@ -36,6 +36,18 @@ export function StakingUI() {
         }
         return BigInt(0);
     }, [unbondAmount]);
+
+    const {
+        data: userRequests,
+        isError: userRequestsError,
+        isLoading: userRequestsLoading,
+    } = useReadContract({
+        address: STAKING_CONTRACT.address,
+        abi: STAKING_CONTRACT.abi,
+        functionName: "getUserRequestIds",
+        args: [userAddress],
+        chainId: STAKING_CONTRACT.chainId,
+    });
 
     if (!isClient) {
         return <p>Loading...</p>; // Static fallback for SSR
@@ -173,6 +185,30 @@ export function StakingUI() {
         );
     };
 
+    const handleClaim = (e: React.FormEvent) => {
+        e.preventDefault();
+        const id = e.target.elements.requestId.value;
+
+        writeContract.mutate(
+            {
+                abi: STAKING_CONTRACT.abi,
+                address: STAKING_CONTRACT.address, // Staking contract address
+                functionName: "claimUnbondRequest",
+                args: [BigInt(id)],
+            },
+            {
+                onSuccess: (data) => {
+                    console.log("Transaction successful:", data);
+                    alert(`Transaction successful! Hash: ${data}`); // Updated to use data directly
+                },
+                onError: (error) => {
+                    console.error("Transaction failed:", error);
+                    alert(`Transaction failed: ${error.message}`);
+                },
+            },
+        );
+    };
+
     const handleMoveBatch = (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -201,19 +237,19 @@ export function StakingUI() {
     return (
         <div
             style={{
-                margin: "20px 0",
-                padding: "15px",
+                margin: "5px",
+                padding: "5px",
                 border: "1px solid blue",
                 display: "flex",
             }}
         >
             <div
                 style={{
-                    margin: "10px 0",
-                    padding: "15px",
+                    margin: "5px 0",
+                    padding: "5px",
                 }}
             >
-                <h2>💰 Bond</h2>
+                <h4>💰 Bond</h4>
                 <form onSubmit={handleBond}>
                     <div style={{ marginBottom: "10px" }}>
                         <label>
@@ -230,13 +266,14 @@ export function StakingUI() {
                     <button type="submit">Delegate</button>
                 </form>
             </div>
+
             <div
                 style={{
-                    margin: "10px 0",
-                    padding: "15px",
+                    margin: "5px 0",
+                    padding: "5px",
                 }}
             >
-                <h2>💰 Unbond</h2>
+                <h4>💰 Unbond</h4>
                 <form onSubmit={handleUnbond}>
                     <div style={{ marginBottom: "10px" }}>
                         <label>
@@ -257,37 +294,64 @@ export function StakingUI() {
             </div>
             <div
                 style={{
-                    margin: "5px",
-                    padding: "5px",
+                    display: "flex",
+                    flexDirection: "column",
+                    margin: "10px 0",
+                    padding: "15px",
                 }}
             >
-                <h4>Submit Batch</h4>
-                <form onSubmit={handleSubmitBatch}>
-                    <button type="submit">Submit Batch</button>
-                </form>
+                <div
+                    style={{
+                        margin: "5px",
+                        padding: "5px",
+                    }}
+                >
+                    <form onSubmit={handleSubmitBatch}>
+                        <button type="submit">Submit Batch</button>
+                    </form>
+                </div>
+                <div
+                    style={{
+                        margin: "5px",
+                        padding: "5px",
+                    }}
+                >
+                    <form onSubmit={handleMoveBatch}>
+                        <button type="submit">Move Batch</button>
+                    </form>
+                </div>
+                <div
+                    style={{
+                        margin: "5px",
+                        padding: "5px",
+                    }}
+                >
+                    <form onSubmit={handleReceiveBatch}>
+                        <button type="submit">Receive Batch</button>
+                    </form>
+                </div>
             </div>
-            <div
-                style={{
-                    margin: "5px",
-                    padding: "5px",
-                }}
-            >
-                <h4>Move Batch</h4>
-                <form onSubmit={handleMoveBatch}>
-                    <button type="submit">Move</button>
-                </form>
-            </div>
-            <div
-                style={{
-                    margin: "5px",
-                    padding: "5px",
-                }}
-            >
-                <h4>Receive Batch</h4>
-                <form onSubmit={handleReceiveBatch}>
-                    <button type="submit">Receive</button>
-                </form>
-            </div>
+            {Array.isArray(userRequests) && userRequests.length > 0 && (
+                <div>
+                    <h4>Claim Unbond:</h4>
+                    <form onSubmit={handleClaim}>
+                        {userRequests ? (
+                            <select id="requestId" name="requestId">
+                                {Array.isArray(userRequests) &&
+                                    userRequests.map((v, index) => (
+                                        <option key={index} value={v}>
+                                            {" "}
+                                            Request Id: {v}{" "}
+                                        </option>
+                                    ))}
+                            </select>
+                        ) : (
+                            ""
+                        )}
+                        <button type="submit">Claim</button>
+                    </form>
+                </div>
+            )}
         </div>
     );
 }
