@@ -185,6 +185,19 @@
     },
     {
         "type": "function",
+        "name": "moveBatch",
+        "inputs": [
+            {
+                "name": "batchId",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
         "name": "rate",
         "inputs": [],
         "outputs": [
@@ -256,6 +269,25 @@
                 "name": "batchId",
                 "type": "uint256",
                 "indexed": true,
+                "internalType": "uint256"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "BatchMoved",
+        "inputs": [
+            {
+                "name": "batchId",
+                "type": "uint256",
+                "indexed": true,
+                "internalType": "uint256"
+            },
+            {
+                "name": "totalAssets",
+                "type": "uint256",
+                "indexed": false,
                 "internalType": "uint256"
             }
         ],

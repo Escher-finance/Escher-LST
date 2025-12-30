@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {HyperliquidDelegationManager} from "../src/contracts/HyperliquidDelegationManager.sol";
@@ -25,7 +25,7 @@ contract DeployHyperliquidValidatorDelegationManager is Script {
             abi.encodeWithSelector(ValidatorSetManager.initialize.selector, msg.sender);
         ERC1967Proxy validatorManagerProxy = new ERC1967Proxy(validatorManagerImpl, initializeValidatorManagerData);
         validatorManager = ValidatorSetManager(address(validatorManagerProxy));
-        console.log("validatorManager address", address(validatorManager));
+        console.log("VALIDATOR_MANAGER=", address(validatorManager));
 
         // Start deploy DelegationManager
         address delegationManagerImpl = address(new HyperliquidDelegationManager());
@@ -34,8 +34,8 @@ contract DeployHyperliquidValidatorDelegationManager is Script {
         );
 
         ERC1967Proxy delegationManagerProxy = new ERC1967Proxy(delegationManagerImpl, initializeDelegationManagerData);
-        delegationManager = HyperliquidDelegationManager(address(delegationManagerProxy));
-        console.log("delegationManager address", address(delegationManager));
+        delegationManager = HyperliquidDelegationManager(payable(address(delegationManagerProxy)));
+        console.log("DELEGATION_MANAGER=", address(delegationManager));
 
         validatorManager.setDelegationManager(address(delegationManager));
 

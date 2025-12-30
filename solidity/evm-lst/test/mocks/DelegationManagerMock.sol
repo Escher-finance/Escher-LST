@@ -113,6 +113,14 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
         require(success, "transfer failed");
     }
 
+    /// @notice Move received unbonded/undelegated assets from validators to liquid staking manager
+    function moveBatch(uint256 batchAssets) external {
+        require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
+
+        bool success = true;
+        require(success, "transfer failed");
+    }
+
     /// @notice Allows the mock to receive ETH
     receive() external payable {}
 }

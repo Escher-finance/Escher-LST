@@ -279,10 +279,26 @@ contract LiquidStakingManager is
         // Update batch status to received
         batch.status = BatchStatus.Received;
 
-        // get the unbonded assets from delegation Manager
+        // get the unbonded assets from delegation Manager to Lst
         delegationManager.receiveBatch(batch.totalAssets);
 
         emit BatchReceived(batchId, batch.totalAssets);
+    }
+
+    /**
+     * @notice Mark a submitted batch as received after undelegation period
+     * @param batchId The ID of the batch to mark as received
+     */
+    function moveBatch(uint256 batchId) external nonReentrant {
+        UnbondBatch storage batch = s_batches[batchId];
+        require(batch.batchId != 0, "batch does not exist");
+        require(batch.status == BatchStatus.Submitted, "batch is not in submitted status");
+        require(block.timestamp >= batch.nextActionTime, "undelegation period not yet passed");
+
+        // move assets from spot to Evm
+        delegationManager.moveBatch(batch.totalAssets);
+
+        emit BatchMoved(batchId, batch.totalAssets);
     }
 
     /**

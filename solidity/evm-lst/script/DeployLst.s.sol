@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {HyperliquidDelegationManager} from "../src/contracts/HyperliquidDelegationManager.sol";
 import {Lst} from "../src/tokens/Lst.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 

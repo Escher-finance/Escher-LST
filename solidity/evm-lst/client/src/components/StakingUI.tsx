@@ -11,8 +11,8 @@ import {
 export function StakingUI() {
     const [isClient, setIsClient] = useState(false);
     const { address: userAddress, isConnected } = useConnection();
-    const [amount, setAmount] = useState("0.0000001");
-    const [unbondAmount, setUnbondAmount] = useState("0.0000001");
+    const [amount, setAmount] = useState("0.000001");
+    const [unbondAmount, setUnbondAmount] = useState("0.000001");
 
     const writeContract = useWriteContract();
     useEffect(() => {
@@ -150,6 +150,52 @@ export function StakingUI() {
         );
     };
 
+    const handleReceiveBatch = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        writeContract.mutate(
+            {
+                abi: STAKING_CONTRACT.abi,
+                address: STAKING_CONTRACT.address, // Staking contract address
+                functionName: "receiveBatch",
+                args: [1],
+            },
+            {
+                onSuccess: (data) => {
+                    console.log("Transaction successful:", data);
+                    alert(`Transaction successful! Hash: ${data}`); // Updated to use data directly
+                },
+                onError: (error) => {
+                    console.error("Transaction failed:", error);
+                    alert(`Transaction failed: ${error.message}`);
+                },
+            },
+        );
+    };
+
+    const handleMoveBatch = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        writeContract.mutate(
+            {
+                abi: STAKING_CONTRACT.abi,
+                address: STAKING_CONTRACT.address, // Staking contract address
+                functionName: "moveBatch",
+                args: [1],
+            },
+            {
+                onSuccess: (data) => {
+                    console.log("Transaction successful:", data);
+                    alert(`Transaction successful! Hash: ${data}`); // Updated to use data directly
+                },
+                onError: (error) => {
+                    console.error("Transaction failed:", error);
+                    alert(`Transaction failed: ${error.message}`);
+                },
+            },
+        );
+    };
+
     if (!isConnected) return null;
 
     return (
@@ -209,16 +255,37 @@ export function StakingUI() {
                     <button type="submit">Unbond</button>
                 </form>
             </div>
-
             <div
                 style={{
-                    margin: "10px 0",
-                    padding: "15px",
+                    margin: "5px",
+                    padding: "5px",
                 }}
             >
-                <h2>Submit Batch</h2>
+                <h4>Submit Batch</h4>
                 <form onSubmit={handleSubmitBatch}>
                     <button type="submit">Submit Batch</button>
+                </form>
+            </div>
+            <div
+                style={{
+                    margin: "5px",
+                    padding: "5px",
+                }}
+            >
+                <h4>Move Batch</h4>
+                <form onSubmit={handleMoveBatch}>
+                    <button type="submit">Move</button>
+                </form>
+            </div>
+            <div
+                style={{
+                    margin: "5px",
+                    padding: "5px",
+                }}
+            >
+                <h4>Receive Batch</h4>
+                <form onSubmit={handleReceiveBatch}>
+                    <button type="submit">Receive</button>
                 </form>
             </div>
         </div>

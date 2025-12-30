@@ -26,6 +26,7 @@ contract HyperliquidDelegationManager is
 {
     IValidatorSetManager validatorManager;
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    uint256 public constant CORE_TO_EVM = 10 ** 10;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -38,6 +39,7 @@ contract HyperliquidDelegationManager is
         __Ownable_init(owner);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
+        _grantRole(MANAGER_ROLE, owner);
         validatorManager = IValidatorSetManager(_validatorManager);
     }
 
@@ -241,11 +243,21 @@ contract HyperliquidDelegationManager is
         }
     }
 
+    function moveBatch(uint256 batchAssets) external nonReentrant {
+        require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
+
+        // Transfer from spot balance to evm
+        uint64 hypeTokenIndex = HLConstants.hypeTokenIndex();
+        CoreWriterLib.bridgeToEvm(hypeTokenIndex, batchAssets, true);
+    }
+
     function receiveBatch(uint256 batchAssets) external nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
 
         // Transfer unbonded assets to liquid staking manager
         (bool success,) = payable(msg.sender).call{value: batchAssets}("");
-        require(success, "transfer failed");
+        require(success, "transfer to receive batch failed");
     }
+
+    receive() external payable {}
 }

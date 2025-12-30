@@ -10,6 +10,7 @@ import {
 } from "@/hooks/useHyperliquidChain";
 import { useEffect, useState } from "react";
 import { STAKING_CONTRACT } from "@/hooks/useHyperliquidChain";
+import { getBalance } from "wagmi/actions";
 
 export function UserBalance() {
     const [isClient, setIsClient] = useState(false);
@@ -17,6 +18,24 @@ export function UserBalance() {
     const { address, status } = useConnection();
     const { data, isLoading, isError, error } = useBalance({
         address,
+    });
+
+    const {
+        data: lstContractData,
+        isLoading: lstContractIsLoading,
+        isError: lstContractIsError,
+        error: lstContractError,
+    } = useBalance({
+        address: STAKING_CONTRACT.address,
+    });
+
+    const {
+        data: delContractData,
+        isLoading: delContractIsLoading,
+        isError: delContractIsError,
+        error: delContractError,
+    } = useBalance({
+        address: DELEGATION_CONTRACT.address,
     });
 
     const EVM_DECIMALS: number = 1e18;
@@ -55,7 +74,7 @@ export function UserBalance() {
     } = useReadContract({
         address: STAKING_CONTRACT.address,
         abi: STAKING_CONTRACT.abi,
-        functionName: "totalAssets",
+        functionName: "getLiquidity",
         args: [],
         chainId: 998, // Stable testnet chain ID (verify this)
     });
@@ -163,7 +182,20 @@ export function UserBalance() {
                     {tokenData ? `${tokenData} eHype` : "0"}
                     <br />
                     <br />
+                    <strong>LSTContract </strong>
+                    <br />
+                    Balance:{" "}
+                    {lstContractData
+                        ? `${lstContractData.value} ${lstContractData.symbol}`
+                        : "0"}
+                    <br />
+                    <br />
                     <strong>DelegationContract </strong>
+                    <br />
+                    EVM Balance:{" "}
+                    {delContractData
+                        ? `${delContractData.value} ${delContractData.symbol}`
+                        : "0"}
                     <br />
                     Spot Balance:{" "}
                     {spotBalance ? `${spotBalance.total} Hype` : "0"}
@@ -172,7 +204,7 @@ export function UserBalance() {
                     <strong>Liquidity: </strong>
                     <br />
                     LST(eHype):
-                    {liquidity ? `${liquidity}` : "0"} eHype
+                    {liquidity ? `${liquidity.totalLst}` : "0"} eHype
                     <br />
                     Delegated:
                     {summaryData ? `${summaryData?.delegated} Hype` : "0"}
@@ -185,10 +217,8 @@ export function UserBalance() {
                         ? `${summaryData?.totalPendingWithdrawal} Hype`
                         : "0"}
                     <br />
-                    nPendingWithdrawals:{" "}
-                    {summaryData
-                        ? `${summaryData?.nPendingWithdrawals} Hype`
-                        : "0"}
+                    PendingWithdrawals:{" "}
+                    {summaryData ? `${summaryData?.nPendingWithdrawals}` : "0"}
                     <br />
                 </div>
             )}

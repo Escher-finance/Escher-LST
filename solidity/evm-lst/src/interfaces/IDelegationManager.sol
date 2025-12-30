@@ -29,6 +29,10 @@ interface IDelegationManager {
     /// @param _weights Array of weights for each validator
     function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external;
 
+    /// @notice moveBatch is function to move batch assets from spot balance to Evm
+    /// @param batchAssets Amount of unbonded assets that was received from validators
+    function moveBatch(uint256 batchAssets) external;
+
     /// @notice Receive Batch is function to transfer received unbonded/undelegated amount to liquid staking manager
     /// @param batchAssets Amount of unbonded assets that was received from validators
     function receiveBatch(uint256 batchAssets) external;

@@ -30,6 +30,11 @@ interface ILiquidStakingManager {
     /// @param nextActionTime The timestamp when the batch can be received.
     event BatchSubmitted(uint256 indexed batchId, uint256 totalShares, uint256 totalAssets, uint256 nextActionTime);
 
+    /// @dev Emitted when a batch has moved the undelegated tokens
+    /// @param batchId The batch ID that received tokens.
+    /// @param totalAssets The total assets received.
+    event BatchMoved(uint256 indexed batchId, uint256 totalAssets);
+
     /// @dev Emitted when a batch has received the undelegated tokens.
     /// @param batchId The batch ID that received tokens.
     /// @param totalAssets The total assets received.
@@ -58,6 +63,10 @@ interface ILiquidStakingManager {
 
     /// @notice Submit the current pending batch for undelegation
     function submitBatch() external;
+
+    /// @notice Move received batch assets
+    /// @param batchId The ID of the batch assets to move
+    function moveBatch(uint256 batchId) external;
 
     /// @notice Mark a submitted batch as received after undelegation period
     /// @param batchId The ID of the batch to mark as received

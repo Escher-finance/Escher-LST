@@ -283,4 +283,12 @@ contract StablechainDelegationManager is
         (bool success,) = payable(msg.sender).call{value: batchAssets}("");
         require(success, "transfer failed");
     }
+
+    function moveBatch(uint256 batchAssets) external nonReentrant {
+        require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
+
+        // Transfer unbonded assets to liquid staking manager
+        (bool success,) = payable(msg.sender).call{value: batchAssets}("");
+        require(success, "transfer failed");
+    }
 }

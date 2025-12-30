@@ -4,7 +4,7 @@ import { ConnectWallet } from "@/components/ConnectWallet";
 import { UserBalance } from "@/components/UserBalance";
 import { Suspense } from "react";
 import { StakingUI } from "@/components/StakingUI";
-import { ValidatorsList } from "@/components/ValidatorsList";
+import { Validators } from "@/components/Validators";
 
 export default function Home() {
     return (
@@ -12,9 +12,18 @@ export default function Home() {
             <h1>Escher Staking</h1>
             <div style={{ display: "flex", flex: "2 1" }}>
                 <UserBalance />
-                <Suspense fallback={<p>Loading wallet...</p>}>
-                    <ConnectWallet />
-                </Suspense>
+                <div
+                    style={{
+                        display: "flex",
+                        flexBasis: "30%",
+                        flexDirection: "column",
+                    }}
+                >
+                    <Suspense fallback={<p>Loading wallet...</p>}>
+                        <ConnectWallet />
+                    </Suspense>
+                    <Validators />
+                </div>
             </div>
 
             <Suspense fallback={<p>Loading validators...</p>}>

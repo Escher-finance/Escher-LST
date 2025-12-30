@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
@@ -19,7 +19,7 @@ contract DeployLiquidStakingManager is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        address delegationManagerAddress = 0xD076481EF09255d243C58C65c119C377009Fda31; //TODO: Replace This
+        address payable delegationManagerAddress = payable(0xE77A50c077Abb0c26Ef8fDa2C7474C684cC1Ce6b); //TODO: Replace This
         delegationManager = HyperliquidDelegationManager(delegationManagerAddress);
 
         // Deploying Lst (ERC20)
@@ -32,11 +32,14 @@ contract DeployLiquidStakingManager is Script {
 
         lst = Lst(address(proxy));
 
-        console.log("eHype address", address(lst));
+        console.log("LST=", address(lst));
 
         // Deploying Lst Manager
         address lstManagerImplementation = address(new LiquidStakingManager());
-        console.log("LiquidStakingManager implementation deployed @", lstManagerImplementation);
+        // console.log(
+        //     "LiquidStakingManager implementation deployed @",
+        //     lstManagerImplementation
+        // );
 
         ERC1967Proxy lstProxy = new ERC1967Proxy(
             lstManagerImplementation,
@@ -44,7 +47,6 @@ contract DeployLiquidStakingManager is Script {
                 LiquidStakingManager.initialize.selector, msg.sender, address(lst), delegationManagerAddress
             )
         );
-        console.log("LST Manager Proxy deployed @", address(lstProxy));
 
         lstManager = LiquidStakingManager(payable(address(lstProxy)));
 
@@ -53,7 +55,7 @@ contract DeployLiquidStakingManager is Script {
         // transfer Liquid staking token (eU) ownership to Liquid staking contract
         lst.transferOwnership(address(lstProxy));
 
-        console.log("lstManager address", address(lstManager));
+        console.log("LST_MANAGER=", address(lstManager));
 
         lstManager.acceptOwnershipTransfer();
 
