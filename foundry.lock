@@ -38,12 +38,6 @@
   "lib/union": {
     "rev": "04f9a404cb3733c544f6274b08ff863ba3dfb68f"
   },
-  "lib/universal-router": {
-    "tag": {
-      "name": "v1.6.0",
-      "rev": "41183d6eb154f0ab0e74a0e911a5ef9ea51fc4bd"
-    }
-  },
   "lib/v4-core": {
     "rev": "59d3ecf53afa9264a16bba0e38f4c5d2231f80bc"
   },
