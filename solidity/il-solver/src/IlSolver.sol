@@ -5,6 +5,7 @@ import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step
 import {IPositionManager as IPositionManagerOriginal} from "univ4-periphery/interfaces/IPositionManager.sol";
 import {Actions} from "univ4-periphery/libraries/Actions.sol";
 import {PoolKey} from "univ4-core/types/PoolKey.sol";
+import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
 import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
 import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
 import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
@@ -43,9 +44,12 @@ contract IlSolver is Ownable2Step {
     // The collateral asset (e.g. USDC)
     IERC20 public immutable collateral;
 
+    IPermit2 permit2;
+
     // Uniswap V4
 
     IPositionManager public uniPosm;
+    IPoolManager uniPoolManager;
     // Must have `currency0` set to ETH and `currency1` set to `collateral`
     PoolKey public uniPoolKey;
     uint256 public uniPositionTokenId;
@@ -75,8 +79,8 @@ contract IlSolver is Ownable2Step {
     ) Ownable(_owner) {
         WETH = _weth;
 
-        _uniPosm.permit2();
-        _uniPosm.poolManager();
+        permit2 = IPermit2(_uniPosm.permit2());
+        uniPoolManager = IPoolManager(address(_uniPosm.poolManager()));
         uniPosm = _uniPosm;
 
         require(_uniPoolKey.currency0.isAddressZero());
@@ -100,12 +104,13 @@ contract IlSolver is Ownable2Step {
      * @notice In the case there's not enough ETH (`_amount0Max`), it will attempt to unwrap the right amount of WETH
      */
     modifier univ4AttachFunds(uint128 _amount0Max, uint128 _amount1Max) {
+        require(_amount0Max > 0);
+        require(_amount1Max > 0);
+
         uint256 amount0Max = uint256(_amount0Max);
         uint256 amount1Max = uint256(_amount1Max);
         PoolKey memory key = uniPoolKey;
         address _this = address(this);
-        address _permit2 = uniPosm.permit2();
-        IPermit2 permit2 = IPermit2(_permit2);
         address _posm = address(uniPosm);
 
         // Handle ETH
@@ -119,8 +124,8 @@ contract IlSolver is Ownable2Step {
         // Handle collateral
 
         IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
-        if (t1.allowance(_this, _permit2) < amount1Max) {
-            t1.approve(_permit2, type(uint128).max);
+        if (t1.allowance(_this, address(permit2)) < amount1Max) {
+            t1.approve(address(permit2), type(uint128).max);
         }
         (uint160 p2Allowance1,,) = permit2.allowance(_this, address(t1), _posm);
         if (p2Allowance1 < amount1Max) {
