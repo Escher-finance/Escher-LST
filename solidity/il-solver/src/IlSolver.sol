@@ -3,7 +3,12 @@ pragma solidity ^0.8.24;
 
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IPositionManager as IPositionManagerOriginal} from "univ4-periphery/interfaces/IPositionManager.sol";
-import {IV4Router} from "univ4-periphery/interfaces/IV4Router.sol";
+import {
+    IV4Router,
+    PoolKey as PeripheryPoolKey,
+    Currency as PeripheryCurrency
+} from "univ4-periphery/interfaces/IV4Router.sol";
+import {IHooks} from "univ4-periphery/libraries/PathKey.sol";
 import {Actions} from "univ4-periphery/libraries/Actions.sol";
 import {PoolKey} from "univ4-core/types/PoolKey.sol";
 import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
@@ -280,9 +285,17 @@ contract IlSolver is Ownable2Step {
 
         PoolKey memory key = uniPoolKey;
         bytes[] memory params = new bytes[](3);
+        PeripheryPoolKey memory _key = PeripheryPoolKey({
+            currency0: PeripheryCurrency.wrap(Currency.unwrap(key.currency0)),
+            currency1: PeripheryCurrency.wrap(Currency.unwrap(key.currency1)),
+            fee: key.fee,
+            tickSpacing: key.tickSpacing,
+            hooks: IHooks(address(key.hooks))
+        });
+
         params[0] = abi.encode(
             IV4Router.ExactInputSingleParams({
-                poolKey: key,
+                poolKey: _key,
                 zeroForOne: zeroForOne,
                 amountIn: amountIn,
                 amountOutMinimum: minAmountOut,
