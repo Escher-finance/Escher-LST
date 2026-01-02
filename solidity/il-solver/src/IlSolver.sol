@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IPositionManager as IPositionManagerOriginal} from "univ4-periphery/interfaces/IPositionManager.sol";
+import {IV4Router} from "univ4-periphery/interfaces/IV4Router.sol";
 import {Actions} from "univ4-periphery/libraries/Actions.sol";
 import {PoolKey} from "univ4-core/types/PoolKey.sol";
 import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
@@ -30,12 +31,62 @@ interface IPositionManager is IPositionManagerOriginal {
 
 interface IL2Pool is IL2PoolOriginal, IPool {}
 
+interface IUniversalRouter {
+    function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
+}
+
 interface IPermit2 {
     function allowance(address user, address token, address spender)
         external
         view
         returns (uint160 amount, uint48 expiration, uint48 nonce);
     function approve(address token, address spender, uint160 amount, uint48 expiration) external;
+}
+
+// src: https://github.com/Uniswap/universal-router/blob/main/contracts/libraries/Commands.sol
+library UniversalRouterCommands {
+    // Masks to extract certain bits of commands
+    bytes1 internal constant FLAG_ALLOW_REVERT = 0x80;
+    bytes1 internal constant COMMAND_TYPE_MASK = 0x7f;
+
+    // Command Types. Maximum supported command at this moment is 0x3f.
+    // The commands are executed in nested if blocks to minimise gas consumption
+
+    // Command Types where value<=0x07, executed in the first nested-if block
+    uint256 constant V3_SWAP_EXACT_IN = 0x00;
+    uint256 constant V3_SWAP_EXACT_OUT = 0x01;
+    uint256 constant PERMIT2_TRANSFER_FROM = 0x02;
+    uint256 constant PERMIT2_PERMIT_BATCH = 0x03;
+    uint256 constant SWEEP = 0x04;
+    uint256 constant TRANSFER = 0x05;
+    uint256 constant PAY_PORTION = 0x06;
+    // COMMAND_PLACEHOLDER = 0x07;
+
+    // Command Types where 0x08<=value<=0x0f, executed in the second nested-if block
+    uint256 constant V2_SWAP_EXACT_IN = 0x08;
+    uint256 constant V2_SWAP_EXACT_OUT = 0x09;
+    uint256 constant PERMIT2_PERMIT = 0x0a;
+    uint256 constant WRAP_ETH = 0x0b;
+    uint256 constant UNWRAP_WETH = 0x0c;
+    uint256 constant PERMIT2_TRANSFER_FROM_BATCH = 0x0d;
+    uint256 constant BALANCE_CHECK_ERC20 = 0x0e;
+    // COMMAND_PLACEHOLDER = 0x0f;
+
+    // Command Types where 0x10<=value<=0x20, executed in the third nested-if block
+    uint256 constant V4_SWAP = 0x10;
+    uint256 constant V3_POSITION_MANAGER_PERMIT = 0x11;
+    uint256 constant V3_POSITION_MANAGER_CALL = 0x12;
+    uint256 constant V4_INITIALIZE_POOL = 0x13;
+    uint256 constant V4_POSITION_MANAGER_CALL = 0x14;
+    // COMMAND_PLACEHOLDER = 0x15 -> 0x20
+
+    // Command Types where 0x21<=value<=0x3f
+    uint256 constant EXECUTE_SUB_PLAN = 0x21;
+    // COMMAND_PLACEHOLDER for 0x22 to 0x3f
+
+    // Command Types where 0x40<=value<=0x5f
+    // Reserved for 3rd party integrations
+    uint256 constant ACROSS_V4_DEPOSIT_V3 = 0x40;
 }
 
 contract IlSolver is Ownable2Step {
@@ -50,6 +101,7 @@ contract IlSolver is Ownable2Step {
 
     IPositionManager public uniPosm;
     IPoolManager uniPoolManager;
+    IUniversalRouter uniRouter;
     // Must have `currency0` set to ETH and `currency1` set to `collateral`
     PoolKey public uniPoolKey;
     uint256 public uniPositionTokenId;
@@ -72,6 +124,7 @@ contract IlSolver is Ownable2Step {
         IERC20 _collateral,
         IPositionManager _uniPosm,
         PoolKey memory _uniPoolKey,
+        IUniversalRouter _uniRouter,
         IL2Pool _aavePool,
         L2Encoder _aaveEncoder,
         IPoolDataProvider _aaveDataProvider,
@@ -82,6 +135,7 @@ contract IlSolver is Ownable2Step {
         permit2 = IPermit2(_uniPosm.permit2());
         uniPoolManager = IPoolManager(address(_uniPosm.poolManager()));
         uniPosm = _uniPosm;
+        uniRouter = _uniRouter;
 
         require(_uniPoolKey.currency0.isAddressZero());
         require(Currency.unwrap(_uniPoolKey.currency1) == address(_collateral));
@@ -216,6 +270,33 @@ contract IlSolver is Ownable2Step {
 
         used0 = b0Before + amount0Max - b0After;
         used1 = b1Before + amount1Max - b1After;
+    }
+
+    // swaps exact input single
+    function _univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut) private {
+        bytes memory commands = abi.encodePacked(uint8(UniversalRouterCommands.V4_SWAP));
+        bytes memory actions =
+            abi.encodePacked(uint8(Actions.SWAP_EXACT_IN_SINGLE), uint8(Actions.SETTLE_ALL), uint8(Actions.TAKE_ALL));
+
+        PoolKey memory key = uniPoolKey;
+        bytes[] memory params = new bytes[](3);
+        params[0] = abi.encode(
+            IV4Router.ExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: zeroForOne,
+                amountIn: amountIn,
+                amountOutMinimum: minAmountOut,
+                hookData: bytes("")
+            })
+        );
+        params[1] = abi.encode(key.currency0, amountIn);
+        params[2] = abi.encode(key.currency1, minAmountOut);
+
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(actions, params);
+        uint256 deadline = block.timestamp;
+
+        uniRouter.execute(commands, inputs, deadline);
     }
 
     /**
