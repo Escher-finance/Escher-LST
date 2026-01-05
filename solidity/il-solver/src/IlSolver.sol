@@ -376,7 +376,7 @@ contract IlSolver is Ownable2Step {
 
         uint256 bBefore = (zeroForOne) ? key.currency1.balanceOfSelf() : key.currency0.balanceOfSelf();
 
-        uniRouter.execute(commands, inputs, deadline);
+        uniRouter.execute{value: zeroForOne ? amountIn : 0}(commands, inputs, deadline);
 
         uint256 bAfter = (zeroForOne) ? key.currency1.balanceOfSelf() : key.currency0.balanceOfSelf();
 
