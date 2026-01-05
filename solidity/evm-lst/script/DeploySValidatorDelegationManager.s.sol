@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {StablechainDelegationManager} from "../src/contracts/StablechainDelegationManager.sol";
-import {ValidatorSetManager} from "../src/ValidatorSetManager.sol";
+import {ValidatorSetManager} from "../src/contracts/ValidatorSetManager.sol";
 import {L1Read} from "../src/L1Read.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -21,14 +21,21 @@ contract DeployHyperliquidValidatorDelegationManager is Script {
 
         // Start deploy Validator set Manager
         address validatorManagerImpl = address(new ValidatorSetManager());
-        bytes memory initializeValidatorManagerData =
-            abi.encodeWithSelector(ValidatorSetManager.initialize.selector, msg.sender);
-        ERC1967Proxy validatorManagerProxy = new ERC1967Proxy(validatorManagerImpl, initializeValidatorManagerData);
+        bytes memory initializeValidatorManagerData = abi.encodeWithSelector(
+            ValidatorSetManager.initialize.selector,
+            msg.sender
+        );
+        ERC1967Proxy validatorManagerProxy = new ERC1967Proxy(
+            validatorManagerImpl,
+            initializeValidatorManagerData
+        );
         validatorManager = ValidatorSetManager(address(validatorManagerProxy));
         console.log("validatorManager address", address(validatorManager));
 
         // Start deploy DelegationManager
-        address delegationManagerImpl = address(new StablechainDelegationManager());
+        address delegationManagerImpl = address(
+            new StablechainDelegationManager()
+        );
 
         address stableToken = 0x0000000000000000000000000000000000001003;
         address liquidToken = 0x0000000000000000000000000000000000001003;
@@ -40,8 +47,13 @@ contract DeployHyperliquidValidatorDelegationManager is Script {
             liquidToken
         );
 
-        ERC1967Proxy delegationManagerProxy = new ERC1967Proxy(delegationManagerImpl, initializeDelegationManagerData);
-        delegationManager = StablechainDelegationManager(address(delegationManagerProxy));
+        ERC1967Proxy delegationManagerProxy = new ERC1967Proxy(
+            delegationManagerImpl,
+            initializeDelegationManagerData
+        );
+        delegationManager = StablechainDelegationManager(
+            address(delegationManagerProxy)
+        );
         console.log("delegationManager address", address(delegationManager));
 
         validatorManager.setDelegationManager(address(delegationManager));

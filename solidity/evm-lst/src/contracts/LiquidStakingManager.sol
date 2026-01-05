@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.28;
 
-import {ILiquidStakingManager} from "./interfaces/ILiquidStakingManager.sol";
-import {IDelegationManager} from "./interfaces/IDelegationManager.sol";
-import {Lst} from "./tokens/Lst.sol";
-import {Config, Liquidity, BatchStatus, UnbondRequest, UnbondBatch} from "./models/State.sol";
-import {DelegatorSummary, Rate} from "./models/Type.sol";
+import {ILiquidStakingManager} from "../interfaces/ILiquidStakingManager.sol";
+import {IDelegationManager} from "../interfaces/IDelegationManager.sol";
+import {Lst} from "../tokens/Lst.sol";
+import {Config, Liquidity, BatchStatus, UnbondRequest, UnbondBatch} from "../models/State.sol";
+import {DelegatorSummary, Rate} from "../models/Type.sol";
 
 import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
@@ -43,21 +43,31 @@ contract LiquidStakingManager is
     mapping(address => uint256[]) private s_userRequestIds;
 
     // Required by UUPSUpgradeable - only owner can upgrade
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address initialOwner, address lstAddress, address _delegationManager) public initializer {
+    function initialize(
+        address initialOwner,
+        address lstAddress,
+        address _delegationManager
+    ) public initializer {
         // Checks that the initialOwner address is not zero.
         require(initialOwner != address(0), "zero address");
         __Ownable_init(initialOwner);
         share = Lst(lstAddress);
         delegationManager = IDelegationManager(_delegationManager);
 
-        s_config =
-            Config({minBondAmount: 1000, minUnbondAmount: 1000, batchPeriodSeconds: 300, undelegatePeriodSeconds: 300});
+        s_config = Config({
+            minBondAmount: 1000,
+            minUnbondAmount: 1000,
+            batchPeriodSeconds: 300,
+            undelegatePeriodSeconds: 300
+        });
         s_liquidity = Liquidity({totalDelegated: 0, totalLst: 0});
 
         // Initialize batch management
@@ -101,18 +111,30 @@ contract LiquidStakingManager is
      * @notice function to stake assets and receive liquid staking tokens in exchange
      * @param _assets amount of the asset token
      */
-    function bond(uint256 _assets, address _recipient) external payable nonReentrant {
+    function bond(
+        uint256 _assets,
+        address _recipient
+    ) external payable nonReentrant {
         // checks that the deposited amount is greater than zero.
-        require(_assets > s_config.minBondAmount, "bond amount should be more than min amount");
+        require(
+            _assets > s_config.minBondAmount,
+            "bond amount should be more than min amount"
+        );
 
         // checks that the deposited amount is greater than zero.
-        require(msg.value > s_config.minBondAmount, "asset should be more than min amount");
+        require(
+            msg.value > s_config.minBondAmount,
+            "asset should be more than min amount"
+        );
 
         // Checks that the _receiver address is not zero.
         require(_recipient != address(0), "recipient zero address");
 
         // Checks that the delegationManager address is not zero.
-        require(address(delegationManager) != address(0), "delegationManager zero address");
+        require(
+            address(delegationManager) != address(0),
+            "delegationManager zero address"
+        );
 
         // calculate how much shares from the assets using current pool state (before delegating)
         uint256 shares = _convertToShares(_assets);
@@ -162,14 +184,18 @@ contract LiquidStakingManager is
         if ((s_liquidity.totalLst == 0) || (s_liquidity.totalDelegated == 0)) {
             return 1 * SCALING_FACTOR;
         }
-        return (totalAssets() * CORE_TO_EVM * SCALING_FACTOR) / s_liquidity.totalLst;
+        return
+            (totalAssets() * CORE_TO_EVM * SCALING_FACTOR) /
+            s_liquidity.totalLst;
     }
 
     function redeemRate() internal view returns (uint256) {
         if ((s_liquidity.totalLst == 0) || (s_liquidity.totalDelegated == 0)) {
             return 1 * SCALING_FACTOR;
         }
-        return (s_liquidity.totalLst * SCALING_FACTOR) / (totalAssets() * CORE_TO_EVM);
+        return
+            (s_liquidity.totalLst * SCALING_FACTOR) /
+            (totalAssets() * CORE_TO_EVM);
     }
 
     /**
@@ -177,17 +203,30 @@ contract LiquidStakingManager is
      * @param _shares amount of shares the user wants to convert
      * @param _recipient address of the user who will receive the assets
      */
-    function unbondRequest(uint256 _shares, address _recipient) external nonReentrant returns (uint256) {
+    function unbondRequest(
+        uint256 _shares,
+        address _recipient
+    ) external nonReentrant returns (uint256) {
         // checks that the deposited amount is greater than zero.
-        require(_shares > s_config.minUnbondAmount, "unbond should be more than min unbond amount");
+        require(
+            _shares > s_config.minUnbondAmount,
+            "unbond should be more than min unbond amount"
+        );
         // Checks that the _receiver address is not zero.
         require(_recipient != address(0), "recipient zero address");
 
         // Checks that the delegationManager address is not zero.
-        require(address(delegationManager) != address(0), "delegation Manager zero address");
+        require(
+            address(delegationManager) != address(0),
+            "delegation Manager zero address"
+        );
 
         // transfer asset to this contract
-        bool transferStatus = share.transferFrom(msg.sender, address(this), _shares);
+        bool transferStatus = share.transferFrom(
+            msg.sender,
+            address(this),
+            _shares
+        );
         if (!transferStatus) {
             revert TokenTransferFailure();
         }
@@ -197,8 +236,12 @@ contract LiquidStakingManager is
         s_nextRequestId++;
 
         // Create the unbond request
-        s_unbondRequests[requestId] =
-            UnbondRequest({user: msg.sender, recipient: _recipient, shares: _shares, batchId: s_pendingBatchId});
+        s_unbondRequests[requestId] = UnbondRequest({
+            user: msg.sender,
+            recipient: _recipient,
+            shares: _shares,
+            batchId: s_pendingBatchId
+        });
 
         // Add request ID to user's list
         s_userRequestIds[msg.sender].push(requestId);
@@ -208,7 +251,13 @@ contract LiquidStakingManager is
         currentBatch.requestIds.push(requestId);
         currentBatch.totalShares += _shares;
 
-        emit UnbondRequested(msg.sender, _shares, _recipient, requestId, s_pendingBatchId);
+        emit UnbondRequested(
+            msg.sender,
+            _shares,
+            _recipient,
+            requestId,
+            s_pendingBatchId
+        );
 
         return requestId;
     }
@@ -221,7 +270,10 @@ contract LiquidStakingManager is
         UnbondBatch storage batch = s_batches[s_pendingBatchId];
 
         require(batch.batchId != 0, "batch does not exist");
-        require(batch.status == BatchStatus.Pending, "batch is not in pending status");
+        require(
+            batch.status == BatchStatus.Pending,
+            "batch is not in pending status"
+        );
         require(batch.totalShares > 0, "batch has no requests");
 
         uint256 submittedBatchId = s_pendingBatchId;
@@ -234,10 +286,14 @@ contract LiquidStakingManager is
         batch.status = BatchStatus.Submitted;
 
         // Set next action time (when tokens can be received)
-        batch.nextActionTime = block.timestamp + s_config.undelegatePeriodSeconds;
+        batch.nextActionTime =
+            block.timestamp +
+            s_config.undelegatePeriodSeconds;
 
         // Call undelegate on delegation manager
-        uint64 undelegateAmount = uint64(assetsToUndelegate / uint256(CORE_TO_EVM));
+        uint64 undelegateAmount = uint64(
+            assetsToUndelegate / uint256(CORE_TO_EVM)
+        );
         delegationManager.undelegate(undelegateAmount);
 
         // Decrease the total delegated assets tracked by the manager
@@ -262,7 +318,12 @@ contract LiquidStakingManager is
 
         emit BatchCreated(s_pendingBatchId);
 
-        emit BatchSubmitted(submittedBatchId, batch.totalShares, batch.totalAssets, batch.nextActionTime);
+        emit BatchSubmitted(
+            submittedBatchId,
+            batch.totalShares,
+            batch.totalAssets,
+            batch.nextActionTime
+        );
     }
 
     /**
@@ -273,8 +334,14 @@ contract LiquidStakingManager is
         UnbondBatch storage batch = s_batches[batchId];
 
         require(batch.batchId != 0, "batch does not exist");
-        require(batch.status == BatchStatus.Submitted, "batch is not in submitted status");
-        require(block.timestamp >= batch.nextActionTime, "undelegation period not yet passed");
+        require(
+            batch.status == BatchStatus.Moved,
+            "batch is not in moved status"
+        );
+        require(
+            block.timestamp >= batch.nextActionTime,
+            "undelegation period not yet passed"
+        );
 
         // Update batch status to received
         batch.status = BatchStatus.Received;
@@ -286,14 +353,23 @@ contract LiquidStakingManager is
     }
 
     /**
-     * @notice Mark a submitted batch as received after undelegation period
-     * @param batchId The ID of the batch to mark as received
+     * @notice Move received assets of a submitted batch after undelegation period from core/spot to evm
+     * @param batchId The ID of the batch assets to move
      */
     function moveBatch(uint256 batchId) external nonReentrant {
         UnbondBatch storage batch = s_batches[batchId];
         require(batch.batchId != 0, "batch does not exist");
-        require(batch.status == BatchStatus.Submitted, "batch is not in submitted status");
-        require(block.timestamp >= batch.nextActionTime, "undelegation period not yet passed");
+        require(
+            batch.status == BatchStatus.Submitted,
+            "batch is not in submitted status"
+        );
+        require(
+            block.timestamp >= batch.nextActionTime,
+            "undelegation period not yet passed"
+        );
+
+        // Update batch status to received
+        batch.status = BatchStatus.Moved;
 
         // move assets from spot to Evm
         delegationManager.moveBatch(batch.totalAssets);
@@ -339,7 +415,8 @@ contract LiquidStakingManager is
             }
 
             // Calculate the user's share of assets
-            uint256 userAssets = (request.shares * batch.totalAssets) / batch.totalShares;
+            uint256 userAssets = (request.shares * batch.totalAssets) /
+                batch.totalShares;
 
             // Store recipient before deleting
             address recipient = request.recipient;
@@ -352,7 +429,7 @@ contract LiquidStakingManager is
             delete s_unbondRequests[requestId];
 
             // Transfer assets to recipient
-            (bool success,) = payable(recipient).call{value: userAssets}("");
+            (bool success, ) = payable(recipient).call{value: userAssets}("");
             require(success, "transfer failed");
 
             emit UnbondClaimed(msg.sender, requestId, userAssets, recipient);
@@ -373,7 +450,8 @@ contract LiquidStakingManager is
         require(batch.status == BatchStatus.Received, "batch not yet received");
 
         // Calculate the user's share of assets
-        uint256 userAssets = (request.shares * batch.totalAssets) / batch.totalShares;
+        uint256 userAssets = (request.shares * batch.totalAssets) /
+            batch.totalShares;
 
         // Store recipient before deleting
         address recipient = request.recipient;
@@ -385,7 +463,7 @@ contract LiquidStakingManager is
         delete s_unbondRequests[requestId];
 
         // Transfer assets to recipient
-        (bool success,) = payable(recipient).call{value: userAssets}("");
+        (bool success, ) = payable(recipient).call{value: userAssets}("");
         require(success, "transfer failed");
 
         emit UnbondClaimed(msg.sender, requestId, userAssets, recipient);
@@ -404,7 +482,9 @@ contract LiquidStakingManager is
      * @param batchId The batch ID to query
      * @return The batch information
      */
-    function getBatch(uint256 batchId) external view returns (UnbondBatch memory) {
+    function getBatch(
+        uint256 batchId
+    ) external view returns (UnbondBatch memory) {
         return s_batches[batchId];
     }
 
@@ -413,7 +493,9 @@ contract LiquidStakingManager is
      * @param requestId The request ID to query
      * @return The unbond request information
      */
-    function getUnbondRequest(uint256 requestId) external view returns (UnbondRequest memory) {
+    function getUnbondRequest(
+        uint256 requestId
+    ) external view returns (UnbondRequest memory) {
         return s_unbondRequests[requestId];
     }
 
@@ -422,7 +504,9 @@ contract LiquidStakingManager is
      * @param batchId The batch ID to query
      * @return Array of request IDs
      */
-    function getBatchRequestIds(uint256 batchId) external view returns (uint256[] memory) {
+    function getBatchRequestIds(
+        uint256 batchId
+    ) external view returns (uint256[] memory) {
         return s_batches[batchId].requestIds;
     }
 
@@ -431,7 +515,9 @@ contract LiquidStakingManager is
      * @param user The user address to query
      * @return Array of request IDs
      */
-    function getUserRequestIds(address user) external view returns (uint256[] memory) {
+    function getUserRequestIds(
+        address user
+    ) external view returns (uint256[] memory) {
         return s_userRequestIds[user];
     }
 

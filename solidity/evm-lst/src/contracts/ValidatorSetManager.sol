@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Validator} from "./models/Type.sol";
-import {IValidatorSetManager} from "./interfaces/IValidatorSetManager.sol";
+import {Validator} from "../models/Type.sol";
+import {IValidatorSetManager} from "../interfaces/IValidatorSetManager.sol";
 import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
@@ -27,7 +27,9 @@ contract ValidatorSetManager is
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     // Required by UUPSUpgradeable - only owner can upgrade
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 
     constructor() {
         _disableInitializers();
@@ -50,14 +52,17 @@ contract ValidatorSetManager is
      * @param _validators Array of validator addresses
      * @param _weights Array of corresponding weights
      */
-    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external nonReentrant {
+    function updateValidators(
+        address[] calldata _validators,
+        uint64[] calldata _weights
+    ) external nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
         uint256 length = _validators.length;
         require(length > 0, "Requires minimum 1 validator");
         if (length != _weights.length) revert ArrayLengthMismatch();
 
         // Clear existing mappings
-        for (uint256 i = 0; i < validators.length;) {
+        for (uint256 i = 0; i < validators.length; ) {
             delete validatorIndex[validators[i].validator];
             unchecked {
                 ++i;
@@ -71,14 +76,16 @@ contract ValidatorSetManager is
         delete validators;
 
         // Add new validators
-        for (uint256 i = 0; i < length;) {
+        for (uint256 i = 0; i < length; ) {
             address validatorAddress = _validators[i];
             uint64 weight = _weights[i];
 
             if (validatorAddress == address(0)) revert InvalidAddress();
             if (weight == 0) revert InvalidWeight();
 
-            validators.push(Validator({validator: validatorAddress, weight: weight}));
+            validators.push(
+                Validator({validator: validatorAddress, weight: weight})
+            );
 
             validatorIndex[validatorAddress] = validators.length;
             totalWeight += weight;
@@ -97,7 +104,9 @@ contract ValidatorSetManager is
      * @return validatorAddress The validator address
      * @return weight The validator weight
      */
-    function getValidator(address _validator) external view returns (address validatorAddress, uint64 weight) {
+    function getValidator(
+        address _validator
+    ) external view returns (address validatorAddress, uint64 weight) {
         uint256 index = validatorIndex[_validator];
         require(index != 0, "Validator not found");
 

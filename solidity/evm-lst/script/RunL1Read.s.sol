@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
+import {LiquidStakingManager} from "../src/contracts/LiquidStakingManager.sol";
 import {L1Read} from "../src/L1Read.sol";
 
 contract RunL1Read is Script {

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
-import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
+import {LiquidStakingManager} from "../src/contracts/LiquidStakingManager.sol";
 import {Lst} from "../src/tokens/Lst.sol";
 import {DelegatorSummary} from "../src/models/Type.sol";
 import {HyperliquidDelegationManager} from "../src/contracts/HyperliquidDelegationManager.sol";
@@ -24,7 +24,10 @@ contract LiquidStakingManagerTest is Test {
     function setUp() public {
         vm.startPrank(bob);
         Lst lstImpl = new Lst();
-        bytes memory initData = abi.encodeCall(Lst.initialize, (bob, "eHYPE", "eHP"));
+        bytes memory initData = abi.encodeCall(
+            Lst.initialize,
+            (bob, "eHYPE", "eHP")
+        );
         ERC1967Proxy proxy = new ERC1967Proxy(address(lstImpl), initData);
 
         lst = Lst(address(proxy));
@@ -34,13 +37,22 @@ contract LiquidStakingManagerTest is Test {
 
         address _delegationManager = address(delegationManager);
 
-        bytes memory initLstManagerData =
-            abi.encodeCall(LiquidStakingManager.initialize, (bob, address(lst), _delegationManager));
-        ERC1967Proxy lstManagerProxy = new ERC1967Proxy(address(liquidStakingManagerImpl), initLstManagerData);
+        bytes memory initLstManagerData = abi.encodeCall(
+            LiquidStakingManager.initialize,
+            (bob, address(lst), _delegationManager)
+        );
+        ERC1967Proxy lstManagerProxy = new ERC1967Proxy(
+            address(liquidStakingManagerImpl),
+            initLstManagerData
+        );
 
-        liquidStakingManager = LiquidStakingManager(payable(address(lstManagerProxy)));
+        liquidStakingManager = LiquidStakingManager(
+            payable(address(lstManagerProxy))
+        );
 
-        delegationManager.setLiquidStakingManager(address(liquidStakingManager));
+        delegationManager.setLiquidStakingManager(
+            address(liquidStakingManager)
+        );
 
         vm.deal(bob, STARTING_BALANCE);
         vm.deal(alice, STARTING_BALANCE);
@@ -55,7 +67,8 @@ contract LiquidStakingManagerTest is Test {
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 1;
 
-        address delegationManagerAddr = liquidStakingManager.getDelegationManager();
+        address delegationManagerAddr = liquidStakingManager
+            .getDelegationManager();
 
         if (delegationManagerAddr == address(0)) {
             vm.expectRevert();
@@ -64,7 +77,9 @@ contract LiquidStakingManagerTest is Test {
 
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
 
-        uint256 bobBalance = liquidStakingManager.getLst().balanceOf(address(bob));
+        uint256 bobBalance = liquidStakingManager.getLst().balanceOf(
+            address(bob)
+        );
         assertEq(bobBalance, bondAmount);
 
         Liquidity memory summary = liquidStakingManager.getLiquidity();
@@ -86,12 +101,18 @@ contract LiquidStakingManagerTest is Test {
 
         uint256 batchId = liquidStakingManager.getCurrentBatchId();
 
-        uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 minUnbondAmount = liquidStakingManager
+            .getConfig()
+            .minUnbondAmount;
         uint256 unbondAmount = minUnbondAmount + 10;
         lst.approve(address(liquidStakingManager), unbondAmount);
-        uint256 requestId = liquidStakingManager.unbondRequest(unbondAmount, bob);
+        uint256 requestId = liquidStakingManager.unbondRequest(
+            unbondAmount,
+            bob
+        );
 
-        UnbondRequest memory unbondRequest = liquidStakingManager.getUnbondRequest(requestId);
+        UnbondRequest memory unbondRequest = liquidStakingManager
+            .getUnbondRequest(requestId);
         assertEq(unbondAmount, unbondRequest.shares);
         assertEq(batchId, unbondRequest.batchId);
     }
@@ -101,23 +122,31 @@ contract LiquidStakingManagerTest is Test {
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = (minBondAmount + 100) * CORE_TO_EVM;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
-        uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 minUnbondAmount = liquidStakingManager
+            .getConfig()
+            .minUnbondAmount;
         uint256 unbondAmount = minUnbondAmount + 10;
         lst.approve(address(liquidStakingManager), unbondAmount);
         liquidStakingManager.unbondRequest(unbondAmount, bob);
 
         // first batch status should be Pending Batch
-        UnbondBatch memory pendingBatch = liquidStakingManager.getBatch(batchId);
+        UnbondBatch memory pendingBatch = liquidStakingManager.getBatch(
+            batchId
+        );
         assertTrue(pendingBatch.status == BatchStatus.Pending);
 
         // Submit batch
         liquidStakingManager.submitBatch();
 
-        UnbondBatch memory submittedBatch = liquidStakingManager.getBatch(batchId);
+        UnbondBatch memory submittedBatch = liquidStakingManager.getBatch(
+            batchId
+        );
         assertTrue(submittedBatch.status == BatchStatus.Submitted);
         // Fast forward time to allow receiveBatch
-        uint256 nextActionTime = block.timestamp + liquidStakingManager.getConfig().undelegatePeriodSeconds;
+        uint256 nextActionTime = block.timestamp +
+            liquidStakingManager.getConfig().undelegatePeriodSeconds;
         vm.warp(nextActionTime + 1);
+        liquidStakingManager.moveBatch(batchId);
         liquidStakingManager.receiveBatch(batchId);
 
         UnbondBatch memory batch = liquidStakingManager.getBatch(batchId);
@@ -149,13 +178,15 @@ contract LiquidStakingManagerTest is Test {
         // Submit batch and receive
         liquidStakingManager.submitBatch();
         uint256 batchId = 1;
-        uint256 nextActionTime = block.timestamp + liquidStakingManager.getConfig().undelegatePeriodSeconds;
+        uint256 nextActionTime = block.timestamp +
+            liquidStakingManager.getConfig().undelegatePeriodSeconds;
         vm.warp(nextActionTime + 1);
 
         UnbondBatch memory batch = liquidStakingManager.getBatch(batchId);
         if (batch.nextActionTime < block.timestamp) {
             vm.deal(address(delegationManager), batch.totalAssets);
         }
+        liquidStakingManager.moveBatch(batchId);
         liquidStakingManager.receiveBatch(batchId);
         // Both claim
         vm.startPrank(bob);
@@ -186,7 +217,9 @@ contract LiquidStakingManagerTest is Test {
         vm.expectRevert();
         liquidStakingManager.unbondRequest(1, bob);
         // Unbond to zero address
-        uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 minUnbondAmount = liquidStakingManager
+            .getConfig()
+            .minUnbondAmount;
         lst.approve(address(liquidStakingManager), minUnbondAmount + 10);
         vm.expectRevert();
         liquidStakingManager.unbondRequest(minUnbondAmount + 10, address(0));
@@ -202,7 +235,9 @@ contract LiquidStakingManagerTest is Test {
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = (minBondAmount + 100) * CORE_TO_EVM;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
-        uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 minUnbondAmount = liquidStakingManager
+            .getConfig()
+            .minUnbondAmount;
         uint256 unbondAmount = minUnbondAmount + 10;
         lst.approve(address(liquidStakingManager), unbondAmount);
         liquidStakingManager.unbondRequest(unbondAmount, bob);
@@ -217,20 +252,28 @@ contract LiquidStakingManagerTest is Test {
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = (minBondAmount + 100) * CORE_TO_EVM;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
-        uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 minUnbondAmount = liquidStakingManager
+            .getConfig()
+            .minUnbondAmount;
         uint256 unbondAmount = minUnbondAmount + 10;
         lst.approve(address(liquidStakingManager), unbondAmount);
         liquidStakingManager.unbondRequest(unbondAmount, bob);
         uint256 batchId = liquidStakingManager.getCurrentBatchId();
-        uint256[] memory reqIds = liquidStakingManager.getBatchRequestIds(batchId);
+        uint256[] memory reqIds = liquidStakingManager.getBatchRequestIds(
+            batchId
+        );
         assertGt(reqIds.length, 0);
-        uint256[] memory userReqIds = liquidStakingManager.getUserRequestIds(bob);
+        uint256[] memory userReqIds = liquidStakingManager.getUserRequestIds(
+            bob
+        );
         assertGt(userReqIds.length, 0);
         uint256 nextReqId = liquidStakingManager.getNextRequestId();
         assertGt(nextReqId, 0);
         // Get batch and request
         UnbondBatch memory batch = liquidStakingManager.getBatch(batchId);
-        UnbondRequest memory req = liquidStakingManager.getUnbondRequest(reqIds[0]);
+        UnbondRequest memory req = liquidStakingManager.getUnbondRequest(
+            reqIds[0]
+        );
         assertEq(batch.batchId, batchId);
         assertEq(req.user, bob);
     }
@@ -243,8 +286,10 @@ contract LiquidStakingManagerTest is Test {
         liquidStakingManager.unbondRequest(bondAmount, bob);
         liquidStakingManager.submitBatch();
         uint256 batchId = 1;
-        uint256 nextActionTime = block.timestamp + liquidStakingManager.getConfig().undelegatePeriodSeconds;
+        uint256 nextActionTime = block.timestamp +
+            liquidStakingManager.getConfig().undelegatePeriodSeconds;
         vm.warp(nextActionTime + 1);
+        liquidStakingManager.moveBatch(batchId);
         liquidStakingManager.receiveBatch(batchId);
         UnbondBatch memory batch = liquidStakingManager.getBatch(batchId);
         assertTrue(batch.status == BatchStatus.Received);
@@ -270,16 +315,19 @@ contract LiquidStakingManagerTest is Test {
         // Submit batch and receive
         liquidStakingManager.submitBatch();
         uint256 batchId = 1;
-        uint256 nextActionTime = block.timestamp + liquidStakingManager.getConfig().undelegatePeriodSeconds;
+        uint256 nextActionTime = block.timestamp +
+            liquidStakingManager.getConfig().undelegatePeriodSeconds;
         vm.warp(nextActionTime + 1);
         // Check batch status and requests
         UnbondBatch memory batch = liquidStakingManager.getBatch(batchId);
         if (batch.nextActionTime < block.timestamp) {
             vm.deal(address(delegationManager), batch.totalAssets);
         }
-
+        liquidStakingManager.moveBatch(batchId);
         liquidStakingManager.receiveBatch(batchId);
-        UnbondBatch memory receivedBatch = liquidStakingManager.getBatch(batchId);
+        UnbondBatch memory receivedBatch = liquidStakingManager.getBatch(
+            batchId
+        );
         assertTrue(receivedBatch.status == BatchStatus.Received);
         assertEq(receivedBatch.requestIds.length, 2);
     }

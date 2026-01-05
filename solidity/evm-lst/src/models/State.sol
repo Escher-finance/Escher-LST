@@ -25,7 +25,8 @@ struct Config {
 enum BatchStatus {
     Pending, // Batch is accepting new unbond requests
     Submitted, // Batch has been submitted for undelegation
-    Received // Batch has received the undelegated/unbonded tokens
+    Moved, // Only Relevant in Hyperliquid: Batch has received the undelegated/unbonded tokens in lst spot/core balance and already moved to evm in Hyperliquid
+    Received // Batch has received the undelegated/unbonded tokens in lst contract
 }
 
 // Individual unbond request from a user

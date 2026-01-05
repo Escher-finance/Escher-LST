@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import "../src/contracts/HyperliquidDelegationManager.sol";
-import "../src/ValidatorSetManager.sol";
+import "../src/contracts/ValidatorSetManager.sol";
 import {Validator, DelegatorSummary} from "../src/models/Type.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CoreSimulatorLib} from "@hyper-evm-lib/test/simulation/CoreSimulatorLib.sol";
@@ -81,7 +81,10 @@ contract HyperliquidDelegationManagerTest is Test {
             owner,
             owner // owner is also manager for testing
         );
-        ERC1967Proxy validatorProxy = new ERC1967Proxy(address(validatorImpl), validatorInitData);
+        ERC1967Proxy validatorProxy = new ERC1967Proxy(
+            address(validatorImpl),
+            validatorInitData
+        );
         validatorManager = ValidatorSetManager(address(validatorProxy));
 
         // Setup initial validators
@@ -98,11 +101,19 @@ contract HyperliquidDelegationManagerTest is Test {
         // Deploy DelegationManager
         implementation = new HyperliquidDelegationManager();
         bytes memory initData = abi.encodeWithSelector(
-            HyperliquidDelegationManager.initialize.selector, owner, address(validatorManager), liquidStakingManager
+            HyperliquidDelegationManager.initialize.selector,
+            owner,
+            address(validatorManager),
+            liquidStakingManager
         );
-        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(implementation),
+            initData
+        );
         // activate delegation Manager
-        delegationManager = HyperliquidDelegationManager(payable(address(proxy)));
+        delegationManager = HyperliquidDelegationManager(
+            payable(address(proxy))
+        );
         hyperCore.forceAccountActivation(address(delegationManager));
 
         vm.prank(owner);
@@ -129,7 +140,10 @@ contract HyperliquidDelegationManagerTest is Test {
             "LiquidStakingManager should have MANAGER_ROLE"
         );
         bytes32 defaultAdminRole = delegationManager.DEFAULT_ADMIN_ROLE();
-        assertTrue(delegationManager.hasRole(defaultAdminRole, owner), "Owner should have DEFAULT_ADMIN_ROLE");
+        assertTrue(
+            delegationManager.hasRole(defaultAdminRole, owner),
+            "Owner should have DEFAULT_ADMIN_ROLE"
+        );
     }
 
     function testInitializeRevertsOnZeroAddress() public {
@@ -169,7 +183,9 @@ contract HyperliquidDelegationManagerTest is Test {
         vm.prank(owner);
         delegationManager.revokeRole(managerRole, liquidStakingManager);
 
-        assertFalse(delegationManager.hasRole(managerRole, liquidStakingManager));
+        assertFalse(
+            delegationManager.hasRole(managerRole, liquidStakingManager)
+        );
     }
 
     function testNonOwnerCannotGrantManagerRole() public {
@@ -194,15 +210,29 @@ contract HyperliquidDelegationManagerTest is Test {
     function testDelegateRevertsWithEmptyValidatorSet() public {
         // Deploy new DelegationManager with empty validator set
         ValidatorSetManager emptyValidatorManager = new ValidatorSetManager();
-        bytes memory validatorInitData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, owner, owner);
-        ERC1967Proxy validatorProxy = new ERC1967Proxy(address(emptyValidatorManager), validatorInitData);
-        ValidatorSetManager emptyVM = ValidatorSetManager(address(validatorProxy));
+        bytes memory validatorInitData = abi.encodeWithSelector(
+            ValidatorSetManager.initialize.selector,
+            owner,
+            owner
+        );
+        ERC1967Proxy validatorProxy = new ERC1967Proxy(
+            address(emptyValidatorManager),
+            validatorInitData
+        );
+        ValidatorSetManager emptyVM = ValidatorSetManager(
+            address(validatorProxy)
+        );
 
         HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
-        bytes memory initData =
-            abi.encodeWithSelector(HyperliquidDelegationManager.initialize.selector, owner, address(emptyVM));
+        bytes memory initData = abi.encodeWithSelector(
+            HyperliquidDelegationManager.initialize.selector,
+            owner,
+            address(emptyVM)
+        );
         ERC1967Proxy proxy = new ERC1967Proxy(address(newImpl), initData);
-        HyperliquidDelegationManager newDM = HyperliquidDelegationManager(payable(address(proxy)));
+        HyperliquidDelegationManager newDM = HyperliquidDelegationManager(
+            payable(address(proxy))
+        );
         vm.prank(owner);
         newDM.setLiquidStakingManager(liquidStakingManager);
         vm.deal(liquidStakingManager, 1 ether);
@@ -226,16 +256,30 @@ contract HyperliquidDelegationManagerTest is Test {
     function testUndelegateRevertsWithEmptyValidatorSet() public {
         // Deploy new DelegationManager with empty validator set
         ValidatorSetManager emptyValidatorManager = new ValidatorSetManager();
-        bytes memory validatorInitData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, owner, owner);
-        ERC1967Proxy validatorProxy = new ERC1967Proxy(address(emptyValidatorManager), validatorInitData);
-        ValidatorSetManager emptyVM = ValidatorSetManager(address(validatorProxy));
+        bytes memory validatorInitData = abi.encodeWithSelector(
+            ValidatorSetManager.initialize.selector,
+            owner,
+            owner
+        );
+        ERC1967Proxy validatorProxy = new ERC1967Proxy(
+            address(emptyValidatorManager),
+            validatorInitData
+        );
+        ValidatorSetManager emptyVM = ValidatorSetManager(
+            address(validatorProxy)
+        );
 
         HyperliquidDelegationManager newImpl = new HyperliquidDelegationManager();
         bytes memory initData = abi.encodeWithSelector(
-            HyperliquidDelegationManager.initialize.selector, owner, address(emptyVM), liquidStakingManager
+            HyperliquidDelegationManager.initialize.selector,
+            owner,
+            address(emptyVM),
+            liquidStakingManager
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(newImpl), initData);
-        HyperliquidDelegationManager newDM = HyperliquidDelegationManager(payable(address(proxy)));
+        HyperliquidDelegationManager newDM = HyperliquidDelegationManager(
+            payable(address(proxy))
+        );
 
         vm.prank(owner);
         newDM.setLiquidStakingManager(liquidStakingManager);
@@ -251,12 +295,19 @@ contract HyperliquidDelegationManagerTest is Test {
         // Arrange: Prank as the liquidStakingManager (who has MANAGER_ROLE)
         vm.prank(liquidStakingManager);
         // Act: Call delegate with a value
-        delegationManager.delegate{value: DELEGATE_AMOUNT_EVM}(DELEGATE_AMOUNT_EVM);
+        delegationManager.delegate{value: DELEGATE_AMOUNT_EVM}(
+            DELEGATE_AMOUNT_EVM
+        );
 
         CoreSimulatorLib.nextBlock();
 
-        PrecompileLib.Delegation[] memory currentDelegations = PrecompileLib.delegations(address(delegationManager));
-        uint64[3] memory expectedAmount = [uint64(20000000), uint64(30000000), uint64(50000000)];
+        PrecompileLib.Delegation[] memory currentDelegations = PrecompileLib
+            .delegations(address(delegationManager));
+        uint64[3] memory expectedAmount = [
+            uint64(20000000),
+            uint64(30000000),
+            uint64(50000000)
+        ];
 
         assertEq(currentDelegations.length, 3);
 
@@ -426,13 +477,17 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.grantRole(managerRole, newLSM);
 
         assertTrue(delegationManager.hasRole(managerRole, newLSM));
-        assertTrue(delegationManager.hasRole(managerRole, liquidStakingManager));
+        assertTrue(
+            delegationManager.hasRole(managerRole, liquidStakingManager)
+        );
 
         // Revoke role from old LSM
         vm.prank(owner);
         delegationManager.revokeRole(managerRole, liquidStakingManager);
 
-        assertFalse(delegationManager.hasRole(managerRole, liquidStakingManager));
+        assertFalse(
+            delegationManager.hasRole(managerRole, liquidStakingManager)
+        );
         assertTrue(delegationManager.hasRole(managerRole, newLSM));
     }
 
@@ -461,15 +516,21 @@ contract HyperliquidDelegationManagerTest is Test {
         // Already set up in setUp with weights 100, 200, 300
         assertEq(validatorManager.getTotalWeight(), totalWeight);
 
-        (address addr1, uint64 weight1) = validatorManager.getValidator(validator1);
+        (address addr1, uint64 weight1) = validatorManager.getValidator(
+            validator1
+        );
         assertEq(addr1, validator1);
         assertEq(weight1, weights[0]);
 
-        (address addr2, uint64 weight2) = validatorManager.getValidator(validator2);
+        (address addr2, uint64 weight2) = validatorManager.getValidator(
+            validator2
+        );
         assertEq(addr2, validator2);
         assertEq(weight2, weights[1]);
 
-        (address addr3, uint64 weight3) = validatorManager.getValidator(validator3);
+        (address addr3, uint64 weight3) = validatorManager.getValidator(
+            validator3
+        );
         assertEq(addr3, validator3);
         assertEq(weight3, weights[2]);
     }
@@ -533,9 +594,14 @@ contract HyperliquidDelegationManagerTest is Test {
     /* ============ Fuzz Tests ============ */
 
     // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skip_testFuzz_UpdateValidators(uint8 validatorCount, uint64 baseWeight) public {
+    function skip_testFuzz_UpdateValidators(
+        uint8 validatorCount,
+        uint64 baseWeight
+    ) public {
         vm.assume(validatorCount > 0 && validatorCount <= 20);
-        vm.assume(baseWeight > 0 && baseWeight < type(uint64).max / validatorCount);
+        vm.assume(
+            baseWeight > 0 && baseWeight < type(uint64).max / validatorCount
+        );
 
         address[] memory validators = new address[](validatorCount);
         uint64[] memory validatorWeights = new uint64[](validatorCount);
@@ -612,7 +678,9 @@ contract HyperliquidDelegationManagerTest is Test {
 
     function testCanCheckManagerRole() public view {
         bytes32 managerRole = delegationManager.MANAGER_ROLE();
-        assertTrue(delegationManager.hasRole(managerRole, liquidStakingManager));
+        assertTrue(
+            delegationManager.hasRole(managerRole, liquidStakingManager)
+        );
         assertFalse(delegationManager.hasRole(managerRole, user));
     }
 
@@ -620,7 +688,9 @@ contract HyperliquidDelegationManagerTest is Test {
         bytes32 defaultAdminRole = delegationManager.DEFAULT_ADMIN_ROLE();
         assertTrue(delegationManager.hasRole(defaultAdminRole, owner));
         assertFalse(delegationManager.hasRole(defaultAdminRole, user));
-        assertFalse(delegationManager.hasRole(defaultAdminRole, liquidStakingManager));
+        assertFalse(
+            delegationManager.hasRole(defaultAdminRole, liquidStakingManager)
+        );
     }
 
     function testOwnerCanTransferOwnership() public {
@@ -667,7 +737,9 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.grantRole(managerRole, manager3);
         vm.stopPrank();
 
-        assertTrue(delegationManager.hasRole(managerRole, liquidStakingManager));
+        assertTrue(
+            delegationManager.hasRole(managerRole, liquidStakingManager)
+        );
         assertTrue(delegationManager.hasRole(managerRole, manager2));
         assertTrue(delegationManager.hasRole(managerRole, manager3));
     }
@@ -678,6 +750,8 @@ contract HyperliquidDelegationManagerTest is Test {
         vm.prank(liquidStakingManager);
         delegationManager.renounceRole(managerRole, liquidStakingManager);
 
-        assertFalse(delegationManager.hasRole(managerRole, liquidStakingManager));
+        assertFalse(
+            delegationManager.hasRole(managerRole, liquidStakingManager)
+        );
     }
 }

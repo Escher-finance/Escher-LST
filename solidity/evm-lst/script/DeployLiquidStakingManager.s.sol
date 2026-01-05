@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {LiquidStakingManager} from "../src/LiquidStakingManager.sol";
+import {LiquidStakingManager} from "../src/contracts/LiquidStakingManager.sol";
 import {HyperliquidDelegationManager} from "../src/contracts/HyperliquidDelegationManager.sol";
 import {InitializePayload} from "../src/models/Type.sol";
 import {Lst} from "../src/tokens/Lst.sol";
@@ -19,15 +19,24 @@ contract DeployLiquidStakingManager is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        address payable delegationManagerAddress = payable(0xE77A50c077Abb0c26Ef8fDa2C7474C684cC1Ce6b); //TODO: Replace This
-        delegationManager = HyperliquidDelegationManager(delegationManagerAddress);
+        address payable delegationManagerAddress = payable(
+            0xE77A50c077Abb0c26Ef8fDa2C7474C684cC1Ce6b
+        ); //TODO: Replace This
+        delegationManager = HyperliquidDelegationManager(
+            delegationManagerAddress
+        );
 
         // Deploying Lst (ERC20)
         address implementation = address(new Lst());
 
         string memory lstName = "eHype";
         string memory lstSymbol = "eHP";
-        bytes memory initializeData = abi.encodeWithSelector(lst.initialize.selector, msg.sender, lstName, lstSymbol);
+        bytes memory initializeData = abi.encodeWithSelector(
+            lst.initialize.selector,
+            msg.sender,
+            lstName,
+            lstSymbol
+        );
         ERC1967Proxy proxy = new ERC1967Proxy(implementation, initializeData);
 
         lst = Lst(address(proxy));
@@ -44,7 +53,10 @@ contract DeployLiquidStakingManager is Script {
         ERC1967Proxy lstProxy = new ERC1967Proxy(
             lstManagerImplementation,
             abi.encodeWithSelector(
-                LiquidStakingManager.initialize.selector, msg.sender, address(lst), delegationManagerAddress
+                LiquidStakingManager.initialize.selector,
+                msg.sender,
+                address(lst),
+                delegationManagerAddress
             )
         );
 
