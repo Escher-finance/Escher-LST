@@ -367,8 +367,8 @@ contract IlSolver is Ownable2Step {
                 hookData: bytes("")
             })
         );
-        params[1] = abi.encode(key.currency0, amountIn);
-        params[2] = abi.encode(key.currency1, minAmountOut);
+        params[1] = abi.encode(zeroForOne ? key.currency0 : key.currency1, amountIn);
+        params[2] = abi.encode(zeroForOne ? key.currency1 : key.currency0, minAmountOut);
 
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(actions, params);
