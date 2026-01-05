@@ -162,6 +162,17 @@ contract IlSolverTest is Test {
         assertGt(amount1, minUsdcOut);
     }
 
+    function testUniV4SwapOneForZero() public {
+        uint256 ethBalanceOld = address(c).balance;
+        // apply 5% slippage and correct decimals 1e8 (oracle) to 1e6 (usdc)
+        uint128 usdcIn = uint128(c.aaveOraclePrice(address(WETH))) * 105 / 10000;
+        uint128 minEthOut = 1 ether;
+        uint256 amount0 = c.univ4Swap(false, usdcIn, minEthOut);
+        uint256 ethBalanceNew = address(c).balance;
+        assertEq(ethBalanceNew - ethBalanceOld, amount0);
+        assertGt(amount0, minEthOut);
+    }
+
     function testAaveV3Supply() public {
         assertEq(reserve.balanceOf(address(c)), 0);
         uint256 amount = 1000e6;
