@@ -417,6 +417,14 @@ contract IlSolver is Ownable2Step {
         return _univ4LiquidityAdd(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
     }
 
+    function univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut)
+        public
+        onlyOwner
+        returns (uint256 actualAmountOut)
+    {
+        return _univ4Swap(zeroForOne, amountIn, minAmountOut);
+    }
+
     /**
      * @dev Supplies `collateral` token to Aave V3
      * @dev See internal helper {_aavev3Supply}
