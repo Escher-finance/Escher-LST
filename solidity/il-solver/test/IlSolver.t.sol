@@ -153,11 +153,12 @@ contract IlSolverTest is Test {
 
     function testUniV4SwapZeroForOne() public {
         uint256 usdcBalanceOld = collateral.balanceOf(address(c));
-        uint128 amount0 = 1 ether;
-        uint256 amount1 = c.univ4Swap(true, amount0, 1);
+        uint128 ethIn = 1 ether;
+        uint128 minUsdcOut = 3300e6;
+        uint256 amount1 = c.univ4Swap(true, ethIn, minUsdcOut);
         uint256 usdcBalanceNew = collateral.balanceOf(address(c));
         assertEq(usdcBalanceNew - usdcBalanceOld, amount1);
-        assertGt(amount1, 3300e6);
+        assertGt(amount1, minUsdcOut);
     }
 
     function testAaveV3Supply() public {
