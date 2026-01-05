@@ -180,7 +180,7 @@ contract IlSolverTest is Test {
         assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
     }
 
-    function testAaveOraclePrice() public {
+    function testAaveOraclePrice() public view {
         uint256 usdc_p = c.aaveOraclePrice(usdc);
         assertApproxEqRel(usdc_p, 1e8, 5e16);
     }

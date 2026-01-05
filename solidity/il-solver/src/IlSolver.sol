@@ -462,7 +462,7 @@ contract IlSolver is Ownable2Step {
     /**
      * @return price Current price of a given `asset` from the Aave Oracle
      */
-    function aaveOraclePrice(address asset) public returns (uint256 price) {
+    function aaveOraclePrice(address asset) public view returns (uint256 price) {
         price = aaveOracle.getAssetPrice(asset);
     }
 }
