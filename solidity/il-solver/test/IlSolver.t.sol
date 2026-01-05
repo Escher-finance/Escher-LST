@@ -154,7 +154,8 @@ contract IlSolverTest is Test {
     function testUniV4SwapZeroForOne() public {
         uint256 usdcBalanceOld = collateral.balanceOf(address(c));
         uint128 ethIn = 1 ether;
-        uint128 minUsdcOut = 3300e6;
+        // apply 5% slippage and correct decimals 1e8 (oracle) to 1e6 (usdc)
+        uint128 minUsdcOut = uint128(c.aaveOraclePrice(address(WETH))) * 95 / 10000;
         uint256 amount1 = c.univ4Swap(true, ethIn, minUsdcOut);
         uint256 usdcBalanceNew = collateral.balanceOf(address(c));
         assertEq(usdcBalanceNew - usdcBalanceOld, amount1);
