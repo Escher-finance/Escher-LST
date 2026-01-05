@@ -452,11 +452,10 @@ contract IlSolver is Ownable2Step {
     }
 
     /**
-     * @return ltv Loan-to-value ratio of the `collateral` asset
+     * @return ltv Loan-to-value ratio of this contract
      */
     function aavev3Ltv() public view returns (uint256 ltv) {
-        DataTypes.ReserveConfigurationMap memory map = aavePool.getConfiguration(address(collateral));
-        ltv = map.getLtv();
+        (,,,, ltv,) = aavePool.getUserAccountData(address(this));
     }
 
     /**
