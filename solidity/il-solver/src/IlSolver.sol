@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// FIXME: dedupe to a single v4-core instead of importing v4-periphery's v4-core types
+// TODO: dedupe to a single v4-core instead of importing v4-periphery's v4-core types
 
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IPositionManager as IPositionManagerOriginal} from "univ4-periphery/interfaces/IPositionManager.sol";
@@ -161,10 +161,10 @@ contract IlSolver is Ownable2Step {
     receive() external payable {}
 
     /**
-     * @dev Sets allowances and validates contract's funds to use in Uniswap V4
+     * @dev Sets allowances and validates contract's funds to use in Uniswap V4 add/increment liquidity
      * @notice In the case there's not enough ETH (`_amount0Max`), it will attempt to unwrap the right amount of WETH
      */
-    modifier univ4AttachFunds(uint128 _amount0Max, uint128 _amount1Max) {
+    modifier univ4AttachFundsForLiquidity(uint128 _amount0Max, uint128 _amount1Max) {
         require(_amount0Max > 0);
         require(_amount1Max > 0);
 
@@ -196,6 +196,40 @@ contract IlSolver is Ownable2Step {
         _;
     }
 
+    modifier univ4AttachFundsForSwap(bool zeroForOne, uint128 _amountIn) {
+        require(_amountIn > 0);
+
+        uint256 amountIn = uint256(_amountIn);
+        PoolKey memory key = uniPoolKey;
+        address _this = address(this);
+        address _router = address(uniRouter);
+
+        // Handle ETH
+
+        if (zeroForOne) {
+            uint256 ethBalance = _this.balance;
+            uint256 ethNeeded = (ethBalance < amountIn) ? amountIn - ethBalance : 0;
+            if (ethNeeded > 0) {
+                WETH.withdraw(ethNeeded);
+            }
+        }
+
+        // Handle collateral
+
+        if (!zeroForOne) {
+            IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
+            if (t1.allowance(_this, address(permit2)) < amountIn) {
+                t1.approve(address(permit2), type(uint128).max);
+            }
+            (uint160 p2Allowance1,,) = permit2.allowance(_this, address(t1), address(_router));
+            if (p2Allowance1 < amountIn) {
+                permit2.approve(address(t1), _router, type(uint128).max, type(uint48).max);
+            }
+        }
+
+        _;
+    }
+
     /**
      * @dev Mints a new Uniswap V4 position given the tick range and `liquidity`
      * @notice Creates a position NFT and stores its token ID in `uniPositionTokenId`
@@ -209,7 +243,7 @@ contract IlSolver is Ownable2Step {
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) private univ4AttachFunds(amount0Max, amount1Max) returns (uint256 used0, uint256 used1) {
+    ) private univ4AttachFundsForLiquidity(amount0Max, amount1Max) returns (uint256 used0, uint256 used1) {
         address _this = address(this);
         PoolKey memory _key = uniPoolKey;
 
@@ -248,7 +282,7 @@ contract IlSolver is Ownable2Step {
      */
     function _univ4LiquidityIncrement(uint256 liquidity, uint128 amount0Max, uint128 amount1Max)
         private
-        univ4AttachFunds(amount0Max, amount1Max)
+        univ4AttachFundsForLiquidity(amount0Max, amount1Max)
         returns (uint256 used0, uint256 used1)
     {
         address _this = address(this);
@@ -280,7 +314,11 @@ contract IlSolver is Ownable2Step {
     }
 
     // swaps exact input single
-    function _univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut) private {
+    function _univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut)
+        private
+        univ4AttachFundsForSwap(zeroForOne, amountIn)
+        returns (uint256 actualAmountOut)
+    {
         bytes memory commands = abi.encodePacked(uint8(UniversalRouterCommands.V4_SWAP));
         bytes memory actions =
             abi.encodePacked(uint8(Actions.SWAP_EXACT_IN_SINGLE), uint8(Actions.SETTLE_ALL), uint8(Actions.TAKE_ALL));
@@ -311,7 +349,13 @@ contract IlSolver is Ownable2Step {
         inputs[0] = abi.encode(actions, params);
         uint256 deadline = block.timestamp;
 
+        uint256 bBefore = (zeroForOne) ? key.currency1.balanceOfSelf() : key.currency0.balanceOfSelf();
+
         uniRouter.execute(commands, inputs, deadline);
+
+        uint256 bAfter = (zeroForOne) ? key.currency1.balanceOfSelf() : key.currency0.balanceOfSelf();
+
+        actualAmountOut = bAfter - bBefore;
     }
 
     /**
