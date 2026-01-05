@@ -13,7 +13,8 @@ import {
     L2Encoder,
     IAaveOracle,
     IPoolDataProvider,
-    IWETH
+    IWETH,
+    IUniversalRouter
 } from "../src/IlSolver.sol";
 import {IHooks} from "univ4-core/interfaces/IHooks.sol";
 import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
@@ -45,6 +46,7 @@ contract IlSolverTest is Test {
     IPositionManager uniPosm;
     IPoolManager uniPoolManager;
     IStateView uniStateView;
+    IUniversalRouter uniRouter;
 
     IL2Pool aavePool;
     L2Encoder aaveEncoder;
@@ -63,6 +65,7 @@ contract IlSolverTest is Test {
         aaveEncoder = L2Encoder(0x39e97c588B2907Fb67F44fea256Ae3BA064207C5);
         aaveOracle = IAaveOracle(0x2Cc0Fc26eD4563A5ce5e8bdcfe1A2878676Ae156);
         aaveDataProvider = IPoolDataProvider(0x0F43731EB8d45A581f4a36DD74F5f358bc90C73A);
+        uniRouter = IUniversalRouter(0x6fF5693b99212Da76ad316178A184AB56D299b43);
 
         WETH = IWETH(weth);
         collateral = IERC20(usdc);
@@ -80,7 +83,9 @@ contract IlSolverTest is Test {
         assertEq(keccak256(abi.encode(key)), rawId);
         id = PoolId.wrap(rawId);
 
-        c = new IlSolver(owner, WETH, collateral, uniPosm, key, aavePool, aaveEncoder, aaveDataProvider, aaveOracle);
+        c = new IlSolver(
+            owner, WETH, collateral, uniPosm, key, uniRouter, aavePool, aaveEncoder, aaveDataProvider, aaveOracle
+        );
         assertEq(c.owner(), owner);
         assertEq(address(c.uniPosm()), address(uniPosm));
 
