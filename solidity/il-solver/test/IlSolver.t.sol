@@ -13,7 +13,8 @@ import {
     L2Encoder,
     IAaveOracle,
     IPoolDataProvider,
-    IWETH
+    IWETH,
+    IUniversalRouter
 } from "../src/IlSolver.sol";
 import {IHooks} from "univ4-core/interfaces/IHooks.sol";
 import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
@@ -45,6 +46,7 @@ contract IlSolverTest is Test {
     IPositionManager uniPosm;
     IPoolManager uniPoolManager;
     IStateView uniStateView;
+    IUniversalRouter uniRouter;
 
     IL2Pool aavePool;
     L2Encoder aaveEncoder;
@@ -63,6 +65,7 @@ contract IlSolverTest is Test {
         aaveEncoder = L2Encoder(0x39e97c588B2907Fb67F44fea256Ae3BA064207C5);
         aaveOracle = IAaveOracle(0x2Cc0Fc26eD4563A5ce5e8bdcfe1A2878676Ae156);
         aaveDataProvider = IPoolDataProvider(0x0F43731EB8d45A581f4a36DD74F5f358bc90C73A);
+        uniRouter = IUniversalRouter(0x6fF5693b99212Da76ad316178A184AB56D299b43);
 
         WETH = IWETH(weth);
         collateral = IERC20(usdc);
@@ -80,7 +83,9 @@ contract IlSolverTest is Test {
         assertEq(keccak256(abi.encode(key)), rawId);
         id = PoolId.wrap(rawId);
 
-        c = new IlSolver(owner, WETH, collateral, uniPosm, key, aavePool, aaveEncoder, aaveDataProvider, aaveOracle);
+        c = new IlSolver(
+            owner, WETH, collateral, uniPosm, key, uniRouter, aavePool, aaveEncoder, aaveDataProvider, aaveOracle
+        );
         assertEq(c.owner(), owner);
         assertEq(address(c.uniPosm()), address(uniPosm));
 
@@ -146,6 +151,28 @@ contract IlSolverTest is Test {
         assertGt(newLiquidity, oldLiquidity);
     }
 
+    function testUniV4SwapZeroForOne() public {
+        uint256 usdcBalanceOld = collateral.balanceOf(address(c));
+        uint128 ethIn = 1 ether;
+        // apply 5% slippage and correct decimals 1e8 (oracle) to 1e6 (usdc)
+        uint128 minUsdcOut = uint128(c.aaveOraclePrice(address(WETH))) * 95 / 10000;
+        uint256 amount1 = c.univ4Swap(true, ethIn, minUsdcOut);
+        uint256 usdcBalanceNew = collateral.balanceOf(address(c));
+        assertEq(usdcBalanceNew - usdcBalanceOld, amount1);
+        assertGt(amount1, minUsdcOut);
+    }
+
+    function testUniV4SwapOneForZero() public {
+        uint256 ethBalanceOld = address(c).balance;
+        // apply 5% slippage and correct decimals 1e8 (oracle) to 1e6 (usdc)
+        uint128 usdcIn = uint128(c.aaveOraclePrice(address(WETH))) * 105 / 10000;
+        uint128 minEthOut = 1 ether;
+        uint256 amount0 = c.univ4Swap(false, usdcIn, minEthOut);
+        uint256 ethBalanceNew = address(c).balance;
+        assertEq(ethBalanceNew - ethBalanceOld, amount0);
+        assertGt(amount0, minEthOut);
+    }
+
     function testAaveV3Supply() public {
         assertEq(reserve.balanceOf(address(c)), 0);
         uint256 amount = 1000e6;
@@ -165,7 +192,7 @@ contract IlSolverTest is Test {
         assertEq(wethBalanceNew - wethBalanceOld, borrowAmount);
     }
 
-    function testAaveOraclePrice() public {
+    function testAaveOraclePrice() public view {
         uint256 usdc_p = c.aaveOraclePrice(usdc);
         assertApproxEqRel(usdc_p, 1e8, 5e16);
     }

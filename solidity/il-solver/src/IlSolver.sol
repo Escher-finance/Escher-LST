@@ -1,10 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// TODO: dedupe to a single v4-core instead of importing v4-periphery's v4-core types
+
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IPositionManager as IPositionManagerOriginal} from "univ4-periphery/interfaces/IPositionManager.sol";
+import {
+    IV4Router,
+    PoolKey as PeripheryPoolKey,
+    Currency as PeripheryCurrency
+} from "univ4-periphery/interfaces/IV4Router.sol";
+import {IHooks} from "univ4-periphery/libraries/PathKey.sol";
 import {Actions} from "univ4-periphery/libraries/Actions.sol";
 import {PoolKey} from "univ4-core/types/PoolKey.sol";
+import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
 import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
 import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
 import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
@@ -29,6 +38,10 @@ interface IPositionManager is IPositionManagerOriginal {
 
 interface IL2Pool is IL2PoolOriginal, IPool {}
 
+interface IUniversalRouter {
+    function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
+}
+
 interface IPermit2 {
     function allowance(address user, address token, address spender)
         external
@@ -37,15 +50,65 @@ interface IPermit2 {
     function approve(address token, address spender, uint160 amount, uint48 expiration) external;
 }
 
+// src: https://github.com/Uniswap/universal-router/blob/main/contracts/libraries/Commands.sol
+library UniversalRouterCommands {
+    // Masks to extract certain bits of commands
+    bytes1 internal constant FLAG_ALLOW_REVERT = 0x80;
+    bytes1 internal constant COMMAND_TYPE_MASK = 0x7f;
+
+    // Command Types. Maximum supported command at this moment is 0x3f.
+    // The commands are executed in nested if blocks to minimise gas consumption
+
+    // Command Types where value<=0x07, executed in the first nested-if block
+    uint256 constant V3_SWAP_EXACT_IN = 0x00;
+    uint256 constant V3_SWAP_EXACT_OUT = 0x01;
+    uint256 constant PERMIT2_TRANSFER_FROM = 0x02;
+    uint256 constant PERMIT2_PERMIT_BATCH = 0x03;
+    uint256 constant SWEEP = 0x04;
+    uint256 constant TRANSFER = 0x05;
+    uint256 constant PAY_PORTION = 0x06;
+    // COMMAND_PLACEHOLDER = 0x07;
+
+    // Command Types where 0x08<=value<=0x0f, executed in the second nested-if block
+    uint256 constant V2_SWAP_EXACT_IN = 0x08;
+    uint256 constant V2_SWAP_EXACT_OUT = 0x09;
+    uint256 constant PERMIT2_PERMIT = 0x0a;
+    uint256 constant WRAP_ETH = 0x0b;
+    uint256 constant UNWRAP_WETH = 0x0c;
+    uint256 constant PERMIT2_TRANSFER_FROM_BATCH = 0x0d;
+    uint256 constant BALANCE_CHECK_ERC20 = 0x0e;
+    // COMMAND_PLACEHOLDER = 0x0f;
+
+    // Command Types where 0x10<=value<=0x20, executed in the third nested-if block
+    uint256 constant V4_SWAP = 0x10;
+    uint256 constant V3_POSITION_MANAGER_PERMIT = 0x11;
+    uint256 constant V3_POSITION_MANAGER_CALL = 0x12;
+    uint256 constant V4_INITIALIZE_POOL = 0x13;
+    uint256 constant V4_POSITION_MANAGER_CALL = 0x14;
+    // COMMAND_PLACEHOLDER = 0x15 -> 0x20
+
+    // Command Types where 0x21<=value<=0x3f
+    uint256 constant EXECUTE_SUB_PLAN = 0x21;
+    // COMMAND_PLACEHOLDER for 0x22 to 0x3f
+
+    // Command Types where 0x40<=value<=0x5f
+    // Reserved for 3rd party integrations
+    uint256 constant ACROSS_V4_DEPOSIT_V3 = 0x40;
+}
+
 contract IlSolver is Ownable2Step {
     // The borrowed asset
     IWETH public immutable WETH;
     // The collateral asset (e.g. USDC)
     IERC20 public immutable collateral;
 
+    IPermit2 permit2;
+
     // Uniswap V4
 
     IPositionManager public uniPosm;
+    IPoolManager uniPoolManager;
+    IUniversalRouter uniRouter;
     // Must have `currency0` set to ETH and `currency1` set to `collateral`
     PoolKey public uniPoolKey;
     uint256 public uniPositionTokenId;
@@ -68,6 +131,7 @@ contract IlSolver is Ownable2Step {
         IERC20 _collateral,
         IPositionManager _uniPosm,
         PoolKey memory _uniPoolKey,
+        IUniversalRouter _uniRouter,
         IL2Pool _aavePool,
         L2Encoder _aaveEncoder,
         IPoolDataProvider _aaveDataProvider,
@@ -75,9 +139,10 @@ contract IlSolver is Ownable2Step {
     ) Ownable(_owner) {
         WETH = _weth;
 
-        _uniPosm.permit2();
-        _uniPosm.poolManager();
+        permit2 = IPermit2(_uniPosm.permit2());
+        uniPoolManager = IPoolManager(address(_uniPosm.poolManager()));
         uniPosm = _uniPosm;
+        uniRouter = _uniRouter;
 
         require(_uniPoolKey.currency0.isAddressZero());
         require(Currency.unwrap(_uniPoolKey.currency1) == address(_collateral));
@@ -96,16 +161,17 @@ contract IlSolver is Ownable2Step {
     receive() external payable {}
 
     /**
-     * @dev Sets allowances and validates contract's funds to use in Uniswap V4
+     * @dev Sets allowances and validates contract's funds to use in Uniswap V4 add/increment liquidity
      * @notice In the case there's not enough ETH (`_amount0Max`), it will attempt to unwrap the right amount of WETH
      */
-    modifier univ4AttachFunds(uint128 _amount0Max, uint128 _amount1Max) {
+    modifier univ4AttachFundsForLiquidity(uint128 _amount0Max, uint128 _amount1Max) {
+        require(_amount0Max > 0);
+        require(_amount1Max > 0);
+
         uint256 amount0Max = uint256(_amount0Max);
         uint256 amount1Max = uint256(_amount1Max);
         PoolKey memory key = uniPoolKey;
         address _this = address(this);
-        address _permit2 = uniPosm.permit2();
-        IPermit2 permit2 = IPermit2(_permit2);
         address _posm = address(uniPosm);
 
         // Handle ETH
@@ -119,12 +185,46 @@ contract IlSolver is Ownable2Step {
         // Handle collateral
 
         IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
-        if (t1.allowance(_this, _permit2) < amount1Max) {
-            t1.approve(_permit2, type(uint128).max);
+        if (t1.allowance(_this, address(permit2)) < amount1Max) {
+            t1.approve(address(permit2), type(uint128).max);
         }
         (uint160 p2Allowance1,,) = permit2.allowance(_this, address(t1), _posm);
         if (p2Allowance1 < amount1Max) {
             permit2.approve(address(t1), _posm, type(uint128).max, type(uint48).max);
+        }
+
+        _;
+    }
+
+    modifier univ4AttachFundsForSwap(bool zeroForOne, uint128 _amountIn) {
+        require(_amountIn > 0);
+
+        uint256 amountIn = uint256(_amountIn);
+        PoolKey memory key = uniPoolKey;
+        address _this = address(this);
+        address _router = address(uniRouter);
+
+        // Handle ETH
+
+        if (zeroForOne) {
+            uint256 ethBalance = _this.balance;
+            uint256 ethNeeded = (ethBalance < amountIn) ? amountIn - ethBalance : 0;
+            if (ethNeeded > 0) {
+                WETH.withdraw(ethNeeded);
+            }
+        }
+
+        // Handle collateral
+
+        if (!zeroForOne) {
+            IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
+            if (t1.allowance(_this, address(permit2)) < amountIn) {
+                t1.approve(address(permit2), type(uint128).max);
+            }
+            (uint160 p2Allowance1,,) = permit2.allowance(_this, address(t1), address(_router));
+            if (p2Allowance1 < amountIn) {
+                permit2.approve(address(t1), _router, type(uint128).max, type(uint48).max);
+            }
         }
 
         _;
@@ -143,7 +243,7 @@ contract IlSolver is Ownable2Step {
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) private univ4AttachFunds(amount0Max, amount1Max) returns (uint256 used0, uint256 used1) {
+    ) private univ4AttachFundsForLiquidity(amount0Max, amount1Max) returns (uint256 used0, uint256 used1) {
         address _this = address(this);
         PoolKey memory _key = uniPoolKey;
 
@@ -182,7 +282,7 @@ contract IlSolver is Ownable2Step {
      */
     function _univ4LiquidityIncrement(uint256 liquidity, uint128 amount0Max, uint128 amount1Max)
         private
-        univ4AttachFunds(amount0Max, amount1Max)
+        univ4AttachFundsForLiquidity(amount0Max, amount1Max)
         returns (uint256 used0, uint256 used1)
     {
         address _this = address(this);
@@ -234,6 +334,56 @@ contract IlSolver is Ownable2Step {
     }
 
     /**
+     * @dev Swaps exact input single from the Uniswap V4 pool with `uniPoolKey`
+     * @dev Swaps one of the tokens for the other configured via `zeroForOne`
+     * @notice Uses contract's funds
+     * @return actualAmountOut Actual amount returned after the swap (i.e. amount1 returned to the contract if zeroForOne is true)
+     */
+    function _univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut)
+        private
+        univ4AttachFundsForSwap(zeroForOne, amountIn)
+        returns (uint256 actualAmountOut)
+    {
+        bytes memory commands = abi.encodePacked(uint8(UniversalRouterCommands.V4_SWAP));
+        bytes memory actions =
+            abi.encodePacked(uint8(Actions.SWAP_EXACT_IN_SINGLE), uint8(Actions.SETTLE_ALL), uint8(Actions.TAKE_ALL));
+
+        PoolKey memory key = uniPoolKey;
+        bytes[] memory params = new bytes[](3);
+        PeripheryPoolKey memory _key = PeripheryPoolKey({
+            currency0: PeripheryCurrency.wrap(Currency.unwrap(key.currency0)),
+            currency1: PeripheryCurrency.wrap(Currency.unwrap(key.currency1)),
+            fee: key.fee,
+            tickSpacing: key.tickSpacing,
+            hooks: IHooks(address(key.hooks))
+        });
+
+        params[0] = abi.encode(
+            IV4Router.ExactInputSingleParams({
+                poolKey: _key,
+                zeroForOne: zeroForOne,
+                amountIn: amountIn,
+                amountOutMinimum: minAmountOut,
+                hookData: bytes("")
+            })
+        );
+        params[1] = abi.encode(zeroForOne ? key.currency0 : key.currency1, amountIn);
+        params[2] = abi.encode(zeroForOne ? key.currency1 : key.currency0, minAmountOut);
+
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(actions, params);
+        uint256 deadline = block.timestamp;
+
+        uint256 bBefore = (zeroForOne) ? key.currency1.balanceOfSelf() : key.currency0.balanceOfSelf();
+
+        uniRouter.execute{value: zeroForOne ? amountIn : 0}(commands, inputs, deadline);
+
+        uint256 bAfter = (zeroForOne) ? key.currency1.balanceOfSelf() : key.currency0.balanceOfSelf();
+
+        actualAmountOut = bAfter - bBefore;
+    }
+
+    /**
      * @dev Supplies `collateral` token to Aave V3
      * @notice Uses contract's funds
      * @notice If it's the first deposit it sets the collateral as the reserve token
@@ -273,6 +423,19 @@ contract IlSolver is Ownable2Step {
     }
 
     /**
+     * @dev Swaps exact input single from the Uniswap V4 pool with `uniPoolKey`
+     * @dev Swaps one of the tokens for the other configured via `zeroForOne`
+     * @dev See internal helper {_univ4Swap}
+     */
+    function univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut)
+        public
+        onlyOwner
+        returns (uint256 actualAmountOut)
+    {
+        return _univ4Swap(zeroForOne, amountIn, minAmountOut);
+    }
+
+    /**
      * @dev Supplies `collateral` token to Aave V3
      * @dev See internal helper {_aavev3Supply}
      */
@@ -297,9 +460,10 @@ contract IlSolver is Ownable2Step {
     }
 
     /**
+     * @notice The Aave oracle uses 8 decimals
      * @return price Current price of a given `asset` from the Aave Oracle
      */
-    function aaveOraclePrice(address asset) public returns (uint256 price) {
+    function aaveOraclePrice(address asset) public view returns (uint256 price) {
         price = aaveOracle.getAssetPrice(asset);
     }
 }
