@@ -313,7 +313,32 @@ contract IlSolver is Ownable2Step {
         used1 = b1Before + amount1Max - b1After;
     }
 
-    // swaps exact input single
+    /**
+     * @dev Mints or increments the Uniswap V4 position depending on whether `uniPositionTokenId` is set
+     * @notice Uses contract's funds
+     * @return used0 Amount used out of `amount0Max`
+     * @return used1 Amount used out of `amount1Max`
+     */
+    function _univ4LiquidityAdd(
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 liquidity,
+        uint128 amount0Max,
+        uint128 amount1Max
+    ) private returns (uint256 used0, uint256 used1) {
+        if (uniPositionTokenId == 0) {
+            return _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+        } else {
+            return _univ4LiquidityIncrement(liquidity, amount0Max, amount1Max);
+        }
+    }
+
+    /**
+     * @dev Swaps exact input single from the Uniswap V4 pool with `uniPoolKey`
+     * @dev Swaps one of the tokens for the other configured via `zeroForOne`
+     * @notice Uses contract's funds
+     * @return actualAmountOut Actual amount returned after the swap (i.e. amount1 returned to the contract if zeroForOne is true)
+     */
     function _univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut)
         private
         univ4AttachFundsForSwap(zeroForOne, amountIn)
@@ -359,26 +384,6 @@ contract IlSolver is Ownable2Step {
     }
 
     /**
-     * @dev Mints or increments the Uniswap V4 position depending on whether `uniPositionTokenId` is set
-     * @notice Uses contract's funds
-     * @return used0 Amount used out of `amount0Max`
-     * @return used1 Amount used out of `amount1Max`
-     */
-    function _univ4LiquidityAdd(
-        int24 tickLower,
-        int24 tickUpper,
-        uint256 liquidity,
-        uint128 amount0Max,
-        uint128 amount1Max
-    ) private returns (uint256 used0, uint256 used1) {
-        if (uniPositionTokenId == 0) {
-            return _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
-        } else {
-            return _univ4LiquidityIncrement(liquidity, amount0Max, amount1Max);
-        }
-    }
-
-    /**
      * @dev Supplies `collateral` token to Aave V3
      * @notice Uses contract's funds
      * @notice If it's the first deposit it sets the collateral as the reserve token
@@ -417,6 +422,11 @@ contract IlSolver is Ownable2Step {
         return _univ4LiquidityAdd(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
     }
 
+    /**
+     * @dev Swaps exact input single from the Uniswap V4 pool with `uniPoolKey`
+     * @dev Swaps one of the tokens for the other configured via `zeroForOne`
+     * @dev See internal helper {_univ4Swap}
+     */
     function univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut)
         public
         onlyOwner
