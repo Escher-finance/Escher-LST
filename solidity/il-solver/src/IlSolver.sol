@@ -2,20 +2,21 @@
 pragma solidity ^0.8.24;
 
 // TODO: dedupe to a single v4-core instead of importing v4-periphery's v4-core types
+// STATUS: partially done; fixed remappings, now can safely import things from where they're supposed to be
 
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {IPositionManager as IPositionManagerOriginal} from "univ4-periphery/interfaces/IPositionManager.sol";
+import {IPositionManager as IPositionManagerOriginal} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
 import {
     IV4Router,
     PoolKey as PeripheryPoolKey,
     Currency as PeripheryCurrency
-} from "univ4-periphery/interfaces/IV4Router.sol";
-import {IHooks} from "univ4-periphery/libraries/PathKey.sol";
-import {Actions} from "univ4-periphery/libraries/Actions.sol";
-import {PoolKey} from "univ4-core/types/PoolKey.sol";
-import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
-import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
-import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
+} from "@uniswap/v4-periphery/src/interfaces/IV4Router.sol";
+import {IHooks} from "@uniswap/v4-periphery/src/libraries/PathKey.sol";
+import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
+import {IImmutableState} from "@uniswap/v4-periphery/src/interfaces/IImmutableState.sol";
 import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
 import {IAaveOracle} from "aavev3/interfaces/IAaveOracle.sol";
 import {IPool} from "aavev3/interfaces/IPool.sol";

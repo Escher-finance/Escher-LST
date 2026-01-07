@@ -16,13 +16,13 @@ import {
     IWETH,
     IUniversalRouter
 } from "../src/IlSolver.sol";
-import {IHooks} from "univ4-core/interfaces/IHooks.sol";
-import {IPoolManager} from "univ4-core/interfaces/IPoolManager.sol";
-import {IStateView, PoolId} from "univ4-periphery/interfaces/IStateView.sol";
-import {LiquidityAmounts} from "univ4-core/../test/utils/LiquidityAmounts.sol";
-import {TickMath} from "univ4-core/libraries/TickMath.sol";
-import {PositionInfo, PositionInfoLibrary} from "univ4-periphery/libraries/PositionInfoLibrary.sol";
-import {Position} from "univ4-core/libraries/Position.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {IStateView, PoolId} from "@uniswap/v4-periphery/src/interfaces/IStateView.sol";
+import {LiquidityAmounts} from "@uniswap/v4-core/src/../test/utils/LiquidityAmounts.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {PositionInfo, PositionInfoLibrary} from "@uniswap/v4-periphery/src/libraries/PositionInfoLibrary.sol";
+import {Position} from "@uniswap/v4-core/src/libraries/Position.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
