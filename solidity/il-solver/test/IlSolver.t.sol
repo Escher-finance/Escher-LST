@@ -107,6 +107,8 @@ contract IlSolverTest is Test {
         returns (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max)
     {
         (uint160 sqrtPriceX96, int24 tick,,) = uniStateView.getSlot0(id);
+        console.log("sqrtPriceX96", sqrtPriceX96);
+
         int24 tickSpacing = key.tickSpacing;
         tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
         tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
