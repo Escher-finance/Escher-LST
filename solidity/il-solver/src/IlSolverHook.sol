@@ -36,14 +36,19 @@ contract IlSolverHook is BaseHook, Ownable2Step {
     // The collateral asset (e.g. USDC)
     IERC20 public immutable collateral;
 
-    constructor(address _owner, IPoolManager _poolManager, IWETH _weth, IERC20 _collateral, IL2Pool _aavePool)
-        BaseHook(_poolManager)
-        Ownable(_owner)
-    {
+    constructor(
+        address _owner,
+        IPoolManager _poolManager,
+        IWETH _weth,
+        IERC20 _collateral,
+        IL2Pool _aavePool,
+        IAaveOracle _aaveOracle
+    ) BaseHook(_poolManager) Ownable(_owner) {
         s_users[_owner] = true;
         WETH = _weth;
         collateral = _collateral;
         s_aavePool = _aavePool;
+        s_aaveOracle = _aaveOracle;
     }
 
     error TrackerHook_verifiedRouterMissingMsgSender(address router);
@@ -92,10 +97,6 @@ contract IlSolverHook is BaseHook, Ownable2Step {
 
     function toggleUser(address user) public onlyOwner {
         s_users[user] = !s_users[user];
-    }
-
-    function updateAaveOracle(IAaveOracle aaveOracle) public onlyOwner {
-        s_aaveOracle = aaveOracle;
     }
 
     /**
