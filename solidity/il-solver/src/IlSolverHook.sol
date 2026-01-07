@@ -1,13 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {
-    BaseHook,
-    Hooks,
-    IPoolManager,
-    ModifyLiquidityParams,
-    BalanceDelta
-} from "v4-periphery/src/utils/BaseHook.sol";
+import {BaseHook, Hooks, IPoolManager, ModifyLiquidityParams, BalanceDelta} from "v4-periphery/src/utils/BaseHook.sol";
 import {BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
@@ -79,7 +73,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         uint256 collateralAmountNeeded
     );
 
-    function _getRealSender(address sender) internal returns (address) {
+    function _getRealSender(address sender) internal view returns (address) {
         if (s_verifiedRouters[sender]) {
             try IMsgSender(sender).msgSender() returns (address s) {
                 return s;
