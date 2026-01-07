@@ -18,6 +18,7 @@ import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
 import {IPool} from "aavev3/interfaces/IPool.sol";
 import {IWETH} from "@common/IWETH.sol";
 import {ReserveConfiguration} from "aavev3/protocol/libraries/configuration/ReserveConfiguration.sol";
+import {IlSolverMath} from "./core/EscherMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -68,6 +69,14 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         int24 tickUpper,
         int256 liquidityDelta,
         bytes32 salt
+    );
+
+    event AddLiquidityData(
+        uint256 borrowedAmountNeeded,
+        uint256 wethPrice,
+        uint256 borrowAmountUsdPrice,
+        uint256 ltv,
+        uint256 collateralAmountNeeded
     );
 
     /// @dev Equivalent to PoolId.sol from v4-core
@@ -153,8 +162,11 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         // );
         uint256 borrowedAmountNeeded = uint256(uint128(BalanceDeltaLibrary.amount0(delta)));
         uint256 wethPrice = aaveOraclePrice(address(WETH)) * 1e10; // in 18 decimals
-        uint256 borrowAmountUSDPrice = borrowedAmountNeeded * wethPrice;
+        uint256 borrowAmountUsdPrice = borrowedAmountNeeded * wethPrice;
         uint256 ltv = aavev3Ltv();
+        uint256 collateralAmountNeeded =
+            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
+        emit AddLiquidityData(borrowedAmountNeeded, wethPrice, borrowAmountUsdPrice, ltv, collateralAmountNeeded);
         return (BaseHook.afterAddLiquidity.selector, delta);
     }
 
