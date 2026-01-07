@@ -5,11 +5,11 @@ import {
     BaseHook,
     Hooks,
     IPoolManager,
-    PoolKey,
     ModifyLiquidityParams,
     BalanceDelta
 } from "v4-periphery/src/utils/BaseHook.sol";
 import {BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IlSolverMath} from "./core/EscherMath.sol";
 import {IAaveOracle} from "aavev3/interfaces/IAaveOracle.sol";
@@ -79,11 +79,6 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         uint256 collateralAmountNeeded
     );
 
-    /// @dev Equivalent to PoolId.sol from v4-core
-    function _getPoolId(PoolKey calldata key) internal returns (bytes32) {
-        return keccak256(abi.encode(key));
-    }
-
     function _getRealSender(address sender) internal returns (address) {
         if (s_verifiedRouters[sender]) {
             try IMsgSender(sender).msgSender() returns (address s) {
@@ -152,14 +147,6 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         BalanceDelta feesAccrued,
         bytes calldata hookData
     ) internal override returns (bytes4, BalanceDelta) {
-        // emit TrackedModifyLiquidity(
-        //     _getPoolId(key),
-        //     _getRealSender(sender),
-        //     params.tickLower,
-        //     params.tickUpper,
-        //     params.liquidityDelta,
-        //     params.salt
-        // );
         uint256 borrowedAmountNeeded = uint256(uint128(BalanceDeltaLibrary.amount0(delta)));
         uint256 wethPrice = aaveOraclePrice(address(WETH)) * 1e10; // in 18 decimals
         uint256 borrowAmountUsdPrice = borrowedAmountNeeded * wethPrice;
@@ -169,23 +156,4 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         emit AddLiquidityData(borrowedAmountNeeded, wethPrice, borrowAmountUsdPrice, ltv, collateralAmountNeeded);
         return (BaseHook.afterAddLiquidity.selector, delta);
     }
-
-    // function _afterRemoveLiquidity(
-    //     address sender,
-    //     PoolKey calldata key,
-    //     ModifyLiquidityParams calldata params,
-    //     BalanceDelta delta,
-    //     BalanceDelta feesAccrued,
-    //     bytes calldata hookData
-    // ) internal override returns (bytes4, BalanceDelta) {
-    //     emit TrackedModifyLiquidity(
-    //         _getPoolId(key),
-    //         _getRealSender(sender),
-    //         params.tickLower,
-    //         params.tickUpper,
-    //         params.liquidityDelta,
-    //         params.salt
-    //     );
-    //     return (BaseHook.afterRemoveLiquidity.selector, delta);
-    // }
 }
