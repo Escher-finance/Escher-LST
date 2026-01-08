@@ -19,7 +19,7 @@ import {
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IStateView, PoolId} from "@uniswap/v4-periphery/src/interfaces/IStateView.sol";
-import {LiquidityAmounts} from "@uniswap/v4-core/src/../test/utils/LiquidityAmounts.sol";
+import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {PositionInfo, PositionInfoLibrary} from "@uniswap/v4-periphery/src/libraries/PositionInfoLibrary.sol";
 import {Position} from "@uniswap/v4-core/src/libraries/Position.sol";
