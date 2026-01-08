@@ -69,6 +69,10 @@ contract IlSolverHookTest is Test {
             hooks: IHooks(hookAddress)
         });
 
+        // fund owner
+        deal(owner, 10 ether);
+        deal(Currency.unwrap(uniPoolKey.currency1), owner, 50000e6);
+
         (uint160 sqrtPriceX96,,,) = uniStateView.getSlot0(_referencePoolKey.toId());
         // initialize pool
         uniPoolManager.initialize(uniPoolKey, sqrtPriceX96);
