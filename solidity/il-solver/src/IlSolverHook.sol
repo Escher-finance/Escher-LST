@@ -99,11 +99,11 @@ contract IlSolverHook is BaseHook, Ownable2Step {
     }
 
     /**
-     * @notice The Aave oracle uses 8 decimals
+     * @notice This function returns the `price` in 18 decimals
      * @return price Current price of a given `asset` from the Aave Oracle
      */
     function aaveOraclePrice(address asset) public view returns (uint256 price) {
-        price = s_aaveOracle.getAssetPrice(asset);
+        price = s_aaveOracle.getAssetPrice(asset) * 1e10;
     }
 
     /**
@@ -148,9 +148,10 @@ contract IlSolverHook is BaseHook, Ownable2Step {
             return (selector, delta);
         }
 
-        uint256 borrowedAmountNeeded = uint256(uint128(BalanceDeltaLibrary.amount0(delta)));
-        uint256 wethPrice = aaveOraclePrice(address(WETH)) * 1e10; // in 18 decimals
-        uint256 borrowAmountUsdPrice = borrowedAmountNeeded * wethPrice;
+        int128 delta0 = BalanceDeltaLibrary.amount0(delta);
+        uint256 borrowedAmountNeeded = delta0 < 0 ? uint256(uint128(-delta0)) : 0;
+        uint256 wethPrice = aaveOraclePrice(address(WETH));
+        uint256 borrowAmountUsdPrice = borrowedAmountNeeded * wethPrice / 1 ether; // normalize price decimals
         uint256 ltv = aavev3Ltv();
         // uint256 collateralAmountNeeded =
         //     IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
