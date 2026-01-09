@@ -74,7 +74,8 @@ library IlSolverMath {
             totalBorrowedToken += borrowThisLoopToken;
             collateralUSD += borrowThisLoopUSD; // borrowed funds are re-deposited as collateral
 
-            if (totalBorrowedToken >= borrowedAmountNeeded) {
+            uint256 targetBorrowUSD = Math.mulDiv(borrowedAmountNeeded, borrowAmountUSDPrice, 1e18);
+            if (totalBorrowedUSD >= targetBorrowUSD) {
                 isEnough = true;
                 // Calculate fractional iterations (in 1e18 scale)
                 // iterations = completed full iterations + (partial amount borrowed / max could borrow)
