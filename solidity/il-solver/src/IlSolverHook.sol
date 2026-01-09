@@ -107,11 +107,12 @@ contract IlSolverHook is BaseHook, Ownable2Step {
     }
 
     /**
+     * @notice This function returns the `ltv` in 16 decimals
      * @return ltv Loan-to-value ratio of the `collateral` asset
      */
     function aavev3Ltv() public view returns (uint256 ltv) {
         DataTypes.ReserveConfigurationMap memory map = s_aavePool.getConfiguration(address(collateral));
-        ltv = map.getLtv();
+        ltv = map.getLtv() * 1e14;
     }
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
@@ -151,11 +152,13 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         int128 delta0 = BalanceDeltaLibrary.amount0(delta);
         uint256 borrowedAmountNeeded = delta0 < 0 ? uint256(uint128(-delta0)) : 0;
         uint256 wethPrice = aaveOraclePrice(address(WETH));
-        uint256 borrowAmountUsdPrice = borrowedAmountNeeded * wethPrice / 1 ether; // normalize price decimals
+        uint256 borrowAmountUsdPrice = borrowedAmountNeeded * wethPrice / 1 ether;
         uint256 ltv = aavev3Ltv();
-        // uint256 collateralAmountNeeded =
-        //     IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
-        emit AddLiquidityData(realSender, borrowedAmountNeeded, wethPrice, borrowAmountUsdPrice, ltv, 0);
+        uint256 collateralAmountNeeded =
+            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
+        emit AddLiquidityData(
+            realSender, borrowedAmountNeeded, wethPrice, borrowAmountUsdPrice, ltv, collateralAmountNeeded
+        );
 
         return (selector, delta);
     }
