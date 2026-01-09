@@ -9,6 +9,7 @@ import {IlSolverHook, IWETH, IERC20, IPoolManager, IL2Pool, IAaveOracle} from ".
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IStateView} from "@uniswap/v4-periphery/src/interfaces/IStateView.sol";
@@ -36,6 +37,7 @@ contract IlSolverHookTest is Test {
     IPositionManager uniPosm;
     PoolKey uniPoolKey;
     IStateView uniStateView;
+    uint256 uniPositionTokenId;
     // NOTE: this pool is used only for reference to create the new one
     PoolKey _referencePoolKey;
 
@@ -59,7 +61,7 @@ contract IlSolverHookTest is Test {
 
         permit2 = IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
         uniPoolManager = IPoolManager(0x498581fF718922c3f8e6A244956aF099B2652b2b);
-        uniPosm = IPositionManager(0x498581fF718922c3f8e6A244956aF099B2652b2b);
+        uniPosm = IPositionManager(0x7C5f5A4bBd8fD63184577525326123B519429bDc);
         uniStateView = IStateView(0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71);
         aavePool = IL2Pool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
         aaveOracle = IAaveOracle(0x2Cc0Fc26eD4563A5ce5e8bdcfe1A2878676Ae156);
@@ -100,29 +102,32 @@ contract IlSolverHookTest is Test {
         assertGt(price, 0);
     }
 
-    function _calculateInputs(uint256 amount0, int24 delta, uint256 slippage)
+    function _univ4LiquidityMintFromAmount0(PoolKey memory key, uint256 amount0, int24 delta, uint256 slippage)
         private
-        view
-        returns (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max)
+        returns (uint256 used0, uint256 used1)
     {
-        (uint160 sqrtPriceX96, int24 tick,,) = uniStateView.getSlot0(uniPoolKey.toId());
+        (uint160 sqrtPriceX96, int24 tick,,) = uniStateView.getSlot0(key.toId());
 
-        int24 tickSpacing = uniPoolKey.tickSpacing;
-        tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
-        tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
+        int24 tickSpacing = key.tickSpacing;
+        int24 tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
+        int24 tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
 
         uint160 sqrtPriceAX96 = TickMath.getSqrtPriceAtTick(tickLower);
         uint160 sqrtPriceBX96 = TickMath.getSqrtPriceAtTick(tickUpper);
-        liquidity = LiquidityAmounts.getLiquidityForAmount0(sqrtPriceAX96, sqrtPriceBX96, amount0);
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmount0(sqrtPriceAX96, sqrtPriceBX96, amount0);
 
         (uint256 required0, uint256 required1) =
             LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtPriceAX96, sqrtPriceBX96, liquidity);
 
-        amount0Max = uint128(required0 * (100 + slippage) / 100);
-        amount1Max = uint128(required1 * (100 + slippage) / 100);
+        uint128 amount0Max = uint128(required0 * (100 + slippage) / 100);
+        uint128 amount1Max = uint128(required1 * (100 + slippage) / 100);
+
+        (used0, used1) =
+            _univ4LiquidityMintRaw(uniPoolKey, owner, tickLower, tickUpper, liquidity, amount0Max, amount1Max);
     }
 
-    function _univ4LiquidityMint(
+    function _univ4LiquidityMintRaw(
+        PoolKey memory k,
         address caller,
         int24 tickLower,
         int24 tickUpper,
@@ -130,52 +135,43 @@ contract IlSolverHookTest is Test {
         uint128 amount0Max,
         uint128 amount1Max
     ) private returns (uint256 used0, uint256 used1) {
-        PoolKey memory _key = uniPoolKey;
+        PoolKey memory _key = k;
         address posm = address(uniPosm);
 
         vm.startPrank(caller);
 
-        IERC20(Currency.unwrap(_key.currency1)).approve(posm, amount1Max);
+        IERC20 t1 = IERC20(Currency.unwrap(_key.currency1));
+        t1.approve(address(permit2), type(uint128).max);
+        permit2.approve(address(t1), posm, type(uint128).max, type(uint48).max);
 
-        bytes memory actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR));
+        bytes memory actions =
+            abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
 
-        bytes[] memory params = new bytes[](2);
+        bytes[] memory params = new bytes[](3);
         params[0] = abi.encode(_key, tickLower, tickUpper, liquidity, amount0Max, amount1Max, caller, bytes(""));
         params[1] = abi.encode(_key.currency0, _key.currency1);
-
-        uint256 b0Before = _key.currency0.balanceOf(owner);
-        uint256 b1Before = _key.currency1.balanceOf(owner);
+        params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, caller);
 
         uint256 deadline = block.timestamp;
-        uint256 valueToPass = _key.currency0.isAddressZero() ? amount0Max : 0;
+        IERC20(Currency.unwrap(_key.currency1)).approve(posm, amount1Max);
 
-        uniPosm.modifyLiquidities{value: valueToPass}(abi.encode(actions, params), deadline);
+        uint256 b0Before = _key.currency0.balanceOfSelf();
+        uint256 b1Before = _key.currency1.balanceOfSelf();
+        uniPositionTokenId = uniPosm.nextTokenId();
+        uniPosm.modifyLiquidities{value: amount0Max}(abi.encode(actions, params), deadline);
 
-        uint256 b0After = _key.currency0.balanceOf(owner);
-        uint256 b1After = _key.currency1.balanceOf(owner);
+        uint256 b0After = _key.currency0.balanceOfSelf();
+        uint256 b1After = _key.currency1.balanceOfSelf();
 
-        vm.stopPrank();
-
-        used0 = b0Before - b0After;
-        used1 = b1Before - b1After;
+        used0 = b0Before + amount0Max - b0After;
+        used1 = b1Before + amount1Max - b1After;
     }
 
     function test_afterAddLiquidityEvent() public {
-        uint256 amount0 = 0.1 ether;
+        uint256 amount0 = 1 ether;
         int24 delta = 488; // 5% in ticks
         uint256 slippage = 10; // 10%
-        (int24 tickLower, int24 tickUpper, uint128 liquidity, uint128 amount0Max, uint128 amount1Max) =
-            _calculateInputs(amount0, delta, slippage);
 
-        // (, int24 tick,,) = uniStateView.getSlot0(uniPoolKey.toId());
-        // int24 tickSpacing = uniPoolKey.tickSpacing;
-        // int24 tickLower = ((tick - tickSpacing) / tickSpacing) * tickSpacing;
-        // int24 tickUpper = ((tick + tickSpacing) / tickSpacing) * tickSpacing;
-        // uint128 amount0Max = 0.1 ether; // token0 side
-        // uint128 amount1Max = 100e6; // token1 side
-        // uint256 liquidity = 1e6;
-
-        (uint256 used0, uint256 used1) =
-            _univ4LiquidityMint(owner, tickLower, tickUpper, liquidity, uint128(amount0Max), uint128(amount1Max));
+        _univ4LiquidityMintFromAmount0(uniPoolKey, amount0, delta, slippage);
     }
 }
