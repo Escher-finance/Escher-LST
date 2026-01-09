@@ -31,16 +31,9 @@ contract ValidatorSetManagerTest is Test {
         implementation = new ValidatorSetManager();
 
         // Deploy proxy
-        bytes memory initData = abi.encodeWithSelector(
-            ValidatorSetManager.initialize.selector,
-            owner,
-            manager
-        );
+        bytes memory initData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, owner, manager);
 
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(implementation),
-            initData
-        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
 
         validatorSetManager = ValidatorSetManager(address(proxy));
 
@@ -52,31 +45,19 @@ contract ValidatorSetManagerTest is Test {
 
     function test_Initialize() public view {
         assertEq(validatorSetManager.owner(), owner);
-        assertTrue(
-            validatorSetManager.hasRole(
-                validatorSetManager.MANAGER_ROLE(),
-                manager
-            )
-        );
+        assertTrue(validatorSetManager.hasRole(validatorSetManager.MANAGER_ROLE(), manager));
         assertEq(validatorSetManager.totalWeight(), 0);
         assertEq(validatorSetManager.getValidatorCount(), 0);
 
         // Check that owner has DEFAULT_ADMIN_ROLE
         bytes32 defaultAdminRole = validatorSetManager.DEFAULT_ADMIN_ROLE();
-        assertTrue(
-            validatorSetManager.hasRole(defaultAdminRole, owner),
-            "Owner should have DEFAULT_ADMIN_ROLE"
-        );
+        assertTrue(validatorSetManager.hasRole(defaultAdminRole, owner), "Owner should have DEFAULT_ADMIN_ROLE");
     }
 
     function test_Initialize_RevertsOnZeroAddress() public {
         ValidatorSetManager newImpl = new ValidatorSetManager();
 
-        bytes memory initData = abi.encodeWithSelector(
-            ValidatorSetManager.initialize.selector,
-            address(0),
-            manager
-        );
+        bytes memory initData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, address(0), manager);
 
         vm.expectRevert(IValidatorSetManager.InvalidAddress.selector);
         new ERC1967Proxy(address(newImpl), initData);
@@ -222,9 +203,7 @@ contract ValidatorSetManagerTest is Test {
         vm.prank(manager);
         validatorSetManager.updateValidators(validators, weights);
 
-        (address addr, uint64 weight) = validatorSetManager.getValidator(
-            validator1
-        );
+        (address addr, uint64 weight) = validatorSetManager.getValidator(validator1);
         assertEq(addr, validator1);
         assertEq(weight, 100);
 
@@ -252,8 +231,7 @@ contract ValidatorSetManagerTest is Test {
         vm.prank(manager);
         validatorSetManager.updateValidators(validators, weights);
 
-        Validator[] memory allValidators = validatorSetManager
-            .getAllValidators();
+        Validator[] memory allValidators = validatorSetManager.getAllValidators();
         assertEq(allValidators.length, 3);
         assertEq(allValidators[0].validator, validator1);
         assertEq(allValidators[0].weight, 100);
@@ -324,14 +302,9 @@ contract ValidatorSetManagerTest is Test {
 
     /* ============ Fuzz Tests ============ */
 
-    function testFuzz_UpdateValidators(
-        uint8 validatorCount,
-        uint64 baseWeight
-    ) public {
+    function testFuzz_UpdateValidators(uint8 validatorCount, uint64 baseWeight) public {
         vm.assume(validatorCount > 0 && validatorCount <= 50);
-        vm.assume(
-            baseWeight > 0 && baseWeight < type(uint64).max / validatorCount
-        );
+        vm.assume(baseWeight > 0 && baseWeight < type(uint64).max / validatorCount);
 
         address[] memory validators = new address[](validatorCount);
         uint64[] memory weights = new uint64[](validatorCount);
