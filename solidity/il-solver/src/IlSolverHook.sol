@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {console} from "forge-std/Test.sol";
 import {BaseHook, Hooks, IPoolManager, ModifyLiquidityParams, BalanceDelta} from "v4-periphery/src/utils/BaseHook.sol";
 import {BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -145,6 +146,10 @@ contract IlSolverHook is BaseHook, Ownable2Step {
     ) internal override returns (bytes4, BalanceDelta) {
         bytes4 selector = BaseHook.afterAddLiquidity.selector;
         address realSender = _getRealSender(sender);
+
+        console.log("sender", sender);
+        console.log("realSender", realSender);
+        console.log("realSender is user", s_users[realSender]);
 
         if (!s_users[realSender]) return (selector, delta);
 
