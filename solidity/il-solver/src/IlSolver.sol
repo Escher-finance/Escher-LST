@@ -1,20 +1,33 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// TODO: dedupe to a single v4-core instead of importing v4-periphery's v4-core types
+// STATUS: partially done; fixed remappings, now can safely import things from where they're supposed to be
+
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {IPositionManager as IPositionManagerOriginal} from "univ4-periphery/interfaces/IPositionManager.sol";
-import {Actions} from "univ4-periphery/libraries/Actions.sol";
-import {PoolKey} from "univ4-core/types/PoolKey.sol";
-import {Currency, CurrencyLibrary} from "univ4-core/types/Currency.sol";
-import {IImmutableState} from "univ4-periphery/interfaces/IImmutableState.sol";
+import {IPositionManager as IPositionManagerOriginal} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
+import {
+    IV4Router,
+    PoolKey as PeripheryPoolKey,
+    Currency as PeripheryCurrency
+} from "@uniswap/v4-periphery/src/interfaces/IV4Router.sol";
+import {IHooks} from "@uniswap/v4-periphery/src/libraries/PathKey.sol";
+import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
+import {IImmutableState} from "@uniswap/v4-periphery/src/interfaces/IImmutableState.sol";
 import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
 import {IAaveOracle} from "aavev3/interfaces/IAaveOracle.sol";
 import {IPool} from "aavev3/interfaces/IPool.sol";
 import {L2Encoder} from "aavev3/helpers/L2Encoder.sol";
 import {DataTypes} from "aavev3/protocol/libraries/types/DataTypes.sol";
 import {ReserveConfiguration} from "aavev3/protocol/libraries/configuration/ReserveConfiguration.sol";
+import {IPoolDataProvider} from "aavev3/interfaces/IPoolDataProvider.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IlSolverMath} from "./core/EscherMath.sol";
+import {IWETH} from "@common/IWETH.sol";
 
 using CurrencyLibrary for Currency;
 using SafeERC20 for IERC20;
@@ -26,6 +39,10 @@ interface IPositionManager is IPositionManagerOriginal {
 
 interface IL2Pool is IL2PoolOriginal, IPool {}
 
+interface IUniversalRouter {
+    function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
+}
+
 interface IPermit2 {
     function allowance(address user, address token, address spender)
         external
@@ -34,88 +51,143 @@ interface IPermit2 {
     function approve(address token, address spender, uint160 amount, uint48 expiration) external;
 }
 
+// src: https://github.com/Uniswap/universal-router/blob/main/contracts/libraries/Commands.sol
+library UniversalRouterCommands {
+    // Masks to extract certain bits of commands
+    bytes1 internal constant FLAG_ALLOW_REVERT = 0x80;
+    bytes1 internal constant COMMAND_TYPE_MASK = 0x7f;
+
+    // Command Types. Maximum supported command at this moment is 0x3f.
+    // The commands are executed in nested if blocks to minimise gas consumption
+
+    // Command Types where value<=0x07, executed in the first nested-if block
+    uint256 constant V3_SWAP_EXACT_IN = 0x00;
+    uint256 constant V3_SWAP_EXACT_OUT = 0x01;
+    uint256 constant PERMIT2_TRANSFER_FROM = 0x02;
+    uint256 constant PERMIT2_PERMIT_BATCH = 0x03;
+    uint256 constant SWEEP = 0x04;
+    uint256 constant TRANSFER = 0x05;
+    uint256 constant PAY_PORTION = 0x06;
+    // COMMAND_PLACEHOLDER = 0x07;
+
+    // Command Types where 0x08<=value<=0x0f, executed in the second nested-if block
+    uint256 constant V2_SWAP_EXACT_IN = 0x08;
+    uint256 constant V2_SWAP_EXACT_OUT = 0x09;
+    uint256 constant PERMIT2_PERMIT = 0x0a;
+    uint256 constant WRAP_ETH = 0x0b;
+    uint256 constant UNWRAP_WETH = 0x0c;
+    uint256 constant PERMIT2_TRANSFER_FROM_BATCH = 0x0d;
+    uint256 constant BALANCE_CHECK_ERC20 = 0x0e;
+    // COMMAND_PLACEHOLDER = 0x0f;
+
+    // Command Types where 0x10<=value<=0x20, executed in the third nested-if block
+    uint256 constant V4_SWAP = 0x10;
+    uint256 constant V3_POSITION_MANAGER_PERMIT = 0x11;
+    uint256 constant V3_POSITION_MANAGER_CALL = 0x12;
+    uint256 constant V4_INITIALIZE_POOL = 0x13;
+    uint256 constant V4_POSITION_MANAGER_CALL = 0x14;
+    // COMMAND_PLACEHOLDER = 0x15 -> 0x20
+
+    // Command Types where 0x21<=value<=0x3f
+    uint256 constant EXECUTE_SUB_PLAN = 0x21;
+    // COMMAND_PLACEHOLDER for 0x22 to 0x3f
+
+    // Command Types where 0x40<=value<=0x5f
+    // Reserved for 3rd party integrations
+    uint256 constant ACROSS_V4_DEPOSIT_V3 = 0x40;
+}
+
 contract IlSolver is Ownable2Step {
+    // The borrowed asset
+    IWETH public immutable WETH;
+    // The collateral asset (e.g. USDC)
+    IERC20 public immutable collateral;
+
+    IPermit2 permit2;
+
     // Uniswap V4
-    IPositionManager public s_posm;
-    PoolKey public s_poolKey;
-    uint256 public s_positionTokenId;
-    bool public s_ethLiquidityPosition;
+
+    IPositionManager public uniPosm;
+    IPoolManager uniPoolManager;
+    IUniversalRouter uniRouter;
+    // Must have `currency0` set to ETH and `currency1` set to `collateral`
+    PoolKey public uniPoolKey;
+    uint256 public uniPositionTokenId;
 
     // Aave V3
-    IL2Pool s_l2Pool;
-    L2Encoder s_l2Encoder;
-    // Supplied token
-    IERC20 s_l2Underlying;
-    // Borrow token
-    IERC20 s_l2Borrow;
-    // Whether collateral has been set for the supplied token
-    bool s_collateralSet;
 
-    IAaveOracle s_oracle;
+    IL2Pool public aavePool;
+    L2Encoder public aaveEncoder;
+    IPoolDataProvider public aaveDataProvider;
+    IAaveOracle aaveOracle;
+    // Whether collateral has been set
+    bool public aaveCollateralSet;
 
     error IlSolver_wrongETHValueSent(uint256 needed, uint256 got);
     error IlSolver_wrongERC20Allowance(IERC20 token, uint256 needed, uint256 got);
 
     constructor(
         address _owner,
-        IPositionManager _posm,
-        PoolKey memory _poolKey,
-        IL2Pool _l2Pool,
-        L2Encoder _l2Encoder,
-        IERC20 _l2Underlying,
-        IERC20 _l2Borrow,
-        IAaveOracle _oracle
+        IWETH _weth,
+        IERC20 _collateral,
+        IPositionManager _uniPosm,
+        PoolKey memory _uniPoolKey,
+        IUniversalRouter _uniRouter,
+        IL2Pool _aavePool,
+        L2Encoder _aaveEncoder,
+        IPoolDataProvider _aaveDataProvider,
+        IAaveOracle _aaveOracle
     ) Ownable(_owner) {
-        _posm.permit2();
-        _posm.poolManager();
-        s_posm = _posm;
-        s_poolKey = _poolKey;
-        // Since it uses numerical sorting of addresses only the `currency0` can be ETH
-        s_ethLiquidityPosition = _poolKey.currency0.isAddressZero();
+        WETH = _weth;
 
-        s_l2Pool = _l2Pool;
-        s_l2Encoder = _l2Encoder;
-        s_l2Underlying = _l2Underlying;
-        s_l2Borrow = _l2Borrow;
-        s_oracle = _oracle;
+        permit2 = IPermit2(_uniPosm.permit2());
+        uniPoolManager = IPoolManager(address(_uniPosm.poolManager()));
+        uniPosm = _uniPosm;
+        uniRouter = _uniRouter;
+
+        require(_uniPoolKey.currency0.isAddressZero());
+        require(Currency.unwrap(_uniPoolKey.currency1) == address(_collateral));
+
+        uniPoolKey = _uniPoolKey;
+
+        (,,,,, bool usageAsCollateralEnabled,,,,) = _aaveDataProvider.getReserveConfigurationData(address(_collateral));
+        require(usageAsCollateralEnabled);
+        aaveDataProvider = _aaveDataProvider;
+        collateral = _collateral;
+        aavePool = _aavePool;
+        aaveEncoder = _aaveEncoder;
+        aaveOracle = _aaveOracle;
     }
 
     receive() external payable {}
 
-    modifier univ4AttachAndRefund(uint128 _amount0Max, uint128 _amount1Max) {
+    /**
+     * @dev Sets allowances and validates contract's funds to use in Uniswap V4 add/increment liquidity
+     * @notice In the case there's not enough ETH (`_amount0Max`), it will attempt to unwrap the right amount of WETH
+     */
+    modifier univ4AttachFundsForLiquidity(uint128 _amount0Max, uint128 _amount1Max) {
+        require(_amount0Max > 0);
+        require(_amount1Max > 0);
+
         uint256 amount0Max = uint256(_amount0Max);
         uint256 amount1Max = uint256(_amount1Max);
-        PoolKey memory key = s_poolKey;
+        PoolKey memory key = uniPoolKey;
         address _this = address(this);
-        address sender = msg.sender;
-        address _permit2 = s_posm.permit2();
-        IPermit2 permit2 = IPermit2(_permit2);
-        address _posm = address(s_posm);
+        address _posm = address(uniPosm);
 
-        uint256 b0Before = key.currency0.balanceOfSelf();
-        uint256 b1Before = key.currency1.balanceOfSelf();
+        // Handle ETH
 
-        if (s_ethLiquidityPosition) {
-            if (msg.value < amount0Max) {
-                revert IlSolver_wrongETHValueSent(amount0Max, msg.value);
-            }
-        } else {
-            IERC20 t0 = IERC20(Currency.unwrap(key.currency0));
-            t0.safeTransferFrom(sender, _this, amount0Max);
-
-            // permit2
-            if (t0.allowance(_this, _permit2) < amount0Max) {
-                t0.approve(_permit2, type(uint128).max);
-            }
-            (uint160 p2Allowance0,,) = permit2.allowance(_this, address(t0), _posm);
-            if (p2Allowance0 < amount0Max) {
-                permit2.approve(address(t0), _posm, type(uint128).max, type(uint48).max);
-            }
+        uint256 ethBalance = _this.balance;
+        uint256 ethNeeded = (ethBalance < amount0Max) ? amount0Max - ethBalance : 0;
+        if (ethNeeded > 0) {
+            WETH.withdraw(ethNeeded);
         }
+
+        // Handle collateral
+
         IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
-        t1.safeTransferFrom(sender, _this, amount1Max);
-        if (t1.allowance(_this, _permit2) < amount1Max) {
-            t1.approve(_permit2, type(uint128).max);
+        if (t1.allowance(_this, address(permit2)) < amount1Max) {
+            t1.approve(address(permit2), type(uint128).max);
         }
         (uint160 p2Allowance1,,) = permit2.allowance(_this, address(t1), _posm);
         if (p2Allowance1 < amount1Max) {
@@ -123,153 +195,276 @@ contract IlSolver is Ownable2Step {
         }
 
         _;
-
-        uint256 b0After = key.currency0.balanceOfSelf();
-        uint256 b1After = key.currency1.balanceOfSelf();
-
-        uint256 used0 = b0Before + amount0Max - b0After;
-        uint256 used1 = b1Before + amount1Max - b1After;
-        uint256 refund0 = used0 < amount0Max ? amount0Max - used0 : 0;
-        uint256 refund1 = used1 < amount1Max ? amount1Max - used1 : 0;
-        if (refund0 > 0) {
-            key.currency0.transfer(sender, refund0);
-        }
-        if (refund1 > 0) {
-            key.currency1.transfer(sender, refund1);
-        }
     }
 
+    modifier univ4AttachFundsForSwap(bool zeroForOne, uint128 _amountIn) {
+        require(_amountIn > 0);
+
+        uint256 amountIn = uint256(_amountIn);
+        PoolKey memory key = uniPoolKey;
+        address _this = address(this);
+        address _router = address(uniRouter);
+
+        // Handle ETH
+
+        if (zeroForOne) {
+            uint256 ethBalance = _this.balance;
+            uint256 ethNeeded = (ethBalance < amountIn) ? amountIn - ethBalance : 0;
+            if (ethNeeded > 0) {
+                WETH.withdraw(ethNeeded);
+            }
+        }
+
+        // Handle collateral
+
+        if (!zeroForOne) {
+            IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
+            if (t1.allowance(_this, address(permit2)) < amountIn) {
+                t1.approve(address(permit2), type(uint128).max);
+            }
+            (uint160 p2Allowance1,,) = permit2.allowance(_this, address(t1), address(_router));
+            if (p2Allowance1 < amountIn) {
+                permit2.approve(address(t1), _router, type(uint128).max, type(uint48).max);
+            }
+        }
+
+        _;
+    }
+
+    /**
+     * @dev Mints a new Uniswap V4 position given the tick range and `liquidity`
+     * @notice Creates a position NFT and stores its token ID in `uniPositionTokenId`
+     * @notice Uses contract's funds
+     * @return used0 Amount used out of `amount0Max`
+     * @return used1 Amount used out of `amount1Max`
+     */
     function _univ4LiquidityMint(
         int24 tickLower,
         int24 tickUpper,
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) private {
-        bool ethLiquidityPosition = s_ethLiquidityPosition;
-        bytes memory actions;
+    ) private univ4AttachFundsForLiquidity(amount0Max, amount1Max) returns (uint256 used0, uint256 used1) {
         address _this = address(this);
-        if (ethLiquidityPosition) {
-            actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
-        } else {
-            actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR));
-        }
-        PoolKey memory _key = s_poolKey;
-        bytes memory params0 =
-            abi.encode(_key, tickLower, tickUpper, liquidity, amount0Max, amount1Max, _this, bytes(""));
-        bytes memory params1 = abi.encode(_key.currency0, _key.currency1);
-        bytes[] memory params;
-        if (ethLiquidityPosition) {
-            params = new bytes[](3);
-            params[0] = params0;
-            params[1] = params1;
-            params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, _this);
-        } else {
-            params = new bytes[](2);
-            params[0] = params0;
-            params[1] = params1;
-        }
+        PoolKey memory _key = uniPoolKey;
+
+        bytes memory actions =
+            abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
+
+        bytes[] memory params = new bytes[](3);
+        params[0] = abi.encode(_key, tickLower, tickUpper, liquidity, amount0Max, amount1Max, _this, bytes(""));
+        params[1] = abi.encode(_key.currency0, _key.currency1);
+        params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, _this);
+
         uint256 deadline = block.timestamp;
-        uint256 positionId = s_posm.nextTokenId();
-        address posm = address(s_posm);
-        if (!ethLiquidityPosition) {
-            IERC20(Currency.unwrap(_key.currency0)).approve(posm, amount0Max);
-        }
+        uint256 positionId = uniPosm.nextTokenId();
+        address posm = address(uniPosm);
         IERC20(Currency.unwrap(_key.currency1)).approve(posm, amount1Max);
-        s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
-        s_positionTokenId = positionId;
+
+        uint256 b0Before = _key.currency0.balanceOfSelf();
+        uint256 b1Before = _key.currency1.balanceOfSelf();
+
+        uniPosm.modifyLiquidities{value: amount0Max}(abi.encode(actions, params), deadline);
+
+        uniPositionTokenId = positionId;
+
+        uint256 b0After = _key.currency0.balanceOfSelf();
+        uint256 b1After = _key.currency1.balanceOfSelf();
+
+        used0 = b0Before + amount0Max - b0After;
+        used1 = b1Before + amount1Max - b1After;
     }
 
-    function _univ4LiquidityIncrement(uint256 liquidity, uint128 amount0Max, uint128 amount1Max) private {
-        bool ethLiquidityPosition = s_ethLiquidityPosition;
-        bytes memory actions;
+    /**
+     * @dev Increments the Uniswap V4 position with ID `uniPositionTokenId` with the given `liquidity`
+     * @notice Uses contract's funds
+     * @return used0 Amount used out of `amount0Max`
+     * @return used1 Amount used out of `amount1Max`
+     */
+    function _univ4LiquidityIncrement(uint256 liquidity, uint128 amount0Max, uint128 amount1Max)
+        private
+        univ4AttachFundsForLiquidity(amount0Max, amount1Max)
+        returns (uint256 used0, uint256 used1)
+    {
         address _this = address(this);
-        if (ethLiquidityPosition) {
-            actions =
-                abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
-        } else {
-            actions = abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR));
-        }
-        uint256 _tokenId = s_positionTokenId;
-        PoolKey memory _key = s_poolKey;
-        bytes memory params0 = abi.encode(_tokenId, liquidity, amount0Max, amount1Max, bytes(""));
-        bytes memory params1 = abi.encode(_key.currency0, _key.currency1);
-        bytes[] memory params;
-        if (ethLiquidityPosition) {
-            params = new bytes[](3);
-            params[0] = params0;
-            params[1] = params1;
-            params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, _this);
-        } else {
-            params = new bytes[](2);
-            params[0] = params0;
-            params[1] = params1;
-        }
+        uint256 _tokenId = uniPositionTokenId;
+        PoolKey memory _key = uniPoolKey;
+
+        bytes memory actions =
+            abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
+
+        bytes[] memory params = new bytes[](3);
+        params[0] = abi.encode(_tokenId, liquidity, amount0Max, amount1Max, bytes(""));
+        params[1] = abi.encode(_key.currency0, _key.currency1);
+        params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, _this);
+
         uint256 deadline = block.timestamp;
-        address posm = address(s_posm);
-        if (!ethLiquidityPosition) {
-            IERC20(Currency.unwrap(_key.currency0)).approve(posm, amount0Max);
-        }
+        address posm = address(uniPosm);
         IERC20(Currency.unwrap(_key.currency1)).approve(posm, amount1Max);
-        s_posm.modifyLiquidities{value: ethLiquidityPosition ? amount0Max : 0}(abi.encode(actions, params), deadline);
+
+        uint256 b0Before = _key.currency0.balanceOfSelf();
+        uint256 b1Before = _key.currency1.balanceOfSelf();
+
+        uniPosm.modifyLiquidities{value: amount0Max}(abi.encode(actions, params), deadline);
+
+        uint256 b0After = _key.currency0.balanceOfSelf();
+        uint256 b1After = _key.currency1.balanceOfSelf();
+
+        used0 = b0Before + amount0Max - b0After;
+        used1 = b1Before + amount1Max - b1After;
     }
 
+    /**
+     * @dev Mints or increments the Uniswap V4 position depending on whether `uniPositionTokenId` is set
+     * @notice Uses contract's funds
+     * @return used0 Amount used out of `amount0Max`
+     * @return used1 Amount used out of `amount1Max`
+     */
     function _univ4LiquidityAdd(
         int24 tickLower,
         int24 tickUpper,
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) private univ4AttachAndRefund(amount0Max, amount1Max) {
-        if (s_positionTokenId == 0) {
-            _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+    ) private returns (uint256 used0, uint256 used1) {
+        if (uniPositionTokenId == 0) {
+            return _univ4LiquidityMint(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
         } else {
-            _univ4LiquidityIncrement(liquidity, amount0Max, amount1Max);
+            return _univ4LiquidityIncrement(liquidity, amount0Max, amount1Max);
         }
     }
 
+    /**
+     * @dev Swaps exact input single from the Uniswap V4 pool with `uniPoolKey`
+     * @dev Swaps one of the tokens for the other configured via `zeroForOne`
+     * @notice Uses contract's funds
+     * @return actualAmountOut Actual amount returned after the swap (i.e. amount1 returned to the contract if zeroForOne is true)
+     */
+    function _univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut)
+        private
+        univ4AttachFundsForSwap(zeroForOne, amountIn)
+        returns (uint256 actualAmountOut)
+    {
+        bytes memory commands = abi.encodePacked(uint8(UniversalRouterCommands.V4_SWAP));
+        bytes memory actions =
+            abi.encodePacked(uint8(Actions.SWAP_EXACT_IN_SINGLE), uint8(Actions.SETTLE_ALL), uint8(Actions.TAKE_ALL));
+
+        PoolKey memory key = uniPoolKey;
+        bytes[] memory params = new bytes[](3);
+        PeripheryPoolKey memory _key = PeripheryPoolKey({
+            currency0: PeripheryCurrency.wrap(Currency.unwrap(key.currency0)),
+            currency1: PeripheryCurrency.wrap(Currency.unwrap(key.currency1)),
+            fee: key.fee,
+            tickSpacing: key.tickSpacing,
+            hooks: IHooks(address(key.hooks))
+        });
+
+        params[0] = abi.encode(
+            IV4Router.ExactInputSingleParams({
+                poolKey: _key,
+                zeroForOne: zeroForOne,
+                amountIn: amountIn,
+                amountOutMinimum: minAmountOut,
+                hookData: bytes("")
+            })
+        );
+        params[1] = abi.encode(zeroForOne ? key.currency0 : key.currency1, amountIn);
+        params[2] = abi.encode(zeroForOne ? key.currency1 : key.currency0, minAmountOut);
+
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(actions, params);
+        uint256 deadline = block.timestamp;
+
+        uint256 bBefore = (zeroForOne) ? key.currency1.balanceOfSelf() : key.currency0.balanceOfSelf();
+
+        uniRouter.execute{value: zeroForOne ? amountIn : 0}(commands, inputs, deadline);
+
+        uint256 bAfter = (zeroForOne) ? key.currency1.balanceOfSelf() : key.currency0.balanceOfSelf();
+
+        actualAmountOut = bAfter - bBefore;
+    }
+
+    /**
+     * @dev Supplies `collateral` token to Aave V3
+     * @notice Uses contract's funds
+     * @notice If it's the first deposit it sets the collateral as the reserve token
+     */
+    function _aavev3Supply(uint256 amount) private {
+        if (collateral.allowance(address(this), address(aavePool)) < amount) {
+            collateral.approve(address(aavePool), type(uint128).max);
+        }
+        bytes32 params = aaveEncoder.encodeSupplyParams(address(collateral), amount, 0);
+        aavePool.supply(params);
+
+        if (!aaveCollateralSet) {
+            aavePool.setUserUseReserveAsCollateral(address(collateral), true);
+            aaveCollateralSet = true;
+        }
+    }
+
+    /**
+     * @dev Borrows `WETH` from Aave V3 using supplied `collateral`
+     */
+    function _aavev3Borrow(uint256 amount) private {
+        aavePool.borrow(address(WETH), amount, 2, 0, address(this));
+    }
+
+    /**
+     * @dev Mints or increments the Uniswap V4 position depending on whether `uniPositionTokenId` is set
+     * @dev See internal helper {_univ4LiquidityAdd}
+     */
     function univ4LiquidityAdd(
         int24 tickLower,
         int24 tickUpper,
         uint256 liquidity,
         uint128 amount0Max,
         uint128 amount1Max
-    ) public payable onlyOwner {
-        _univ4LiquidityAdd(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
+    ) public onlyOwner returns (uint256 used0, uint256 used1) {
+        return _univ4LiquidityAdd(tickLower, tickUpper, liquidity, amount0Max, amount1Max);
     }
 
-    function _aavev3Supply(uint256 amount) private {
-        s_l2Underlying.safeTransferFrom(msg.sender, address(this), amount);
-        if (s_l2Underlying.allowance(address(this), address(s_l2Pool)) < amount) {
-            s_l2Underlying.approve(address(s_l2Pool), type(uint128).max);
-        }
-        bytes32 params = s_l2Encoder.encodeSupplyParams(address(s_l2Underlying), amount, 0);
-        s_l2Pool.supply(params);
-
-        if (!s_collateralSet) {
-            s_l2Pool.setUserUseReserveAsCollateral(address(s_l2Underlying), true);
-            s_collateralSet = true;
-        }
+    /**
+     * @dev Swaps exact input single from the Uniswap V4 pool with `uniPoolKey`
+     * @dev Swaps one of the tokens for the other configured via `zeroForOne`
+     * @dev See internal helper {_univ4Swap}
+     */
+    function univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut)
+        public
+        onlyOwner
+        returns (uint256 actualAmountOut)
+    {
+        return _univ4Swap(zeroForOne, amountIn, minAmountOut);
     }
 
+    /**
+     * @dev Supplies `collateral` token to Aave V3
+     * @dev See internal helper {_aavev3Supply}
+     */
     function aavev3Supply(uint256 amount) public onlyOwner {
         _aavev3Supply(amount);
     }
 
-    function _aavev3Borrow(uint256 amount) private {
-        s_l2Pool.borrow(address(s_l2Borrow), amount, 2, 0, address(this));
-    }
-
+    /**
+     * @dev Borrows `WETH` from Aave V3 using supplied `collateral`
+     * @dev See internal helper {_aavev3Borrow}
+     */
     function aavev3Borrow(uint256 amount) public onlyOwner {
         _aavev3Borrow(amount);
     }
 
+    /**
+     * @return ltv Loan-to-value ratio of the `collateral` asset
+     */
     function aavev3Ltv() public view returns (uint256 ltv) {
-        DataTypes.ReserveConfigurationMap memory map = s_l2Pool.getConfiguration(address(s_l2Underlying));
+        DataTypes.ReserveConfigurationMap memory map = aavePool.getConfiguration(address(collateral));
         ltv = map.getLtv();
     }
 
-    function oraclePrice(address asset) public returns (uint256 price) {
-        price = s_oracle.getAssetPrice(asset);
+    /**
+     * @notice The Aave oracle uses 8 decimals
+     * @return price Current price of a given `asset` from the Aave Oracle
+     */
+    function aaveOraclePrice(address asset) public view returns (uint256 price) {
+        price = aaveOracle.getAssetPrice(asset);
     }
 }
