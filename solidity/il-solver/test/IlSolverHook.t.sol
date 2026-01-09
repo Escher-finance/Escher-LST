@@ -188,17 +188,11 @@ contract IlSolverHookTest is Test {
                 break;
             }
         }
-        (
-            uint256 borrowedAmountNeeded,
-            uint256 wethPrice,
-            uint256 borrowAmountUsdPrice,
-            uint256 ltv,
-            uint256 collateralAmountNeeded
-        ) = abi.decode(dataLog.data, (uint256, uint256, uint256, uint256, uint256));
+        (uint256 borrowedAmountNeeded, uint256 borrowAmountUsdPrice, uint256 ltv, uint256 collateralAmountNeeded) =
+            abi.decode(dataLog.data, (uint256, uint256, uint256, uint256));
         console.log("owner                 ", owner);
         console.log("realSender            ", address(uint160(uint256(dataLog.topics[1]))));
         console.log("borrowedAmountNeeded  ", borrowedAmountNeeded);
-        console.log("wethPrice             ", wethPrice);
         console.log("borrowAmountUsdPrice  ", borrowAmountUsdPrice);
         console.log("ltv                   ", ltv);
         console.log("collateralAmountNeeded", collateralAmountNeeded);
