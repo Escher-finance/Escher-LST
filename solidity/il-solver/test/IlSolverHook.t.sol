@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
 import {HookMiner} from "@uniswap/v4-periphery/src/utils/HookMiner.sol";
-import {IlSolverHook, IWETH, IERC20, IPoolManager, IL2Pool, IAaveOracle} from "../src/IlSolverHook.sol";
+import {IlSolverHook, IWETH, IERC20, IPoolManager, IL2Pool, IAaveOracle, IMsgSender} from "../src/IlSolverHook.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -79,6 +79,10 @@ contract IlSolverHookTest is Test {
         // deploy hook contract
         h = new IlSolverHook{salt: salt}(owner, uniPoolManager, WETH, collateral, aavePool, aaveOracle);
         assertEq(address(h), hookAddress);
+
+        // verify posm as router
+        vm.prank(owner);
+        h.toggleVerifiedRouter(IMsgSender(address(uniPosm)));
 
         // create pool
         uniPoolKey = PoolKey({
@@ -173,23 +177,18 @@ contract IlSolverHookTest is Test {
         int24 delta = 488; // 5% in ticks
         uint256 slippage = 10; // 10%
 
-        console.log("owner", owner);
-
         vm.recordLogs();
         _univ4LiquidityMintFromAmount0(uniPoolKey, amount0, delta, slippage);
         Vm.Log[] memory entries = vm.getRecordedLogs();
         Vm.Log memory dataLog;
         for (uint256 i = 0; i < entries.length; i++) {
             Vm.Log memory log = entries[i];
-            console.log("log", i);
-            console.logBytes32(log.topics[0]);
-            console.logBytes32(IlSolverHook.AddLiquidityData.selector);
             if (log.topics[0] == IlSolverHook.AddLiquidityData.selector) {
                 dataLog = log;
                 break;
             }
         }
-        // console.log("log", dataLog.emitter);
-        // console.logBytes(dataLog.data);
+        console.log("log", dataLog.emitter);
+        console.logBytes(dataLog.data);
     }
 }

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {console} from "forge-std/Test.sol";
 import {BaseHook, Hooks, IPoolManager, ModifyLiquidityParams, BalanceDelta} from "v4-periphery/src/utils/BaseHook.sol";
 import {BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -87,8 +86,6 @@ contract IlSolverHook is BaseHook, Ownable2Step {
             } catch {
                 revert TrackerHook_verifiedRouterMissingMsgSender(sender);
             }
-        } else {
-            return sender;
         }
     }
 
@@ -147,11 +144,9 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         bytes4 selector = BaseHook.afterAddLiquidity.selector;
         address realSender = _getRealSender(sender);
 
-        console.log("sender", sender);
-        console.log("realSender", realSender);
-        console.log("realSender is user", s_users[realSender]);
-
-        if (!s_users[realSender]) return (selector, delta);
+        if (realSender == address(0) || !s_users[realSender]) {
+            return (selector, delta);
+        }
 
         uint256 borrowedAmountNeeded = uint256(uint128(BalanceDeltaLibrary.amount0(delta)));
         uint256 wethPrice = aaveOraclePrice(address(WETH)) * 1e10; // in 18 decimals
