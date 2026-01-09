@@ -152,11 +152,9 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         uint256 wethPrice = aaveOraclePrice(address(WETH)) * 1e10; // in 18 decimals
         uint256 borrowAmountUsdPrice = borrowedAmountNeeded * wethPrice;
         uint256 ltv = aavev3Ltv();
-        uint256 collateralAmountNeeded =
-            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
-        emit AddLiquidityData(
-            realSender, borrowedAmountNeeded, wethPrice, borrowAmountUsdPrice, ltv, collateralAmountNeeded
-        );
+        // uint256 collateralAmountNeeded =
+        //     IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
+        emit AddLiquidityData(realSender, borrowedAmountNeeded, wethPrice, borrowAmountUsdPrice, ltv, 0);
 
         return (selector, delta);
     }
