@@ -115,8 +115,10 @@ contract IlSolverHookTest is Test {
 
         int24 tickSpacing = key.tickSpacing;
 
-        int24 tickLower = ((tick - delta) * tickSpacing) / tickSpacing;
-        int24 tickUpper = ((tick + delta) * tickSpacing) / tickSpacing;
+        /// forge-lint disable-next-line
+        int24 tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
+        /// forge-lint disable-next-line
+        int24 tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
 
         uint160 sqrtPriceAx96 = TickMath.getSqrtPriceAtTick(tickLower);
         uint160 sqrtPriceBx96 = TickMath.getSqrtPriceAtTick(tickUpper);
