@@ -13,10 +13,11 @@ import {IPool} from "aavev3/interfaces/IPool.sol";
 import {IWETH} from "@common/IWETH.sol";
 import {ReserveConfiguration} from "aavev3/protocol/libraries/configuration/ReserveConfiguration.sol";
 import {IlSolverMath} from "./core/EscherMath.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 using ReserveConfiguration for DataTypes.ReserveConfigurationMap;
+using SafeCast for int128;
 
 interface IL2Pool is IL2PoolOriginal, IPool {}
 
@@ -25,16 +26,16 @@ interface IMsgSender {
 }
 
 contract IlSolverHook is BaseHook, Ownable2Step {
-    mapping(address => bool) public s_verifiedRouters;
-    mapping(address => bool) public s_users;
+    mapping(address => bool) public verifiedRouters;
+    mapping(address => bool) public users;
 
-    IAaveOracle public s_aaveOracle;
-    IL2Pool public s_aavePool;
+    IAaveOracle public aaveOracle;
+    IL2Pool public aavePool;
 
     // The borrowed asset
     IWETH public immutable WETH;
     // The collateral asset (e.g. USDC)
-    IERC20 public immutable collateral;
+    IERC20 public immutable COLLATERAL;
 
     constructor(
         address _owner,
@@ -44,11 +45,11 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         IL2Pool _aavePool,
         IAaveOracle _aaveOracle
     ) BaseHook(_poolManager) Ownable(_owner) {
-        s_users[_owner] = true;
+        users[_owner] = true;
         WETH = _weth;
-        collateral = _collateral;
-        s_aavePool = _aavePool;
-        s_aaveOracle = _aaveOracle;
+        COLLATERAL = _collateral;
+        aavePool = _aavePool;
+        aaveOracle = _aaveOracle;
     }
 
     error TrackerHook_verifiedRouterMissingMsgSender(address router);
@@ -102,7 +103,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
      * @return realSender Actual sender
      */
     function _getRealSender(address sender) internal view returns (address realSender) {
-        if (s_verifiedRouters[sender]) {
+        if (verifiedRouters[sender]) {
             try IMsgSender(sender).msgSender() returns (address s) {
                 realSender = s;
             } catch {
@@ -116,14 +117,14 @@ contract IlSolverHook is BaseHook, Ownable2Step {
      */
     function toggleVerifiedRouter(IMsgSender router) public onlyOwner {
         address routerAddr = address(router);
-        s_verifiedRouters[routerAddr] = !s_verifiedRouters[routerAddr];
+        verifiedRouters[routerAddr] = !verifiedRouters[routerAddr];
     }
 
     /**
      * @notice Toggle address as an Il Solver user
      */
     function toggleUser(address user) public onlyOwner {
-        s_users[user] = !s_users[user];
+        users[user] = !users[user];
     }
 
     /**
@@ -131,7 +132,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
      * @return price Current price of a given `asset` from the Aave Oracle
      */
     function aaveOraclePrice(address asset) public view returns (uint256 price) {
-        price = s_aaveOracle.getAssetPrice(asset) * 1e10;
+        price = aaveOracle.getAssetPrice(asset) * 1e10;
     }
 
     /**
@@ -139,7 +140,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
      * @return ltv Loan-to-value ratio of the `collateral` asset
      */
     function aavev3Ltv() public view returns (uint256 ltv) {
-        DataTypes.ReserveConfigurationMap memory map = s_aavePool.getConfiguration(address(collateral));
+        DataTypes.ReserveConfigurationMap memory map = aavePool.getConfiguration(address(COLLATERAL));
         ltv = map.getLtv() * 1e14;
     }
 
@@ -148,21 +149,21 @@ contract IlSolverHook is BaseHook, Ownable2Step {
      */
     function _afterAddLiquidity(
         address sender,
-        PoolKey calldata key,
-        ModifyLiquidityParams calldata params,
+        PoolKey calldata,
+        ModifyLiquidityParams calldata,
         BalanceDelta delta,
-        BalanceDelta feesAccrued,
-        bytes calldata hookData
+        BalanceDelta,
+        bytes calldata
     ) internal override returns (bytes4, BalanceDelta) {
         bytes4 selector = BaseHook.afterAddLiquidity.selector;
         address realSender = _getRealSender(sender);
 
-        if (realSender == address(0) || !s_users[realSender]) {
+        if (realSender == address(0) || !users[realSender]) {
             return (selector, delta);
         }
 
         int128 delta0 = BalanceDeltaLibrary.amount0(delta);
-        uint256 borrowedAmountNeeded = delta0 < 0 ? uint256(uint128(-delta0)) : 0;
+        uint256 borrowedAmountNeeded = delta0 < 0 ? (-delta0).toUint256() : 0;
         uint256 borrowAmountUsdPrice = aaveOraclePrice(address(WETH));
         uint256 ltv = aavev3Ltv();
         uint256 collateralAmountNeeded =
