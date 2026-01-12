@@ -49,7 +49,10 @@ contract LiquidStakingManager is
         _disableInitializers();
     }
 
-    function initialize(address initialOwner, address lstAddress, address _delegationManager) public initializer {
+    function initialize(string calldata chainName, address initialOwner, address lstAddress, address _delegationManager)
+        public
+        initializer
+    {
         // Checks that the initialOwner address is not zero.
         require(initialOwner != address(0), "zero address");
         __Ownable_init(initialOwner);
@@ -57,6 +60,7 @@ contract LiquidStakingManager is
         delegationManager = IDelegationManager(_delegationManager);
 
         s_config = Config({
+            chainName: chainName,
             minBondAmount: 1000 * CORE_TO_EVM,
             minUnbondAmount: 1000 * CORE_TO_EVM,
             batchPeriodSeconds: 300,
@@ -232,7 +236,6 @@ contract LiquidStakingManager is
 
         // Calculate total assets to undelegate based on current exchange rate
         uint256 assetsToUndelegate = _convertToAssets(batch.totalShares);
-        batch.totalAssets = assetsToUndelegate;
 
         // Update batch status to submitted
         batch.status = BatchStatus.Submitted;
@@ -243,6 +246,8 @@ contract LiquidStakingManager is
         // Call undelegate on delegation manager
         uint64 undelegateAmount = uint64(assetsToUndelegate / uint256(CORE_TO_EVM));
         delegationManager.undelegate(undelegateAmount);
+
+        batch.totalAssets = undelegateAmount * uint256(CORE_TO_EVM);
 
         // Decrease the total delegated assets tracked by the manager
         s_liquidity.totalDelegated -= undelegateAmount;
@@ -277,7 +282,22 @@ contract LiquidStakingManager is
         UnbondBatch storage batch = s_batches[batchId];
 
         require(batch.batchId != 0, "batch does not exist");
-        require(batch.status == BatchStatus.Moved, "batch is not in moved status");
+        // to receive batch hyperliquid, batch status must be in Moved Status
+        if (
+            keccak256(abi.encodePacked(s_config.chainName)) == keccak256(abi.encodePacked("s_config.hyperliquid"))
+                && batch.status != BatchStatus.Moved
+        ) {
+            revert IncorrectBatchStatus();
+        }
+
+        // to receive batch in non hyperliquid, batch status must be in Submitted Status
+        if (
+            keccak256(abi.encodePacked(s_config.chainName)) != keccak256(abi.encodePacked("hyperliquid"))
+                && batch.status != BatchStatus.Submitted
+        ) {
+            revert IncorrectBatchStatus();
+        }
+
         require(block.timestamp >= batch.nextActionTime, "undelegation period not yet passed");
 
         // Update batch status to received
@@ -290,7 +310,7 @@ contract LiquidStakingManager is
     }
 
     /**
-     * @notice Move received assets of a submitted batch after undelegation period from core/spot to evm
+     * @notice Move received assets of a submitted batch after undelegation period from core/spot to evm (only on hyperliquid)
      * @param batchId The ID of the batch assets to move
      */
     function moveBatch(uint256 batchId) external nonReentrant {
@@ -332,9 +352,10 @@ contract LiquidStakingManager is
      */
     function claimUnbond() external nonReentrant {
         uint256[] storage userRequests = s_userRequestIds[msg.sender];
-        require(userRequests.length > 0, "no unbond requests found");
+        uint256 totalUserRequests = userRequests.length;
+        require(totalUserRequests > 0, "no unbond requests found");
 
-        for (uint256 i = userRequests.length; i > 0; i--) {
+        for (uint256 i = totalUserRequests; i > 0; i--) {
             uint256 requestId = userRequests[i - 1];
             UnbondRequest storage request = s_unbondRequests[requestId];
 
@@ -352,7 +373,7 @@ contract LiquidStakingManager is
             address recipient = request.recipient;
 
             // Remove from user's request array (swap and pop)
-            userRequests[i - 1] = userRequests[userRequests.length - 1];
+            userRequests[i - 1] = userRequests[totalUserRequests - 1];
             userRequests.pop();
 
             // Delete the request from storage

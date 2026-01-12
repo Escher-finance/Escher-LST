@@ -49,6 +49,13 @@ contract HyperliquidDelegationManager is
         _grantRole(MANAGER_ROLE, _manager);
     }
 
+    function active() external view returns (bool) {
+        // if no validators, set delegation manager active to false
+        Validator[] memory newValidators = validatorManager.getAllValidators();
+        if (newValidators.length == 0) return false;
+        return PrecompileLib.coreUserExists(address(this));
+    }
+
     /**
      * @notice Calculate stake distribution for a given amount
      * @param _amount Total amount to distribute
@@ -61,21 +68,21 @@ contract HyperliquidDelegationManager is
         returns (address[] memory addresses, uint64[] memory amounts)
     {
         uint64 totalWeight = validatorManager.getTotalWeight();
-        uint256 length = validators.length;
-        if (length == 0) revert EmptyValidatorSet();
+        uint256 totalValidators = validators.length;
+        if (totalValidators == 0) revert EmptyValidatorSet();
 
-        addresses = new address[](length);
-        amounts = new uint64[](length);
+        addresses = new address[](totalValidators);
+        amounts = new uint64[](totalValidators);
 
         uint64 distributed = 0;
 
-        for (uint64 i = 0; i < length;) {
+        for (uint64 i = 0; i < totalValidators;) {
             Validator memory v = validators[i];
 
             addresses[i] = v.validator;
 
             // Last validator gets remaining amount to handle rounding
-            if (i == length - 1) {
+            if (i == totalValidators - 1) {
                 amounts[i] = _amount - distributed;
             } else {
                 amounts[i] = (_amount * v.weight) / totalWeight;
@@ -173,6 +180,7 @@ contract HyperliquidDelegationManager is
 
         // Get current delegations
         PrecompileLib.Delegation[] memory currentDelegations = PrecompileLib.delegations(address(this));
+        uint256 totalDelegations = currentDelegations.length;
 
         // Get new validators
         Validator[] memory newValidators = validatorManager.getAllValidators();
@@ -184,8 +192,9 @@ contract HyperliquidDelegationManager is
         uint64[] memory targetAmounts = new uint64[](newValidators.length);
         uint64 distributed = 0;
 
-        for (uint256 i = 0; i < newValidators.length; i++) {
-            if (i == newValidators.length - 1) {
+        uint256 newValidatorsLength = newValidators.length;
+        for (uint256 i = 0; i < newValidatorsLength; i++) {
+            if (i == newValidatorsLength - 1) {
                 // Last validator gets remaining amount to handle rounding
                 targetAmounts[i] = totalDelegated - distributed;
             } else {
@@ -195,7 +204,7 @@ contract HyperliquidDelegationManager is
         }
 
         // First pass: undelegate from validators not in new set or with excess
-        for (uint256 i = 0; i < currentDelegations.length; i++) {
+        for (uint256 i = 0; i < totalDelegations; i++) {
             address validator = currentDelegations[i].validator;
             uint64 currentAmount = currentDelegations[i].amount;
 
@@ -203,7 +212,7 @@ contract HyperliquidDelegationManager is
             uint64 targetAmount = 0;
             bool isInNewSet = false;
 
-            for (uint256 j = 0; j < newValidators.length; j++) {
+            for (uint256 j = 0; j < newValidatorsLength; j++) {
                 if (newValidators[j].validator == validator) {
                     isInNewSet = true;
                     targetAmount = targetAmounts[j];
@@ -223,13 +232,14 @@ contract HyperliquidDelegationManager is
         }
 
         // Second pass: delegate to validators that need more
-        for (uint256 i = 0; i < newValidators.length; i++) {
+        for (uint256 i = 0; i < newValidatorsLength; i++) {
             address validator = newValidators[i].validator;
             uint64 targetAmount = targetAmounts[i];
 
             // Find current amount for this validator
             uint64 currentAmount = 0;
-            for (uint256 j = 0; j < currentDelegations.length; j++) {
+
+            for (uint256 j = 0; j < totalDelegations; j++) {
                 if (currentDelegations[j].validator == validator) {
                     currentAmount = currentDelegations[j].amount;
                     break;

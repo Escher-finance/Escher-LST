@@ -11,6 +11,8 @@ struct Liquidity {
 }
 
 struct Config {
+    // chain name, like stable, hyperliquid
+    string chainName;
     // minimum bond amount
     uint256 minBondAmount;
     // minimum unbond amount

@@ -65,6 +65,10 @@ contract StablechainDelegationManager is
         _grantRole(MANAGER_ROLE, _manager);
     }
 
+    function active() external view returns (bool) {
+        return true;
+    }
+
     /**
      * @notice Calculate stake distribution for a given amount
      * @param _amount Total amount to distribute

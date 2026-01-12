@@ -20,6 +20,8 @@ interface IDelegationManager {
     /// @param amount The amount to undelegate
     function undelegate(uint256 amount) external;
 
+    function active() external view returns (bool);
+
     /// @notice Returns the delegation summary for this contract
     /// @return The delegator summary from the precompile
     function delegationSummary() external view returns (DelegatorSummary memory);
