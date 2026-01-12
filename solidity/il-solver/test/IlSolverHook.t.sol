@@ -10,11 +10,11 @@ import {IlSolverHook, IWETH, IERC20, IPoolManager, IL2Pool, IAaveOracle, IMsgSen
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IStateView} from "@uniswap/v4-periphery/src/interfaces/IStateView.sol";
 import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 interface IPermit2 {
     function allowance(address user, address token, address spender)
@@ -24,12 +24,14 @@ interface IPermit2 {
     function approve(address token, address spender, uint160 amount, uint48 expiration) external;
 }
 
+using SafeCast for uint256;
+
 contract IlSolverHookTest is Test {
     address usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address weth = 0x4200000000000000000000000000000000000006;
 
-    IWETH WETH;
-    IERC20 collateral;
+    IWETH immutable WETH = IWETH(0x4200000000000000000000000000000000000006);
+    IERC20 immutable COLLATERAL = IERC20(usdc);
     IERC20 reserve;
 
     IPermit2 permit2;
@@ -67,17 +69,15 @@ contract IlSolverHookTest is Test {
         aavePool = IL2Pool(0xA238Dd80C259a72e81d7e4664a9801593F98d1c5);
         aaveOracle = IAaveOracle(0x2Cc0Fc26eD4563A5ce5e8bdcfe1A2878676Ae156);
 
-        WETH = IWETH(weth);
-        collateral = IERC20(usdc);
         reserve = IERC20(aavePool.getReserveAToken(usdc));
 
         uint160 flags = uint160(Hooks.AFTER_ADD_LIQUIDITY_FLAG);
-        bytes memory constructorArgs = abi.encode(owner, uniPoolManager, WETH, collateral, aavePool, aaveOracle);
+        bytes memory constructorArgs = abi.encode(owner, uniPoolManager, WETH, COLLATERAL, aavePool, aaveOracle);
         (address hookAddress, bytes32 salt) =
             HookMiner.find(address(this), flags, type(IlSolverHook).creationCode, constructorArgs);
 
         // deploy hook contract
-        h = new IlSolverHook{salt: salt}(owner, uniPoolManager, WETH, collateral, aavePool, aaveOracle);
+        h = new IlSolverHook{salt: salt}(owner, uniPoolManager, WETH, COLLATERAL, aavePool, aaveOracle);
         assertEq(address(h), hookAddress);
 
         // verify posm as router
@@ -102,7 +102,7 @@ contract IlSolverHookTest is Test {
         uniPoolManager.initialize(uniPoolKey, sqrtPriceX96);
     }
 
-    function test_canCallOracle() public {
+    function test_canCallOracle() public view {
         uint256 price = h.aaveOraclePrice(address(WETH));
         assertGt(price, 0);
     }
@@ -114,18 +114,19 @@ contract IlSolverHookTest is Test {
         (uint160 sqrtPriceX96, int24 tick,,) = uniStateView.getSlot0(key.toId());
 
         int24 tickSpacing = key.tickSpacing;
-        int24 tickLower = ((tick - delta) / tickSpacing) * tickSpacing;
-        int24 tickUpper = ((tick + delta) / tickSpacing) * tickSpacing;
 
-        uint160 sqrtPriceAX96 = TickMath.getSqrtPriceAtTick(tickLower);
-        uint160 sqrtPriceBX96 = TickMath.getSqrtPriceAtTick(tickUpper);
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmount0(sqrtPriceAX96, sqrtPriceBX96, amount0);
+        int24 tickLower = ((tick - delta) * tickSpacing) / tickSpacing;
+        int24 tickUpper = ((tick + delta) * tickSpacing) / tickSpacing;
+
+        uint160 sqrtPriceAx96 = TickMath.getSqrtPriceAtTick(tickLower);
+        uint160 sqrtPriceBx96 = TickMath.getSqrtPriceAtTick(tickUpper);
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmount0(sqrtPriceAx96, sqrtPriceBx96, amount0);
 
         (uint256 required0, uint256 required1) =
-            LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtPriceAX96, sqrtPriceBX96, liquidity);
+            LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtPriceAx96, sqrtPriceBx96, liquidity);
 
-        uint128 amount0Max = uint128(required0 * (100 + slippage) / 100);
-        uint128 amount1Max = uint128(required1 * (100 + slippage) / 100);
+        uint128 amount0Max = (required0 * (100 + slippage) / 100).toUint128();
+        uint128 amount1Max = (required1 * (100 + slippage) / 100).toUint128();
 
         (used0, used1) =
             _univ4LiquidityMintRaw(uniPoolKey, owner, tickLower, tickUpper, liquidity, amount0Max, amount1Max);
