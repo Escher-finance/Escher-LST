@@ -78,6 +78,29 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         uint256 collateralAmountNeeded
     );
 
+    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
+        return Hooks.Permissions({
+            beforeInitialize: false,
+            afterInitialize: false,
+            beforeAddLiquidity: false,
+            afterAddLiquidity: true,
+            beforeRemoveLiquidity: false,
+            afterRemoveLiquidity: false,
+            beforeSwap: false,
+            afterSwap: false,
+            beforeDonate: false,
+            afterDonate: false,
+            beforeSwapReturnDelta: false,
+            afterSwapReturnDelta: false,
+            afterAddLiquidityReturnDelta: false,
+            afterRemoveLiquidityReturnDelta: false
+        });
+    }
+
+    /**
+     * @notice Gets the actual sender by calling `.msgSender` from the verified router
+     * @return realSender Actual sender
+     */
     function _getRealSender(address sender) internal view returns (address realSender) {
         if (s_verifiedRouters[sender]) {
             try IMsgSender(sender).msgSender() returns (address s) {
@@ -88,11 +111,17 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         }
     }
 
+    /**
+     * @notice Toggle IMsgSender as a verified router
+     */
     function toggleVerifiedRouter(IMsgSender router) public onlyOwner {
         address routerAddr = address(router);
         s_verifiedRouters[routerAddr] = !s_verifiedRouters[routerAddr];
     }
 
+    /**
+     * @notice Toggle address as an Il Solver user
+     */
     function toggleUser(address user) public onlyOwner {
         s_users[user] = !s_users[user];
     }
@@ -114,25 +143,9 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         ltv = map.getLtv() * 1e14;
     }
 
-    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
-        return Hooks.Permissions({
-            beforeInitialize: false,
-            afterInitialize: false,
-            beforeAddLiquidity: false,
-            afterAddLiquidity: true,
-            beforeRemoveLiquidity: false,
-            afterRemoveLiquidity: false,
-            beforeSwap: false,
-            afterSwap: false,
-            beforeDonate: false,
-            afterDonate: false,
-            beforeSwapReturnDelta: false,
-            afterSwapReturnDelta: false,
-            afterAddLiquidityReturnDelta: false,
-            afterRemoveLiquidityReturnDelta: false
-        });
-    }
-
+    /**
+     * @notice Custom Il Solver logic only applies to calls made from `s_users` and `s_verifiedRouters`
+     */
     function _afterAddLiquidity(
         address sender,
         PoolKey calldata key,
