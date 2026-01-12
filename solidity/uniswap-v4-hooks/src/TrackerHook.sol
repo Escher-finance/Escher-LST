@@ -8,7 +8,7 @@ import {
     PoolKey,
     BalanceDelta,
     ModifyLiquidityParams
-} from "univ4-periphery/utils/BaseHook.sol";
+} from "@uniswap/v4-periphery/src/utils/BaseHook.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 interface IMsgSender {
