@@ -78,10 +78,10 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         uint256 collateralAmountNeeded
     );
 
-    function _getRealSender(address sender) internal view returns (address) {
+    function _getRealSender(address sender) internal view returns (address realSender) {
         if (s_verifiedRouters[sender]) {
             try IMsgSender(sender).msgSender() returns (address s) {
-                return s;
+                realSender = s;
             } catch {
                 revert TrackerHook_verifiedRouterMissingMsgSender(sender);
             }
