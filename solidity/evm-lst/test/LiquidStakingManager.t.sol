@@ -35,7 +35,7 @@ contract LiquidStakingManagerTest is Test {
         address _delegationManager = address(delegationManager);
 
         bytes memory initLstManagerData =
-            abi.encodeCall(LiquidStakingManager.initialize, (bob, address(lst), _delegationManager));
+            abi.encodeCall(LiquidStakingManager.initialize, ("hyperliquid", bob, address(lst), _delegationManager));
         ERC1967Proxy lstManagerProxy = new ERC1967Proxy(address(liquidStakingManagerImpl), initLstManagerData);
 
         liquidStakingManager = LiquidStakingManager(payable(address(lstManagerProxy)));

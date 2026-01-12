@@ -121,6 +121,10 @@ contract DelegationManagerMock is IDelegationManager, Ownable, AccessControl {
         require(success, "transfer failed");
     }
 
+    function active() external view returns (bool) {
+        return true;
+    }
+
     /// @notice Allows the mock to receive ETH
     receive() external payable {}
 }
