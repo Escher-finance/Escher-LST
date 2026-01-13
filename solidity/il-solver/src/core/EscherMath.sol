@@ -152,8 +152,11 @@ library IlSolverMath {
     {
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
 
+        uint256 borrowedTokenScale = 10 ** (18 - borrowedTokenDecimals);
+
         // Binary search bounds
-        uint256 borrowedUsd = Math.mulDiv(borrowedAmountNeeded, borrowedTokenUsdPrice, 1e18);
+        uint256 borrowedAmountNeededNorm = borrowedAmountNeeded * borrowedTokenScale;
+        uint256 borrowedUsd = Math.mulDiv(borrowedAmountNeededNorm, borrowedTokenUsdPrice, 1e18);
 
         // Lower bound: We're limited to MAX_LOOP_ITERATIONS, so can't reach theoretical infinite minimum
         // Use a more realistic lower bound: ~half of what we'd need with just one iteration
