@@ -142,7 +142,7 @@ contract HyperliquidDelegationManagerTest is Test {
             liquidStakingManager
         );
 
-        vm.expectRevert("zero address");
+        vm.expectRevert("owner zero address");
         new ERC1967Proxy(address(newImpl), initData);
     }
 
