@@ -21,7 +21,14 @@ contract LimitOrderHook {
         bool active;
     }
 
-    event OrderPlaced(uint256 indexed id, address indexed owner, address pool, uint160 triggerSqrtPriceX96, bool zeroForOne, int256 amountSpecified);
+    event OrderPlaced(
+        uint256 indexed id,
+        address indexed owner,
+        address pool,
+        uint160 triggerSqrtPriceX96,
+        bool zeroForOne,
+        int256 amountSpecified
+    );
     event OrderCancelled(uint256 indexed id, address indexed owner);
     event OrderExecuted(uint256 indexed id, address indexed executor, int256 amount0, int256 amount1);
 
@@ -95,5 +102,4 @@ contract LimitOrderHook {
         emit OrderExecuted(id, msg.sender, a0, a1);
     }
 }
-
 

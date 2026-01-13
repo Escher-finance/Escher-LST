@@ -9,12 +9,9 @@ interface IPoolLike {
 
     /// @notice Perform a swap in the pool
     /// @dev Signature is intentionally generic to keep this scaffold unopinionated.
-    function swap(
-        address recipient,
-        bool zeroForOne,
-        int256 amountSpecified,
-        bytes calldata data
-    ) external returns (int256 amount0, int256 amount1);
+    function swap(address recipient, bool zeroForOne, int256 amountSpecified, bytes calldata data)
+        external
+        returns (int256 amount0, int256 amount1);
 }
 
 /// Optional lightweight swapper that the hook can call to perform token transfers/approvals
@@ -25,12 +22,8 @@ interface ISwapper {
     /// @param zeroForOne Direction
     /// @param amountSpecified Signed amount (positive for exact in, negative for exact out)
     /// @param data Arbitrary data forwarded to pool callback mechanics
-    function executeSwap(
-        IPoolLike pool,
-        bool zeroForOne,
-        int256 amountSpecified,
-        bytes calldata data
-    ) external returns (int256 amount0, int256 amount1);
+    function executeSwap(IPoolLike pool, bool zeroForOne, int256 amountSpecified, bytes calldata data)
+        external
+        returns (int256 amount0, int256 amount1);
 }
-
 
