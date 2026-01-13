@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.28;
 
 import {Validator} from "../models/Type.sol";
 import {IValidatorSetManager} from "../interfaces/IValidatorSetManager.sol";
@@ -42,6 +42,8 @@ contract ValidatorSetManager is
     }
 
     function setDelegationManager(address manager) external onlyOwner {
+        // Checks that the manager address is not zero.
+        require(manager != address(0), "manager zero address");
         _grantRole(MANAGER_ROLE, manager);
     }
 

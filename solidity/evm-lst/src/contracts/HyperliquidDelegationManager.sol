@@ -35,7 +35,8 @@ contract HyperliquidDelegationManager is
 
     function initialize(address owner, address validatorManagerAddr) public initializer {
         // Checks that the initialOwner address is not zero.
-        require(owner != address(0), "zero address");
+        require(owner != address(0), "owner zero address");
+        require(validatorManagerAddr != address(0), "validator manager zero address");
         __Ownable_init(owner);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
