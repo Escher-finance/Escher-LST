@@ -41,23 +41,24 @@ contract ValidatorSetManager is
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
     }
 
-    function setDelegationManager(address _manager) external onlyOwner {
-        _grantRole(MANAGER_ROLE, _manager);
+    function setDelegationManager(address manager) external onlyOwner {
+        _grantRole(MANAGER_ROLE, manager);
     }
 
     /**
      * @notice Update validator set, requires minimum 1 validator and weight pair
-     * @param _validators Array of validator addresses
-     * @param _weights Array of corresponding weights
+     * @param newValidators Array of validator addresses
+     * @param weights Array of corresponding weights
      */
-    function updateValidators(address[] calldata _validators, uint64[] calldata _weights) external nonReentrant {
+    function updateValidators(address[] calldata newValidators, uint64[] calldata weights) external nonReentrant {
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
-        uint256 length = _validators.length;
-        require(length > 0, "Requires minimum 1 validator");
-        if (length != _weights.length) revert ArrayLengthMismatch();
+        uint256 newLength = newValidators.length;
+        require(newLength > 0, "Requires minimum 1 validator");
+        if (newLength != weights.length) revert ArrayLengthMismatch();
 
+        uint256 oldLength = validators.length;
         // Clear existing mappings
-        for (uint256 i = 0; i < validators.length;) {
+        for (uint256 i = 0; i < oldLength;) {
             delete validatorIndex[validators[i].validator];
             unchecked {
                 ++i;
@@ -71,9 +72,9 @@ contract ValidatorSetManager is
         delete validators;
 
         // Add new validators
-        for (uint256 i = 0; i < length;) {
-            address validatorAddress = _validators[i];
-            uint64 weight = _weights[i];
+        for (uint256 i = 0; i < newLength;) {
+            address validatorAddress = newValidators[i];
+            uint64 weight = weights[i];
 
             if (validatorAddress == address(0)) revert InvalidAddress();
             if (weight == 0) revert InvalidWeight();
@@ -88,17 +89,17 @@ contract ValidatorSetManager is
             }
         }
 
-        emit ValidatorSetBatchUpdated(length);
+        emit ValidatorSetBatchUpdated(newLength);
     }
 
     /**
      * @notice Get validator details by address
-     * @param _validator Address of the validator
+     * @param validatorAddr Address of the validator
      * @return validatorAddress The validator address
      * @return weight The validator weight
      */
-    function getValidator(address _validator) external view returns (address validatorAddress, uint64 weight) {
-        uint256 index = validatorIndex[_validator];
+    function getValidator(address validatorAddr) external view returns (address validatorAddress, uint64 weight) {
+        uint256 index = validatorIndex[validatorAddr];
         require(index != 0, "Validator not found");
 
         index--;
@@ -132,10 +133,10 @@ contract ValidatorSetManager is
 
     /**
      * @notice Check if a validator exists
-     * @param _validator Address to check
+     * @param validatorAddr Address to check
      * @return bool True if validator exists
      */
-    function validatorExists(address _validator) external view returns (bool) {
-        return validatorIndex[_validator] != 0;
+    function validatorExists(address validatorAddr) external view returns (bool) {
+        return validatorIndex[validatorAddr] != 0;
     }
 }
