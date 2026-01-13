@@ -49,15 +49,17 @@ contract LiquidStakingManager is
         _disableInitializers();
     }
 
-    function initialize(string calldata chainName, address initialOwner, address lstAddress, address _delegationManager)
-        public
-        initializer
-    {
+    function initialize(
+        string calldata chainName,
+        address initialOwner,
+        address lstAddress,
+        address delegationManagerAddress
+    ) public initializer {
         // Checks that the initialOwner address is not zero.
         require(initialOwner != address(0), "zero address");
         __Ownable_init(initialOwner);
         share = Lst(lstAddress);
-        delegationManager = IDelegationManager(_delegationManager);
+        delegationManager = IDelegationManager(delegationManagerAddress);
 
         s_config = Config({
             chainName: chainName,
@@ -107,35 +109,37 @@ contract LiquidStakingManager is
 
     /**
      * @notice function to stake assets and receive liquid staking tokens in exchange
-     * @param _assets amount of the asset token
+     * @param assets amount of the asset token
+     * @param recipient address of the share token recipient
      */
-    function bond(uint256 _assets, address _recipient) external payable nonReentrant {
+    function bond(uint256 assets, address recipient) external payable nonReentrant {
         // checks that the deposited amount is greater than zero.
-        require(_assets > s_config.minBondAmount, "bond amount should be more than min amount");
+        require(assets > s_config.minBondAmount, "bond amount should be more than min amount");
 
         // checks that the deposited amount is greater than zero.
         require(msg.value > s_config.minBondAmount, "asset should be more than min amount");
 
         // Checks that the _receiver address is not zero.
-        require(_recipient != address(0), "recipient zero address");
+        require(recipient != address(0), "recipient zero address");
 
         // Checks that the delegationManager address is not zero.
         require(address(delegationManager) != address(0), "delegationManager zero address");
 
         // calculate how much shares from the assets using current pool state (before delegating)
-        uint256 shares = _convertToShares(_assets);
+        uint256 shares = _convertToShares(assets);
 
-        // call delegate and send the required native asset
-        delegationManager.delegate{value: msg.value}(_assets);
-
-        // mint the liquid staking token and send to recipient
-        share.mint(_recipient, shares);
         // increase the total minted liquid staking token
         s_liquidity.totalLst += shares;
         // increase the total delegated assets tracked by the manager
-        s_liquidity.totalDelegated += _assets;
+        s_liquidity.totalDelegated += assets;
 
-        emit Bond(msg.sender, _assets, _recipient);
+        // call delegate and send the required native asset
+        delegationManager.delegate{value: msg.value}(assets);
+
+        // mint the liquid staking token and send to recipient
+        share.mint(recipient, shares);
+
+        emit Bond(msg.sender, assets, recipient);
     }
 
     /**
@@ -177,25 +181,27 @@ contract LiquidStakingManager is
         if ((s_liquidity.totalLst == 0) || (s_liquidity.totalDelegated == 0)) {
             return 1 * SCALING_FACTOR;
         }
-        return ((s_liquidity.totalLst / CORE_TO_EVM) * SCALING_FACTOR) / (totalAssets());
+
+        uint256 totalLstInCore = uint256(s_liquidity.totalLst / uint256(CORE_TO_EVM));
+        return (totalLstInCore * SCALING_FACTOR) / totalAssets();
     }
 
     /**
      * @notice Function to allow msg.sender to request to unbond of their staked asset
-     * @param _shares amount of shares the user wants to convert
-     * @param _recipient address of the user who will receive the assets
+     * @param shares amount of shares the user wants to convert
+     * @param recipient address of the user who will receive the assets
      */
-    function unbondRequest(uint256 _shares, address _recipient) external nonReentrant returns (uint256) {
+    function unbondRequest(uint256 shares, address recipient) external nonReentrant returns (uint256) {
         // checks that the deposited amount is greater than zero.
-        require(_shares > s_config.minUnbondAmount, "unbond should be more than min unbond amount");
+        require(shares > s_config.minUnbondAmount, "unbond should be more than min unbond amount");
         // Checks that the _receiver address is not zero.
-        require(_recipient != address(0), "recipient zero address");
+        require(recipient != address(0), "recipient zero address");
 
         // Checks that the delegationManager address is not zero.
         require(address(delegationManager) != address(0), "delegation Manager zero address");
 
         // transfer asset to this contract
-        bool transferStatus = share.transferFrom(msg.sender, address(this), _shares);
+        bool transferStatus = share.transferFrom(msg.sender, address(this), shares);
         if (!transferStatus) {
             revert TokenTransferFailure();
         }
@@ -206,7 +212,7 @@ contract LiquidStakingManager is
 
         // Create the unbond request
         s_unbondRequests[requestId] =
-            UnbondRequest({user: msg.sender, recipient: _recipient, shares: _shares, batchId: s_pendingBatchId});
+            UnbondRequest({user: msg.sender, recipient: recipient, shares: shares, batchId: s_pendingBatchId});
 
         // Add request ID to user's list
         s_userRequestIds[msg.sender].push(requestId);
@@ -214,9 +220,9 @@ contract LiquidStakingManager is
         // Add request to the current batch
         UnbondBatch storage currentBatch = s_batches[s_pendingBatchId];
         currentBatch.requestIds.push(requestId);
-        currentBatch.totalShares += _shares;
+        currentBatch.totalShares += shares;
 
-        emit UnbondRequested(msg.sender, _shares, _recipient, requestId, s_pendingBatchId);
+        emit UnbondRequested(msg.sender, shares, recipient, requestId, s_pendingBatchId);
 
         return requestId;
     }
@@ -240,23 +246,23 @@ contract LiquidStakingManager is
         // Update batch status to submitted
         batch.status = BatchStatus.Submitted;
 
-        // Set next action time (when tokens can be received)
-        batch.nextActionTime = block.timestamp + s_config.undelegatePeriodSeconds;
-
         // Call undelegate on delegation manager
         uint64 undelegateAmount = uint64(assetsToUndelegate / uint256(CORE_TO_EVM));
-        delegationManager.undelegate(undelegateAmount);
 
+        // Set next action time (when tokens can be received)
+        batch.nextActionTime = block.timestamp + s_config.undelegatePeriodSeconds;
         batch.totalAssets = undelegateAmount * uint256(CORE_TO_EVM);
 
         // Decrease the total delegated assets tracked by the manager
         s_liquidity.totalDelegated -= undelegateAmount;
 
-        // Burn the LST tokens held by this contract for this batch
-        share.burn(address(this), batch.totalShares);
-
         // Decrease total LST
         s_liquidity.totalLst -= batch.totalShares;
+
+        delegationManager.undelegate(undelegateAmount);
+
+        // Burn the LST tokens held by this contract for this batch
+        share.burn(address(this), batch.totalShares);
 
         // Create a new pending batch
         s_pendingBatchId++;
@@ -355,6 +361,8 @@ contract LiquidStakingManager is
         uint256 totalUserRequests = userRequests.length;
         require(totalUserRequests > 0, "no unbond requests found");
 
+        uint256 totalTransfer = 0;
+
         for (uint256 i = totalUserRequests; i > 0; i--) {
             uint256 requestId = userRequests[i - 1];
             UnbondRequest storage request = s_unbondRequests[requestId];
@@ -376,11 +384,12 @@ contract LiquidStakingManager is
             userRequests[i - 1] = userRequests[totalUserRequests - 1];
             userRequests.pop();
 
+            totalTransfer += userAssets;
             // Delete the request from storage
             delete s_unbondRequests[requestId];
 
             // Transfer assets to recipient
-            (bool success,) = payable(recipient).call{value: userAssets}("");
+            (bool success,) = payable(recipient).call{value: totalTransfer}("");
             require(success, "transfer failed");
 
             emit UnbondClaimed(msg.sender, requestId, userAssets, recipient);

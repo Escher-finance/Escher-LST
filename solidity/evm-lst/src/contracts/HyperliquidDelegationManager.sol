@@ -33,14 +33,14 @@ contract HyperliquidDelegationManager is
         _disableInitializers();
     }
 
-    function initialize(address owner, address _validatorManager) public initializer {
+    function initialize(address owner, address validatorManagerAddr) public initializer {
         // Checks that the initialOwner address is not zero.
         require(owner != address(0), "zero address");
         __Ownable_init(owner);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         _grantRole(MANAGER_ROLE, owner);
-        validatorManager = IValidatorSetManager(_validatorManager);
+        validatorManager = IValidatorSetManager(validatorManagerAddr);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -58,11 +58,11 @@ contract HyperliquidDelegationManager is
 
     /**
      * @notice Calculate stake distribution for a given amount
-     * @param _amount Total amount to distribute
+     * @param delegateAmount Total amount to distribute
      * @return addresses Array of validator addresses
      * @return amounts Array of amounts to stake to each validator
      */
-    function calculateStakeDistribution(uint64 _amount, Validator[] memory validators)
+    function calculateStakeDistribution(uint64 delegateAmount, Validator[] memory validators)
         internal
         view
         returns (address[] memory addresses, uint64[] memory amounts)
@@ -83,9 +83,9 @@ contract HyperliquidDelegationManager is
 
             // Last validator gets remaining amount to handle rounding
             if (i == totalValidators - 1) {
-                amounts[i] = _amount - distributed;
+                amounts[i] = delegateAmount - distributed;
             } else {
-                amounts[i] = (_amount * v.weight) / totalWeight;
+                amounts[i] = (delegateAmount * v.weight) / totalWeight;
                 distributed += amounts[i];
             }
 
@@ -155,13 +155,13 @@ contract HyperliquidDelegationManager is
         });
     }
 
-    function updateValidators(address[] calldata _validators, uint64[] calldata _weights)
+    function updateValidators(address[] calldata newValidators, uint64[] calldata newWeights)
         external
         nonReentrant
         onlyOwner
     {
         // update validators with new weights
-        validatorManager.updateValidators(_validators, _weights);
+        validatorManager.updateValidators(newValidators, newWeights);
 
         // redelegate to new validators set
         _redelegate();
