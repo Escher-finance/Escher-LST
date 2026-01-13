@@ -11,44 +11,31 @@ library IlSolverMath {
     // 0.000001 tokens (in 18 decimals) = 1e12
     uint256 public constant TOKEN_AMOUNT_EPSILON = 0.000001 ether;
 
-    function _validInput(
-        uint256 collateralAmount,
+    modifier validBorrowedToken(
         uint256 borrowedAmountNeeded,
         uint256 borrowedTokenUsdPrice,
-        uint8 borrowedTokenDecimals,
-        uint8 collateralTokenDecimals,
-        uint256 ltv
-    ) internal pure {
+        uint8 borrowedTokenDecimals
+    ) {
         if (
-            borrowedTokenUsdPrice == 0 || borrowedAmountNeeded == 0 || ltv == 0 || collateralAmount == 0
-                || ltv <= LTV_SAFTY_FACTOR
+            borrowedTokenUsdPrice == 0 || borrowedAmountNeeded == 0 || borrowedTokenDecimals == 0
+                || borrowedTokenDecimals > 18
         ) {
             revert INVALID_INPUT();
         }
-        if (
-            borrowedTokenDecimals == 0 || borrowedTokenDecimals > 18 || collateralTokenDecimals == 0
-                || collateralTokenDecimals > 18
-        ) {
-            revert INVALID_INPUT();
-        }
+        _;
     }
 
-    modifier validInput(
-        uint256 collateralAmount,
-        uint256 borrowedAmountNeeded,
-        uint256 borrowedTokenUsdPrice,
-        uint8 borrowedTokenDecimals,
-        uint8 collateralTokenDecimals,
-        uint256 ltv
-    ) {
-        _validInput(
-            collateralAmount,
-            borrowedAmountNeeded,
-            borrowedTokenUsdPrice,
-            borrowedTokenDecimals,
-            collateralTokenDecimals,
-            ltv
-        );
+    modifier validCollateralToken(uint256 collateralAmount, uint8 collateralTokenDecimals) {
+        if (collateralAmount == 0 || collateralTokenDecimals == 0 || collateralTokenDecimals > 18) {
+            revert INVALID_INPUT();
+        }
+        _;
+    }
+
+    modifier validLtv(uint256 ltv) {
+        if (ltv <= LTV_SAFTY_FACTOR) {
+            revert INVALID_INPUT();
+        }
         _;
     }
 
@@ -75,14 +62,9 @@ library IlSolverMath {
     )
         internal
         pure
-        validInput(
-            collateralAmount,
-            borrowedAmountNeeded,
-            borrowedTokenUsdPrice,
-            borrowedTokenDecimals,
-            collateralTokenDecimals,
-            ltv
-        )
+        validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals)
+        validCollateralToken(collateralAmount, collateralTokenDecimals)
+        validLtv(ltv)
         returns (uint256 iterations, bool isEnough, uint256 totalBorrowedToken, uint256 ltvUsed)
     {
         isEnough = false;
@@ -149,13 +131,23 @@ library IlSolverMath {
      * @dev This function uses binary search to find the minimum collateral needed to reach the borrowed amount needed.
      * @param borrowedAmountNeeded The amount of borrowed tokens needed token decimals (1e18).
      * @param borrowedTokenUsdPrice The price of the borrowed token in USD token decimals (1e18).
+     * @param borrowedTokenDecimals The number of decimals of the borrowed token; must be between 1 and 18.
+     * @param collateralTokenDecimals The number of decimals of the collateral token; must be between 1 and 18.
      * @param ltv The LTV of the collateral in 1e16.
      * @return collateralAmountNeeded The minimum amount of collateral needed to reach the borrowed amount needed.
      *
      */
-    function calculateCollateralAmount(uint256 borrowedAmountNeeded, uint256 borrowedTokenUsdPrice, uint256 ltv)
+    function calculateCollateralAmount(
+        uint256 borrowedAmountNeeded,
+        uint256 borrowedTokenUsdPrice,
+        uint8 borrowedTokenDecimals,
+        uint8 collateralTokenDecimals,
+        uint256 ltv
+    )
         internal
         pure
+        validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals)
+        validLtv(ltv)
         returns (uint256 collateralAmountNeeded)
     {
         // Manual input validation (can't use modifier since collateral is unknown)
@@ -184,7 +176,9 @@ library IlSolverMath {
             uint256 mid = (low + high) / 2;
 
             // Test if this collateral amount is sufficient
-            (, bool isEnough,,) = hedgingLoop(mid, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv);
+            (, bool isEnough,,) = hedgingLoop(
+                mid, borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
+            );
 
             if (isEnough) {
                 result = mid;
