@@ -12,6 +12,8 @@ contract Handler is Test {
     uint256 public constant MAX_LTV = 98e16; // 98%
     uint256 public constant MIN_LTV = 21e15; // 2.1% (above safety factor)
 
+    uint8 constant DEFAULT_DECIMALS = 18;
+
     // Track calls for invariants
     uint256 public callCount;
     uint256 public successfulCalls;
@@ -33,8 +35,9 @@ contract Handler is Test {
         borrowAmountUSD = bound(borrowAmountUSD, 10 * 1e18, 100000 * 1e18); // $10-$100k
         ltv = bound(ltv, MIN_LTV, MAX_LTV);
 
-        (uint256 iterations, bool isEnough, uint256 totalBorrowed, uint256 ltvUsed) =
-            IlSolverMath.hedgingLoop(collateralAmount, borrowedAmount, borrowAmountUSD, ltv);
+        (uint256 iterations, bool isEnough, uint256 totalBorrowed, uint256 ltvUsed) = IlSolverMath.hedgingLoop(
+            collateralAmount, borrowedAmount, borrowAmountUSD, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
+        );
         assertEq(isEnough, true);
         lastIterations = iterations;
         lastTotalBorrowed = totalBorrowed;
@@ -49,9 +52,12 @@ contract Handler is Test {
         borrowAmountUSD = bound(borrowAmountUSD, 10 * 1e18, 100000 * 1e18); // $10-$100k
         ltv = bound(ltv, MIN_LTV, MAX_LTV);
 
-        uint256 collateral = IlSolverMath.calculateCollateralAmount(borrowedAmount, borrowAmountUSD, ltv);
-        (uint256 iterations, bool isEnough, uint256 totalBorrowed, uint256 ltvUsed) =
-            IlSolverMath.hedgingLoop(collateral, borrowedAmount, borrowAmountUSD, ltv);
+        uint256 collateral = IlSolverMath.calculateCollateralAmount(
+            borrowedAmount, borrowAmountUSD, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
+        );
+        (uint256 iterations, bool isEnough, uint256 totalBorrowed, uint256 ltvUsed) = IlSolverMath.hedgingLoop(
+            collateral, borrowedAmount, borrowAmountUSD, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
+        );
         assertEq(isEnough, true);
     }
 }
