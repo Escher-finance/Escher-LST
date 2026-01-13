@@ -283,7 +283,7 @@ contract IlSolverMathTest is Test {
 
     function test_temporary() public pure {
         uint256 borrowedAmountNeeded = 0.1 ether;
-        uint256 borrowAmountUsdPrice = 3000 ether;
+        uint256 borrowAmountUsdPrice = 3000 ether +1 ;
         uint256 ltv = 700000000000000000;
         uint256 collateral = IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
         console.log("collateral needed", collateral);
