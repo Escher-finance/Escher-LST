@@ -8,8 +8,8 @@ library IlSolverMath {
     uint256 public constant MAX_LOOP_ITERATIONS = 8;
     uint256 public constant LTV_SAFTY_FACTOR = 2e16;
     // Epsilon tolerance for token amount comparison to account for rounding errors
-    // 1e12 = 0.000001 tokens (in 18 decimals)
-    uint256 public constant TOKEN_AMOUNT_EPSILON = 1e12;
+    // 0.000001 tokens (in 18 decimals) = 1e12
+    uint256 public constant TOKEN_AMOUNT_EPSILON = 0.000001 ether;
 
     function _validInput(
         uint256 collateralAmount,
