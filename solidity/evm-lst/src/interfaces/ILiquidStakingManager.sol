@@ -13,12 +13,11 @@ interface ILiquidStakingManager {
     event Bond(address indexed staker, uint256 value, address recipient);
 
     /// @dev Emitted when user request to unstake some amount of liquid staking token.
-    /// @param user The address of the user who unstaked.
+    /// @param sender The address of the sender who unstaked.
     /// @param shares The shares of the liquid staking token that the user wants to unstake.
-    /// @param recipient The address of the user who will receive the asset back.
     /// @param requestId The unique ID of this unbond request.
     /// @param batchId The batch ID this request belongs to.
-    event UnbondRequested(address indexed user, uint256 shares, address recipient, uint256 requestId, uint256 batchId);
+    event UnbondRequested(address indexed sender, uint256 shares, uint256 requestId, uint256 batchId);
 
     /// @dev Emitted when a new unbond batch is created.
     /// @param batchId The unique ID of the new batch.
@@ -42,11 +41,10 @@ interface ILiquidStakingManager {
     event BatchReceived(uint256 indexed batchId, uint256 totalAssets);
 
     /// @dev Emitted when a user claims their unbonded assets.
-    /// @param user The address of the user who claimed.
+    /// @param sender The address of the user who claimed.
     /// @param requestId The request ID that was claimed.
-    /// @param assets The amount of assets claimed.
-    /// @param recipient The address that received the assets.
-    event UnbondClaimed(address indexed user, uint256 requestId, uint256 assets, address recipient);
+    /// @param assets The amount of assets claimed
+    event UnbondClaimed(address indexed sender, uint256 requestId, uint256 assets);
 
     /// @notice Bond native token and get the share/liquid staking token to recipient according to the rate
     /// @param _assets amount of native token that is staked
@@ -54,9 +52,8 @@ interface ILiquidStakingManager {
     function bond(uint256 _assets, address _recipient) external payable;
 
     /// @notice Create unbond request of liquid staking token to receive native token back according to the rate
-    /// @param _shares amount of shares/liquid staking token that will be unbonded
-    /// @param _recipient recipient address of native token as unbonding result
-    function unbondRequest(uint256 _shares, address _recipient) external returns (uint256);
+    /// @param shares amount of shares/liquid staking token that will be unbonded
+    function unbondRequest(uint256 shares) external returns (uint256);
 
     /// @notice Get delegation manager contract address
     /// @return address of delegation manager contract

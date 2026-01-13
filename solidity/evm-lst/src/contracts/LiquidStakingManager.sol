@@ -56,7 +56,11 @@ contract LiquidStakingManager is
         address delegationManagerAddress
     ) public initializer {
         // Checks that the initialOwner address is not zero.
-        require(initialOwner != address(0), "zero address");
+        require(initialOwner != address(0), "owner zero address");
+        // Checks that the lst address is not zero.
+        require(lstAddress != address(0), "lstAddress zero address");
+        // Checks that the delegation manager address is not zero.
+        require(delegationManagerAddress != address(0), "delegation manager zero address");
         __Ownable_init(initialOwner);
         share = Lst(lstAddress);
         delegationManager = IDelegationManager(delegationManagerAddress);
@@ -189,13 +193,10 @@ contract LiquidStakingManager is
     /**
      * @notice Function to allow msg.sender to request to unbond of their staked asset
      * @param shares amount of shares the user wants to convert
-     * @param recipient address of the user who will receive the assets
      */
-    function unbondRequest(uint256 shares, address recipient) external nonReentrant returns (uint256) {
+    function unbondRequest(uint256 shares) external nonReentrant returns (uint256) {
         // checks that the deposited amount is greater than zero.
         require(shares > s_config.minUnbondAmount, "unbond should be more than min unbond amount");
-        // Checks that the _receiver address is not zero.
-        require(recipient != address(0), "recipient zero address");
 
         // Checks that the delegationManager address is not zero.
         require(address(delegationManager) != address(0), "delegation Manager zero address");
@@ -211,8 +212,7 @@ contract LiquidStakingManager is
         s_nextRequestId++;
 
         // Create the unbond request
-        s_unbondRequests[requestId] =
-            UnbondRequest({user: msg.sender, recipient: recipient, shares: shares, batchId: s_pendingBatchId});
+        s_unbondRequests[requestId] = UnbondRequest({sender: msg.sender, shares: shares, batchId: s_pendingBatchId});
 
         // Add request ID to user's list
         s_userRequestIds[msg.sender].push(requestId);
@@ -222,7 +222,7 @@ contract LiquidStakingManager is
         currentBatch.requestIds.push(requestId);
         currentBatch.totalShares += shares;
 
-        emit UnbondRequested(msg.sender, shares, recipient, requestId, s_pendingBatchId);
+        emit UnbondRequested(msg.sender, shares, requestId, s_pendingBatchId);
 
         return requestId;
     }
@@ -378,7 +378,7 @@ contract LiquidStakingManager is
             uint256 userAssets = (request.shares * batch.totalAssets) / batch.totalShares;
 
             // Store recipient before deleting
-            address recipient = request.recipient;
+            address recipient = request.sender;
 
             // Remove from user's request array (swap and pop)
             userRequests[i - 1] = userRequests[totalUserRequests - 1];
@@ -392,7 +392,7 @@ contract LiquidStakingManager is
             (bool success,) = payable(recipient).call{value: totalTransfer}("");
             require(success, "transfer failed");
 
-            emit UnbondClaimed(msg.sender, requestId, userAssets, recipient);
+            emit UnbondClaimed(recipient, requestId, userAssets);
         }
     }
 
@@ -403,8 +403,8 @@ contract LiquidStakingManager is
     function claimUnbondRequest(uint256 requestId) external nonReentrant {
         UnbondRequest storage request = s_unbondRequests[requestId];
 
-        require(request.user != address(0), "request does not exist");
-        require(request.user == msg.sender, "not request owner");
+        require(request.sender != address(0), "request does not exist");
+        require(request.sender == msg.sender, "not request owner");
 
         UnbondBatch storage batch = s_batches[request.batchId];
         require(batch.status == BatchStatus.Received, "batch not yet received");
@@ -413,7 +413,7 @@ contract LiquidStakingManager is
         uint256 userAssets = (request.shares * batch.totalAssets) / batch.totalShares;
 
         // Store recipient before deleting
-        address recipient = request.recipient;
+        address recipient = request.sender;
 
         // Remove request from user's array
         _removeUserRequest(msg.sender, requestId);
@@ -425,7 +425,7 @@ contract LiquidStakingManager is
         (bool success,) = payable(recipient).call{value: userAssets}("");
         require(success, "transfer failed");
 
-        emit UnbondClaimed(msg.sender, requestId, userAssets, recipient);
+        emit UnbondClaimed(msg.sender, requestId, userAssets);
     }
 
     /**

@@ -33,10 +33,8 @@ enum BatchStatus {
 
 // Individual unbond request from a user
 struct UnbondRequest {
-    // Address of the user who made the request
-    address user;
-    // Address that will receive the unbonded assets
-    address recipient;
+    // Address of the sender who made the request
+    address sender;
     // Amount of LST shares to unbond
     uint256 shares;
     // The batch ID this request belongs to
