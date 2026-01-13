@@ -150,12 +150,6 @@ library IlSolverMath {
         validLtv(ltv)
         returns (uint256 collateralAmountNeeded)
     {
-        // Manual input validation (can't use modifier since collateral is unknown)
-        if (borrowedTokenUsdPrice == 0 || borrowedAmountNeeded == 0 || ltv == 0) {
-            revert INVALID_INPUT();
-        }
-        if (ltv <= LTV_SAFTY_FACTOR) revert INVALID_INPUT();
-
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
 
         // Binary search bounds
