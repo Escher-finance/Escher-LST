@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.28;
 
-import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IDelegationManager} from "../interfaces/IDelegationManager.sol";
 import {IValidatorSetManager} from "../interfaces/IValidatorSetManager.sol";
 import {Validator, DelegatorSummary} from "../models/Type.sol";
@@ -11,9 +9,9 @@ import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 contract HyperliquidDelegationManager is
     IDelegationManager,
@@ -131,9 +129,9 @@ contract HyperliquidDelegationManager is
         Validator[] memory validators = validatorManager.getAllValidators();
         if (validators.length == 0) revert EmptyValidatorSet();
 
+        uint64 amount = SafeCast.toUint64(coreAmount);
         // get validator addresses array and the amount to stake to that validator
-        (address[] memory validatorAddresses, uint64[] memory amounts) =
-            calculateStakeDistribution(uint64(coreAmount), validators);
+        (address[] memory validatorAddresses, uint64[] memory amounts) = calculateStakeDistribution(amount, validators);
 
         uint256 totalValidators = validatorAddresses.length;
 

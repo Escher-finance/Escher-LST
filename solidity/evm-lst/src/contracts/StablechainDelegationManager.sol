@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.28;
 
-import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IDelegationManager} from "../interfaces/IDelegationManager.sol";
 import {IValidatorSetManager} from "../interfaces/IValidatorSetManager.sol";
@@ -13,9 +12,9 @@ import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 contract StablechainDelegationManager is
     IDelegationManager,
@@ -35,9 +34,6 @@ contract StablechainDelegationManager is
     IStableStaking staking;
     IStableDistribution distribution;
 
-    uint256 delegateCount;
-    uint256 undelegateCount;
-
     IERC20 asset;
     ERC20 share;
 
@@ -48,7 +44,11 @@ contract StablechainDelegationManager is
 
     function initialize(address owner, address _validatorManager, address _asset, address _share) public initializer {
         // Checks that the initialOwner address is not zero.
-        require(owner != address(0), "zero address");
+        require(owner != address(0), "owner zero address");
+        require(_validatorManager != address(0), "validator manager zero address");
+        require(_asset != address(0), "_asset zero address");
+        require(_share != address(0), "_share zero address");
+
         __Ownable_init(owner);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
@@ -178,11 +178,11 @@ contract StablechainDelegationManager is
         uint256 _rewards = total[0].amount;
 
         return DelegatorSummary({
-            delegated: uint64(delegated),
+            delegated: SafeCast.toUint64(delegated),
             undelegated: 0,
             totalPendingWithdrawal: 0,
             nPendingWithdrawals: 0,
-            rewards: uint64(_rewards)
+            rewards: SafeCast.toUint64(_rewards)
         });
     }
 
