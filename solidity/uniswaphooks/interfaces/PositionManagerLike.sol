@@ -22,4 +22,3 @@ interface IPositionManagerLike {
     function modifyLiquiditiesWithoutUnlock(bytes calldata actionsAndParams) external payable;
 }
 
-

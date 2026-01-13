@@ -6,14 +6,12 @@ import {IPoolLike, ISwapper} from "./interfaces/PoolLike.sol";
 /// Minimal swapper that forwards swaps to the pool. In production you would
 /// handle token approvals, callbacks, and accounting here.
 contract SimpleSwapper is ISwapper {
-    function executeSwap(
-        IPoolLike pool,
-        bool zeroForOne,
-        int256 amountSpecified,
-        bytes calldata data
-    ) external override returns (int256 amount0, int256 amount1) {
+    function executeSwap(IPoolLike pool, bool zeroForOne, int256 amountSpecified, bytes calldata data)
+        external
+        override
+        returns (int256 amount0, int256 amount1)
+    {
         return pool.swap(msg.sender, zeroForOne, amountSpecified, data);
     }
 }
-
 
