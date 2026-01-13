@@ -74,7 +74,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
     event AddLiquidityData(
         address indexed sender,
         uint256 borrowedAmountNeeded,
-        uint256 borrowAmountUsdPrice,
+        uint256 borrowedTokenUsdPrice,
         uint256 ltv,
         uint256 collateralAmountNeeded
     );
@@ -164,11 +164,11 @@ contract IlSolverHook is BaseHook, Ownable2Step {
 
         int128 delta0 = BalanceDeltaLibrary.amount0(delta);
         uint256 borrowedAmountNeeded = delta0 < 0 ? (-delta0).toUint256() : 0;
-        uint256 borrowAmountUsdPrice = aaveOraclePrice(address(WETH));
+        uint256 borrowedTokenUsdPrice = aaveOraclePrice(address(WETH));
         uint256 ltv = aavev3Ltv();
         uint256 collateralAmountNeeded =
-            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
-        emit AddLiquidityData(realSender, borrowedAmountNeeded, borrowAmountUsdPrice, ltv, collateralAmountNeeded);
+            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowedTokenUsdPrice, ltv);
+        emit AddLiquidityData(realSender, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv, collateralAmountNeeded);
 
         return (selector, delta);
     }
