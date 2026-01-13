@@ -12,11 +12,17 @@ contract MockPool is IPoolLike {
     int256 public lastAmountSpecified;
     bytes public lastData;
 
-    constructor(uint160 start) { p = start; }
+    constructor(uint160 start) {
+        p = start;
+    }
 
-    function setPrice(uint160 v) external { p = v; }
+    function setPrice(uint160 v) external {
+        p = v;
+    }
 
-    function sqrtPriceX96() external view returns (uint160) { return p; }
+    function sqrtPriceX96() external view returns (uint160) {
+        return p;
+    }
 
     function swap(address, bool zeroForOne, int256 amountSpecified, bytes calldata data)
         external
@@ -77,5 +83,4 @@ contract LimitOrderHookTest is Test {
         hook.execute(id);
     }
 }
-
 

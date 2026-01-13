@@ -25,22 +25,10 @@ contract PMRouter {
         address recipient,
         uint256 deadline
     ) external payable {
-        bytes memory actions = abi.encodePacked(
-            Actions.MINT_POSITION,
-            Actions.SETTLE_PAIR
-        );
+        bytes memory actions = abi.encodePacked(Actions.MINT_POSITION, Actions.SETTLE_PAIR);
 
         bytes[] memory params = new bytes[](2);
-        params[0] = abi.encode(
-            poolKey,
-            tickLower,
-            tickUpper,
-            liquidity,
-            amount0Max,
-            amount1Max,
-            recipient,
-            bytes("")
-        );
+        params[0] = abi.encode(poolKey, tickLower, tickUpper, liquidity, amount0Max, amount1Max, recipient, bytes(""));
         params[1] = abi.encode(poolKey.currency0, poolKey.currency1);
 
         positionManager.modifyLiquidities(abi.encode(actions, params), deadline);
@@ -68,5 +56,4 @@ contract PMRouter {
         positionManager.modifyLiquidities(abi.encode(actions, params), deadline);
     }
 }
-
 
