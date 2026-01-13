@@ -164,7 +164,7 @@ contract IlSolverMathTest is Test {
             IlSolverMath.hedgingLoop(collateralNeeded, borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
 
         assertTrue(isEnough);
-        assertGe(totalBorrowed, borrowedAmountNeeded);
+        assertGe(totalBorrowed + IlSolverMath.TOKEN_AMOUNT_EPSILON, borrowedAmountNeeded);
     }
 
     // --- Precision and fractional iteration tests ---
@@ -206,9 +206,9 @@ contract IlSolverMathTest is Test {
 
         assertTrue(isEnough);
         // Should borrow AT LEAST what's needed
-        assertGe(totalBorrowed, borrowedAmountNeeded);
+        assertGe(totalBorrowed + IlSolverMath.TOKEN_AMOUNT_EPSILON, borrowedAmountNeeded);
         // But not significantly more (allowing small rounding)
-        assertLt(totalBorrowed, borrowedAmountNeeded + 1e15); // Less than 0.001 tokens extra
+        assertLt(totalBorrowed + IlSolverMath.TOKEN_AMOUNT_EPSILON, borrowedAmountNeeded + 1e15); // Less than 0.001 tokens extra
     }
 
     // --- Error case tests ---
@@ -283,7 +283,7 @@ contract IlSolverMathTest is Test {
 
     function test_temporary() public pure {
         uint256 borrowedAmountNeeded = 0.1 ether;
-        uint256 borrowAmountUsdPrice = 3000 ether;
+        uint256 borrowAmountUsdPrice = 3000 ether + 1;
         uint256 ltv = 700000000000000000;
         uint256 collateral = IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowAmountUsdPrice, ltv);
         console.log("collateral needed", collateral);

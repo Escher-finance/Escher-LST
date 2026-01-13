@@ -7,6 +7,9 @@ library IlSolverMath {
     error INVALID_INPUT();
     uint256 public constant MAX_LOOP_ITERATIONS = 8;
     uint256 public constant LTV_SAFTY_FACTOR = 2e16;
+    // Epsilon tolerance for token amount comparison to account for rounding errors
+    // 0.000001 tokens (in 18 decimals) = 1e12
+    uint256 public constant TOKEN_AMOUNT_EPSILON = 0.000001 ether;
 
     function _validInput(
         uint256 collateralAmount,
@@ -57,6 +60,9 @@ library IlSolverMath {
         isEnough = false;
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
 
+        // Calculate target USD value once to avoid rounding errors in comparison
+        uint256 targetBorrowUsd = Math.mulDiv(borrowedAmountNeeded, borrowAmountUsdPrice, 1e18);
+
         // Track total collateral and borrow amounts in Usd (1e18 scale) and tokens.
         uint256 collateralUsd = collateralAmount;
         uint256 totalBorrowedUsd = 0;
@@ -71,9 +77,8 @@ library IlSolverMath {
 
             uint256 remainingCapacityUsd = maxBorrowableUsd - totalBorrowedUsd;
 
-            // Calculate how much more we need to borrow (in tokens)
-            uint256 tokensStillNeeded = borrowedAmountNeeded - totalBorrowedToken;
-            uint256 usdStillNeeded = Math.mulDiv(tokensStillNeeded, borrowAmountUsdPrice, 1e18);
+            // Calculate how much more we need to borrow (in USD)
+            uint256 usdStillNeeded = targetBorrowUsd - totalBorrowedUsd;
 
             // Borrow the MINIMUM of: what we need vs what we can borrow
             // This simulates a "partial/fractional" iteration
@@ -84,13 +89,11 @@ library IlSolverMath {
             totalBorrowedToken += borrowThisLoopToken;
             collateralUsd += borrowThisLoopUsd; // borrowed funds are re-deposited as collateral
 
-            // TODO: address this comparison
-            // attempt 1: fix by comparing USD value based on aave oracle
-            // ```
-            // uint256 targetBorrowUsd = Math.mulDiv(borrowedAmountNeeded, borrowAmountUsdPrice, 1e18);
-            // if (totalBorrowedUsd >= targetBorrowUsd) {
-            // ```
-            if (totalBorrowedToken >= borrowedAmountNeeded) {
+            // Check if we've reached the target using token amount with epsilon tolerance
+            // This accounts for rounding errors from USD->token conversions
+            // We check if totalBorrowedToken >= borrowedAmountNeeded - epsilon
+            // This means we're within epsilon of the target (or above it)
+            if (totalBorrowedToken + TOKEN_AMOUNT_EPSILON >= borrowedAmountNeeded) {
                 isEnough = true;
                 // Calculate fractional iterations (in 1e18 scale)
                 // iterations = completed full iterations + (partial amount borrowed / max could borrow)
