@@ -1,4 +1,4 @@
-use cosmwasm_std::{testing::mock_dependencies, Uint128};
+use cosmwasm_std::{Uint128, testing::mock_dependencies};
 
 use crate::utils::batch::*;
 
@@ -13,7 +13,7 @@ fn test_batch_indexes() {
         expected_native_unstaked: None,
         received_native_unstaked: None,
         unbond_records_count: 5,
-        next_batch_action_time: Some(1000000),
+        next_batch_action_time: Some(1_000_000),
         status: BatchStatus::Pending,
     };
     let batch_b = Batch {

@@ -6,7 +6,6 @@ pub const PARAMETERS: Item<Parameters> = Item::new("parameters");
 pub const STATE: Item<State> = Item::new("state");
 pub const STATUS: Item<Status> = Item::new("status");
 pub const VALIDATORS_REGISTRY: Item<ValidatorsRegistry> = Item::new("validators_registry");
-pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const REWARD_BALANCE: Item<Uint128> = Item::new("reward_balance");
 
@@ -24,15 +23,18 @@ pub const PENDING_BATCH_ID: Item<u64> = Item::new("pending_batch_id");
 // Queue of validator reward for executing split reward
 pub const SPLIT_REWARD_QUEUE: Item<WithdrawReward> = Item::new("split_reward_queue");
 
-// Map of supported ucs03 chains with channel_id as key
-pub const CHAINS: Map<u32, Chain> = Map::new("chains");
+// Map of supported ucs03 recipient chains with channel_id as key on bond action, only support zkgm recipient for cross chain
+pub const BOND_ZKGM_CHAINS: Map<u32, ZkgmChain> = Map::new("chains");
 
-// Map of supported ibc channels with channel_id as key and address prefix as value, like bbn, union, osmo
+// Map of supported unbond ibc channels with channel_id as key and address prefix as value, like bbn, union, osmo
 pub const IBC_CHANNELS: Map<String, String> = Map::new("ibc_channels");
 
 // Map of unbond record id and the recipient ibc channel id
 pub const UNBOND_RECIPIENT_IBC_CHANNEL: Map<u64, Option<String>> =
     Map::new("unbond_record_recipient_ibc_channel");
+
+// Map of supported ucs03 recipient chains with channel_id as key on unbond action
+pub const UNBOND_ZKGM_CHAINS: Map<u32, ZkgmChain> = Map::new("unbond_chains");
 
 #[cw_serde]
 pub struct Status {
@@ -136,12 +138,20 @@ pub struct Parameters {
 
 pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
 
+/// # Result
+/// Will return new incremented token as u64
+/// # Errors
+/// Will return `cosmwasm_std::StdError`
 pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
     let val = num_tokens(storage)? + 1;
     TOKEN_COUNT.save(storage, &val)?;
     Ok(val)
 }
 
+/// # Result
+/// Will return current token as u64
+/// # Errors
+/// Will return `cosmwasm_std::StdError`
 pub fn num_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
     Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
 }
@@ -166,6 +176,7 @@ pub struct OldUnbondRecordIndexes<'a> {
     pub batch: MultiIndex<'a, String, OldUnbondRecord, u64>,
 }
 
+#[allow(clippy::elidable_lifetime_names)]
 impl<'a> IndexList<OldUnbondRecord> for OldUnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<OldUnbondRecord>> + '_> {
         let v: Vec<&dyn Index<OldUnbondRecord>> = vec![
@@ -178,6 +189,7 @@ impl<'a> IndexList<OldUnbondRecord> for OldUnbondRecordIndexes<'a> {
     }
 }
 
+#[must_use]
 pub fn old_unbond_record<'a>() -> IndexedMap<u64, OldUnbondRecord, OldUnbondRecordIndexes<'a>> {
     let indexes = OldUnbondRecordIndexes {
         staker: MultiIndex::new(
@@ -228,6 +240,7 @@ pub struct UnbondRecordIndexes<'a> {
     pub batch: MultiIndex<'a, String, UnbondRecord, u64>,
 }
 
+#[allow(clippy::elidable_lifetime_names)]
 impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<UnbondRecord>> + '_> {
         let v: Vec<&dyn Index<UnbondRecord>> = vec![
@@ -240,6 +253,7 @@ impl<'a> IndexList<UnbondRecord> for UnbondRecordIndexes<'a> {
     }
 }
 
+#[must_use]
 pub fn unbond_record<'a>() -> IndexedMap<u64, UnbondRecord, UnbondRecordIndexes<'a>> {
     let indexes = UnbondRecordIndexes {
         staker: MultiIndex::new(
@@ -273,14 +287,6 @@ pub struct QuoteToken {
     pub lst_quote_token: String,
 }
 
-#[cw_serde]
-pub struct Config {
-    pub lst_contract_address: Addr,
-    pub fee_receiver: Addr,
-    pub fee_rate: Decimal,
-    pub coin_denom: String,
-}
-
 /// the queued staking token mint amount
 #[cw_serde]
 pub struct MintQueue {
@@ -309,7 +315,7 @@ pub struct SupplyQueue {
 }
 
 #[cw_serde]
-pub struct Chain {
+pub struct ZkgmChain {
     pub name: String,
     pub chain_id: String,
     pub ucs03_channel_id: u32,

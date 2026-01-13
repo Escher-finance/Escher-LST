@@ -72,22 +72,6 @@
             root = ./.;
             inherit ((union.lib.getRepoMeta self)) gitRev;
           };
-
-          cargoWorkspaceAttrs = {
-            pname = "cargo-workspace";
-            version = "0.0.0";
-            src = crane.cargoWorkspaceSrc;
-
-            cargoTestExtraArgs = "--workspace --no-fail-fast";
-            cargoClippyExtraArgs = "--workspace --tests -- -Dwarnings";
-
-            CARGO_PROFILE = "dev";
-
-            buildInputs = [ ];
-            nativeBuildInputs = [ ];
-          };
-
-          cargoArtifacts = crane.lib.buildDepsOnly cargoWorkspaceAttrs;
         in
         {
           _module = {
@@ -100,16 +84,11 @@
 
           packages = {
             liquidstaking-babylon =
-              crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/liquidstaking/babylon"
+              crane.buildWasmContract "cosmwasm/babylon-lst/contracts/liquidstaking/babylon"
                 { };
             # liquidstaking-union = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/liquidstaking/union" { };
-            reward = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/reward" { };
-            cw20-base = crane.buildWasmContract "cosmwasm/Babylon-LST/contracts/cw20-base" { };
-          };
-
-          checks = {
-            cargo-workspace-clippy = crane.lib.cargoClippy (cargoWorkspaceAttrs // { inherit cargoArtifacts; });
-            cargo-workspace-test = crane.lib.cargoTest (cargoWorkspaceAttrs // { inherit cargoArtifacts; });
+            reward = crane.buildWasmContract "cosmwasm/babylon-lst/contracts/reward" { };
+            cw20-base = crane.buildWasmContract "cosmwasm/babylon-lst/contracts/cw20-base" { };
           };
 
           devShells.default = pkgs.mkShell {
@@ -124,6 +103,7 @@
                 yq
                 wasm-tools
                 binaryen
+                pkg-config
               ]);
             nativeBuildInputs = [
               config.treefmt.build.wrapper
@@ -140,6 +120,7 @@
               rustfmt = {
                 enable = true;
                 package = rust-dev-toolchain;
+                edition = "2024";
               };
               taplo.enable = true;
               yamlfmt = {

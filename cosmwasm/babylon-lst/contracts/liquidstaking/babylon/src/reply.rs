@@ -1,51 +1,54 @@
-use std::str::FromStr;
-
 use cosmwasm_std::{
-    attr, entry_point, from_json, to_json_binary, Attribute, BankMsg, Coin, CosmosMsg, DepsMut,
-    Env, Reply, Response, StdError, SubMsg, Uint128, WasmMsg,
+    Attribute, BankMsg, Coin, CosmosMsg, DepsMut, Env, Reply, Response, SubMsg, Uint128, WasmMsg,
+    attr, entry_point, from_json, to_json_binary, wasm_execute,
 };
-use unionlabs_primitives::Bytes;
 
 use crate::{
     error::ContractError,
-    msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload},
+    msg::{BondRewardsPayload, ExecuteRewardMsg, MintTokensPayload, ZkgmTransfer},
     state::{
-        Parameters, WithdrawReward, WithdrawRewardQueue, PARAMETERS, QUOTE_TOKEN, REWARD_BALANCE,
-        SPLIT_REWARD_QUEUE, SUPPLY_QUEUE, WITHDRAW_REWARD_QUEUE,
+        PARAMETERS, Parameters, QUOTE_TOKEN, REWARD_BALANCE, SPLIT_REWARD_QUEUE, SUPPLY_QUEUE,
+        WITHDRAW_REWARD_QUEUE, WithdrawReward, WithdrawRewardQueue,
     },
     utils::calc::get_next_epoch,
+    zkgm::protocol::{TokenPair, Ucs03Zkgm},
 };
 pub const MINT_CW20_TOKENS_REPLY_ID: u64 = 124;
 pub const PROCESS_WITHDRAW_REWARD_REPLY_ID: u64 = 125;
 pub const SPLIT_REWARD_REPLY_ID: u64 = 126;
+pub const MINT_AND_SEND_ZKGM_REPLY_ID: u64 = 127;
 
 #[entry_point]
+/// Errors:
+/// - Propagates errors from submessage replies and handlers.
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
     if !msg.result.is_ok() {
         let err = msg.result.unwrap_err();
         return Err(ContractError::ReplyError {
-            message: err.to_string(),
+            message: err.clone(),
         });
     }
 
     match msg.id {
-        MINT_CW20_TOKENS_REPLY_ID => on_mint_cw20_tokens(deps, env, msg),
+        MINT_AND_SEND_ZKGM_REPLY_ID => on_mint_and_send_zkgm(&deps, &env, msg),
+        MINT_CW20_TOKENS_REPLY_ID => on_mint_cw20_tokens(deps, &env, msg),
         PROCESS_WITHDRAW_REWARD_REPLY_ID => on_process_rewards(deps, env, msg),
-        SPLIT_REWARD_REPLY_ID => on_split_reward(deps, env, msg),
+        SPLIT_REWARD_REPLY_ID => on_split_reward(deps, &env, msg),
         _ => Ok(Response::new()),
     }
 }
 
-fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractError> {
+#[allow(clippy::too_many_lines)]
+fn on_mint_cw20_tokens(deps: DepsMut, env: &Env, msg: Reply) -> Result<Response, ContractError> {
     let params: Parameters = PARAMETERS.load(deps.storage)?;
     let payload: MintTokensPayload = from_json(msg.payload)?;
 
     // if recipient channel id is none, need to make sure recipient address is valid address on the chain where the contract is running
     let is_on_chain_recipient = crate::utils::validation::is_on_chain_recipient(
         &deps.as_ref(),
-        payload.recipient.clone(),
+        &payload.recipient.clone(),
         payload.recipient_channel_id,
-        None,
+        &None,
     );
 
     // check to query balance of transfer handler or this contract
@@ -54,7 +57,7 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         && (payload.channel_id.is_some() || payload.recipient_channel_id.is_some())
     {
         cw20::Cw20QueryMsg::Balance {
-            address: params.transfer_handler.to_string(),
+            address: params.transfer_handler.clone(),
         }
     } else {
         cw20::Cw20QueryMsg::Balance {
@@ -99,79 +102,44 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
         };
         let params = PARAMETERS.load(deps.storage)?;
 
-        // allow/approve ucs03 to transfer on behalf of transfer handler via authz
-        let allowance_msg = crate::utils::authz::get_authz_increase_allowance_msg(
-            params.transfer_handler.clone(),
-            env.contract.address.to_string(),
-            params.cw20_address.to_string(),
-            params.zkgm_token_minter,
-            amount,
-            vec![],
-        )?;
-
-        msgs.push(allowance_msg);
-
-        let mut funds = vec![];
-
-        if transfer_fee > Uint128::zero() {
-            funds.push(Coin {
-                amount: transfer_fee,
-                denom: params.underlying_coin_denom.clone(),
-            });
-        }
+        // create allowance msg to zkgm token minter
+        msgs.push(
+            wasm_execute(
+                params.cw20_address.clone(),
+                &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+                    spender: params.zkgm_token_minter,
+                    amount,
+                    expires: None,
+                },
+                vec![],
+            )?
+            .into(),
+        );
 
         let quote_token = QUOTE_TOKEN.load(deps.storage, channel_id)?;
-        quote_token_string = quote_token.lst_quote_token.clone();
+        quote_token_string.clone_from(&quote_token.lst_quote_token);
 
-        let recipient_address = match Bytes::from_str(recipient.as_str()) {
-            Ok(rec) => rec,
-            Err(_) => {
-                return Err(ContractError::InvalidAddress {
-                    kind: "recipient".into(),
-                    address: recipient,
-                    reason: "address must be in hex and starts with 0x".to_string(),
-                });
-            }
-        };
-        let quote_token = match Bytes::from_str(quote_token_string.as_str()) {
-            Ok(token) => token,
-            Err(_) => {
-                return Err(ContractError::InvalidAddress {
-                    kind: "quote_token".into(),
-                    address: quote_token_string,
-                    reason: "address must be in hex and starts with 0x".to_string(),
-                });
-            }
-        };
-
-        let salt: unionlabs_primitives::H256 =
-            match unionlabs_primitives::H256::from_str(payload.salt.as_str()) {
-                Ok(s) => s,
-                Err(e) => {
-                    return Err(ContractError::Std(StdError::generic_err(format!(
-                        "failed to parse salt: {}, reason: {}",
-                        payload.salt, e
-                    ))));
-                }
-            };
-
-        let authz_ucs03_msg = crate::utils::authz::get_authz_ucs03_transfer(
-            params.cw20_address.to_string(),
-            params.transfer_handler,
-            env.contract.address.to_string(),
-            env.block.time,
-            params.ucs03_relay_contract.clone(),
-            channel_id,
-            recipient_address,
-            params.cw20_address.to_string(),
-            amount,
-            quote_token,
-            amount,
-            funds.clone(),
-            salt,
-        )?;
-
-        msgs.push(authz_ucs03_msg);
+        // create send ucs03 zkgm msg
+        msgs.push(
+            Ucs03Zkgm::new(
+                params.ucs03_relay_contract.clone(),
+                TokenPair {
+                    base_token: params.cw20_address.to_string(),
+                    quote_token: quote_token_string.clone(),
+                },
+            )
+            .transfer_escrow_with_funds(
+                &ZkgmTransfer {
+                    sender: env.contract.address.to_string(),
+                    amount,
+                    recipient,
+                    recipient_channel_id: channel_id,
+                    salt: payload.salt,
+                    time: env.block.time,
+                },
+                &[], // to transfer cw20 based token (liquid staking token), no need to attach funds
+            )?,
+        );
     } else {
         let receiver = match payload.recipient.clone() {
             Some(receiver) => receiver,
@@ -186,8 +154,8 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     let res: Response = Response::new()
         .add_messages(msgs)
         .add_attribute("action", "mint_cw20")
-        .add_attribute("sender", payload.sender.to_string())
-        .add_attribute("staker", payload.staker.to_string())
+        .add_attribute("sender", payload.sender.clone())
+        .add_attribute("staker", payload.staker.clone())
         .add_attribute("recipient", format!("{:?}", payload.recipient))
         .add_attribute("channel_id", payload.channel_id.unwrap_or(0).to_string())
         .add_attribute("amount", amount.to_string())
@@ -201,7 +169,55 @@ fn on_mint_cw20_tokens(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, 
     Ok(res)
 }
 
+fn on_mint_and_send_zkgm(
+    deps: &DepsMut,
+    _env: &Env,
+    msg: Reply,
+) -> Result<Response, ContractError> {
+    let zkgm_transfer: ZkgmTransfer = from_json(msg.payload)?;
+    let params = PARAMETERS.load(deps.storage)?;
+    let quote_token = QUOTE_TOKEN.load(deps.storage, zkgm_transfer.recipient_channel_id)?;
+
+    // construct send allowance and ucs03 zkgm send message
+    let msgs: Vec<CosmosMsg> = vec![
+        // 1. send allowance msg
+        wasm_execute(
+            params.cw20_address.clone(),
+            &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+                spender: params.zkgm_token_minter,
+                amount: zkgm_transfer.amount,
+                expires: None,
+            },
+            vec![],
+        )?
+        .into(),
+        // 2. send to ucs03 msg without funds as we transfer cw20 denom
+        Ucs03Zkgm::new(
+            params.ucs03_relay_contract.clone(),
+            TokenPair {
+                base_token: params.cw20_address.to_string(),
+                quote_token: quote_token.lst_quote_token.clone(),
+            },
+        )
+        .transfer_escrow_with_funds(&zkgm_transfer, &[])?,
+    ];
+
+    let res: Response = Response::new()
+        .add_messages(msgs)
+        .add_attribute("action", "send_zkgm")
+        .add_attribute("sender", zkgm_transfer.sender.clone())
+        .add_attribute("recipient", zkgm_transfer.recipient)
+        .add_attribute("channel_id", zkgm_transfer.recipient_channel_id.to_string())
+        .add_attribute("amount", zkgm_transfer.amount.to_string())
+        .add_attribute("denom", params.liquidstaking_denom)
+        .add_attribute("base_denom", params.cw20_address)
+        .add_attribute("quote_token", quote_token.lst_quote_token);
+
+    Ok(res)
+}
+
 /// Call split reward to reward contract after withdraw reward
+#[allow(clippy::needless_pass_by_value)]
 fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
     let params = PARAMETERS.load(deps.storage)?;
     let payload: BondRewardsPayload = from_json(msg.payload)?;
@@ -252,7 +268,8 @@ fn on_process_rewards(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, 
 }
 
 /// Handle split reward call to reward contract reply
-fn on_split_reward(deps: DepsMut, env: Env, _msg: Reply) -> Result<Response, ContractError> {
+#[allow(clippy::needless_pass_by_value)]
+fn on_split_reward(deps: DepsMut, env: &Env, _msg: Reply) -> Result<Response, ContractError> {
     // reset reward balance after split reward call success
     REWARD_BALANCE.save(deps.storage, &Uint128::new(0))?;
     let supply = SUPPLY_QUEUE.load(deps.storage)?;
@@ -262,7 +279,7 @@ fn on_split_reward(deps: DepsMut, env: Env, _msg: Reply) -> Result<Response, Con
     let epoch_diff = next_epoch - block_height;
 
     // Only add one withdraw reward queue entry if epoch diff > 3 to trigger normalize reward
-    if epoch_diff > 0 && epoch_diff != supply.epoch_period as u64 {
+    if epoch_diff > 0 && epoch_diff != u64::from(supply.epoch_period) {
         let reward_queue = WithdrawRewardQueue {
             amount: Uint128::zero(),
             block: block_height,
@@ -279,9 +296,11 @@ fn on_split_reward(deps: DepsMut, env: Env, _msg: Reply) -> Result<Response, Con
 }
 
 /// Send or transfer token on same chain
-pub fn send(_deps: DepsMut, amount: Coin, receiver: String) -> Result<Response, ContractError> {
+/// Errors:
+/// - Returns StdError on message serialization failure.
+pub fn send(_deps: DepsMut, amount: Coin, receiver: &str) -> Result<Response, ContractError> {
     let bank_msg: BankMsg = BankMsg::Send {
-        to_address: receiver.clone(),
+        to_address: receiver.to_string(),
         amount: vec![amount.clone()],
     };
 
@@ -297,6 +316,8 @@ pub fn send(_deps: DepsMut, amount: Coin, receiver: String) -> Result<Response, 
 }
 
 /// Send or transfer cw20 token on same chain
+/// Errors:
+/// - Returns StdError if CW20 message serialization fails.
 pub fn send_cw20(
     _deps: DepsMut,
     amount: Uint128,

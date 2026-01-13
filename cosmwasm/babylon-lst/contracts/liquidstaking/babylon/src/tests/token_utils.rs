@@ -1,4 +1,4 @@
-use cosmwasm_std::{from_json, Addr, Binary, CosmosMsg, ReplyOn, Uint128, WasmMsg};
+use cosmwasm_std::{Addr, Binary, CosmosMsg, ReplyOn, Uint128, WasmMsg, from_json};
 
 use crate::{reply::MINT_CW20_TOKENS_REPLY_ID, utils::token::*};
 
@@ -13,7 +13,7 @@ fn test_get_staked_token_submsg() {
         mint_amount,
         String::default(),
         payload_bin.clone(),
-        cw20_address.clone(),
+        &cw20_address,
     );
     assert_eq!(submsg.reply_on, ReplyOn::Always);
     assert_eq!(submsg.payload, payload_bin);
@@ -52,7 +52,7 @@ fn test_burn_token() {
     else {
         panic!("bad cosmos msg");
     };
-    assert_eq!(contract_addr, cw20_address.to_string());
+    assert_eq!(contract_addr, cw20_address.clone());
     assert!(funds.is_empty());
 
     let cw20_msg: cw20::Cw20ExecuteMsg = from_json(msg).unwrap();

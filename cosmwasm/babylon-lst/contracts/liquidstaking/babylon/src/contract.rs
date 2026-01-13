@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    entry_point, CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response,
-    StdError, Uint128,
+    CosmosMsg, Decimal, DepsMut, DistributionMsg, Env, MessageInfo, Response, StdError, Uint128,
+    entry_point,
 };
 use cw2::set_contract_version;
 
@@ -10,13 +10,13 @@ use crate::{
     instantiate::create_reward,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
     state::{
-        unbond_record, Config, OldParameters, Parameters, State, Status, SupplyQueue,
-        ValidatorsRegistry, WithdrawReward, CONFIG, PARAMETERS, PENDING_BATCH_ID, QUOTE_TOKEN,
-        REWARD_BALANCE, SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, VALIDATORS_REGISTRY,
-        WITHDRAW_REWARD_QUEUE,
+        OldParameters, PARAMETERS, PENDING_BATCH_ID, Parameters, QUOTE_TOKEN, REWARD_BALANCE,
+        SPLIT_REWARD_QUEUE, STATE, STATUS, SUPPLY_QUEUE, State, Status, SupplyQueue,
+        VALIDATORS_REGISTRY, ValidatorsRegistry, WITHDRAW_REWARD_QUEUE, WithdrawReward,
+        unbond_record,
     },
     utils::{
-        batch::{batches, Batch},
+        batch::{Batch, batches},
         validation::{validate_quote_tokens, validate_validators},
     },
 };
@@ -25,7 +25,13 @@ use crate::{
 const CONTRACT_NAME: &str = "crates.io:liquidstaking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Instantiate new contract
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[allow(clippy::needless_pass_by_value)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -47,14 +53,6 @@ pub fn instantiate(
     };
 
     VALIDATORS_REGISTRY.save(deps.storage, &reg)?;
-
-    let reward_config = Config {
-        lst_contract_address: env.clone().contract.address,
-        fee_receiver: msg.fee_receiver.clone(),
-        fee_rate: msg.fee_rate,
-        coin_denom: msg.underlying_coin_denom.clone(),
-    };
-    CONFIG.save(deps.storage, &reward_config)?;
 
     let mut reward_address = env.contract.address.clone();
     let msgs: Vec<CosmosMsg> = if msg.use_external_reward.unwrap_or(false) {
@@ -159,7 +157,13 @@ pub fn instantiate(
         .add_messages(msgs))
 }
 
+/// Execute contract
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[allow(clippy::too_many_lines)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -171,18 +175,19 @@ pub fn execute(
             slippage,
             expected,
             recipient,
-            recipient_channel_id,
-            salt,
-        } => execute::bond(
-            deps,
-            env,
-            info,
+            recipient_channel_id: _,
+            salt: _,
+        } => {
+            let default_recipient = info.sender.clone().to_string();
+            let recipient_string = recipient.unwrap_or(default_recipient);
+            let recipient_address = deps.api.addr_validate(&recipient_string)?;
+            execute::bond(deps, env, info, slippage, expected, recipient_address)
+        }
+        ExecuteMsg::BondV2 {
             slippage,
-            expected,
-            recipient,
-            recipient_channel_id,
-            salt,
-        ),
+            min_mint_amount,
+            mint_to_address,
+        } => execute::bond(deps, env, info, slippage, min_mint_amount, mint_to_address),
         ExecuteMsg::Receive(cw20_msg) => execute::receive(deps, env, info, cw20_msg),
         ExecuteMsg::SubmitBatch {} => execute::submit_batch(deps, env, info),
         ExecuteMsg::ProcessRewards {} => execute::process_rewards(deps, env, info),
@@ -239,35 +244,17 @@ pub fn execute(
             quote_token,
         } => execute::update_quote_token(deps, env, info, channel_id, quote_token),
         ExecuteMsg::Redelegate {} => execute::redelegate(deps, env, info),
-        ExecuteMsg::OnZkgm {
-            caller: _caller,
-            path: _path,
-            source_channel_id: _source_channel_id,
-            destination_channel_id,
-            sender,
-            message,
-            relayer: _relayer,
-            relayer_msg: _relayer_msg,
-        } => execute::on_zkgm(deps, env, info, destination_channel_id, sender, message),
         ExecuteMsg::MigrateReward { code_id } => execute::migrate_reward(deps, env, info, code_id),
         ExecuteMsg::SplitReward {} => execute::split_reward(deps, env, info),
-        ExecuteMsg::SetConfig {
-            lst_contract_address,
-            fee_receiver,
-            fee_rate,
-            coin_denom,
-        } => execute::set_config(
-            deps,
-            env,
-            info,
-            lst_contract_address,
-            fee_receiver,
-            fee_rate,
-            coin_denom,
-        ),
         ExecuteMsg::SetStatus(new_status) => execute::set_status(deps, info, new_status),
-        ExecuteMsg::SetChain { chain } => execute::set_chain(deps, info, chain),
-        ExecuteMsg::RemoveChain { channel_id } => execute::remove_chain(deps, info, channel_id),
+        ExecuteMsg::SetBondChain { chain } => execute::set_bond_chain(deps, info, chain),
+        ExecuteMsg::SetUnbondChain { chain } => execute::set_unbond_chain(deps, info, chain),
+        ExecuteMsg::RemoveBondChain { channel_id } => {
+            execute::remove_bond_chain(deps, info, channel_id)
+        }
+        ExecuteMsg::RemoveUnbondChain { channel_id } => {
+            execute::remove_unbond_chain(deps, info, channel_id)
+        }
         ExecuteMsg::NormalizeReward {} => execute::normalize_reward(deps, env),
         ExecuteMsg::Inject { amount } => execute::inject(deps, env, info, amount),
         ExecuteMsg::AddIbcChannel {
@@ -277,9 +264,21 @@ pub fn execute(
         ExecuteMsg::RemoveIbcChannel { ibc_channel_id } => {
             execute::remove_ibc_channel(deps, info, ibc_channel_id)
         }
+        ExecuteMsg::Unbond { amount, recipient } => {
+            execute::unbond(deps, env, info, amount, recipient)
+        }
+        ExecuteMsg::SlashBatch {
+            new_received_amounts,
+        } => execute::slash_batch(deps, env, info, new_received_amounts),
     }
 }
 
+/// Migrate contract
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::needless_pass_by_value)]
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     cw2::ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -347,7 +346,12 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
         .add_attribute("contract_name", CONTRACT_NAME))
 }
 
-/// Migrate the old unbond record to the new record with recipient and recipient_channel_id properties
+/// Migrate the old unbond record to the new record with recipient and `recipient_channel_id` properties
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+#[allow(clippy::needless_pass_by_value)]
 pub fn migrate_unbond_record_v0_1_163(
     storage: &mut dyn cosmwasm_std::Storage,
 ) -> Result<(), ContractError> {
@@ -424,5 +428,5 @@ fn test_migrate_unbond_record_v0_1_163() {
     assert_eq!(new_data.height, 1008);
     assert_eq!(new_data.recipient, None);
 
-    println!("{:#?}", new_data);
+    println!("{new_data:#?}");
 }

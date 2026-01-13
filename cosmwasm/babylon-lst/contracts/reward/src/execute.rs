@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
-    Uint128,
+    Addr, Attribute, BankMsg, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128,
+    attr,
 };
 
 use crate::{
@@ -11,6 +11,8 @@ use crate::{
     state::CONFIG,
 };
 
+/// Errors:
+/// - Returns `ContractError::NoBalance` when there is no available reward to split.
 pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
@@ -48,7 +50,7 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         attr("time", format!("{}", env.block.time.nanos())),
     ];
     let (redelegate, fee) =
-        helpers::split_revenue(balance_to_split, config.fee_rate, config.coin_denom);
+        helpers::split_revenue(balance_to_split, config.fee_rate, &config.coin_denom);
 
     // Send the fee to revenue receiver
     let bank_msg = CosmosMsg::Bank(BankMsg::Send {
@@ -81,6 +83,8 @@ pub fn split_reward(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
         .add_attributes(attrs))
 }
 
+/// Errors:
+/// - Returns `ContractError::InvalidFeeRate` when `fee_rate` is greater than one.
 pub fn set_config(
     deps: DepsMut,
     _env: Env,
@@ -104,7 +108,7 @@ pub fn set_config(
         .unwrap_or(config.lst_contract_address);
     config.fee_receiver = fee_receiver.clone().unwrap_or(config.fee_receiver);
     config.fee_rate = fee_rate.unwrap_or(config.fee_rate);
-    config.coin_denom = coin_denom.clone().unwrap_or(config.coin_denom);
+    config.coin_denom = coin_denom.unwrap_or(config.coin_denom);
     CONFIG.save(deps.storage, &config)?;
 
     let event = UpdateConfigEvent(
@@ -125,6 +129,8 @@ pub fn set_config(
     Ok(Response::new().add_attributes(attrs).add_event(event))
 }
 
+/// Errors:
+/// - Returns `ContractError::NoBalance` when there is no available balance to transfer.
 pub fn transfer_to_owner(
     deps: DepsMut,
     env: Env,

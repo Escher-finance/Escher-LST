@@ -33,6 +33,7 @@ pub struct Batch {
 // Batch should always be constructed with a pending status
 // Contract: Caller determines batch data
 impl Batch {
+    #[must_use]
     pub fn new(id: u64, total_liquid_stake: Uint128, est_next_batch_action: u64) -> Self {
         Self {
             id,
@@ -47,20 +48,12 @@ impl Batch {
     pub fn update_status(&mut self, new_status: BatchStatus, next_action_time: Option<u64>) {
         // Defined by caller - env.block.time + batch period
         match new_status {
-            BatchStatus::Pending => {
-                self.status = new_status;
-                self.next_batch_action_time = next_action_time;
-            }
             // Defined by caller - env.block.time + unbonding period
-            BatchStatus::Submitted => {
+            BatchStatus::Pending | BatchStatus::Submitted => {
                 self.status = new_status;
                 self.next_batch_action_time = next_action_time;
             }
-            BatchStatus::Received => {
-                self.status = new_status;
-                self.next_batch_action_time = None;
-            }
-            BatchStatus::Released => {
+            BatchStatus::Received | BatchStatus::Released => {
                 self.status = new_status;
                 self.next_batch_action_time = None;
             }
@@ -83,7 +76,7 @@ pub struct BatchIndexes<'a> {
     pub status: MultiIndex<'a, String, Batch, u64>,
 }
 
-impl<'a> IndexList<Batch> for BatchIndexes<'a> {
+impl IndexList<Batch> for BatchIndexes<'_> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<Batch>> + '_> {
         let v: Vec<&dyn Index<Batch>> = vec![&self.status];
         Box::new(v.into_iter())
@@ -92,6 +85,7 @@ impl<'a> IndexList<Batch> for BatchIndexes<'a> {
 
 const BATCH_NAMESPACE: &str = "batch";
 
+#[must_use]
 pub fn batches<'a>() -> IndexedMap<u64, Batch, BatchIndexes<'a>> {
     let indexes = BatchIndexes {
         status: MultiIndex::new(

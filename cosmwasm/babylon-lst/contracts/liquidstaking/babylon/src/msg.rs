@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint128, Uint256, Uint64};
+use cosmwasm_schema::{QueryResponses, cw_serde};
+use cosmwasm_std::{Addr, Coin, Decimal, Timestamp, Uint64, Uint128, Uint256};
+use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use cw2::ContractVersion;
 use cw20::Cw20ReceiveMsg;
-use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use serde::{Deserialize, Serialize};
 use unionlabs_primitives::{Bytes, H256};
 
@@ -91,19 +91,56 @@ pub enum Cw20PayloadMsg {
     },
 }
 
+#[cw_serde]
+pub enum RecipientAction {
+    Bond,
+    Unbond,
+}
+
+impl std::fmt::Display for RecipientAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RecipientAction::Bond => write!(f, "Bond"),
+            RecipientAction::Unbond => write!(f, "Unbond"),
+        }
+    }
+}
+
+#[cw_serde]
+pub enum Recipient {
+    OnChain {
+        address: Addr,
+    },
+    Zkgm {
+        address: String,
+        channel_id: u32,
+    },
+    Ibc {
+        address: String,
+        ibc_channel_id: String,
+    },
+}
+
 #[cw_ownable_execute]
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
 pub enum ExecuteMsg {
     /// Delegate native denom `amount` to validator
-    /// Issue `amount` / exchange_rate for the user.
+    /// Issue `amount` / `exchange_rate` for the user.
     Bond {
         slippage: Option<Decimal>,
         expected: Uint128,
         recipient: Option<String>,
         recipient_channel_id: Option<u32>,
         salt: Option<String>,
+    },
+    // Delegate native denom `amount` to validator
+    // Issue liquid staking token and send to mint_to_address.
+    BondV2 {
+        slippage: Option<Decimal>,
+        min_mint_amount: Uint128,
+        mint_to_address: Addr,
     },
     /// Receive liquid staking cw20 token denom then undelegate native denom according exchange rate from validator
     Receive(Cw20ReceiveMsg),
@@ -148,16 +185,6 @@ pub enum ExecuteMsg {
     UpdateValidators {
         validators: Vec<Validator>,
     },
-    OnZkgm {
-        caller: Addr,
-        path: Uint256,
-        source_channel_id: ChannelId,
-        destination_channel_id: ChannelId,
-        sender: Bytes,
-        message: Bytes,
-        relayer: Addr,
-        relayer_msg: Bytes,
-    },
     /// Redelegate some amount that is called from reward contract as result of split reward call to reward contract
     Redelegate {},
     /// Call migrate to reward contract
@@ -165,17 +192,17 @@ pub enum ExecuteMsg {
         code_id: u64,
     },
     SplitReward {},
-    SetConfig {
-        lst_contract_address: Option<Addr>,
-        fee_receiver: Option<Addr>,
-        fee_rate: Option<Decimal>,
-        coin_denom: Option<String>,
-    },
     SetStatus(Status),
-    SetChain {
-        chain: crate::state::Chain,
+    SetBondChain {
+        chain: crate::state::ZkgmChain,
     },
-    RemoveChain {
+    SetUnbondChain {
+        chain: crate::state::ZkgmChain,
+    },
+    RemoveBondChain {
+        channel_id: u32,
+    },
+    RemoveUnbondChain {
         channel_id: u32,
     },
     NormalizeReward {},
@@ -189,11 +216,29 @@ pub enum ExecuteMsg {
     RemoveIbcChannel {
         ibc_channel_id: String,
     },
+    Unbond {
+        amount: Uint128,
+        recipient: Recipient,
+    },
+    SlashBatch {
+        new_received_amounts: Vec<BatchReceivedAmount>,
+    },
+}
+
+#[cw_serde]
+pub struct BatchReceivedAmount {
+    pub id: u64,
+    pub received: Uint128,
 }
 
 #[cw_serde]
 pub struct Balance {
     pub amount: Uint128,
+}
+
+#[cw_serde]
+pub struct GitInfo {
+    pub rev: String,
 }
 
 #[cw_ownable_query]
@@ -226,6 +271,8 @@ pub enum QueryMsg {
     },
     #[returns(ContractVersion)]
     Version {},
+    #[returns(GitInfo)]
+    GitInfo {},
     #[returns(QuoteToken)]
     QuoteToken { channel_id: u32 },
     #[returns(Vec<Batch>)]
@@ -241,8 +288,10 @@ pub enum QueryMsg {
     Status {},
     #[returns(Vec<cosmwasm_std::FullDelegation>)]
     Delegations {},
-    #[returns(Vec<crate::state::Chain>)]
-    Chains {},
+    #[returns(Vec<crate::state::ZkgmChain>)]
+    BondChains {},
+    #[returns(Vec<crate::state::ZkgmChain>)]
+    UnbondChains {},
     #[returns(Vec<crate::state::WithdrawRewardQueue>)]
     RewardQueue {},
     #[returns(Vec<IBCChannel>)]
@@ -347,6 +396,8 @@ pub enum ZkgmMessage {
 
 #[cw_serde]
 pub struct BondData {
+    pub denom: String,
+    pub bond_amount: Uint128,
     pub mint_amount: Uint128,
     pub delegated_amount: Uint128,
     pub total_bond_amount: Uint128,
@@ -354,6 +405,7 @@ pub struct BondData {
     pub total_supply: Uint128,
     pub reward_balance: Uint128,
     pub unclaimed_reward: Uint128,
+    pub cw20_address: String,
 }
 
 #[cw_serde]
@@ -381,11 +433,9 @@ pub struct RewardMigrateMsg {}
 pub struct IBCCallbackPayload {
     pub amount: Uint128,
     pub slippage: Option<Decimal>,
-    pub expected: Uint128,
+    pub min_mint_amount: Uint128,
     pub salt: String,
-    pub recipient: String,
-    pub recipient_channel_id: Option<u32>,
-    pub transfer_fee: Option<Uint128>,
+    pub recipient: Recipient,
 }
 
 pub struct InjectData {
@@ -407,4 +457,23 @@ pub struct IBCChannel {
 #[cw_serde]
 pub struct IbcChannelId {
     pub channel_id: String,
+}
+
+#[cw_serde]
+pub struct LiquidityState {
+    pub assets: Uint128, // delegated + erward
+    pub delegated: Uint128,
+    pub reward_balance: Uint128,
+    pub unclaimed_reward: Uint128,
+    pub exchange_rate: Decimal,
+}
+
+#[cw_serde]
+pub struct ZkgmTransfer {
+    pub sender: String,
+    pub amount: Uint128,
+    pub recipient: String,
+    pub recipient_channel_id: u32,
+    pub salt: String,
+    pub time: Timestamp,
 }

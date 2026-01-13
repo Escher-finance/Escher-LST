@@ -1,5 +1,6 @@
 use cosmwasm_std::StdError;
 use cw_ownable::OwnershipError;
+use cw_utils::PaymentError;
 use thiserror::Error;
 
 use crate::utils::batch::BatchStatus;
@@ -134,7 +135,7 @@ pub enum ContractError {
     #[error("invalid/unsupported recipient ibc channel id")]
     InvalidIBCChannelId {},
 
-    #[error("invalid {kind} address: {address} because: {reason}")]
+    #[error("invalid {kind} address/hex: {address} because: {reason}")]
     InvalidAddress {
         kind: String,
         address: String,
@@ -146,4 +147,44 @@ pub enum ContractError {
 
     #[error("recipient ibc channel id not found for unbond record with id: {id}")]
     UnbondRecordIbcChannelNotFound { id: u64 },
+
+    #[error("batch next action time is not set")]
+    BatchNextActionTimeNotSet,
+
+    #[error("batch expected native unstaked is not set")]
+    BatchExpectedNativeUnstakedNotSet,
+
+    #[error("invalid undelegation unstake return native amount")]
+    InvalidUnstakeReturnNativeAmount,
+
+    #[error("no salt")]
+    NoSalt,
+
+    #[error("invalid salt")]
+    InvalidSalt(#[from] unionlabs_primitives::encoding::HexPrefixedFromStrError),
+
+    #[error("batch received amount: {received_amount} exceed {expected_native_unstaked}")]
+    SlashBatchReceivedAmountExceedExpected {
+        batch_id: u64,
+        received_amount: cosmwasm_std::Uint128,
+        expected_native_unstaked: cosmwasm_std::Uint128,
+    },
+
+    #[error("unsupported operation: {msg}")]
+    UnsupportedOperation { msg: String },
+
+    #[error("insufficient allowance, {allowance} is lower than {required}")]
+    InsufficientAllowance {
+        allowance: cosmwasm_std::Uint128,
+        required: cosmwasm_std::Uint128,
+    },
+
+    #[error(transparent)]
+    Payment(#[from] PaymentError),
+
+    #[error("unsupported recipient type: {recipient_type} on {action}")]
+    InvalidRecipient {
+        recipient_type: String,
+        action: String,
+    },
 }
