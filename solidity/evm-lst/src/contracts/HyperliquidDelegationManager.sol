@@ -121,6 +121,8 @@ contract HyperliquidDelegationManager is
         for (uint256 i = 0; i < totalValidators; i++) {
             CoreWriterLib.delegateToken(validatorAddresses[i], amounts[i], false);
         }
+
+        emit Delegated(msg.sender, amount);
     }
 
     function undelegate(uint256 coreAmount) external nonReentrant {
@@ -141,6 +143,8 @@ contract HyperliquidDelegationManager is
             // Withdraw the tokens from staking balance to core balances
             CoreWriterLib.withdrawStake(amounts[i]);
         }
+
+        emit Undelegated(msg.sender, amount);
     }
 
     function delegationSummary() external view returns (DelegatorSummary memory) {
@@ -164,6 +168,8 @@ contract HyperliquidDelegationManager is
 
         // redelegate to new validators set
         _redelegate();
+
+        emit ValidatorsUpdated(newValidators, newWeights);
     }
 
     /**
@@ -258,6 +264,8 @@ contract HyperliquidDelegationManager is
         // Transfer from spot balance to evm
         uint64 hypeTokenIndex = HLConstants.hypeTokenIndex();
         CoreWriterLib.bridgeToEvm(hypeTokenIndex, batchAssets, true);
+
+        emit BatchMoved(batchAssets);
     }
 
     function receiveBatch(uint256 batchAssets) external nonReentrant {
@@ -266,6 +274,8 @@ contract HyperliquidDelegationManager is
         // Transfer unbonded assets to liquid staking manager
         (bool success,) = payable(msg.sender).call{value: batchAssets}("");
         require(success, "transfer to receive batch failed");
+
+        emit BatchReceived(batchAssets);
     }
 
     receive() external payable {}

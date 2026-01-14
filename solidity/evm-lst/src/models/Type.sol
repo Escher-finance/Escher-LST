@@ -23,3 +23,14 @@ struct Rate {
     uint256 bondRate;
     uint256 unbondRate;
 }
+
+struct InitializeLstManagerPayload {
+    string chainName;
+    address initialOwner;
+    address lstAddress;
+    address delegationManagerAddress;
+    uint256 minBondAmount;
+    uint256 minUnbondAmount;
+    uint64 batchPeriodSeconds;
+    uint64 undelegatePeriodSeconds;
+}

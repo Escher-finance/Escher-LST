@@ -6,10 +6,15 @@ import {DelegatorSummary} from "../models/Type.sol";
 /// @dev Interface of the IDelegationManager that handles delegation and undelegation
 interface IDelegationManager {
     error EmptyValidatorSet();
+    error FailedDelegation();
+    error FailedUndelegation();
 
     // Events
     event Delegated(address indexed sender, uint256 amount);
     event Undelegated(address indexed sender, uint256 amount);
+    event ValidatorsUpdated(address[] validators, uint64[] weights);
+    event BatchMoved(uint256 assets);
+    event BatchReceived(uint256 assets);
 
     function setLiquidStakingManager(address _manager) external;
 

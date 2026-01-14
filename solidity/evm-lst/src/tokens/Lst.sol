@@ -13,7 +13,7 @@ contract Lst is Initializable, ERC20Upgradeable, Ownable2StepUpgradeable, ERC20P
         _disableInitializers();
     }
 
-    function initialize(address initialOwner, string calldata name, string calldata symbol) public initializer {
+    function initialize(address initialOwner, string calldata name, string calldata symbol) external initializer {
         __Ownable_init(initialOwner);
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);

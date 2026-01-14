@@ -141,6 +141,8 @@ contract StablechainDelegationManager is
         if (!successDelegation) {
             revert FailedDelegation();
         }
+
+        emit Delegated(msg.sender, amount);
     }
 
     function undelegate(uint256 amount) external nonReentrant {
@@ -172,6 +174,8 @@ contract StablechainDelegationManager is
         if (!successUndelegation) {
             revert FailedUndelegation();
         }
+
+        emit Undelegated(msg.sender, amount);
     }
 
     function delegationSummary() external view returns (DelegatorSummary memory) {
@@ -202,16 +206,18 @@ contract StablechainDelegationManager is
         });
     }
 
-    function updateValidators(address[] calldata _validators, uint64[] calldata _weights)
+    function updateValidators(address[] calldata newValidators, uint64[] calldata newWeights)
         external
         nonReentrant
         onlyOwner
     {
         // update validators with new weights
-        validatorManager.updateValidators(_validators, _weights);
+        validatorManager.updateValidators(newValidators, newWeights);
 
         // redelegate to new validators set
         _redelegate();
+
+        emit ValidatorsUpdated(newValidators, newWeights);
     }
 
     /**
@@ -302,6 +308,8 @@ contract StablechainDelegationManager is
         // Transfer unbonded assets to liquid staking manager
         (bool success,) = payable(msg.sender).call{value: batchAssets}("");
         require(success, "transfer failed");
+
+        emit BatchReceived(batchAssets);
     }
 
     function moveBatch(uint256 batchAssets) external nonReentrant {
@@ -310,5 +318,7 @@ contract StablechainDelegationManager is
         // Transfer unbonded assets to liquid staking manager
         (bool success,) = payable(msg.sender).call{value: batchAssets}("");
         require(success, "transfer failed");
+
+        emit BatchMoved(batchAssets);
     }
 }
