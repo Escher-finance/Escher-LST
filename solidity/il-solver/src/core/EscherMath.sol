@@ -153,6 +153,7 @@ library IlSolverMath {
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
 
         uint256 borrowedTokenScale = 10 ** (18 - borrowedTokenDecimals);
+        uint256 collateralTokenScale = 10 ** (18 - collateralTokenDecimals);
 
         // Binary search bounds
         uint256 borrowedAmountNeededNorm = borrowedAmountNeeded * borrowedTokenScale;
@@ -174,7 +175,12 @@ library IlSolverMath {
 
             // Test if this collateral amount is sufficient
             (, bool isEnough,,) = hedgingLoop(
-                mid, borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
+                mid / collateralTokenScale,
+                borrowedAmountNeeded,
+                borrowedTokenUsdPrice,
+                borrowedTokenDecimals,
+                collateralTokenDecimals,
+                ltv
             );
 
             if (isEnough) {
@@ -186,6 +192,6 @@ library IlSolverMath {
             }
         }
 
-        return result;
+        return result / collateralTokenScale;
     }
 }
