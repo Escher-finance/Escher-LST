@@ -14,6 +14,7 @@ import {IWETH} from "@common/IWETH.sol";
 import {ReserveConfiguration} from "aavev3/protocol/libraries/configuration/ReserveConfiguration.sol";
 import {IlSolverMath} from "./core/EscherMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 using ReserveConfiguration for DataTypes.ReserveConfigurationMap;
@@ -166,8 +167,12 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         uint256 borrowedAmountNeeded = delta0 < 0 ? (-delta0).toUint256() : 0;
         uint256 borrowedTokenUsdPrice = aaveOraclePrice(address(WETH));
         uint256 ltv = aavev3Ltv();
-        uint256 collateralAmountNeeded =
-            IlSolverMath.calculateCollateralAmount(borrowedAmountNeeded, borrowedTokenUsdPrice, ltv);
+
+        uint8 borrowedTokenDecimals = 18;
+        uint8 collateralTokenDecimals = IERC20Metadata(address(COLLATERAL)).decimals();
+        uint256 collateralAmountNeeded = IlSolverMath.calculateCollateralAmount(
+            borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
+        );
         emit AddLiquidityData(realSender, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv, collateralAmountNeeded);
 
         return (selector, delta);

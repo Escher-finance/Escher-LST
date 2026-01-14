@@ -11,35 +11,41 @@ library IlSolverMath {
     // 0.000001 tokens (in 18 decimals) = 1e12
     uint256 public constant TOKEN_AMOUNT_EPSILON = 0.000001 ether;
 
-    function _validInput(
-        uint256 collateralAmount,
+    modifier validBorrowedToken(
         uint256 borrowedAmountNeeded,
         uint256 borrowedTokenUsdPrice,
-        uint256 ltv
-    ) internal pure {
+        uint8 borrowedTokenDecimals
+    ) {
         if (
-            borrowedTokenUsdPrice == 0 || borrowedAmountNeeded == 0 || ltv == 0 || collateralAmount == 0
-                || ltv <= LTV_SAFTY_FACTOR
+            borrowedTokenUsdPrice == 0 || borrowedAmountNeeded == 0 || borrowedTokenDecimals == 0
+                || borrowedTokenDecimals > 18
         ) {
             revert INVALID_INPUT();
         }
+        _;
     }
 
-    modifier validInput(
-        uint256 collateralAmount,
-        uint256 borrowedAmountNeeded,
-        uint256 borrowedTokenUsdPrice,
-        uint256 ltv
-    ) {
-        _validInput(collateralAmount, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv);
+    modifier validCollateralToken(uint256 collateralAmount, uint8 collateralTokenDecimals) {
+        if (collateralAmount == 0 || collateralTokenDecimals == 0 || collateralTokenDecimals > 18) {
+            revert INVALID_INPUT();
+        }
+        _;
+    }
+
+    modifier validLtv(uint256 ltv) {
+        if (ltv <= LTV_SAFTY_FACTOR) {
+            revert INVALID_INPUT();
+        }
         _;
     }
 
     /**
      * @dev This function is used to calculate the number of iterations needed to reach the borrowed amount needed.
-     * @param collateralAmount The amount of collateral to be used in token decimals (1e18).
-     * @param borrowedAmountNeeded The amount of borrowed tokens needed token decimals (1e18).
-     * @param borrowedTokenUsdPrice The price of the borrowed token in USD token decimals (1e18).
+     * @param collateralAmount The amount of collateral to be used; price must equal 1 USD.
+     * @param borrowedAmountNeeded The amount of borrowed tokens needed token (18 decimals).
+     * @param borrowedTokenUsdPrice The price of the borrowed token in USD (18 decimals).
+     * @param borrowedTokenDecimals The number of decimals of the borrowed token; must be between 1 and 18.
+     * @param collateralTokenDecimals The number of decimals of the collateral token; must be between 1 and 18.
      * @param ltv The LTV of the collateral in 1e16.
      * @return iterations The number of iterations needed to reach the borrowed amount needed.
      *  After n loops starting with L_0 collateral:
@@ -50,23 +56,32 @@ library IlSolverMath {
         uint256 collateralAmount,
         uint256 borrowedAmountNeeded,
         uint256 borrowedTokenUsdPrice,
+        uint8 borrowedTokenDecimals,
+        uint8 collateralTokenDecimals,
         uint256 ltv
     )
         internal
         pure
-        validInput(collateralAmount, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv)
+        validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals)
+        validCollateralToken(collateralAmount, collateralTokenDecimals)
+        validLtv(ltv)
         returns (uint256 iterations, bool isEnough, uint256 totalBorrowedToken, uint256 ltvUsed)
     {
         isEnough = false;
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
+        uint256 borrowedTokenScale = 10 ** (18 - borrowedTokenDecimals);
+        uint256 collateralTokenScale = 10 ** (18 - collateralTokenDecimals);
+
+        // Normalized amount to 18 decimals
+        uint256 borrowedAmountNeededNorm = borrowedAmountNeeded * borrowedTokenScale;
 
         // Calculate target USD value once to avoid rounding errors in comparison
-        uint256 targetBorrowUsd = Math.mulDiv(borrowedAmountNeeded, borrowedTokenUsdPrice, 1e18);
+        uint256 targetBorrowUsd = Math.mulDiv(borrowedAmountNeededNorm, borrowedTokenUsdPrice, 1e18);
 
         // Track total collateral and borrow amounts in Usd (1e18 scale) and tokens.
-        uint256 collateralUsd = collateralAmount;
+        uint256 collateralUsd = collateralAmount * collateralTokenScale;
         uint256 totalBorrowedUsd = 0;
-        totalBorrowedToken = 0;
+        uint256 totalBorrowedTokenNorm = 0;
 
         for (uint256 i = 0; i < MAX_LOOP_ITERATIONS; ++i) {
             // Maximum borrowable Usd at this collateral level.
@@ -86,19 +101,20 @@ library IlSolverMath {
             uint256 borrowThisLoopToken = Math.mulDiv(borrowThisLoopUsd, 1e18, borrowedTokenUsdPrice);
 
             totalBorrowedUsd += borrowThisLoopUsd;
-            totalBorrowedToken += borrowThisLoopToken;
+            totalBorrowedTokenNorm += borrowThisLoopToken;
             collateralUsd += borrowThisLoopUsd; // borrowed funds are re-deposited as collateral
 
             // Check if we've reached the target using token amount with epsilon tolerance
             // This accounts for rounding errors from USD->token conversions
-            // We check if totalBorrowedToken >= borrowedAmountNeeded - epsilon
+            // We check if totalBorrowedTokenNorm >= borrowedAmountNeededNorm - epsilon
             // This means we're within epsilon of the target (or above it)
-            if (totalBorrowedToken + TOKEN_AMOUNT_EPSILON >= borrowedAmountNeeded) {
+            if (totalBorrowedTokenNorm + TOKEN_AMOUNT_EPSILON >= borrowedAmountNeededNorm) {
                 isEnough = true;
                 // Calculate fractional iterations (in 1e18 scale)
                 // iterations = completed full iterations + (partial amount borrowed / max could borrow)
                 uint256 fractionOfIteration = Math.mulDiv(borrowThisLoopUsd, 1e18, remainingCapacityUsd);
                 iterations = (i * 1e18) + fractionOfIteration;
+                totalBorrowedToken = totalBorrowedTokenNorm / borrowedTokenScale;
                 return (iterations, isEnough, totalBorrowedToken, ltvUsed);
             }
 
@@ -107,6 +123,7 @@ library IlSolverMath {
         }
 
         if (iterations == MAX_LOOP_ITERATIONS * 1e18) revert MAX_LOOP_ITERATIONS_REACHED();
+        totalBorrowedToken = totalBorrowedTokenNorm / borrowedTokenScale;
         return (iterations, isEnough, totalBorrowedToken, 0);
     }
 
@@ -114,25 +131,32 @@ library IlSolverMath {
      * @dev This function uses binary search to find the minimum collateral needed to reach the borrowed amount needed.
      * @param borrowedAmountNeeded The amount of borrowed tokens needed token decimals (1e18).
      * @param borrowedTokenUsdPrice The price of the borrowed token in USD token decimals (1e18).
+     * @param borrowedTokenDecimals The number of decimals of the borrowed token; must be between 1 and 18.
+     * @param collateralTokenDecimals The number of decimals of the collateral token; must be between 1 and 18.
      * @param ltv The LTV of the collateral in 1e16.
      * @return collateralAmountNeeded The minimum amount of collateral needed to reach the borrowed amount needed.
      *
      */
-    function calculateCollateralAmount(uint256 borrowedAmountNeeded, uint256 borrowedTokenUsdPrice, uint256 ltv)
+    function calculateCollateralAmount(
+        uint256 borrowedAmountNeeded,
+        uint256 borrowedTokenUsdPrice,
+        uint8 borrowedTokenDecimals,
+        uint8 collateralTokenDecimals,
+        uint256 ltv
+    )
         internal
         pure
+        validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals)
+        validLtv(ltv)
         returns (uint256 collateralAmountNeeded)
     {
-        // Manual input validation (can't use modifier since collateral is unknown)
-        if (borrowedTokenUsdPrice == 0 || borrowedAmountNeeded == 0 || ltv == 0) {
-            revert INVALID_INPUT();
-        }
-        if (ltv <= LTV_SAFTY_FACTOR) revert INVALID_INPUT();
-
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
 
+        uint256 borrowedTokenScale = 10 ** (18 - borrowedTokenDecimals);
+
         // Binary search bounds
-        uint256 borrowedUsd = Math.mulDiv(borrowedAmountNeeded, borrowedTokenUsdPrice, 1e18);
+        uint256 borrowedAmountNeededNorm = borrowedAmountNeeded * borrowedTokenScale;
+        uint256 borrowedUsd = Math.mulDiv(borrowedAmountNeededNorm, borrowedTokenUsdPrice, 1e18);
 
         // Lower bound: We're limited to MAX_LOOP_ITERATIONS, so can't reach theoretical infinite minimum
         // Use a more realistic lower bound: ~half of what we'd need with just one iteration
@@ -149,7 +173,9 @@ library IlSolverMath {
             uint256 mid = (low + high) / 2;
 
             // Test if this collateral amount is sufficient
-            (, bool isEnough,,) = hedgingLoop(mid, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv);
+            (, bool isEnough,,) = hedgingLoop(
+                mid, borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
+            );
 
             if (isEnough) {
                 result = mid;
