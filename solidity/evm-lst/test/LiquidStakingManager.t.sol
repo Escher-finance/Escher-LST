@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test, console} from "forge-std/Test.sol";
 import {LiquidStakingManager} from "../src/contracts/LiquidStakingManager.sol";
 import {Lst} from "../src/tokens/Lst.sol";
-import {DelegatorSummary} from "../src/models/Type.sol";
+import {DelegatorSummary, InitializeLstManagerPayload} from "../src/models/Type.sol";
 import {HyperliquidDelegationManager} from "../src/contracts/HyperliquidDelegationManager.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {DelegationManagerMock} from "./mocks/DelegationManagerMock.sol";
@@ -33,9 +33,17 @@ contract LiquidStakingManagerTest is Test {
         delegationManager = new DelegationManagerMock();
 
         address _delegationManager = address(delegationManager);
-
-        bytes memory initLstManagerData =
-            abi.encodeCall(LiquidStakingManager.initialize, ("hyperliquid", bob, address(lst), _delegationManager));
+        InitializeLstManagerPayload memory payload = InitializeLstManagerPayload({
+            chainName: "hyperliquid",
+            initialOwner: bob,
+            lstAddress: address(lst),
+            delegationManagerAddress: _delegationManager,
+            minBondAmount: 1000 * CORE_TO_EVM,
+            minUnbondAmount: 1000 * CORE_TO_EVM,
+            batchPeriodSeconds: 300,
+            undelegatePeriodSeconds: 300
+        });
+        bytes memory initLstManagerData = abi.encodeCall(LiquidStakingManager.initialize, (payload));
         ERC1967Proxy lstManagerProxy = new ERC1967Proxy(address(liquidStakingManagerImpl), initLstManagerData);
 
         liquidStakingManager = LiquidStakingManager(payable(address(lstManagerProxy)));
