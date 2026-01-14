@@ -11,21 +11,8 @@ library IlSolverMath {
     // 0.000001 tokens (in 18 decimals) = 1e12
     uint256 public constant TOKEN_AMOUNT_EPSILON = 0.000001 ether;
 
-    function _validBorrowedToken(
-        uint256 borrowedAmountNeeded,
-        uint256 borrowedTokenUsdPrice,
-        uint8 borrowedTokenDecimals
-    ) internal pure {
-        if (
-            borrowedTokenUsdPrice == 0 || borrowedAmountNeeded == 0 || borrowedTokenDecimals == 0
-                || borrowedTokenDecimals > 18
-        ) {
-            revert INVALID_INPUT();
-        }
-    }
-
-    function _validCollateralToken(uint256 collateralAmount, uint8 collateralTokenDecimals) internal pure {
-        if (collateralAmount == 0 || collateralTokenDecimals == 0 || collateralTokenDecimals > 18) {
+    function _nonZeroAmount(uint256 amount) internal pure {
+        if (amount == 0) {
             revert INVALID_INPUT();
         }
     }
@@ -36,22 +23,24 @@ library IlSolverMath {
         }
     }
 
-    modifier validBorrowedToken(
-        uint256 borrowedAmountNeeded,
-        uint256 borrowedTokenUsdPrice,
-        uint8 borrowedTokenDecimals
-    ) {
-        _validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals);
-        _;
+    function _validDecimals(uint8 decimals) internal pure {
+        if (decimals == 0 || decimals > 18) {
+            revert INVALID_INPUT();
+        }
     }
 
-    modifier validCollateralToken(uint256 collateralAmount, uint8 collateralTokenDecimals) {
-        _validCollateralToken(collateralAmount, collateralTokenDecimals);
+    modifier nonZeroAmount(uint256 amount) {
+        _nonZeroAmount(amount);
         _;
     }
 
     modifier validLtv(uint256 ltv) {
         _validLtv(ltv);
+        _;
+    }
+
+    modifier validDecimals(uint8 decimals) {
+        _validDecimals(decimals);
         _;
     }
 
@@ -78,8 +67,11 @@ library IlSolverMath {
     )
         internal
         pure
-        validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals)
-        validCollateralToken(collateralAmount, collateralTokenDecimals)
+        nonZeroAmount(collateralAmount)
+        nonZeroAmount(borrowedAmountNeeded)
+        nonZeroAmount(borrowedTokenUsdPrice)
+        validDecimals(borrowedTokenDecimals)
+        validDecimals(collateralTokenDecimals)
         validLtv(ltv)
         returns (uint256 iterations, bool isEnough, uint256 totalBorrowedToken, uint256 ltvUsed)
     {
@@ -162,7 +154,10 @@ library IlSolverMath {
     )
         internal
         pure
-        validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals)
+        nonZeroAmount(borrowedAmountNeeded)
+        nonZeroAmount(borrowedTokenUsdPrice)
+        validDecimals(borrowedTokenDecimals)
+        validDecimals(collateralTokenDecimals)
         validLtv(ltv)
         returns (uint256 collateralAmountNeeded)
     {
