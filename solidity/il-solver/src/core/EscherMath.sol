@@ -11,31 +11,47 @@ library IlSolverMath {
     // 0.000001 tokens (in 18 decimals) = 1e12
     uint256 public constant TOKEN_AMOUNT_EPSILON = 0.000001 ether;
 
-    modifier validBorrowedToken(
+    function _validBorrowedToken(
         uint256 borrowedAmountNeeded,
         uint256 borrowedTokenUsdPrice,
         uint8 borrowedTokenDecimals
-    ) {
+    ) internal pure {
         if (
             borrowedTokenUsdPrice == 0 || borrowedAmountNeeded == 0 || borrowedTokenDecimals == 0
                 || borrowedTokenDecimals > 18
         ) {
             revert INVALID_INPUT();
         }
+    }
+
+    function _validCollateralToken(uint256 collateralAmount, uint8 collateralTokenDecimals) internal pure {
+        if (collateralAmount == 0 || collateralTokenDecimals == 0 || collateralTokenDecimals > 18) {
+            revert INVALID_INPUT();
+        }
+    }
+
+    function _validLtv(uint256 ltv) internal pure {
+        if (ltv <= LTV_SAFTY_FACTOR) {
+            revert INVALID_INPUT();
+        }
+    }
+
+    modifier validBorrowedToken(
+        uint256 borrowedAmountNeeded,
+        uint256 borrowedTokenUsdPrice,
+        uint8 borrowedTokenDecimals
+    ) {
+        _validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals);
         _;
     }
 
     modifier validCollateralToken(uint256 collateralAmount, uint8 collateralTokenDecimals) {
-        if (collateralAmount == 0 || collateralTokenDecimals == 0 || collateralTokenDecimals > 18) {
-            revert INVALID_INPUT();
-        }
+        _validCollateralToken(collateralAmount, collateralTokenDecimals);
         _;
     }
 
     modifier validLtv(uint256 ltv) {
-        if (ltv <= LTV_SAFTY_FACTOR) {
-            revert INVALID_INPUT();
-        }
+        _validLtv(ltv);
         _;
     }
 
