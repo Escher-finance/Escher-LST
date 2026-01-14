@@ -31,21 +31,21 @@ contract HyperliquidDelegationManager is
         _disableInitializers();
     }
 
-    function initialize(address owner, address validatorManagerAddr) public initializer {
+    function initialize(address owner, address validatorManagerAddr) external initializer {
         // Checks that the initialOwner address is not zero.
         require(owner != address(0), "owner zero address");
         require(validatorManagerAddr != address(0), "validator manager zero address");
         __Ownable_init(owner);
         __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, owner);
-        _grantRole(MANAGER_ROLE, owner);
+        require(_grantRole(DEFAULT_ADMIN_ROLE, owner), "failed to grant admin role");
         validatorManager = IValidatorSetManager(validatorManagerAddr);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function setLiquidStakingManager(address _manager) external onlyOwner {
-        _grantRole(MANAGER_ROLE, _manager);
+    function setLiquidStakingManager(address manager) external onlyOwner {
+        require(manager != address(0), "manager zero address");
+        require(_grantRole(MANAGER_ROLE, manager), "failed to grant manager role");
     }
 
     function active() external view returns (bool) {

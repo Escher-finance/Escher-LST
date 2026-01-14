@@ -5,7 +5,7 @@ import {ILiquidStakingManager} from "../interfaces/ILiquidStakingManager.sol";
 import {IDelegationManager} from "../interfaces/IDelegationManager.sol";
 import {Lst} from "../tokens/Lst.sol";
 import {Config, Liquidity, BatchStatus, UnbondRequest, UnbondBatch} from "../models/State.sol";
-import {DelegatorSummary, Rate} from "../models/Type.sol";
+import {DelegatorSummary, Rate, InitializeLstManagerPayload} from "../models/Type.sol";
 
 import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
@@ -48,28 +48,23 @@ contract LiquidStakingManager is
         _disableInitializers();
     }
 
-    function initialize(
-        string calldata chainName,
-        address initialOwner,
-        address lstAddress,
-        address delegationManagerAddress
-    ) public initializer {
+    function initialize(InitializeLstManagerPayload calldata payload) external initializer {
         // Checks that the initialOwner address is not zero.
-        require(initialOwner != address(0), "owner zero address");
+        require(payload.initialOwner != address(0), "owner zero address");
         // Checks that the lst address is not zero.
-        require(lstAddress != address(0), "lstAddress zero address");
+        require(payload.lstAddress != address(0), "lstAddress zero address");
         // Checks that the delegation manager address is not zero.
-        require(delegationManagerAddress != address(0), "delegation manager zero address");
-        __Ownable_init(initialOwner);
-        share = Lst(lstAddress);
-        delegationManager = IDelegationManager(delegationManagerAddress);
+        require(payload.delegationManagerAddress != address(0), "delegation manager zero address");
+        __Ownable_init(payload.initialOwner);
+        share = Lst(payload.lstAddress);
+        delegationManager = IDelegationManager(payload.delegationManagerAddress);
 
         s_config = Config({
-            chainName: chainName,
-            minBondAmount: 1000 * CORE_TO_EVM,
-            minUnbondAmount: 1000 * CORE_TO_EVM,
-            batchPeriodSeconds: 300,
-            undelegatePeriodSeconds: 300
+            chainName: payload.chainName,
+            minBondAmount: payload.minBondAmount,
+            minUnbondAmount: payload.minUnbondAmount,
+            batchPeriodSeconds: payload.batchPeriodSeconds,
+            undelegatePeriodSeconds: payload.undelegatePeriodSeconds
         });
         s_liquidity = Liquidity({totalDelegated: 0, totalLst: 0});
 
@@ -364,9 +359,9 @@ contract LiquidStakingManager is
 
         for (uint256 i = totalUserRequests; i > 0; i--) {
             uint256 requestId = userRequests[i - 1];
-            UnbondRequest storage request = s_unbondRequests[requestId];
+            UnbondRequest memory request = s_unbondRequests[requestId];
 
-            UnbondBatch storage batch = s_batches[request.batchId];
+            UnbondBatch memory batch = s_batches[request.batchId];
 
             // Skip if batch is not yet received
             if (batch.status != BatchStatus.Received) {
@@ -376,9 +371,6 @@ contract LiquidStakingManager is
             // Calculate the user's share of assets
             uint256 userAssets = (request.shares * batch.totalAssets) / batch.totalShares;
 
-            // Store recipient before deleting
-            address recipient = request.sender;
-
             // Remove from user's request array (swap and pop)
             userRequests[i - 1] = userRequests[totalUserRequests - 1];
             userRequests.pop();
@@ -387,12 +379,12 @@ contract LiquidStakingManager is
             // Delete the request from storage
             delete s_unbondRequests[requestId];
 
-            // Transfer assets to recipient
-            (bool success,) = payable(recipient).call{value: totalTransfer}("");
-            require(success, "transfer failed");
-
-            emit UnbondClaimed(recipient, requestId, userAssets);
+            emit UnbondClaimed(msg.sender, requestId, userAssets);
         }
+
+        // Transfer assets to recipient
+        (bool success,) = payable(msg.sender).call{value: totalTransfer}("");
+        require(success, "transfer unbond claim failed");
     }
 
     /**

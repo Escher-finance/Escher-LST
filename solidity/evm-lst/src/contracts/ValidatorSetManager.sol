@@ -33,18 +33,18 @@ contract ValidatorSetManager is
         _disableInitializers();
     }
 
-    function initialize(address initialOwner) public initializer {
+    function initialize(address initialOwner) external initializer {
         // Checks that the initialOwner address is not zero.
         if (initialOwner == address(0)) revert InvalidAddress();
         __Ownable_init(initialOwner);
         __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+        require(_grantRole(DEFAULT_ADMIN_ROLE, initialOwner), "failed to grant admin role");
     }
 
     function setDelegationManager(address manager) external onlyOwner {
         // Checks that the manager address is not zero.
         require(manager != address(0), "manager zero address");
-        _grantRole(MANAGER_ROLE, manager);
+        require(_grantRole(MANAGER_ROLE, manager), "failed to grant manager role");
     }
 
     /**
@@ -73,13 +73,23 @@ contract ValidatorSetManager is
         // Clear array
         delete validators;
 
+        bool invalidAddress = false;
+        bool invalidWeight = false;
+
         // Add new validators
         for (uint256 i = 0; i < newLength;) {
             address validatorAddress = newValidators[i];
             uint64 weight = weights[i];
 
-            if (validatorAddress == address(0)) revert InvalidAddress();
-            if (weight == 0) revert InvalidWeight();
+            if (validatorAddress == address(0)) {
+                invalidAddress = true;
+                break;
+            }
+
+            if (weight == 0) {
+                invalidWeight = true;
+                break;
+            }
 
             validators.push(Validator({validator: validatorAddress, weight: weight}));
 
@@ -90,6 +100,9 @@ contract ValidatorSetManager is
                 ++i;
             }
         }
+
+        if (invalidAddress) revert InvalidAddress();
+        if (invalidWeight) revert InvalidWeight();
 
         emit ValidatorSetBatchUpdated(newLength);
     }

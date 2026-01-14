@@ -15,6 +15,7 @@ import "@openzeppelin-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract StablechainDelegationManager is
     IDelegationManager,
@@ -42,7 +43,7 @@ contract StablechainDelegationManager is
         _disableInitializers();
     }
 
-    function initialize(address owner, address _validatorManager, address _asset, address _share) public initializer {
+    function initialize(address owner, address _validatorManager, address _asset, address _share) external initializer {
         // Checks that the initialOwner address is not zero.
         require(owner != address(0), "owner zero address");
         require(_validatorManager != address(0), "validator manager zero address");
@@ -51,7 +52,7 @@ contract StablechainDelegationManager is
 
         __Ownable_init(owner);
         __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, owner);
+        require(_grantRole(DEFAULT_ADMIN_ROLE, owner), "failed to grant admin role");
         validatorManager = IValidatorSetManager(_validatorManager);
         staking = IStableStaking(PRECOMPILED_STAKING);
         distribution = IStableDistribution(PRECOMPILED_DISTRIBUTION);
@@ -61,8 +62,9 @@ contract StablechainDelegationManager is
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function setLiquidStakingManager(address _manager) external onlyOwner {
-        _grantRole(MANAGER_ROLE, _manager);
+    function setLiquidStakingManager(address manager) external onlyOwner {
+        require(manager != address(0), "manager zero address");
+        require(_grantRole(MANAGER_ROLE, manager), "failed to grant manager role");
     }
 
     function active() external view returns (bool) {
@@ -112,7 +114,7 @@ contract StablechainDelegationManager is
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
 
         // transfer required asset to delegate
-        asset.transfer(address(this), amount);
+        SafeERC20.safeTransfer(asset, address(this), amount);
 
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
@@ -126,10 +128,18 @@ contract StablechainDelegationManager is
             calculateStakeDistribution(coinAmount, validators);
 
         uint256 totalValidators = validatorAddresses.length;
+        bool successDelegation = true;
 
         for (uint256 i = 0; i < totalValidators; i++) {
             //delegate to validator according to weight
-            staking.delegate(delegatorAddress, validatorAddresses[i], amounts[i]);
+            successDelegation = staking.delegate(delegatorAddress, validatorAddresses[i], amounts[i]);
+            if (!successDelegation) {
+                break;
+            }
+        }
+
+        if (!successDelegation) {
+            revert FailedDelegation();
         }
     }
 
@@ -137,7 +147,7 @@ contract StablechainDelegationManager is
         require(hasRole(MANAGER_ROLE, msg.sender), "Caller is not a manager");
 
         // transfer required share/liquid staking token to undelegate
-        share.transfer(address(this), amount);
+        SafeERC20.safeTransfer(share, address(this), amount);
 
         // get validators
         Validator[] memory validators = validatorManager.getAllValidators();
@@ -149,13 +159,19 @@ contract StablechainDelegationManager is
 
         uint256 totalValidators = validatorAddresses.length;
         address delegatorAddress = address(this);
+
+        bool successUndelegation = true;
         for (uint256 i = 0; i < totalValidators; i++) {
             // undelegate from validator according to weight
-            staking.undelegate(delegatorAddress, validatorAddresses[i], amounts[i]);
+            successUndelegation = staking.undelegate(delegatorAddress, validatorAddresses[i], amounts[i]);
+            if (!successUndelegation) {
+                break;
+            }
         }
 
-        // burn after it is undelegated
-        // share.burn(amount);
+        if (!successUndelegation) {
+            revert FailedUndelegation();
+        }
     }
 
     function delegationSummary() external view returns (DelegatorSummary memory) {
