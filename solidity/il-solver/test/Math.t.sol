@@ -311,13 +311,17 @@ contract IlSolverMathTest is Test {
         }
     }
 
-    function test_temporary() public pure {
+    function test_customCollateralDecimals() public pure {
         uint256 borrowedAmountNeeded = 0.1 ether;
         uint256 borrowedTokenUsdPrice = 3000 ether + 1;
         uint256 ltv = 700000000000000000;
         uint256 collateral = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
-        console.log("collateral needed", collateral);
+        uint256 collateral6 = IlSolverMath.calculateCollateralAmount(
+            borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, 6, ltv
+        );
+        uint256 scale = 10 ** (DEFAULT_DECIMALS - 6);
+        assertEq(collateral6, collateral / scale);
     }
 }
