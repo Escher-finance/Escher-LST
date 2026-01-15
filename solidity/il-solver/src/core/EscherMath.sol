@@ -73,7 +73,13 @@ library IlSolverMath {
         validDecimals(borrowedTokenDecimals)
         validDecimals(collateralTokenDecimals)
         validLtv(ltv)
-        returns (uint256 iterations, bool isEnough, uint256 totalBorrowedToken, uint256 ltvUsed)
+        returns (
+            uint256 iterations,
+            bool isEnough,
+            uint256 totalBorrowedToken,
+            uint256 ltvUsed,
+            uint256[] memory borrowedAmounts
+        )
     {
         isEnough = false;
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
@@ -91,6 +97,7 @@ library IlSolverMath {
         uint256 totalBorrowedUsd = 0;
         uint256 totalBorrowedTokenNorm = 0;
 
+        borrowedAmounts = new uint256[](MAX_LOOP_ITERATIONS);
         for (uint256 i = 0; i < MAX_LOOP_ITERATIONS; ++i) {
             // Maximum borrowable Usd at this collateral level.
             uint256 maxBorrowableUsd = Math.mulDiv(collateralUsd, ltvMax, 1e18);
@@ -107,6 +114,7 @@ library IlSolverMath {
             // This simulates a "partial/fractional" iteration
             uint256 borrowThisLoopUsd = Math.min(remainingCapacityUsd, usdStillNeeded);
             uint256 borrowThisLoopToken = Math.mulDiv(borrowThisLoopUsd, 1e18, borrowedTokenUsdPrice);
+            borrowedAmounts[i] = borrowThisLoopToken / borrowedTokenScale;
 
             totalBorrowedUsd += borrowThisLoopUsd;
             totalBorrowedTokenNorm += borrowThisLoopToken;
@@ -123,7 +131,7 @@ library IlSolverMath {
                 uint256 fractionOfIteration = Math.mulDiv(borrowThisLoopUsd, 1e18, remainingCapacityUsd);
                 iterations = (i * 1e18) + fractionOfIteration;
                 totalBorrowedToken = totalBorrowedTokenNorm / borrowedTokenScale;
-                return (iterations, isEnough, totalBorrowedToken, ltvUsed);
+                return (iterations, isEnough, totalBorrowedToken, ltvUsed, borrowedAmounts);
             }
 
             // This was a full iteration, continue
@@ -132,7 +140,7 @@ library IlSolverMath {
 
         if (iterations == MAX_LOOP_ITERATIONS * 1e18) revert MAX_LOOP_ITERATIONS_REACHED();
         totalBorrowedToken = totalBorrowedTokenNorm / borrowedTokenScale;
-        return (iterations, isEnough, totalBorrowedToken, 0);
+        return (iterations, isEnough, totalBorrowedToken, 0, borrowedAmounts);
     }
 
     /**
@@ -185,7 +193,7 @@ library IlSolverMath {
             uint256 mid = (low + high) / 2;
 
             // Test if this collateral amount is sufficient
-            (, bool isEnough,,) = hedgingLoop(
+            (, bool isEnough,,,) = hedgingLoop(
                 mid / collateralTokenScale,
                 borrowedAmountNeeded,
                 borrowedTokenUsdPrice,
