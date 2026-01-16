@@ -139,7 +139,7 @@ contract HyperliquidDelegationManager is
 
         for (uint256 i = 0; i < totalValidators; i++) {
             // Undelegate tokens from the validator
-            CoreWriterLib.delegateToken(validators[i].validator, amounts[i], true);
+            CoreWriterLib.delegateToken(validatorAddresses[i], amounts[i], true);
             // Withdraw the tokens from staking balance to core balances
             CoreWriterLib.withdrawStake(amounts[i]);
         }
