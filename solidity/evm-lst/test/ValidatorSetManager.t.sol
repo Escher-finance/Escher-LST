@@ -43,7 +43,7 @@ contract ValidatorSetManagerTest is Test {
 
     /* ============ Initialization Tests ============ */
 
-    function test_Initialize() public view {
+    function testInitialize() public view {
         assertEq(validatorSetManager.owner(), owner);
         assertTrue(validatorSetManager.hasRole(validatorSetManager.MANAGER_ROLE(), manager));
         assertEq(validatorSetManager.totalWeight(), 0);
@@ -54,7 +54,7 @@ contract ValidatorSetManagerTest is Test {
         assertTrue(validatorSetManager.hasRole(defaultAdminRole, owner), "Owner should have DEFAULT_ADMIN_ROLE");
     }
 
-    function test_Initialize_RevertsOnZeroAddress() public {
+    function testInitialize_RevertsOnZeroAddress() public {
         ValidatorSetManager newImpl = new ValidatorSetManager();
 
         bytes memory initData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, address(0), manager);
@@ -63,14 +63,14 @@ contract ValidatorSetManagerTest is Test {
         new ERC1967Proxy(address(newImpl), initData);
     }
 
-    function test_Initialize_CannotReinitialize() public {
+    function testInitialize_CannotReinitialize() public {
         vm.expectRevert();
         validatorSetManager.initialize(owner);
     }
 
     /* ============ Update Validators Tests ============ */
 
-    function test_UpdateValidators_Success() public {
+    function testUpdateValidators_Success() public {
         address[] memory validators = new address[](3);
         validators[0] = validator1;
         validators[1] = validator2;
@@ -93,7 +93,7 @@ contract ValidatorSetManagerTest is Test {
         assertTrue(validatorSetManager.validatorExists(validator3));
     }
 
-    function test_UpdateValidators_ReplaceExisting() public {
+    function testUpdateValidators_ReplaceExisting() public {
         // First update
         address[] memory validators1 = new address[](2);
         validators1[0] = validator1;
@@ -125,7 +125,7 @@ contract ValidatorSetManagerTest is Test {
         assertTrue(validatorSetManager.validatorExists(validator3));
     }
 
-    function test_UpdateValidators_RevertsOnEmptyArray() public {
+    function testUpdateValidators_RevertsOnEmptyArray() public {
         address[] memory validators = new address[](0);
         uint64[] memory weights = new uint64[](0);
 
@@ -134,7 +134,7 @@ contract ValidatorSetManagerTest is Test {
         validatorSetManager.updateValidators(validators, weights);
     }
 
-    function test_UpdateValidators_RevertsOnArrayLengthMismatch() public {
+    function testUpdateValidators_RevertsOnArrayLengthMismatch() public {
         address[] memory validators = new address[](3);
         validators[0] = validator1;
         validators[1] = validator2;
@@ -149,7 +149,7 @@ contract ValidatorSetManagerTest is Test {
         validatorSetManager.updateValidators(validators, weights);
     }
 
-    function test_UpdateValidators_RevertsOnZeroAddress() public {
+    function testUpdateValidators_RevertsOnZeroAddress() public {
         address[] memory validators = new address[](2);
         validators[0] = validator1;
         validators[1] = address(0);
@@ -163,7 +163,7 @@ contract ValidatorSetManagerTest is Test {
         validatorSetManager.updateValidators(validators, weights);
     }
 
-    function test_UpdateValidators_RevertsOnZeroWeight() public {
+    function testUpdateValidators_RevertsOnZeroWeight() public {
         address[] memory validators = new address[](2);
         validators[0] = validator1;
         validators[1] = validator2;
@@ -177,7 +177,7 @@ contract ValidatorSetManagerTest is Test {
         validatorSetManager.updateValidators(validators, weights);
     }
 
-    function test_UpdateValidators_RevertsOnNonManager() public {
+    function testUpdateValidators_RevertsOnNonManager() public {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
@@ -191,7 +191,7 @@ contract ValidatorSetManagerTest is Test {
 
     /* ============ Getter Tests ============ */
 
-    function test_GetValidator() public {
+    function testGetValidator() public {
         address[] memory validators = new address[](2);
         validators[0] = validator1;
         validators[1] = validator2;
@@ -212,12 +212,12 @@ contract ValidatorSetManagerTest is Test {
         assertEq(weight, 200);
     }
 
-    function test_GetValidator_RevertsOnNotFound() public {
+    function testGetValidator_RevertsOnNotFound() public {
         vm.expectRevert("Validator not found");
         validatorSetManager.getValidator(validator1);
     }
 
-    function test_GetAllValidators() public {
+    function testGetAllValidators() public {
         address[] memory validators = new address[](3);
         validators[0] = validator1;
         validators[1] = validator2;
@@ -241,7 +241,7 @@ contract ValidatorSetManagerTest is Test {
         assertEq(allValidators[2].weight, 300);
     }
 
-    function test_ValidatorExists() public {
+    function testValidatorExists() public {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
@@ -257,7 +257,7 @@ contract ValidatorSetManagerTest is Test {
 
     /* ============ Access Control Tests ============ */
 
-    function test_OwnerCanGrantManagerRole() public {
+    function testOwnerCanGrantManagerRole() public {
         address newManager = makeAddr("newManager");
 
         bytes32 managerRole = validatorSetManager.MANAGER_ROLE();
@@ -267,14 +267,14 @@ contract ValidatorSetManagerTest is Test {
         assertTrue(validatorSetManager.hasRole(managerRole, newManager));
     }
 
-    function test_OwnerCanRevokeManagerRole() public {
+    function testOwnerCanRevokeManagerRole() public {
         bytes32 managerRole = validatorSetManager.MANAGER_ROLE();
         vm.prank(owner);
         validatorSetManager.revokeRole(managerRole, manager);
         assertFalse(validatorSetManager.hasRole(managerRole, manager));
     }
 
-    function test_NonOwnerCannotGrantManagerRole() public {
+    function testNonOwnerCannotGrantManagerRole() public {
         address newManager = makeAddr("newManager");
 
         bytes32 managerRole = validatorSetManager.MANAGER_ROLE();
@@ -285,14 +285,14 @@ contract ValidatorSetManagerTest is Test {
 
     /* ============ UUPS Upgrade Tests ============ */
 
-    function test_OwnerCanUpgrade() public {
+    function testOwnerCanUpgrade() public {
         ValidatorSetManager newImpl = new ValidatorSetManager();
 
         vm.prank(owner);
         validatorSetManager.upgradeToAndCall(address(newImpl), "");
     }
 
-    function test_NonOwnerCannotUpgrade() public {
+    function testNonOwnerCannotUpgrade() public {
         ValidatorSetManager newImpl = new ValidatorSetManager();
 
         vm.prank(user);
@@ -325,7 +325,7 @@ contract ValidatorSetManagerTest is Test {
 
     /* ============ Edge Case Tests ============ */
 
-    function test_UpdateValidators_MaxWeight() public {
+    function testUpdateValidators_MaxWeight() public {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
@@ -338,7 +338,7 @@ contract ValidatorSetManagerTest is Test {
         assertEq(validatorSetManager.totalWeight(), type(uint64).max);
     }
 
-    function test_UpdateValidators_MultipleUpdates() public {
+    function testUpdateValidators_MultipleUpdates() public {
         // First update
         address[] memory validators1 = new address[](1);
         validators1[0] = validator1;
