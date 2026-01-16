@@ -8,6 +8,9 @@ import {Validator, DelegatorSummary} from "../src/models/Type.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CoreSimulatorLib} from "@hyper-evm-lib/test/simulation/CoreSimulatorLib.sol";
 import {HyperCore} from "@hyper-evm-lib/test/simulation/HyperCore.sol";
+import {CoreWriterSim} from "@hyper-evm-lib/test/simulation/CoreWriterSim.sol";
+
+CoreWriterSim constant coreWriter = CoreWriterSim(0x3333333333333333333333333333333333333333);
 
 /**
  * @title DelegationManagerTest
@@ -151,7 +154,17 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.initialize(owner, liquidStakingManager);
     }
 
+    function testManagerActive() public view {
+        assertTrue(delegationManager.active());
+    }
+
     /* ============ Access Control Tests ============ */
+
+    function testNonOwnerCannotSetDelegationManager() public {
+        vm.expectRevert();
+        vm.prank(user);
+        delegationManager.setLiquidStakingManager(liquidStakingManager);
+    }
 
     function testOwnerCanGrantManagerRole() public {
         address newManager = makeAddr("newManager");
@@ -268,6 +281,71 @@ contract HyperliquidDelegationManagerTest is Test {
         DelegatorSummary memory summary = delegationManager.delegationSummary();
 
         assertEq(summary.delegated, 100000000);
+    }
+
+    function testUndelegateSuccess() public {
+        CoreSimulatorLib.nextBlock();
+
+        // Arrange: Prank as the liquidStakingManager (who has MANAGER_ROLE)
+        vm.prank(liquidStakingManager);
+        // Act: Call delegate with a value
+        delegationManager.delegate{value: DELEGATE_AMOUNT_EVM}(DELEGATE_AMOUNT_EVM);
+
+        CoreSimulatorLib.nextBlock();
+
+        PrecompileLib.Delegation[] memory currentDelegations = PrecompileLib.delegations(address(delegationManager));
+        uint64[3] memory expectedAmount = [uint64(20000000), uint64(30000000), uint64(50000000)];
+
+        assertEq(currentDelegations.length, 3);
+
+        for (uint256 i = 0; i < currentDelegations.length; i++) {
+            PrecompileLib.Delegation memory delegate = currentDelegations[i];
+            assertEq(delegate.amount, expectedAmount[i]);
+        }
+
+        DelegatorSummary memory summary = delegationManager.delegationSummary();
+        assertEq(summary.delegated, 100000000);
+
+        CoreSimulatorLib.nextBlock();
+        vm.prank(liquidStakingManager);
+        delegationManager.delegate{value: DELEGATE_AMOUNT_EVM}(DELEGATE_AMOUNT_EVM);
+
+        CoreSimulatorLib.nextBlock();
+        DelegatorSummary memory summary2 = delegationManager.delegationSummary();
+        assertEq(summary2.delegated, 200000000);
+
+        // Clear recorded logs for next block
+        vm.recordLogs();
+
+        vm.roll(block.number + 1000);
+        vm.warp(block.timestamp + 30000);
+        // liquidate any positions that are liquidatable
+        hyperCore.liquidatePositions();
+
+        // Process any pending actions
+        coreWriter.executeQueuedActions(false);
+
+        // Process pending orders
+        hyperCore.processPendingOrders();
+
+        vm.prank(liquidStakingManager);
+        delegationManager.undelegate(100000000);
+        // Clear recorded logs for next block
+        vm.recordLogs();
+
+        vm.roll(block.number + 1000);
+        vm.warp(block.timestamp + 100000);
+        // liquidate any positions that are liquidatable
+        hyperCore.liquidatePositions();
+
+        // Process any pending actions
+        coreWriter.executeQueuedActions(false);
+
+        // Process pending orders
+        hyperCore.processPendingOrders();
+
+        DelegatorSummary memory summary3 = delegationManager.delegationSummary();
+        assertEq(summary3.delegated, 100000000);
     }
 
     /* ============ UpdateValidators Tests ============ */
