@@ -170,7 +170,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
 
         uint8 borrowedTokenDecimals = 18;
         uint8 collateralTokenDecimals = IERC20Metadata(address(COLLATERAL)).decimals();
-        uint256 collateralAmountNeeded = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralAmountNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
         );
         emit AddLiquidityData(realSender, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv, collateralAmountNeeded);

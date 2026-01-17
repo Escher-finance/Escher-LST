@@ -14,7 +14,7 @@ contract IlSolverMathWrapper {
         uint8 borrowedTokenDecimals,
         uint8 collateralTokenDecimals,
         uint256 ltv
-    ) public pure returns (uint256, bool, uint256, uint256) {
+    ) public pure returns (uint256, bool, uint256, uint256, uint256[] memory) {
         return IlSolverMath.hedgingLoop(
             collateralAmount,
             borrowedAmountNeeded,
@@ -32,9 +32,10 @@ contract IlSolverMathWrapper {
         uint8 collateralTokenDecimals,
         uint256 ltv
     ) public pure returns (uint256) {
-        return IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralAmountNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
         );
+        return collateralAmountNeeded;
     }
 }
 
@@ -58,7 +59,13 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUsd = 2000 * 1e18;
         uint256 ltv = 90e16; // 0.90 * 1e18
 
-        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken, uint256 ltvUsed) = IlSolverMath.hedgingLoop(
+        (
+            uint256 iterations,
+            bool isEnough,
+            uint256 totalBorrowedToken,
+            uint256 ltvUsed,
+            uint256[] memory borrowedAmounts
+        ) = IlSolverMath.hedgingLoop(
             collateralAmount, borrowedAmount, borrowAmountUsd, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
         console.log("iterations (1e18 scale)", iterations);
@@ -67,6 +74,9 @@ contract IlSolverMathTest is Test {
         console.log("isEnough", isEnough);
         console.log("totalBorrowedToken", totalBorrowedToken);
         console.log("ltvUsed", ltvUsed);
+        for (uint256 i = 0; i < iterations / 1e18; i++) {
+            console.log("borrowedAmounts", i, borrowedAmounts[i]);
+        }
 
         // With 2224 Usd, should need fractional iterations (less than 2)
         assertLt(iterations, 2 * 1e18); // Less than 2.0 iterations
@@ -79,7 +89,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 2000 * 1e18;
         uint256 ltv = 90e16; // 0.90 * 1e18
 
-        uint256 collateralAmountNeeded = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralAmountNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
         console.log("collateralAmountNeeded", collateralAmountNeeded);
@@ -95,7 +105,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUsd = 1000 * 1e18;
         uint256 ltv = 95e16; // 0.95 (93% after safety factor)
 
-        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken,) = IlSolverMath.hedgingLoop(
+        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken,,) = IlSolverMath.hedgingLoop(
             collateralAmount, borrowedAmount, borrowAmountUsd, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -115,7 +125,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowAmountUsd = 2000 * 1e18;
         uint256 ltv = 70e16; // 0.70 (68% after safety factor)
 
-        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken,) = IlSolverMath.hedgingLoop(
+        (uint256 iterations, bool isEnough, uint256 totalBorrowedToken,,) = IlSolverMath.hedgingLoop(
             collateralAmount, borrowedAmount, borrowAmountUsd, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -136,7 +146,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 10000 * 1e18;
         uint256 ltv = 90e16;
 
-        uint256 collateralNeeded = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -153,7 +163,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 1 * 1e18;
         uint256 ltv = 90e16;
 
-        uint256 collateralNeeded = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -173,7 +183,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 2000 * 1e18;
         uint256 ltv = 85e16;
 
-        uint256 collateralNeeded = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -182,7 +192,7 @@ contract IlSolverMathTest is Test {
         console.log("  collateral needed:", collateralNeeded / 1e18, "Usd");
 
         // Verify it works with the found collateral
-        (, bool isEnough, uint256 totalBorrowed,) = IlSolverMath.hedgingLoop(
+        (, bool isEnough, uint256 totalBorrowed,,) = IlSolverMath.hedgingLoop(
             collateralNeeded, borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -198,11 +208,11 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 2000 * 1e18;
         uint256 ltv = 90e16;
 
-        uint256 minCollateral = IlSolverMath.calculateCollateralAmount(
+        (uint256 minCollateral,,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
-        (uint256 iterations, bool isEnough, uint256 totalBorrowed,) = IlSolverMath.hedgingLoop(
+        (uint256 iterations, bool isEnough, uint256 totalBorrowed,,) = IlSolverMath.hedgingLoop(
             minCollateral, borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -225,11 +235,11 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 1500 * 1e18;
         uint256 ltv = 80e16;
 
-        uint256 collateral = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateral,,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
-        (, bool isEnough, uint256 totalBorrowed,) = IlSolverMath.hedgingLoop(
+        (, bool isEnough, uint256 totalBorrowed,,) = IlSolverMath.hedgingLoop(
             collateral, borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -296,7 +306,7 @@ contract IlSolverMathTest is Test {
         uint256 previousCollateral = type(uint256).max;
 
         for (uint256 i = 0; i < ltvValues.length; i++) {
-            uint256 collateral = IlSolverMath.calculateCollateralAmount(
+            (uint256 collateral,,,,,) = IlSolverMath.calculateCollateralAmount(
                 borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltvValues[i]
             );
 
@@ -311,13 +321,17 @@ contract IlSolverMathTest is Test {
         }
     }
 
-    function test_temporary() public pure {
+    function test_customCollateralDecimals() public pure {
         uint256 borrowedAmountNeeded = 0.1 ether;
         uint256 borrowedTokenUsdPrice = 3000 ether + 1;
         uint256 ltv = 700000000000000000;
-        uint256 collateral = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateral,,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
-        console.log("collateral needed", collateral);
+        (uint256 collateral6,,,,,) = IlSolverMath.calculateCollateralAmount(
+            borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, 6, ltv
+        );
+        uint256 scale = 10 ** (DEFAULT_DECIMALS - 6);
+        assertEq(collateral6, collateral / scale);
     }
 }

@@ -11,31 +11,36 @@ library IlSolverMath {
     // 0.000001 tokens (in 18 decimals) = 1e12
     uint256 public constant TOKEN_AMOUNT_EPSILON = 0.000001 ether;
 
-    modifier validBorrowedToken(
-        uint256 borrowedAmountNeeded,
-        uint256 borrowedTokenUsdPrice,
-        uint8 borrowedTokenDecimals
-    ) {
-        if (
-            borrowedTokenUsdPrice == 0 || borrowedAmountNeeded == 0 || borrowedTokenDecimals == 0
-                || borrowedTokenDecimals > 18
-        ) {
+    function _nonZeroAmount(uint256 amount) internal pure {
+        if (amount == 0) {
             revert INVALID_INPUT();
         }
-        _;
     }
 
-    modifier validCollateralToken(uint256 collateralAmount, uint8 collateralTokenDecimals) {
-        if (collateralAmount == 0 || collateralTokenDecimals == 0 || collateralTokenDecimals > 18) {
+    function _validLtv(uint256 ltv) internal pure {
+        if (ltv <= LTV_SAFTY_FACTOR) {
             revert INVALID_INPUT();
         }
+    }
+
+    function _validDecimals(uint8 decimals) internal pure {
+        if (decimals == 0 || decimals > 18) {
+            revert INVALID_INPUT();
+        }
+    }
+
+    modifier nonZeroAmount(uint256 amount) {
+        _nonZeroAmount(amount);
         _;
     }
 
     modifier validLtv(uint256 ltv) {
-        if (ltv <= LTV_SAFTY_FACTOR) {
-            revert INVALID_INPUT();
-        }
+        _validLtv(ltv);
+        _;
+    }
+
+    modifier validDecimals(uint8 decimals) {
+        _validDecimals(decimals);
         _;
     }
 
@@ -62,10 +67,19 @@ library IlSolverMath {
     )
         internal
         pure
-        validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals)
-        validCollateralToken(collateralAmount, collateralTokenDecimals)
+        nonZeroAmount(collateralAmount)
+        nonZeroAmount(borrowedAmountNeeded)
+        nonZeroAmount(borrowedTokenUsdPrice)
+        validDecimals(borrowedTokenDecimals)
+        validDecimals(collateralTokenDecimals)
         validLtv(ltv)
-        returns (uint256 iterations, bool isEnough, uint256 totalBorrowedToken, uint256 ltvUsed)
+        returns (
+            uint256 iterations,
+            bool isEnough,
+            uint256 totalBorrowedToken,
+            uint256 ltvUsed,
+            uint256[] memory borrowedAmounts
+        )
     {
         isEnough = false;
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
@@ -83,6 +97,7 @@ library IlSolverMath {
         uint256 totalBorrowedUsd = 0;
         uint256 totalBorrowedTokenNorm = 0;
 
+        borrowedAmounts = new uint256[](MAX_LOOP_ITERATIONS);
         for (uint256 i = 0; i < MAX_LOOP_ITERATIONS; ++i) {
             // Maximum borrowable Usd at this collateral level.
             uint256 maxBorrowableUsd = Math.mulDiv(collateralUsd, ltvMax, 1e18);
@@ -99,6 +114,7 @@ library IlSolverMath {
             // This simulates a "partial/fractional" iteration
             uint256 borrowThisLoopUsd = Math.min(remainingCapacityUsd, usdStillNeeded);
             uint256 borrowThisLoopToken = Math.mulDiv(borrowThisLoopUsd, 1e18, borrowedTokenUsdPrice);
+            borrowedAmounts[i] = borrowThisLoopToken / borrowedTokenScale;
 
             totalBorrowedUsd += borrowThisLoopUsd;
             totalBorrowedTokenNorm += borrowThisLoopToken;
@@ -115,7 +131,7 @@ library IlSolverMath {
                 uint256 fractionOfIteration = Math.mulDiv(borrowThisLoopUsd, 1e18, remainingCapacityUsd);
                 iterations = (i * 1e18) + fractionOfIteration;
                 totalBorrowedToken = totalBorrowedTokenNorm / borrowedTokenScale;
-                return (iterations, isEnough, totalBorrowedToken, ltvUsed);
+                return (iterations, isEnough, totalBorrowedToken, ltvUsed, borrowedAmounts);
             }
 
             // This was a full iteration, continue
@@ -124,7 +140,7 @@ library IlSolverMath {
 
         if (iterations == MAX_LOOP_ITERATIONS * 1e18) revert MAX_LOOP_ITERATIONS_REACHED();
         totalBorrowedToken = totalBorrowedTokenNorm / borrowedTokenScale;
-        return (iterations, isEnough, totalBorrowedToken, 0);
+        return (iterations, isEnough, totalBorrowedToken, 0, borrowedAmounts);
     }
 
     /**
@@ -146,13 +162,24 @@ library IlSolverMath {
     )
         internal
         pure
-        validBorrowedToken(borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals)
+        nonZeroAmount(borrowedAmountNeeded)
+        nonZeroAmount(borrowedTokenUsdPrice)
+        validDecimals(borrowedTokenDecimals)
+        validDecimals(collateralTokenDecimals)
         validLtv(ltv)
-        returns (uint256 collateralAmountNeeded)
+        returns (
+            uint256 collateralAmountNeeded,
+            uint256 iterations,
+            bool isEnough,
+            uint256 totalBorrowedToken,
+            uint256 ltvUsed,
+            uint256[] memory borrowedAmounts
+        )
     {
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
 
         uint256 borrowedTokenScale = 10 ** (18 - borrowedTokenDecimals);
+        uint256 collateralTokenScale = 10 ** (18 - collateralTokenDecimals);
 
         // Binary search bounds
         uint256 borrowedAmountNeededNorm = borrowedAmountNeeded * borrowedTokenScale;
@@ -173,8 +200,13 @@ library IlSolverMath {
             uint256 mid = (low + high) / 2;
 
             // Test if this collateral amount is sufficient
-            (, bool isEnough,,) = hedgingLoop(
-                mid, borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
+            (iterations, isEnough, totalBorrowedToken, ltvUsed, borrowedAmounts) = hedgingLoop(
+                mid / collateralTokenScale,
+                borrowedAmountNeeded,
+                borrowedTokenUsdPrice,
+                borrowedTokenDecimals,
+                collateralTokenDecimals,
+                ltv
             );
 
             if (isEnough) {
@@ -186,6 +218,6 @@ library IlSolverMath {
             }
         }
 
-        return result;
+        collateralAmountNeeded = result / collateralTokenScale;
     }
 }
