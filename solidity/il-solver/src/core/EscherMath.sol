@@ -167,7 +167,14 @@ library IlSolverMath {
         validDecimals(borrowedTokenDecimals)
         validDecimals(collateralTokenDecimals)
         validLtv(ltv)
-        returns (uint256 collateralAmountNeeded)
+        returns (
+            uint256 collateralAmountNeeded,
+            uint256 iterations,
+            bool isEnough,
+            uint256 totalBorrowedToken,
+            uint256 ltvUsed,
+            uint256[] memory borrowedAmounts
+        )
     {
         uint256 ltvMax = ltv - LTV_SAFTY_FACTOR;
 
@@ -193,7 +200,7 @@ library IlSolverMath {
             uint256 mid = (low + high) / 2;
 
             // Test if this collateral amount is sufficient
-            (, bool isEnough,,,) = hedgingLoop(
+            (iterations, isEnough, totalBorrowedToken, ltvUsed, borrowedAmounts) = hedgingLoop(
                 mid / collateralTokenScale,
                 borrowedAmountNeeded,
                 borrowedTokenUsdPrice,
@@ -211,6 +218,6 @@ library IlSolverMath {
             }
         }
 
-        return result / collateralTokenScale;
+        collateralAmountNeeded = result / collateralTokenScale;
     }
 }
