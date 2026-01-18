@@ -26,9 +26,19 @@ interface IMsgSender {
     function msgSender() external view returns (address);
 }
 
+struct UserData {
+    uint256 collateralAmountNeeded;
+    uint256 iterations;
+    uint256 totalBorrowedToken;
+    uint256 ltvUsed;
+    uint256[] borrowedAmounts;
+    bool done;
+}
+
 contract IlSolverHook is BaseHook, Ownable2Step {
     mapping(address => bool) public verifiedRouters;
     mapping(address => bool) public users;
+    mapping(address => UserData) public usersData;
 
     IAaveOracle public aaveOracle;
     IL2Pool public aavePool;
@@ -179,6 +189,18 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         ) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
         );
+
+        UserData memory senderData = UserData({
+            collateralAmountNeeded: collateralAmountNeeded,
+            iterations: iterations,
+            totalBorrowedToken: totalBorrowedToken,
+            ltvUsed: ltvUsed,
+            borrowedAmounts: borrowedAmounts,
+            done: false
+        });
+
+        usersData[realSender] = senderData;
+
         emit AddLiquidityData(realSender, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv, collateralAmountNeeded);
 
         return (selector, delta);
