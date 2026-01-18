@@ -217,6 +217,9 @@ contract IlSolverHook is BaseHook, Ownable2Step {
     }
 
     function loop() public payable onlyUser {
+        UserData memory senderData = usersData[msg.sender];
+        require(senderData.collateralAmountNeeded > 0 && !senderData.done);
+
         // 1. supply usdc (collateral)
         // 2. borrow weth
         // 3. swap weth with usdc
