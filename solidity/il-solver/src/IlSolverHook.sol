@@ -10,6 +10,7 @@ import {IAaveOracle} from "aavev3/interfaces/IAaveOracle.sol";
 import {DataTypes} from "aavev3/protocol/libraries/types/DataTypes.sol";
 import {IL2Pool as IL2PoolOriginal} from "aavev3/interfaces/IL2Pool.sol";
 import {IPool} from "aavev3/interfaces/IPool.sol";
+import {L2Encoder} from "aavev3/helpers/L2Encoder.sol";
 import {IWETH} from "@common/IWETH.sol";
 import {ReserveConfiguration} from "aavev3/protocol/libraries/configuration/ReserveConfiguration.sol";
 import {IlSolverMath} from "./core/EscherMath.sol";
@@ -41,7 +42,10 @@ contract IlSolverHook is BaseHook, Ownable2Step {
     mapping(address => UserData) public usersData;
 
     IAaveOracle public aaveOracle;
+    L2Encoder public aaveEncoder;
     IL2Pool public aavePool;
+    // Whether collateral has been set
+    bool public aaveCollateralSet;
 
     // The borrowed asset
     IWETH public immutable WETH;
@@ -54,6 +58,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         IWETH _weth,
         IERC20 _collateral,
         IL2Pool _aavePool,
+        L2Encoder _aaveEncoder,
         IAaveOracle _aaveOracle
     ) BaseHook(_poolManager) Ownable(_owner) {
         users[_owner] = true;
@@ -61,6 +66,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         COLLATERAL = _collateral;
         aavePool = _aavePool;
         aaveOracle = _aaveOracle;
+        aaveEncoder = _aaveEncoder;
     }
 
     modifier onlyUser() {
@@ -214,6 +220,26 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         emit AddLiquidityData(realSender, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv, collateralAmountNeeded);
 
         return (selector, delta);
+    }
+
+    /**
+     * @dev Supplies `collateral` token to Aave V3
+     */
+    function _aavev3Supply(uint256 amount) private {
+        bytes32 params = aaveEncoder.encodeSupplyParams(address(COLLATERAL), amount, 0);
+        aavePool.supply(params);
+
+        if (!aaveCollateralSet) {
+            aavePool.setUserUseReserveAsCollateral(address(COLLATERAL), true);
+            aaveCollateralSet = true;
+        }
+    }
+
+    /**
+     * @dev Borrows `WETH` from Aave V3 using supplied `collateral`
+     */
+    function _aavev3Borrow(uint256 amount) private {
+        aavePool.borrow(address(WETH), amount, 2, 0, address(this));
     }
 
     function loop() public payable onlyUser {
