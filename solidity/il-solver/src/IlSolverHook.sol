@@ -169,7 +169,12 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         bytes4 selector = BaseHook.afterAddLiquidity.selector;
         address realSender = _getRealSender(sender);
 
-        if (realSender == address(0) || !users[realSender]) {
+        UserData memory senderData = usersData[realSender];
+
+        if (
+            realSender == address(0) || !users[realSender]
+                || (senderData.collateralAmountNeeded > 0 && !senderData.done)
+        ) {
             return (selector, delta);
         }
 
@@ -190,7 +195,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
             borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
         );
 
-        UserData memory senderData = UserData({
+        UserData memory newSenderData = UserData({
             collateralAmountNeeded: collateralAmountNeeded,
             iterations: iterations,
             totalBorrowedToken: totalBorrowedToken,
@@ -199,7 +204,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
             done: false
         });
 
-        usersData[realSender] = senderData;
+        usersData[realSender] = newSenderData;
 
         emit AddLiquidityData(realSender, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv, collateralAmountNeeded);
 
