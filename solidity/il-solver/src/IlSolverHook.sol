@@ -63,6 +63,11 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         aaveOracle = _aaveOracle;
     }
 
+    modifier onlyUser() {
+        require(users[msg.sender]);
+        _;
+    }
+
     error TrackerHook_verifiedRouterMissingMsgSender(address router);
 
     /// @dev Original event from `IPoolManager` with changed name
@@ -209,5 +214,11 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         emit AddLiquidityData(realSender, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv, collateralAmountNeeded);
 
         return (selector, delta);
+    }
+
+    function loop() public payable onlyUser {
+        // 1. supply usdc (collateral)
+        // 2. borrow weth
+        // 3. swap weth with usdc
     }
 }
