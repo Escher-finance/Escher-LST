@@ -32,7 +32,7 @@ contract IlSolverMathWrapper {
         uint8 collateralTokenDecimals,
         uint256 ltv
     ) public pure returns (uint256) {
-        (uint256 collateralAmountNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralAmountNeeded,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
         );
         return collateralAmountNeeded;
@@ -89,7 +89,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 2000 * 1e18;
         uint256 ltv = 90e16; // 0.90 * 1e18
 
-        (uint256 collateralAmountNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralAmountNeeded,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
         console.log("collateralAmountNeeded", collateralAmountNeeded);
@@ -146,7 +146,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 10000 * 1e18;
         uint256 ltv = 90e16;
 
-        (uint256 collateralNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralNeeded,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -163,7 +163,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 1 * 1e18;
         uint256 ltv = 90e16;
 
-        (uint256 collateralNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralNeeded,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -183,7 +183,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 2000 * 1e18;
         uint256 ltv = 85e16;
 
-        (uint256 collateralNeeded,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralNeeded,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -208,7 +208,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 2000 * 1e18;
         uint256 ltv = 90e16;
 
-        (uint256 minCollateral,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 minCollateral,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -235,7 +235,7 @@ contract IlSolverMathTest is Test {
         uint256 borrowedTokenUsdPrice = 1500 * 1e18;
         uint256 ltv = 80e16;
 
-        (uint256 collateral,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateral,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
 
@@ -306,7 +306,7 @@ contract IlSolverMathTest is Test {
         uint256 previousCollateral = type(uint256).max;
 
         for (uint256 i = 0; i < ltvValues.length; i++) {
-            (uint256 collateral,,,,,) = IlSolverMath.calculateCollateralAmount(
+            (uint256 collateral,,,,) = IlSolverMath.calculateCollateralAmount(
                 borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltvValues[i]
             );
 
@@ -325,10 +325,10 @@ contract IlSolverMathTest is Test {
         uint256 borrowedAmountNeeded = 0.1 ether;
         uint256 borrowedTokenUsdPrice = 3000 ether + 1;
         uint256 ltv = 700000000000000000;
-        (uint256 collateral,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateral,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
-        (uint256 collateral6,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateral6,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, DEFAULT_DECIMALS, 6, ltv
         );
         uint256 scale = 10 ** (DEFAULT_DECIMALS - 6);

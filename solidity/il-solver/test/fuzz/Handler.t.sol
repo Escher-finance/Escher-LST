@@ -52,7 +52,7 @@ contract Handler is Test {
         borrowAmountUSD = bound(borrowAmountUSD, 10 * 1e18, 100000 * 1e18); // $10-$100k
         ltv = bound(ltv, MIN_LTV, MAX_LTV);
 
-        (uint256 collateral,,,,,) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateral,,,,) = IlSolverMath.calculateCollateralAmount(
             borrowedAmount, borrowAmountUSD, DEFAULT_DECIMALS, DEFAULT_DECIMALS, ltv
         );
         (uint256 iterations, bool isEnough, uint256 totalBorrowed, uint256 ltvUsed,) = IlSolverMath.hedgingLoop(

@@ -170,7 +170,6 @@ library IlSolverMath {
         returns (
             uint256 collateralAmountNeeded,
             uint256 iterations,
-            bool isEnough,
             uint256 totalBorrowedToken,
             uint256 ltvUsed,
             uint256[] memory borrowedAmounts
@@ -194,6 +193,8 @@ library IlSolverMath {
         // The binary search will find the actual minimum between these bounds
 
         uint256 result = high; // Default to high if we don't find better
+
+        bool isEnough;
 
         // Binary search for minimum collateral
         while (low <= high) {
