@@ -242,5 +242,20 @@ contract IlSolverHookTest is Test {
 
         COLLATERAL.approve(address(h), 10000e8);
         h.loop();
+
+        (
+            uint256 totalCollateralBase,
+            uint256 totalDebtBase,
+            uint256 availableBorrowsBase,
+            uint256 currentLiquidationThreshold,
+            uint256 ltv,
+            uint256 healthFactor
+        ) = aavePool.getUserAccountData(address(h));
+        console.log("totalCollateralBase", totalCollateralBase);
+        console.log("totalDebtBase", totalDebtBase);
+        console.log("availableBorrowsBase", availableBorrowsBase);
+        console.log("currentLiquidationThreshold", currentLiquidationThreshold);
+        console.log("ltv", ltv);
+        console.log("healthFactor", healthFactor);
     }
 }
