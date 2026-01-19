@@ -233,4 +233,14 @@ contract IlSolverHookTest is Test {
         UserData memory data = h.getUserData(owner);
         assertGt(data.collateralAmountNeeded, 0);
     }
+
+    function test_loop() public {
+        uint256 amount0 = 1 ether;
+        int24 delta = 488; // 5% in ticks
+        uint256 slippage = 10; // 10%
+        _univ4LiquidityMintFromAmount0(uniPoolKey, amount0, delta, slippage);
+
+        COLLATERAL.approve(address(h), 10000e8);
+        h.loop();
+    }
 }

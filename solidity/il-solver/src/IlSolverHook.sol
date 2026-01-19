@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {console} from "forge-std/Test.sol";
 import {BaseHook, Hooks, IPoolManager, ModifyLiquidityParams, BalanceDelta} from "v4-periphery/src/utils/BaseHook.sol";
 import {BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -404,6 +405,8 @@ contract IlSolverHook is BaseHook, Ownable2Step {
 
         uint256 collateralAmount = senderData.collateralAmountNeeded;
         COLLATERAL.transferFrom(msg.sender, address(this), collateralAmount);
+
+        console.log("transferred collateral", collateralAmount);
 
         // 1. supply usdc (collateral)
         // 2. borrow weth
