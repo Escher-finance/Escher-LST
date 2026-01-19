@@ -35,6 +35,14 @@ interface IUniversalRouter {
     function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
 }
 
+interface IPermit2 {
+    function allowance(address user, address token, address spender)
+        external
+        view
+        returns (uint160 amount, uint48 expiration, uint48 nonce);
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
+}
+
 // src: https://github.com/Uniswap/universal-router/blob/main/contracts/libraries/Commands.sol
 library UniversalRouterCommands {
     // Masks to extract certain bits of commands
@@ -111,11 +119,14 @@ contract IlSolverHook is BaseHook, Ownable2Step {
     PoolKey public uniPoolKey;
     IUniversalRouter public uniRouter;
 
+    IPermit2 public permit2;
+
     constructor(
         address _owner,
         IPoolManager _poolManager,
         IWETH _weth,
         IERC20 _collateral,
+        IPermit2 _permit2,
         PoolKey memory _uniPoolKey,
         IUniversalRouter _uniRouter,
         IL2Pool _aavePool,
@@ -134,6 +145,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         aavePool = _aavePool;
         aaveOracle = _aaveOracle;
         aaveEncoder = _aaveEncoder;
+        permit2 = _permit2;
     }
 
     modifier onlyUser() {
@@ -309,6 +321,40 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         aavePool.borrow(address(WETH), amount, 2, 0, address(this));
     }
 
+    modifier univ4AttachFundsForSwap(bool zeroForOne, uint128 _amountIn) {
+        require(_amountIn > 0);
+
+        uint256 amountIn = uint256(_amountIn);
+        PoolKey memory key = uniPoolKey;
+        address _this = address(this);
+        address _router = address(uniRouter);
+
+        // Handle ETH
+
+        if (zeroForOne) {
+            uint256 ethBalance = _this.balance;
+            uint256 ethNeeded = (ethBalance < amountIn) ? amountIn - ethBalance : 0;
+            if (ethNeeded > 0) {
+                WETH.withdraw(ethNeeded);
+            }
+        }
+
+        // Handle collateral
+
+        if (!zeroForOne) {
+            IERC20 t1 = IERC20(Currency.unwrap(key.currency1));
+            if (t1.allowance(_this, address(permit2)) < amountIn) {
+                t1.approve(address(permit2), type(uint128).max);
+            }
+            (uint160 p2Allowance1,,) = permit2.allowance(_this, address(t1), address(_router));
+            if (p2Allowance1 < amountIn) {
+                permit2.approve(address(t1), _router, type(uint128).max, type(uint48).max);
+            }
+        }
+
+        _;
+    }
+
     /**
      * @dev Swaps exact input single from the Uniswap V4 pool with `uniPoolKey`
      * @dev Swaps one of the tokens for the other configured via `zeroForOne`
@@ -316,7 +362,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
      */
     function _univ4Swap(bool zeroForOne, uint128 amountIn, uint128 minAmountOut)
         private
-        // univ4AttachFundsForSwap(zeroForOne, amountIn)
+        univ4AttachFundsForSwap(zeroForOne, amountIn)
         returns (uint256 actualAmountOut)
     {
         bytes memory commands = abi.encodePacked(uint8(UniversalRouterCommands.V4_SWAP));
@@ -351,12 +397,14 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         actualAmountOut = bAfter - bBefore;
     }
 
-    function loop() public payable onlyUser {
+    function loop() public onlyUser {
         UserData memory senderData = usersData[msg.sender];
         require(senderData.collateralAmountNeeded > 0 && !senderData.done);
         uint256 iterations = senderData.iterations / 1e18;
 
         uint256 collateralAmount = senderData.collateralAmountNeeded;
+        COLLATERAL.transferFrom(msg.sender, address(this), collateralAmount);
+
         // 1. supply usdc (collateral)
         // 2. borrow weth
         // 3. swap weth with usdc
