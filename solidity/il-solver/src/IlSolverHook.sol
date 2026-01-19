@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {console} from "forge-std/Test.sol";
 import {BaseHook, Hooks, IPoolManager, ModifyLiquidityParams, BalanceDelta} from "v4-periphery/src/utils/BaseHook.sol";
 import {BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -409,6 +410,8 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         require(senderData.collateralAmountNeeded > 0 && !senderData.done);
         uint256 iterations = senderData.iterations / 1e18;
 
+        uint256 collateralDecimals = uint256(IERC20Metadata(address(COLLATERAL)).decimals());
+
         uint256 collateralAmount = senderData.collateralAmountNeeded;
         COLLATERAL.transferFrom(msg.sender, address(this), collateralAmount);
 
@@ -419,7 +422,11 @@ contract IlSolverHook is BaseHook, Ownable2Step {
             _aavev3Supply(collateralAmount);
             uint256 currentBorrowAmount = senderData.borrowedAmounts[i];
             _aavev3Borrow(currentBorrowAmount);
+            uint256 minAmountOut =
+                currentBorrowAmount * aaveOraclePrice(address(WETH)) / (10 ** (36 - collateralDecimals));
+            console.log("expected", minAmountOut);
             collateralAmount = _univ4Swap(true, uint128(currentBorrowAmount), 0);
+            console.log("actual  ", collateralAmount);
         }
     }
 
