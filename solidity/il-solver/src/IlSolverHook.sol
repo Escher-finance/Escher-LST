@@ -304,8 +304,13 @@ contract IlSolverHook is BaseHook, Ownable2Step {
 
     /**
      * @dev Supplies `collateral` token to Aave V3
+     * @notice Uses contract's funds
      */
     function _aavev3Supply(uint256 amount) private {
+        if (COLLATERAL.allowance(address(this), address(aavePool)) < amount) {
+            COLLATERAL.approve(address(aavePool), type(uint128).max);
+        }
+
         bytes32 params = aaveEncoder.encodeSupplyParams(address(COLLATERAL), amount, 0);
         aavePool.supply(params);
 
