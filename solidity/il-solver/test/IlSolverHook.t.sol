@@ -16,7 +16,8 @@ import {
     IMsgSender,
     IUniversalRouter,
     L2Encoder,
-    IPermit2
+    IPermit2,
+    UserData
 } from "../src/IlSolverHook.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
@@ -228,5 +229,8 @@ contract IlSolverHookTest is Test {
         console.log("borrowedTokenUsdPrice ", borrowedTokenUsdPrice);
         console.log("ltv                   ", ltv);
         console.log("collateralAmountNeeded", collateralAmountNeeded);
+
+        UserData memory data = h.getUserData(owner);
+        assertGt(data.collateralAmountNeeded, 0);
     }
 }

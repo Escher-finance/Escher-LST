@@ -101,7 +101,7 @@ struct UserData {
 contract IlSolverHook is BaseHook, Ownable2Step {
     mapping(address => bool) public verifiedRouters;
     mapping(address => bool) public users;
-    mapping(address => UserData) public usersData;
+    mapping(address => UserData) usersData;
 
     IAaveOracle public aaveOracle;
     L2Encoder public aaveEncoder;
@@ -414,5 +414,9 @@ contract IlSolverHook is BaseHook, Ownable2Step {
             _aavev3Borrow(currentBorrowAmount);
             collateralAmount = _univ4Swap(true, uint128(currentBorrowAmount), 0);
         }
+    }
+
+    function getUserData(address user) public view returns (UserData memory data) {
+        data = usersData[user];
     }
 }
