@@ -758,4 +758,36 @@ contract HyperliquidDelegationManagerTest is Test {
 
         assertFalse(delegationManager.hasRole(managerRole, liquidStakingManager));
     }
+
+    function testDelegationMoveBatch() public {
+        hyperCore.forceSpotBalance(address(delegationManager), HYPE_TOKEN, 1000e8);
+        CoreSimulatorLib.nextBlock();
+        vm.prank(liquidStakingManager);
+        delegationManager.moveBatch(1000e8);
+        CoreSimulatorLib.nextBlock();
+
+        uint256 balance = address(delegationManager).balance;
+        assertEq(balance, 1000e8);
+    }
+
+    function testDelegationReceiveBatch() public {
+        hyperCore.forceSpotBalance(address(delegationManager), HYPE_TOKEN, 1000e8);
+        uint256 balance = address(delegationManager).balance;
+        CoreSimulatorLib.nextBlock();
+        assertEq(balance, 0);
+
+        vm.prank(liquidStakingManager);
+        delegationManager.moveBatch(1000e8);
+
+        CoreSimulatorLib.nextBlock();
+        uint256 balance2 = address(delegationManager).balance;
+        console.log("delegationManager after move balance:", balance2); // Shows balance in Wei
+        assertEq(balance2, 1000e8);
+
+        vm.prank(liquidStakingManager);
+        delegationManager.receiveBatch(1000e8);
+        CoreSimulatorLib.nextBlock();
+        uint256 balance3 = address(delegationManager).balance;
+        assertEq(balance3, 0);
+    }
 }

@@ -59,6 +59,18 @@ contract LiquidStakingManagerTest is Test {
         assertEq(bob, owner);
     }
 
+    function testTransferOwnership() public {
+        address owner = lst.owner();
+        assertEq(bob, owner);
+
+        lst.transferOwnership(address(liquidStakingManager));
+
+        liquidStakingManager.acceptOwnershipTransfer();
+
+        address newOwner = lst.owner();
+        assertEq(address(liquidStakingManager), newOwner);
+    }
+
     function testBond() public {
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 1;
