@@ -149,6 +149,8 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         permit2 = _permit2;
     }
 
+    receive() external payable {}
+
     modifier onlyUser() {
         require(users[msg.sender]);
         _;
