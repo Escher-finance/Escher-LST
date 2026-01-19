@@ -15,7 +15,8 @@ import {
     IAaveOracle,
     IMsgSender,
     IUniversalRouter,
-    L2Encoder
+    L2Encoder,
+    IPermit2
 } from "../src/IlSolverHook.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
@@ -25,14 +26,6 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IStateView} from "@uniswap/v4-periphery/src/interfaces/IStateView.sol";
 import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-
-interface IPermit2 {
-    function allowance(address user, address token, address spender)
-        external
-        view
-        returns (uint160 amount, uint48 expiration, uint48 nonce);
-    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
-}
 
 using SafeCast for uint256;
 
@@ -86,13 +79,33 @@ contract IlSolverHookTest is Test {
         reserve = IERC20(aavePool.getReserveAToken(usdc));
 
         uint160 flags = uint160(Hooks.AFTER_ADD_LIQUIDITY_FLAG);
-        bytes memory constructorArgs = abi.encode(owner, uniPoolManager, WETH, COLLATERAL, aavePool, aaveOracle);
+        bytes memory constructorArgs = abi.encode(
+            owner,
+            uniPoolManager,
+            WETH,
+            COLLATERAL,
+            permit2,
+            _referencePoolKey,
+            uniRouter,
+            aavePool,
+            aaveEncoder,
+            aaveOracle
+        );
         (address hookAddress, bytes32 salt) =
             HookMiner.find(address(this), flags, type(IlSolverHook).creationCode, constructorArgs);
 
         // deploy hook contract
         h = new IlSolverHook{salt: salt}(
-            owner, uniPoolManager, WETH, COLLATERAL, _referencePoolKey, uniRouter, aavePool, aaveEncoder, aaveOracle
+            owner,
+            uniPoolManager,
+            WETH,
+            COLLATERAL,
+            permit2,
+            _referencePoolKey,
+            uniRouter,
+            aavePool,
+            aaveEncoder,
+            aaveOracle
         );
         assertEq(address(h), hookAddress);
 
