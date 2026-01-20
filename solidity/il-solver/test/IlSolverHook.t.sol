@@ -235,6 +235,9 @@ contract IlSolverHookTest is Test {
     }
 
     function test_loop() public {
+        UserData memory data = h.getUserData(owner);
+        assert(!data.done);
+
         uint256 amount0 = 1 ether;
         int24 delta = 488; // 5% in ticks
         uint256 slippage = 10; // 10%
@@ -257,5 +260,8 @@ contract IlSolverHookTest is Test {
         console.log("currentLiquidationThreshold", currentLiquidationThreshold);
         console.log("ltv", ltv);
         console.log("healthFactor", healthFactor);
+
+        UserData memory newData = h.getUserData(owner);
+        assert(newData.done);
     }
 }

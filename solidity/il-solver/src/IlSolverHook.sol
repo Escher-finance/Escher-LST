@@ -426,6 +426,8 @@ contract IlSolverHook is BaseHook, Ownable2Step {
             uint256 minAmountOut = expectedAmountOut * 98 / 100; // add some slippage
             collateralAmount = _univ4Swap(true, uint128(currentBorrowAmount), uint128(minAmountOut));
         }
+
+        usersData[msg.sender].done = true;
     }
 
     function getUserData(address user) public view returns (UserData memory data) {
