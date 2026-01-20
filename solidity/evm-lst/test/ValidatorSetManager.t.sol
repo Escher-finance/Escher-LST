@@ -54,7 +54,7 @@ contract ValidatorSetManagerTest is Test {
         assertTrue(validatorSetManager.hasRole(defaultAdminRole, owner), "Owner should have DEFAULT_ADMIN_ROLE");
     }
 
-    function testInitialize_RevertsOnZeroAddress() public {
+    function testInitializeRevertsOnZeroAddress() public {
         ValidatorSetManager newImpl = new ValidatorSetManager();
 
         bytes memory initData = abi.encodeWithSelector(ValidatorSetManager.initialize.selector, address(0), manager);
@@ -63,14 +63,14 @@ contract ValidatorSetManagerTest is Test {
         new ERC1967Proxy(address(newImpl), initData);
     }
 
-    function testInitialize_CannotReinitialize() public {
+    function testInitializeCannotReinitialize() public {
         vm.expectRevert();
         validatorSetManager.initialize(owner);
     }
 
     /* ============ Update Validators Tests ============ */
 
-    function testUpdateValidators_Success() public {
+    function testUpdateValidatorsSuccess() public {
         address[] memory validators = new address[](3);
         validators[0] = validator1;
         validators[1] = validator2;
@@ -93,7 +93,7 @@ contract ValidatorSetManagerTest is Test {
         assertTrue(validatorSetManager.validatorExists(validator3));
     }
 
-    function testUpdateValidators_ReplaceExisting() public {
+    function testUpdateValidatorsReplaceExisting() public {
         // First update
         address[] memory validators1 = new address[](2);
         validators1[0] = validator1;
@@ -125,7 +125,7 @@ contract ValidatorSetManagerTest is Test {
         assertTrue(validatorSetManager.validatorExists(validator3));
     }
 
-    function testUpdateValidators_RevertsOnEmptyArray() public {
+    function testUpdateValidatorsRevertsOnEmptyArray() public {
         address[] memory validators = new address[](0);
         uint64[] memory weights = new uint64[](0);
 
@@ -134,7 +134,7 @@ contract ValidatorSetManagerTest is Test {
         validatorSetManager.updateValidators(validators, weights);
     }
 
-    function testUpdateValidators_RevertsOnArrayLengthMismatch() public {
+    function testUpdateValidatorsRevertsOnArrayLengthMismatch() public {
         address[] memory validators = new address[](3);
         validators[0] = validator1;
         validators[1] = validator2;
@@ -149,7 +149,7 @@ contract ValidatorSetManagerTest is Test {
         validatorSetManager.updateValidators(validators, weights);
     }
 
-    function testUpdateValidators_RevertsOnZeroAddress() public {
+    function testUpdateValidatorsRevertsOnZeroAddress() public {
         address[] memory validators = new address[](2);
         validators[0] = validator1;
         validators[1] = address(0);
@@ -163,7 +163,7 @@ contract ValidatorSetManagerTest is Test {
         validatorSetManager.updateValidators(validators, weights);
     }
 
-    function testUpdateValidators_RevertsOnZeroWeight() public {
+    function testUpdateValidatorsRevertsOnZeroWeight() public {
         address[] memory validators = new address[](2);
         validators[0] = validator1;
         validators[1] = validator2;
@@ -177,7 +177,7 @@ contract ValidatorSetManagerTest is Test {
         validatorSetManager.updateValidators(validators, weights);
     }
 
-    function testUpdateValidators_RevertsOnNonManager() public {
+    function testUpdateValidatorsRevertsOnNonManager() public {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
@@ -212,7 +212,7 @@ contract ValidatorSetManagerTest is Test {
         assertEq(weight, 200);
     }
 
-    function testGetValidator_RevertsOnNotFound() public {
+    function testGetValidatorRevertsOnNotFound() public {
         vm.expectRevert("Validator not found");
         validatorSetManager.getValidator(validator1);
     }
@@ -302,7 +302,7 @@ contract ValidatorSetManagerTest is Test {
 
     /* ============ Fuzz Tests ============ */
 
-    function testFuzz_UpdateValidators(uint8 validatorCount, uint64 baseWeight) public {
+    function testFuzzUpdateValidators(uint8 validatorCount, uint64 baseWeight) public {
         vm.assume(validatorCount > 0 && validatorCount <= 50);
         vm.assume(baseWeight > 0 && baseWeight < type(uint64).max / validatorCount);
 
@@ -325,7 +325,7 @@ contract ValidatorSetManagerTest is Test {
 
     /* ============ Edge Case Tests ============ */
 
-    function testUpdateValidators_MaxWeight() public {
+    function testUpdateValidatorsMaxWeight() public {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
@@ -338,7 +338,7 @@ contract ValidatorSetManagerTest is Test {
         assertEq(validatorSetManager.totalWeight(), type(uint64).max);
     }
 
-    function testUpdateValidators_MultipleUpdates() public {
+    function testUpdateValidatorsMultipleUpdates() public {
         // First update
         address[] memory validators1 = new address[](1);
         validators1[0] = validator1;

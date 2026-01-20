@@ -390,7 +390,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(validatorManager.getTotalWeight(), 400);
     }
 
-    function testUpdateValidators_RevertsWithEmptyArray() public {
+    function testUpdateValidatorsRevertsWithEmptyArray() public {
         address[] memory newValidators = new address[](0);
         uint64[] memory newWeights = new uint64[](0);
 
@@ -399,7 +399,7 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.updateValidators(newValidators, newWeights);
     }
 
-    function testUpdateValidators_RevertsWithMismatchedArrays() public {
+    function testUpdateValidatorsRevertsWithMismatchedArrays() public {
         address[] memory newValidators = new address[](2);
         newValidators[0] = validator1;
         newValidators[1] = validator2;
@@ -412,7 +412,7 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.updateValidators(newValidators, newWeights);
     }
 
-    function testUpdateValidators_RevertsWithZeroAddress() public {
+    function testUpdateValidatorsRevertsWithZeroAddress() public {
         address[] memory newValidators = new address[](2);
         newValidators[0] = validator1;
         newValidators[1] = address(0);
@@ -426,7 +426,7 @@ contract HyperliquidDelegationManagerTest is Test {
         delegationManager.updateValidators(newValidators, newWeights);
     }
 
-    function testUpdateValidators_RevertsWithZeroWeight() public {
+    function testUpdateValidatorsRevertsWithZeroWeight() public {
         address[] memory newValidators = new address[](2);
         newValidators[0] = validator1;
         newValidators[1] = validator2;
@@ -463,7 +463,7 @@ contract HyperliquidDelegationManagerTest is Test {
     /* ============ Integration Tests ============ */
 
     // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skipTestCompleteFlow_UpdateValidatorsMultipleTimes() public {
+    function skipTestCompleteFlowUpdateValidatorsMultipleTimes() public {
         // First update
         address[] memory validators1 = new address[](2);
         validators1[0] = validator1;
@@ -516,7 +516,7 @@ contract HyperliquidDelegationManagerTest is Test {
 
     /* ============ Validator Distribution Calculation Tests ============ */
 
-    function testValidatorDistribution_EqualWeights() public {
+    function testValidatorDistributionEqualWeights() public {
         // Setup validators with equal weights
         address[] memory validators = new address[](3);
         validators[0] = validator1;
@@ -535,7 +535,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(validatorManager.getTotalWeight(), 300);
     }
 
-    function testValidatorDistribution_UnequalWeights() public view {
+    function testValidatorDistributionUnequalWeights() public view {
         // Already set up in setUp with weights 100, 200, 300
         assertEq(validatorManager.getTotalWeight(), totalWeight);
 
@@ -552,7 +552,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertEq(weight3, weights[2]);
     }
 
-    function testValidatorDistribution_SingleValidator() public {
+    function testValidatorDistributionSingleValidator() public {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
@@ -568,8 +568,7 @@ contract HyperliquidDelegationManagerTest is Test {
 
     /* ============ Edge Case Tests ============ */
 
-    // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skipTestUpdateValidators_ReplaceAllValidators() public {
+    function skipTestUpdateValidatorsReplaceAllValidators() public {
         address newValidator1 = makeAddr("newValidator1");
         address newValidator2 = makeAddr("newValidator2");
 
@@ -594,8 +593,7 @@ contract HyperliquidDelegationManagerTest is Test {
         assertFalse(validatorManager.validatorExists(validator3));
     }
 
-    // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skipTestUpdateValidators_MaxWeight() public {
+    function skipTestUpdateValidatorsMaxWeight() public {
         address[] memory validators = new address[](1);
         validators[0] = validator1;
 
@@ -610,8 +608,7 @@ contract HyperliquidDelegationManagerTest is Test {
 
     /* ============ Fuzz Tests ============ */
 
-    // NOTE: Skipped because it calls updateValidators which triggers _redelegate() with precompiles
-    function skip_testFuzz_UpdateValidators(uint8 validatorCount, uint64 baseWeight) public {
+    function skip_testFuzzUpdateValidators(uint8 validatorCount, uint64 baseWeight) public {
         vm.assume(validatorCount > 0 && validatorCount <= 20);
         vm.assume(baseWeight > 0 && baseWeight < type(uint64).max / validatorCount);
 
