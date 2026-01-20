@@ -6,7 +6,6 @@ import {Rate} from "../models/Type.sol";
 
 /// @dev Interface of the ILiquidStakingManager that handle liquid staking user interactions and operations.
 interface ILiquidStakingManager {
-    error TokenTransferFailure();
     error IncorrectBatchStatus();
 
     /// @dev Emitted when user stakes some amount of native token

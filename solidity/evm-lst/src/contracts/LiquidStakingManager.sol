@@ -6,7 +6,7 @@ import {IDelegationManager} from "../interfaces/IDelegationManager.sol";
 import {Lst} from "../tokens/Lst.sol";
 import {Config, Liquidity, BatchStatus, UnbondRequest, UnbondBatch} from "../models/State.sol";
 import {DelegatorSummary, Rate, InitializeLstManagerPayload} from "../models/Type.sol";
-
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
@@ -27,6 +27,8 @@ contract LiquidStakingManager is
     Liquidity private s_liquidity;
     uint256 public constant SCALING_FACTOR = 10 ** 18;
     uint256 public constant CORE_TO_EVM = 10 ** 10;
+
+    string constant HYPERLIQUID_CHAIN = "hyperliquid";
 
     // Batch management storage
     uint256 private s_pendingBatchId;
@@ -189,17 +191,10 @@ contract LiquidStakingManager is
      * @param shares amount of shares the user wants to convert
      */
     function unbondRequest(uint256 shares) external nonReentrant returns (uint256) {
-        // checks that the deposited amount is greater than zero.
         require(shares > s_config.minUnbondAmount, "unbond should be more than min unbond amount");
 
-        // Checks that the delegationManager address is not zero.
-        require(address(delegationManager) != address(0), "delegation Manager zero address");
-
         // transfer asset to this contract
-        bool transferStatus = share.transferFrom(msg.sender, address(this), shares);
-        if (!transferStatus) {
-            revert TokenTransferFailure();
-        }
+        SafeERC20.safeTransferFrom(share, msg.sender, address(this), shares);
 
         // Get current request ID and increment
         uint256 requestId = s_nextRequestId;
@@ -284,7 +279,7 @@ contract LiquidStakingManager is
         require(batch.batchId != 0, "batch does not exist");
         // to receive batch hyperliquid, batch status must be in Moved Status
         if (
-            keccak256(abi.encodePacked(s_config.chainName)) == keccak256(abi.encodePacked("s_config.hyperliquid"))
+            keccak256(abi.encodePacked(s_config.chainName)) == keccak256(abi.encodePacked(HYPERLIQUID_CHAIN))
                 && batch.status != BatchStatus.Moved
         ) {
             revert IncorrectBatchStatus();
@@ -292,7 +287,7 @@ contract LiquidStakingManager is
 
         // to receive batch in non hyperliquid, batch status must be in Submitted Status
         if (
-            keccak256(abi.encodePacked(s_config.chainName)) != keccak256(abi.encodePacked("hyperliquid"))
+            keccak256(abi.encodePacked(s_config.chainName)) != keccak256(abi.encodePacked(HYPERLIQUID_CHAIN))
                 && batch.status != BatchStatus.Submitted
         ) {
             revert IncorrectBatchStatus();
