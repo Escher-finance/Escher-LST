@@ -2,24 +2,30 @@
 pragma solidity 0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
+import {ILiquidStakingManager} from "../src/interfaces/ILiquidStakingManager.sol";
 import {LiquidStakingManager} from "../src/contracts/LiquidStakingManager.sol";
 import {Lst} from "../src/tokens/Lst.sol";
-import {DelegatorSummary, InitializeLstManagerPayload} from "../src/models/Type.sol";
+import {DelegatorSummary, InitializeLstManagerPayload, Rate} from "../src/models/Type.sol";
 import {HyperliquidDelegationManager} from "../src/contracts/HyperliquidDelegationManager.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {DelegationManagerMock} from "./mocks/DelegationManagerMock.sol";
 import {Config, Liquidity, BatchStatus, UnbondRequest, UnbondBatch} from "../src/models/State.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 contract LiquidStakingManagerTest is Test {
     LiquidStakingManager public liquidStakingManager;
     Lst public lst;
     DelegationManagerMock public delegationManager;
+    LiquidStakingManager public stableLstManager;
+    ERC1967Proxy lstManagerProxy;
 
     address public bob = makeAddr("bob");
     address public alice = makeAddr("alice");
 
     uint256 public constant CORE_TO_EVM = 10 ** 10;
     uint256 public STARTING_BALANCE = 10000 * CORE_TO_EVM;
+    uint256 public SCALING_FACTOR = 10 ** 18;
 
     function setUp() public {
         vm.startPrank(bob);
@@ -44,11 +50,26 @@ contract LiquidStakingManagerTest is Test {
             undelegatePeriodSeconds: 300
         });
         bytes memory initLstManagerData = abi.encodeCall(LiquidStakingManager.initialize, (payload));
-        ERC1967Proxy lstManagerProxy = new ERC1967Proxy(address(liquidStakingManagerImpl), initLstManagerData);
+        lstManagerProxy = new ERC1967Proxy(address(liquidStakingManagerImpl), initLstManagerData);
 
         liquidStakingManager = LiquidStakingManager(payable(address(lstManagerProxy)));
 
         delegationManager.setLiquidStakingManager(address(liquidStakingManager));
+
+        InitializeLstManagerPayload memory payload2 = InitializeLstManagerPayload({
+            chainName: "stable",
+            initialOwner: bob,
+            lstAddress: address(lst),
+            delegationManagerAddress: _delegationManager,
+            minBondAmount: 1000 * CORE_TO_EVM,
+            minUnbondAmount: 1000 * CORE_TO_EVM,
+            batchPeriodSeconds: 300,
+            undelegatePeriodSeconds: 300
+        });
+        bytes memory initLstManagerData2 = abi.encodeCall(LiquidStakingManager.initialize, (payload2));
+        ERC1967Proxy lstManagerProxy2 = new ERC1967Proxy(address(liquidStakingManagerImpl), initLstManagerData2);
+
+        stableLstManager = LiquidStakingManager(payable(address(lstManagerProxy2)));
 
         vm.deal(bob, STARTING_BALANCE);
         vm.deal(alice, STARTING_BALANCE);
@@ -57,6 +78,12 @@ contract LiquidStakingManagerTest is Test {
     function testOwner() public view {
         address owner = liquidStakingManager.owner();
         assertEq(bob, owner);
+    }
+
+    function testRate() public view {
+        Rate memory rate = liquidStakingManager.rate();
+        assertEq(rate.bondRate, SCALING_FACTOR);
+        assertEq(rate.unbondRate, SCALING_FACTOR);
     }
 
     function testTransferOwnership() public {
@@ -99,7 +126,7 @@ contract LiquidStakingManagerTest is Test {
         liquidStakingManager.bond{value: bondAmount - 10}(bondAmount - 10, bob);
     }
 
-    function testUnbondRequest() public {
+    function testUnbondRequestSuccess() public {
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
@@ -110,6 +137,7 @@ contract LiquidStakingManagerTest is Test {
         uint256 unbondAmount = minUnbondAmount + 10;
         lst.approve(address(liquidStakingManager), unbondAmount);
         uint256 requestId = liquidStakingManager.unbondRequest(unbondAmount);
+        assertEq(requestId, 1);
 
         UnbondRequest memory unbondRequest = liquidStakingManager.getUnbondRequest(requestId);
         assertEq(unbondAmount, unbondRequest.shares);
@@ -203,7 +231,7 @@ contract LiquidStakingManagerTest is Test {
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
         // Unbond below min amount
         lst.approve(address(liquidStakingManager), 1);
-        vm.expectRevert();
+        vm.expectRevert(bytes("unbond should be more than min unbond amount"));
         liquidStakingManager.unbondRequest(1);
     }
 
@@ -265,9 +293,6 @@ contract LiquidStakingManagerTest is Test {
         UnbondBatch memory batch = liquidStakingManager.getBatch(batchId);
         assertTrue(batch.status == BatchStatus.Received);
         assertEq(batch.totalShares, bondAmount);
-        console.log("batch.totalAssets", batch.totalAssets);
-        console.log("batch.totalShares", batch.totalShares);
-        //assertGt(batch.totalAssets, 0);
     }
 
     function testBatchLifecycleMultipleRequests() public {
@@ -340,17 +365,17 @@ contract LiquidStakingManagerTest is Test {
         liquidStakingManager.unbondRequest(unbondAmount);
     }
 
-    function testClaimUnbondAndRequest() public {
+    function testClaimUnbondSuccess() public {
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
-        console.log("minBondAmount", minBondAmount);
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
-        DelegatorSummary memory summary = delegationManager.delegationSummary();
 
         uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
         uint256 unbondAmount = minUnbondAmount + 10;
         lst.approve(address(liquidStakingManager), unbondAmount);
-        liquidStakingManager.unbondRequest(unbondAmount);
+        uint256 reqId = liquidStakingManager.unbondRequest(unbondAmount);
+        assertEq(reqId, 1);
+
         liquidStakingManager.submitBatch();
         uint256 batchId = 1;
         uint256 nextActionTime = block.timestamp + liquidStakingManager.getConfig().undelegatePeriodSeconds;
@@ -369,12 +394,40 @@ contract LiquidStakingManagerTest is Test {
         liquidStakingManager.claimUnbond();
     }
 
-    function testClaimUnbondRequestReverts() public {
+    function testClaimUnbondRequestSuccess() public {
         uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
-        console.log("minBondAmount", minBondAmount);
         uint256 bondAmount = minBondAmount + 100;
         liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
-        DelegatorSummary memory summary = delegationManager.delegationSummary();
+
+        uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 unbondAmount = minUnbondAmount + 10;
+        lst.approve(address(liquidStakingManager), unbondAmount);
+        uint256 reqId = liquidStakingManager.unbondRequest(unbondAmount);
+        assertEq(reqId, 1);
+
+        uint256 balance1 = bob.balance;
+
+        liquidStakingManager.submitBatch();
+        uint256 batchId = 1;
+        uint256 nextActionTime = block.timestamp + liquidStakingManager.getConfig().undelegatePeriodSeconds;
+        vm.warp(nextActionTime + 1);
+
+        UnbondBatch memory batch = liquidStakingManager.getBatch(batchId);
+        if (batch.nextActionTime < block.timestamp) {
+            vm.deal(address(delegationManager), batch.totalAssets);
+        }
+        liquidStakingManager.moveBatch(batchId);
+        liquidStakingManager.receiveBatch(batchId);
+        liquidStakingManager.claimUnbondRequest(reqId);
+
+        uint256 balance2 = bob.balance;
+        assertEq(balance2, balance1 + minBondAmount);
+    }
+
+    function testClaimUnbondRequestReverts() public {
+        uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
+        uint256 bondAmount = minBondAmount + 100;
+        liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
 
         uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
         uint256 unbondAmount = minUnbondAmount + 10;
@@ -389,7 +442,12 @@ contract LiquidStakingManagerTest is Test {
         if (batch.nextActionTime < block.timestamp) {
             vm.deal(address(delegationManager), batch.totalAssets);
         }
+
         liquidStakingManager.moveBatch(batchId);
+
+        vm.expectRevert(bytes("batch not yet received"));
+        liquidStakingManager.claimUnbondRequest(1);
+
         liquidStakingManager.receiveBatch(batchId);
 
         // Invalid requestId
@@ -402,5 +460,77 @@ contract LiquidStakingManagerTest is Test {
             vm.expectRevert();
             liquidStakingManager.claimUnbondRequest(reqIds[0]);
         }
+    }
+
+    function testReceiveBatchIncorrectBatchStatus() public {
+        uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
+        uint256 bondAmount = minBondAmount + 100;
+        liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
+
+        uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 unbondAmount = minUnbondAmount + 10;
+        lst.approve(address(liquidStakingManager), unbondAmount);
+        liquidStakingManager.unbondRequest(unbondAmount);
+
+        uint256 batchId = 1;
+
+        vm.expectRevert(ILiquidStakingManager.IncorrectBatchStatus.selector);
+        liquidStakingManager.receiveBatch(batchId);
+
+        liquidStakingManager.submitBatch();
+        uint256 nextActionTime = block.timestamp + liquidStakingManager.getConfig().undelegatePeriodSeconds;
+        vm.warp(nextActionTime + 1);
+        vm.expectRevert(ILiquidStakingManager.IncorrectBatchStatus.selector);
+        liquidStakingManager.receiveBatch(batchId);
+    }
+
+    function testIncorrectBatchStatus() public {
+        delegationManager.setLiquidStakingManager(address(stableLstManager));
+        uint256 minBondAmount = stableLstManager.getConfig().minBondAmount;
+        uint256 bondAmount = minBondAmount + 100;
+        stableLstManager.bond{value: bondAmount}(bondAmount, bob);
+
+        uint256 minUnbondAmount = stableLstManager.getConfig().minUnbondAmount;
+        uint256 unbondAmount = minUnbondAmount + 10;
+        lst.approve(address(stableLstManager), unbondAmount);
+        stableLstManager.unbondRequest(unbondAmount);
+
+        uint256 batchId = 1;
+        vm.expectRevert(ILiquidStakingManager.IncorrectBatchStatus.selector);
+        stableLstManager.receiveBatch(batchId);
+    }
+
+    function testUnbondRequestFail() public {
+        uint256 minBondAmount = liquidStakingManager.getConfig().minBondAmount;
+        uint256 bondAmount = minBondAmount + 100;
+        liquidStakingManager.bond{value: bondAmount}(bondAmount, bob);
+
+        uint256 minUnbondAmount = liquidStakingManager.getConfig().minUnbondAmount;
+        uint256 unbondAmount = minUnbondAmount + 10;
+
+        vm.expectRevert();
+        liquidStakingManager.unbondRequest(unbondAmount);
+    }
+
+    function testRevertIfNonOwnerUpgrades() public {
+        address newImplementation = address(new LiquidStakingManager());
+
+        vm.startPrank(alice);
+        // The upgradeToAndCall function is the entry point for UUPS upgrades
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", alice));
+        UUPSUpgradeable(address(lstManagerProxy)).upgradeToAndCall(newImplementation, "");
+        vm.stopPrank();
+    }
+
+    function testOwnerCanUpgrade() public {
+        address newImplementation = address(new LiquidStakingManager());
+
+        vm.startPrank(bob);
+        UUPSUpgradeable(address(lstManagerProxy)).upgradeToAndCall(newImplementation, "");
+
+        // Verify the implementation slot was updated
+        bytes32 slot = bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1);
+        address currentImpl = address(uint160(uint256(vm.load(address(lstManagerProxy), slot))));
+        assertEq(currentImpl, newImplementation);
     }
 }
