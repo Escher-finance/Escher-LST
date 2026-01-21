@@ -13,3 +13,4 @@ solady/utils/=lib/solady/src/utils
 @uniswap/v4-periphery/=lib/v4-periphery/
 uni-universal-router/=lib/universal-router/contracts/
 aavev3/=lib/aave-v3-origin/src/contracts/
+@hyper-evm-lib=lib/hyper-evm-lib
