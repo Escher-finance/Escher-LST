@@ -1,5 +1,6 @@
 ## Hyperliquid EVM Liquid Staking Token
-Very initial draft of LST Contract on hyperliquid
+Implementaton LST Contract on Hyperliquid 
+and draft implementation for Stablechain
 
 ## Usage
 
