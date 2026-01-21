@@ -38,6 +38,18 @@ export function StakingUI() {
     }, [unbondAmount]);
 
     const {
+        data: currentBatch,
+        isError: currentBatchError,
+        isLoading: currentBatchLoading,
+    } = useReadContract({
+        address: STAKING_CONTRACT.address,
+        abi: STAKING_CONTRACT.abi,
+        functionName: "getCurrentBatchId",
+        args: [],
+        chainId: 998, // Stable testnet chain ID (verify this)
+    });
+
+    const {
         data: userRequests,
         isError: userRequestsError,
         isLoading: userRequestsLoading,
@@ -164,37 +176,37 @@ export function StakingUI() {
 
     const handleReceiveBatch = (e: React.FormEvent) => {
         e.preventDefault();
-
-        writeContract.mutate(
-            {
-                abi: STAKING_CONTRACT.abi,
-                address: STAKING_CONTRACT.address, // Staking contract address
-                functionName: "receiveBatch",
-                args: [1],
-            },
-            {
-                onSuccess: (data) => {
-                    console.log("Transaction successful:", data);
-                    alert(`Transaction successful! Hash: ${data}`); // Updated to use data directly
+        if (currentBatch) {
+            writeContract.mutate(
+                {
+                    abi: STAKING_CONTRACT.abi,
+                    address: STAKING_CONTRACT.address, // Staking contract address
+                    functionName: "receiveBatch",
+                    args: [BigInt(Number(currentBatch) - 1)],
                 },
-                onError: (error) => {
-                    console.error("Transaction failed:", error);
-                    alert(`Transaction failed: ${error.message}`);
+                {
+                    onSuccess: (data) => {
+                        console.log("Transaction successful:", data);
+                        alert(`Transaction successful! Hash: ${data}`); // Updated to use data directly
+                    },
+                    onError: (error) => {
+                        console.error("Transaction failed:", error);
+                        alert(`Transaction failed: ${error.message}`);
+                    },
                 },
-            },
-        );
+            );
+        }
     };
 
     const handleClaim = (e: React.FormEvent) => {
         e.preventDefault();
-        const id = e.target.elements.requestId.value;
 
         writeContract.mutate(
             {
                 abi: STAKING_CONTRACT.abi,
                 address: STAKING_CONTRACT.address, // Staking contract address
-                functionName: "claimUnbondRequest",
-                args: [BigInt(id)],
+                functionName: "claimUnbond",
+                args: [],
             },
             {
                 onSuccess: (data) => {
@@ -217,7 +229,7 @@ export function StakingUI() {
                 abi: STAKING_CONTRACT.abi,
                 address: STAKING_CONTRACT.address, // Staking contract address
                 functionName: "moveBatch",
-                args: [1],
+                args: [BigInt(Number(currentBatch) - 1)],
             },
             {
                 onSuccess: (data) => {
@@ -335,7 +347,7 @@ export function StakingUI() {
                 <div>
                     <h4>Claim Unbond:</h4>
                     <form onSubmit={handleClaim}>
-                        {userRequests ? (
+                        {/*{userRequests ? (
                             <select id="requestId" name="requestId">
                                 {Array.isArray(userRequests) &&
                                     userRequests.map((v, index) => (
@@ -347,7 +359,7 @@ export function StakingUI() {
                             </select>
                         ) : (
                             ""
-                        )}
+                        )}*/}
                         <button type="submit">Claim</button>
                     </form>
                 </div>

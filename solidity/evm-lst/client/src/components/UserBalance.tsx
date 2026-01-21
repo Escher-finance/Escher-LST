@@ -15,6 +15,7 @@ import { getBalance } from "wagmi/actions";
 export function UserBalance() {
     const [isClient, setIsClient] = useState(false);
     const [showBalance, setShowBalance] = useState(false);
+    const [selectedBatch, setSelectedBatch] = useState(1);
     const { address, status } = useConnection();
     const { data, isLoading, isError, error } = useBalance({
         address,
@@ -99,7 +100,7 @@ export function UserBalance() {
         address: STAKING_CONTRACT.address,
         abi: STAKING_CONTRACT.abi,
         functionName: "getBatch",
-        args: [1],
+        args: [selectedBatch],
         chainId: 998, // Stable testnet chain ID (verify this)
     });
 
@@ -127,6 +128,20 @@ export function UserBalance() {
         chainId: 998, // Stable testnet chain ID (verify this)
     });
 
+    const handleChange = (event: any) => {
+        setSelectedBatch(event.target.value); // Access the new value
+    };
+
+    const getStatus = (status: Number) => {
+        if (status === 0) {
+            return "Pending";
+        } else if (status === 1) {
+            return "Submitted";
+        } else if (status === 2) {
+            return "Received";
+        }
+    };
+
     useEffect(() => {
         setIsClient(true);
 
@@ -152,6 +167,12 @@ export function UserBalance() {
         console.log("batchLoading status:", batchLoading);
         console.log("batchError status:", batchError);
     }, [batchLoading, batchError]);
+
+    useEffect(() => {
+        if (currentBatch) {
+            setSelectedBatch(Number(currentBatch));
+        }
+    }, [currentBatch]);
 
     if (!isClient) {
         return <p>Loading...</p>; // Static fallback for SSR
@@ -237,7 +258,23 @@ export function UserBalance() {
                 >
                     <strong>Batch</strong>
                     <br />
-                    Batch ID: {batch ? `${batch.batchId}` : "0"}
+                    Current Pending Batch:{" "}
+                    {currentBatch ? `${currentBatch}` : "0"}
+                    <br />
+                    <br />
+                    <strong>Show Batch:</strong>
+                    <select onChange={handleChange} value={selectedBatch}>
+                        {Array.from(
+                            { length: Number(currentBatch) },
+                            (_, index) => (
+                                <option key={index} value={index + 1}>
+                                    {index + 1}{" "}
+                                </option>
+                            ),
+                        )}
+                    </select>
+                    <br />
+                    ID: {batch ? `${batch.batchId}` : "0"}
                     <br />
                     Total Shares: {batch ? `${batch.totalShares}` : "0"}
                     <br />
@@ -247,7 +284,10 @@ export function UserBalance() {
                     <br />
                     Next Action time: {batch ? `${batch.nextActionTime}` : "-"}
                     <br />
-                    Status: {batch ? `${batch.status}` : "-"}
+                    Status:{" "}
+                    <strong>
+                        {batch ? `${getStatus(batch.status)}` : "-"}
+                    </strong>
                 </div>
                 <div
                     style={{

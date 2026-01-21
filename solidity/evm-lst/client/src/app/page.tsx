@@ -4,6 +4,7 @@ import { ConnectWallet } from "@/components/ConnectWallet";
 import { UserBalance } from "@/components/UserBalance";
 import { Suspense } from "react";
 import { StakingUI } from "@/components/StakingUI";
+import { Contracts } from "@/components/Contracts";
 import { Validators } from "@/components/Validators";
 
 export default function Home() {
@@ -23,6 +24,7 @@ export default function Home() {
                         <ConnectWallet />
                     </Suspense>
                     <Validators />
+                    <Contracts />
                 </div>
             </div>
 
