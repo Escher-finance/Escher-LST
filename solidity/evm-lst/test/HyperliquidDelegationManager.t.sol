@@ -608,7 +608,7 @@ contract HyperliquidDelegationManagerTest is Test {
 
     /* ============ Fuzz Tests ============ */
 
-    function skip_testFuzzUpdateValidators(uint8 validatorCount, uint64 baseWeight) public {
+    function skipTestFuzzUpdateValidators(uint8 validatorCount, uint64 baseWeight) public {
         vm.assume(validatorCount > 0 && validatorCount <= 20);
         vm.assume(baseWeight > 0 && baseWeight < type(uint64).max / validatorCount);
 
