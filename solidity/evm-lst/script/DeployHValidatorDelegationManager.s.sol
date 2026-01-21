@@ -21,34 +21,20 @@ contract DeployHyperliquidValidatorDelegationManager is Script {
 
         // Start deploy Validator set Manager
         address validatorManagerImpl = address(new ValidatorSetManager());
-        bytes memory initializeValidatorManagerData = abi.encodeWithSelector(
-            ValidatorSetManager.initialize.selector,
-            msg.sender
-        );
-        ERC1967Proxy validatorManagerProxy = new ERC1967Proxy(
-            validatorManagerImpl,
-            initializeValidatorManagerData
-        );
+        bytes memory initializeValidatorManagerData =
+            abi.encodeWithSelector(ValidatorSetManager.initialize.selector, msg.sender);
+        ERC1967Proxy validatorManagerProxy = new ERC1967Proxy(validatorManagerImpl, initializeValidatorManagerData);
         validatorManager = ValidatorSetManager(address(validatorManagerProxy));
         console.log("VALIDATOR_MANAGER=", address(validatorManager));
 
         // Start deploy DelegationManager
-        address delegationManagerImpl = address(
-            new HyperliquidDelegationManager()
-        );
+        address delegationManagerImpl = address(new HyperliquidDelegationManager());
         bytes memory initializeDelegationManagerData = abi.encodeWithSelector(
-            HyperliquidDelegationManager.initialize.selector,
-            msg.sender,
-            address(validatorManager)
+            HyperliquidDelegationManager.initialize.selector, msg.sender, address(validatorManager)
         );
 
-        ERC1967Proxy delegationManagerProxy = new ERC1967Proxy(
-            delegationManagerImpl,
-            initializeDelegationManagerData
-        );
-        delegationManager = HyperliquidDelegationManager(
-            payable(address(delegationManagerProxy))
-        );
+        ERC1967Proxy delegationManagerProxy = new ERC1967Proxy(delegationManagerImpl, initializeDelegationManagerData);
+        delegationManager = HyperliquidDelegationManager(payable(address(delegationManagerProxy)));
         console.log("DELEGATION_MANAGER=", address(delegationManager));
 
         validatorManager.setDelegationManager(address(delegationManager));
