@@ -57,7 +57,7 @@ contract IlSolverHookTest is Test {
     address owner;
 
     function setUp() public {
-        vm.createSelectFork("base", 39260000);
+        vm.createSelectFork("base");
         owner = makeAddr("owner");
 
         _referencePoolKey = PoolKey({
