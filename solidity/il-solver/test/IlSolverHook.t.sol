@@ -16,8 +16,7 @@ import {
     IMsgSender,
     IUniversalRouter,
     L2Encoder,
-    IPermit2,
-    UserData
+    IPermit2
 } from "../src/IlSolverHook.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
@@ -178,6 +177,9 @@ contract IlSolverHookTest is Test {
 
         vm.startPrank(caller);
 
+        // needs approval for collateral
+        COLLATERAL.approve(address(h), type(uint256).max);
+
         IERC20 t1 = IERC20(Currency.unwrap(_key.currency1));
         t1.approve(address(permit2), type(uint128).max);
         permit2.approve(address(t1), posm, type(uint128).max, type(uint48).max);
@@ -205,11 +207,12 @@ contract IlSolverHookTest is Test {
         used1 = b1Before + amount1Max - b1After;
     }
 
-    function test_afterAddLiquidityEvent() public {
+    function test_afterAddLiquidity() public {
         uint256 amount0 = 1 ether;
         int24 delta = 488; // 5% in ticks
         uint256 slippage = 10; // 10%
 
+        // Decode event
         vm.recordLogs();
         _univ4LiquidityMintFromAmount0(uniPoolKey, amount0, delta, slippage);
         Vm.Log[] memory entries = vm.getRecordedLogs();
@@ -230,38 +233,7 @@ contract IlSolverHookTest is Test {
         console.log("ltv                   ", ltv);
         console.log("collateralAmountNeeded", collateralAmountNeeded);
 
-        UserData memory data = h.getUserData(owner);
-        assertGt(data.collateralAmountNeeded, 0);
-    }
-
-    function test_loop() public {
-        UserData memory data = h.getUserData(owner);
-        assert(!data.done);
-
-        uint256 amount0 = 1 ether;
-        int24 delta = 488; // 5% in ticks
-        uint256 slippage = 10; // 10%
-        _univ4LiquidityMintFromAmount0(uniPoolKey, amount0, delta, slippage);
-
-        COLLATERAL.approve(address(h), 10000e8);
-        h.loop();
-
-        (
-            uint256 totalCollateralBase,
-            uint256 totalDebtBase,
-            uint256 availableBorrowsBase,
-            uint256 currentLiquidationThreshold,
-            uint256 ltv,
-            uint256 healthFactor
-        ) = aavePool.getUserAccountData(address(h));
-        console.log("totalCollateralBase", totalCollateralBase);
-        console.log("totalDebtBase", totalDebtBase);
-        console.log("availableBorrowsBase", availableBorrowsBase);
-        console.log("currentLiquidationThreshold", currentLiquidationThreshold);
-        console.log("ltv", ltv);
-        console.log("healthFactor", healthFactor);
-
-        UserData memory newData = h.getUserData(owner);
-        assert(newData.done);
+        // UserData memory data = h.getUserData(owner);
+        // assertGt(data.collateralAmountNeeded, 0);
     }
 }

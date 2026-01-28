@@ -89,19 +89,9 @@ library UniversalRouterCommands {
     uint256 constant ACROSS_V4_DEPOSIT_V3 = 0x40;
 }
 
-struct UserData {
-    uint256 collateralAmountNeeded;
-    uint256 iterations;
-    uint256 totalBorrowedToken;
-    uint256 ltvUsed;
-    uint256[] borrowedAmounts;
-    bool done;
-}
-
 contract IlSolverHook is BaseHook, Ownable2Step {
     mapping(address => bool) public verifiedRouters;
     mapping(address => bool) public users;
-    mapping(address => UserData) usersData;
 
     IAaveOracle public aaveOracle;
     L2Encoder public aaveEncoder;
@@ -261,12 +251,7 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         bytes4 selector = BaseHook.afterAddLiquidity.selector;
         address realSender = _getRealSender(sender);
 
-        UserData memory senderData = usersData[realSender];
-
-        if (
-            realSender == address(0) || !users[realSender]
-                || (senderData.collateralAmountNeeded > 0 && !senderData.done)
-        ) {
+        if (realSender == address(0) || !users[realSender]) {
             return (selector, delta);
         }
 
@@ -277,26 +262,11 @@ contract IlSolverHook is BaseHook, Ownable2Step {
 
         uint8 borrowedTokenDecimals = 18;
         uint8 collateralTokenDecimals = IERC20Metadata(address(COLLATERAL)).decimals();
-        (
-            uint256 collateralAmountNeeded,
-            uint256 iterations,
-            uint256 totalBorrowedToken,
-            uint256 ltvUsed,
-            uint256[] memory borrowedAmounts
-        ) = IlSolverMath.calculateCollateralAmount(
+        (uint256 collateralAmountNeeded, uint256 iterations,,, uint256[] memory borrowedAmounts) = IlSolverMath.calculateCollateralAmount(
             borrowedAmountNeeded, borrowedTokenUsdPrice, borrowedTokenDecimals, collateralTokenDecimals, ltv
         );
 
-        UserData memory newSenderData = UserData({
-            collateralAmountNeeded: collateralAmountNeeded,
-            iterations: iterations,
-            totalBorrowedToken: totalBorrowedToken,
-            ltvUsed: ltvUsed,
-            borrowedAmounts: borrowedAmounts,
-            done: false
-        });
-
-        usersData[realSender] = newSenderData;
+        _hedge(realSender, collateralAmountNeeded, iterations, borrowedAmounts);
 
         emit AddLiquidityData(realSender, borrowedAmountNeeded, borrowedTokenUsdPrice, ltv, collateralAmountNeeded);
 
@@ -404,33 +374,31 @@ contract IlSolverHook is BaseHook, Ownable2Step {
         actualAmountOut = bAfter - bBefore;
     }
 
-    function loop() public onlyUser {
-        UserData memory senderData = usersData[msg.sender];
-        require(senderData.collateralAmountNeeded > 0 && !senderData.done);
-        uint256 iterations = senderData.iterations / 1e18;
+    function _hedge(
+        address sender,
+        uint256 collateralAmountNeeded,
+        uint256 iterations,
+        uint256[] memory borrowedAmounts
+    ) private {
+        require(collateralAmountNeeded > 0);
+        uint256 wholeIterations = iterations / 1e18;
 
         uint256 collateralDecimals = uint256(IERC20Metadata(address(COLLATERAL)).decimals());
         uint256 wethPrice = aaveOraclePrice(address(WETH));
 
-        uint256 collateralAmount = senderData.collateralAmountNeeded;
-        COLLATERAL.transferFrom(msg.sender, address(this), collateralAmount);
+        uint256 collateralAmount = collateralAmountNeeded;
+        COLLATERAL.transferFrom(sender, address(this), collateralAmount);
 
         // 1. supply usdc (collateral)
         // 2. borrow weth
         // 3. swap weth with usdc
-        for (uint256 i = 0; i < iterations; i++) {
+        for (uint256 i = 0; i < wholeIterations; i++) {
             _aavev3Supply(collateralAmount);
-            uint256 currentBorrowAmount = senderData.borrowedAmounts[i];
+            uint256 currentBorrowAmount = borrowedAmounts[i];
             _aavev3Borrow(currentBorrowAmount);
             uint256 expectedAmountOut = currentBorrowAmount * wethPrice / (10 ** (36 - collateralDecimals));
-            uint256 minAmountOut = expectedAmountOut * 98 / 100; // add some slippage
+            uint256 minAmountOut = expectedAmountOut * 98 / 100; // apply some slippage
             collateralAmount = _univ4Swap(true, uint128(currentBorrowAmount), uint128(minAmountOut));
         }
-
-        usersData[msg.sender].done = true;
-    }
-
-    function getUserData(address user) public view returns (UserData memory data) {
-        data = usersData[user];
     }
 }
