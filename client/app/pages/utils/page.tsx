@@ -25,115 +25,127 @@ import Burn from "./burn";
 // import InstantiateReward from "./instantiate_reward";
 // import SetReward from "./set_reward";
 // import MoveToReward from "./move_to_reward";
-// import TransferBack from "./transfer_back";
 
 export default function Utils() {
-  const { userAddress, client, network } = useGlobalContext();
-  const [stateKey, setStateKey] = useState(1);
+    const { userAddress, client, network } = useGlobalContext();
+    const [stateKey, setStateKey] = useState(1);
 
-  const reset = async () => {
-    const msg = {
-      reset: {}
+    const reset = async () => {
+        const msg = {
+            reset: {},
+        };
+
+        console.log(JSON.stringify(msg));
+        try {
+            if (!userAddress) {
+                alert("no user");
+                return;
+            }
+            const res = await client?.execute(
+                userAddress,
+                network?.contracts.lst,
+                msg,
+                "auto",
+            );
+            alert(res?.transactionHash);
+        } catch (err) {
+            console.log(err);
+        }
     };
 
-    console.log(JSON.stringify(msg));
-    try {
-      if (!userAddress) {
-        alert("no user");
-        return;
-      }
-      const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto");
-      alert(res?.transactionHash);
+    const transferReward = async () => {
+        const msg = {
+            transfer_reward: {},
+        };
 
-    } catch (err) {
-      console.log(err);
-    }
-  }
-
-  const transferReward = async () => {
-    const msg = {
-      transfer_reward: {}
+        console.log(JSON.stringify(msg));
+        try {
+            if (!userAddress) {
+                alert("no user");
+                return;
+            }
+            const res = await client?.execute(
+                userAddress,
+                network?.contracts.lst,
+                msg,
+                "auto",
+            );
+            alert(res?.transactionHash);
+        } catch (err) {
+            console.log(err);
+        }
     };
 
-    console.log(JSON.stringify(msg));
-    try {
-      if (!userAddress) {
-        alert("no user");
-        return;
-      }
-      const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto");
-      alert(res?.transactionHash);
+    const transferToOwner = async () => {
+        const msg = {
+            transfer_to_owner: {},
+        };
 
-    } catch (err) {
-      console.log(err);
-    }
-  }
-
-  const transferToOwner = async () => {
-    const msg = {
-      transfer_to_owner: {}
+        console.log(JSON.stringify(msg));
+        try {
+            if (!userAddress) {
+                alert("no user");
+                return;
+            }
+            const res = await client?.execute(
+                userAddress,
+                network?.contracts.lst,
+                msg,
+                "auto",
+            );
+            alert(res?.transactionHash);
+        } catch (err) {
+            console.log(err);
+        }
     };
 
-    console.log(JSON.stringify(msg));
-    try {
-      if (!userAddress) {
-        alert("no user");
-        return;
-      }
-      const res = await client?.execute(userAddress, network?.contracts.lst, msg, "auto");
-      alert(res?.transactionHash);
+    return (
+        <div className="w-full flex flex-col gap-4">
+            <div className="w-full">
+                <h1>Utilities</h1>
+            </div>
+            <div className="w-full flex flex-col gap-4">
+                <div className="w-full flex flex-row gap-4">
+                    <Button color="primary" onPress={reset}>
+                        RESET
+                    </Button>
+                    <Button color="primary" onPress={transferReward}>
+                        Transfer Reward
+                    </Button>
+                    <Button color="primary" onPress={transferToOwner}>
+                        Transfer to Owner
+                    </Button>
+                </div>
+                <div className="w-full flex flex-col">
+                    <Accordion variant="splitted">
+                        <AccordionItem
+                            key="1"
+                            aria-label="Upload Contract"
+                            title="Upload Contract"
+                        >
+                            <ContractUpload />
+                        </AccordionItem>
 
-    } catch (err) {
-      console.log(err);
-    }
-  }
+                        <AccordionItem
+                            key="3"
+                            aria-label="InstantiateCW20 Token"
+                            title="Instantiate CW20"
+                        >
+                            <InstantiateCW20 />
+                        </AccordionItem>
 
-  return (
-    <div className="w-full flex flex-col gap-4">
-      <div className="w-full">
-        <h1>Utilities</h1>
-      </div>
-      <div className="w-full flex flex-col gap-4">
+                        <AccordionItem
+                            key="4"
+                            aria-label="Set Minter"
+                            title="Set Minter"
+                        >
+                            <SetMinter />
+                        </AccordionItem>
 
-        <div className="w-full flex flex-row gap-4">
-          <Button color="primary" onPress={reset}>RESET</Button>
-          <Button color="primary" onPress={transferReward}>Transfer Reward</Button>
-          <Button color="primary" onPress={transferToOwner}>Transfer to Owner</Button>
-        </div>
-        <div className="w-full flex flex-col">
-          <Accordion variant="splitted">
-            <AccordionItem
-              key="1"
-              aria-label="Upload Contract"
-              title="Upload Contract"
-            >
-              <ContractUpload />
-            </AccordionItem>
-
-            <AccordionItem
-              key="3"
-              aria-label="InstantiateCW20 Token"
-              title="Instantiate CW20"
-            >
-              <InstantiateCW20 />
-            </AccordionItem>
-
-            <AccordionItem
-              key="4"
-              aria-label="Set Minter"
-              title="Set Minter"
-            >
-              <SetMinter />
-            </AccordionItem>
-
-            <AccordionItem
-              key="5"
-              aria-label="Burn"
-              title="Burn"
-            >
-              <Burn />
-            </AccordionItem>
-            {/* 
+                        <AccordionItem key="5" aria-label="Burn" title="Burn">
+                            <Burn />
+                        </AccordionItem>
+                        {/*
             <AccordionItem
               key="4"
               aria-label="Instantiate LiquidStaking"
@@ -254,16 +266,16 @@ export default function Utils() {
             >
               <TransferBack />
             </AccordionItem> */}
-            <AccordionItem
-              key="22"
-              aria-label="Instantiate LST"
-              title="Instantiate LST"
-            >
-              <InstantiateLiquidStaking />
-            </AccordionItem>
-          </Accordion>
+                        <AccordionItem
+                            key="22"
+                            aria-label="Instantiate LST"
+                            title="Instantiate LST"
+                        >
+                            <InstantiateLiquidStaking />
+                        </AccordionItem>
+                    </Accordion>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
