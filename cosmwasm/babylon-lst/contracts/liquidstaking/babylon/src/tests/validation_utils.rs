@@ -155,7 +155,7 @@ fn test_validate_recipient_on_chain_recipient() {
         &crate::msg::RecipientAction::Unbond,
     )
     .unwrap();
-    assert_eq!(on_chain_recipient, true);
+    assert!(on_chain_recipient);
 }
 
 #[test]
@@ -236,7 +236,7 @@ fn test_validate_recipient_channel_id() {
         &crate::msg::RecipientAction::Bond,
     )
     .unwrap();
-    assert_eq!(on_chain_recipient, false);
+    assert!(!on_chain_recipient);
 }
 
 #[test]
@@ -302,7 +302,7 @@ fn test_validate_recipient_ibc_channel_id() {
         &crate::msg::RecipientAction::Unbond,
     )
     .unwrap();
-    assert_eq!(on_chain_recipient, false);
+    assert!(!on_chain_recipient);
 }
 
 #[test]
@@ -322,6 +322,18 @@ fn test_split_and_validate_recipient_on_chain() {
     assert_eq!(result.0, Some(recipient_addr.to_string()));
     assert_eq!(result.1, None);
     assert_eq!(result.2, None);
+
+    let recipient_addr = cosmwasm_std::Addr::unchecked("badaddress");
+    let recipient = Recipient::OnChain {
+        address: recipient_addr.clone(),
+    };
+    let result = validation::split_and_validate_recipient(
+        &deps.storage,
+        &deps.api,
+        recipient,
+        &crate::msg::RecipientAction::Bond,
+    );
+    assert!(result.is_err());
 }
 
 #[test]
@@ -351,7 +363,7 @@ fn test_split_and_validate_recipient_zkgm() {
         &crate::msg::RecipientAction::Bond,
     )
     .unwrap();
-    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.0, Some(recipient_addr.clone()));
     assert_eq!(result.1, Some(channel_id));
     assert_eq!(result.2, None);
 
@@ -390,7 +402,7 @@ fn test_split_and_validate_recipient_zkgm() {
         &crate::msg::RecipientAction::Unbond,
     )
     .unwrap();
-    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.0, Some(recipient_addr.clone()));
     assert_eq!(result.1, Some(channel_id));
     assert_eq!(result.2, None);
 }
@@ -420,7 +432,7 @@ fn test_split_and_validate_recipient_ibc() {
         &crate::msg::RecipientAction::Unbond,
     )
     .unwrap();
-    assert_eq!(result.0, Some(recipient_addr.to_string()));
+    assert_eq!(result.0, Some(recipient_addr.clone()));
     assert_eq!(result.1, None);
     assert_eq!(result.2, Some(ibc_channel_id));
 
@@ -442,7 +454,7 @@ fn test_validate_hex() {
     assert!(validation::validate_hex(&value, "hex", Some(63)).is_err());
 
     // missing prefix
-    assert!(validation::validate_hex(&value.strip_prefix("0x").unwrap(), "hex", None).is_err());
+    assert!(validation::validate_hex(value.strip_prefix("0x").unwrap(), "hex", None).is_err());
 
     // invalid hex chars
     assert!(validation::validate_hex("0xescher", "hex", None).is_err());
@@ -480,12 +492,12 @@ fn test_validate_required_coin() {
     let coin_other = Coin::new(100_u128, "b".to_string());
 
     // invalid coin
-    assert!(validation::validate_required_coin(&[coin_other.clone()], &coin).is_err());
+    assert!(validation::validate_required_coin(std::slice::from_ref(&coin_other), &coin).is_err());
 
     // insufficient amount
     assert!(
         validation::validate_required_coin(
-            &[coin.clone()],
+            std::slice::from_ref(&coin),
             &Coin::new(coin.amount + Uint128::one(), coin.denom.clone()),
         )
         .is_err()
@@ -496,9 +508,9 @@ fn test_validate_required_coin() {
         validation::validate_required_coin(&[coin.clone(), coin_other.clone()], &coin).is_err()
     );
 
-    validation::validate_required_coin(&[coin.clone()], &coin).unwrap();
+    validation::validate_required_coin(std::slice::from_ref(&coin), &coin).unwrap();
     validation::validate_required_coin(
-        &[coin.clone()],
+        std::slice::from_ref(&coin),
         &Coin::new(coin.amount - Uint128::one(), coin.denom.clone()),
     )
     .unwrap();

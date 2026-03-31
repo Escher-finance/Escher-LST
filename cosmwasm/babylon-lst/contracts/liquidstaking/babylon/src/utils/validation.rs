@@ -145,7 +145,10 @@ pub fn split_and_validate_recipient(
     action: &RecipientAction,
 ) -> Result<(Option<String>, Option<u32>, Option<String>), ContractError> {
     let (recipient_addr, recipient_channel_id, recipient_ibc_channel_id) = match recipient {
-        Recipient::OnChain { address } => (Some(address.to_string()), None, None),
+        Recipient::OnChain { address } => {
+            api.addr_validate(address.as_str())?;
+            (Some(address.to_string()), None, None)
+        }
         Recipient::Zkgm {
             address,
             channel_id,

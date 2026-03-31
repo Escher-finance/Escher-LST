@@ -421,9 +421,15 @@ pub struct UnbondData {
 }
 
 #[cw_serde]
+pub struct UnbondRecordPatch {
+    pub id: u64,
+}
+
+#[cw_serde]
 pub struct MigrateMsg {
     pub transfer_handler: Option<String>,
     pub zkgm_token_minter: Option<String>,
+    pub unbond_record_patch: Option<UnbondRecordPatch>,
 }
 
 #[cw_serde]
