@@ -325,7 +325,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
                 zkgm_token_minter,
             };
 
-            // Serialize the new dataya
+            // Serialize the new data
             let new_data = cosmwasm_std::to_json_vec(&new_params)?;
             deps.storage.set(b"parameters", &new_data);
         }
@@ -340,10 +340,28 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
         WITHDRAW_REWARD_QUEUE.save(deps.storage, &vec![])?;
     }
 
+    if let Some(unbond_record_patch) = msg.unbond_record_patch.clone() {
+        unbond_record().update(deps.storage, unbond_record_patch.id, |old| match old {
+            Some(mut record) => {
+                record.recipient = unbond_record_patch.recipient;
+                record.channel_id = unbond_record_patch.channel_id;
+                record.recipient_channel_id = unbond_record_patch.recipient_channel_id;
+                Ok(record)
+            }
+            _ => Err(ContractError::Std(StdError::generic_err(
+                "Unbond record not found",
+            ))),
+        })?;
+    }
+
     Ok(Response::new()
         .add_attribute("action", "migrate")
         .add_attribute("version", CONTRACT_VERSION)
-        .add_attribute("contract_name", CONTRACT_NAME))
+        .add_attribute("contract_name", CONTRACT_NAME)
+        .add_attribute(
+            "unbond_record_patch",
+            format!("{:?}", msg.unbond_record_patch),
+        ))
 }
 
 /// Migrate the old unbond record to the new record with recipient and `recipient_channel_id` properties

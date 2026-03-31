@@ -421,9 +421,18 @@ pub struct UnbondData {
 }
 
 #[cw_serde]
+pub struct UnbondRecordPatch {
+    pub id: u64,
+    pub recipient: Option<String>,
+    pub recipient_channel_id: Option<u32>,
+    pub channel_id: Option<u32>,
+}
+
+#[cw_serde]
 pub struct MigrateMsg {
     pub transfer_handler: Option<String>,
     pub zkgm_token_minter: Option<String>,
+    pub unbond_record_patch: Option<UnbondRecordPatch>,
 }
 
 #[cw_serde]
