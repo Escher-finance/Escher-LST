@@ -341,7 +341,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
     }
 
     if let Some(unbond_record_patch) = msg.unbond_record_patch.clone() {
-        patch_invalid_unbond_record_recipient(deps.api, deps.storage, unbond_record_patch)?;
+        patch_invalid_unbond_record_recipient(deps.api, deps.storage, &unbond_record_patch)?;
     }
 
     Ok(Response::new()
@@ -358,7 +358,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
 pub fn patch_invalid_unbond_record_recipient(
     api: &dyn cosmwasm_std::Api,
     storage: &mut dyn cosmwasm_std::Storage,
-    unbond_record_patch: crate::msg::UnbondRecordPatch,
+    unbond_record_patch: &crate::msg::UnbondRecordPatch,
 ) -> Result<(), ContractError> {
     unbond_record().update(storage, unbond_record_patch.id, |old| match old {
         Some(mut record) => {
@@ -511,7 +511,7 @@ fn test_patch_invalid_unbond_record() {
     patch_invalid_unbond_record_recipient(
         &deps.api,
         &mut deps.storage,
-        crate::msg::UnbondRecordPatch { id: 1 },
+        &crate::msg::UnbondRecordPatch { id: 1 },
     )
     .unwrap();
 
@@ -522,7 +522,7 @@ fn test_patch_invalid_unbond_record() {
     patch_invalid_unbond_record_recipient(
         &deps.api,
         &mut deps.storage,
-        crate::msg::UnbondRecordPatch { id: 2 },
+        &crate::msg::UnbondRecordPatch { id: 2 },
     )
     .unwrap();
 
