@@ -341,27 +341,47 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, Con
     }
 
     if let Some(unbond_record_patch) = msg.unbond_record_patch.clone() {
-        unbond_record().update(deps.storage, unbond_record_patch.id, |old| match old {
-            Some(mut record) => {
-                record.recipient = unbond_record_patch.recipient;
-                record.channel_id = unbond_record_patch.channel_id;
-                record.recipient_channel_id = unbond_record_patch.recipient_channel_id;
-                Ok(record)
-            }
-            _ => Err(ContractError::Std(StdError::generic_err(
-                "Unbond record not found",
-            ))),
-        })?;
+        patch_invalid_unbond_record_recipient(deps.api, deps.storage, unbond_record_patch)?;
     }
 
     Ok(Response::new()
         .add_attribute("action", "migrate")
         .add_attribute("version", CONTRACT_VERSION)
-        .add_attribute("contract_name", CONTRACT_NAME)
-        .add_attribute(
-            "unbond_record_patch",
-            format!("{:?}", msg.unbond_record_patch),
-        ))
+        .add_attribute("contract_name", CONTRACT_NAME))
+}
+
+/// Patch on chain invalid unbond record recipient
+/// # Result
+/// Will return result of `cosmwasm_std::Response`
+/// # Errors
+/// Will return contract error
+pub fn patch_invalid_unbond_record_recipient(
+    api: &dyn cosmwasm_std::Api,
+    storage: &mut dyn cosmwasm_std::Storage,
+    unbond_record_patch: crate::msg::UnbondRecordPatch,
+) -> Result<(), ContractError> {
+    unbond_record().update(storage, unbond_record_patch.id, |old| match old {
+        Some(mut record) => {
+            // if both channel id and recipient channel id are none, then it is on chain recipient
+            if record.channel_id.is_none()
+                && record.recipient_channel_id.is_none()
+                && record.recipient.is_some()
+                && !record.released
+            {
+                if let Some(current_recipient) = record.recipient.clone() {
+                    if api.addr_validate(current_recipient.as_str()).is_err() {
+                        record.recipient = Some(record.sender.clone());
+                    }
+                }
+            }
+
+            Ok(record)
+        }
+        _ => Err(ContractError::Std(StdError::generic_err(
+            "Unbond record not found",
+        ))),
+    })?;
+    Ok(())
 }
 
 /// Migrate the old unbond record to the new record with recipient and `recipient_channel_id` properties
@@ -447,4 +467,66 @@ fn test_migrate_unbond_record_v0_1_163() {
     assert_eq!(new_data.recipient, None);
 
     println!("{new_data:#?}");
+}
+
+#[test]
+fn test_patch_invalid_unbond_record() {
+    let mut deps = cosmwasm_std::testing::mock_dependencies();
+    let sender = "sender".to_string();
+    let staker = "staker".to_string();
+    let record_store = crate::state::unbond_record();
+
+    let invalid_recipient = "badone".to_string();
+
+    let data1 = crate::state::UnbondRecord {
+        id: 1,
+        height: 1000,
+        sender: sender.clone(),
+        staker: staker.clone(),
+        channel_id: None,
+        amount: Uint128::new(1000u128),
+        released_height: 0,
+        released: false,
+        batch_id: 1,
+        recipient: Some(invalid_recipient),
+        recipient_channel_id: None,
+    };
+    record_store.save(deps.as_mut().storage, 1, &data1).unwrap();
+
+    let data2 = crate::state::UnbondRecord {
+        id: 1,
+        height: 1000,
+        sender: sender.clone(),
+        staker: staker.clone(),
+        channel_id: Some(1),
+        amount: Uint128::new(1000u128),
+        released_height: 0,
+        released: false,
+        batch_id: 1,
+        recipient: None,
+        recipient_channel_id: None,
+    };
+    record_store.save(deps.as_mut().storage, 2, &data2).unwrap();
+
+    patch_invalid_unbond_record_recipient(
+        &deps.api,
+        &mut deps.storage,
+        crate::msg::UnbondRecordPatch { id: 1 },
+    )
+    .unwrap();
+
+    let updated_record_1 = record_store.load(deps.as_mut().storage, 1).unwrap();
+    // make sure updated invalid record recipient equals to sender
+    assert_eq!(updated_record_1.recipient, Some(updated_record_1.sender));
+
+    patch_invalid_unbond_record_recipient(
+        &deps.api,
+        &mut deps.storage,
+        crate::msg::UnbondRecordPatch { id: 2 },
+    )
+    .unwrap();
+
+    let updated_record_2 = record_store.load(deps.as_mut().storage, 2).unwrap();
+    // make sure updated record recipient doesn't change because it is not on chain recipient
+    assert_eq!(updated_record_2.recipient, None);
 }
